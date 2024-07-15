@@ -23,7 +23,18 @@ Core :: struct {
 	bind: gfx.Bindings,
 	pass_action: gfx.Pass_Action,
 
-
+	layer_list: [dynamic]int,
+	layouts: [MAX_LAYOUTS]Layout,
+	layout_idx: int,
+}
+// Boxes
+Box :: struct {
+	low, high: [2]f32,
+}
+// Layout
+Layout :: struct {
+	contents: [dynamic]Element,
+	box: Box,
 }
 
 init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
@@ -33,7 +44,7 @@ init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 			environment = glue.environment(),
 			logger = { func = log.func },
 		})
-		core.pipeline = gfx.make_pipeline({
+		core.pipeline = gfx.make_pipeline(gfx.Pipeline_Desc{
 			shader = gfx.make_shader({}),
 			index_type = .UINT16,
 			layout = {
@@ -59,10 +70,12 @@ init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 	}
 	cleanup_cb :: proc "c" () {
 		context = runtime.default_context()
+
 		gfx.shutdown()
 	}
 	event_cb :: proc "c" (e: ^app.Event) {
 		context = runtime.default_context()
+
 		#partial switch e.type {
 			case .MOUSE_DOWN:
 
