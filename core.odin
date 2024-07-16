@@ -24,8 +24,15 @@ Core :: struct {
 	pass_action: gfx.Pass_Action,
 
 	layer_list: [dynamic]int,
-	layouts: [MAX_LAYOUTS]Layout,
+	// layouts: [MAX_LAYOUTS]Layout,
 	layout_idx: int,
+
+	mouse_pos: [2]f32,
+	mouse_scroll: [2]f32,
+	mouse_bits, last_mouse_bits: Mouse_Bits,
+
+	keys, last_keys: [max(app.Keycode)]bool,
+	runes: [dynamic]rune,
 }
 // Boxes
 Box :: struct {
@@ -33,7 +40,7 @@ Box :: struct {
 }
 // Layout
 Layout :: struct {
-	contents: [dynamic]Element,
+	// contents: [dynamic]Element,
 	box: Box,
 }
 
@@ -45,7 +52,7 @@ init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 			logger = { func = log.func },
 		})
 		core.pipeline = gfx.make_pipeline(gfx.Pipeline_Desc{
-			shader = gfx.make_shader({}),
+			shader = gfx.make_shader(shader_desc(gfx.query_backend())),
 			index_type = .UINT16,
 			layout = {
 				attrs = {
@@ -53,6 +60,21 @@ init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 				},
 			},
 		})
+		core.pass_action = {
+			colors = {
+				0 = {
+					load_action = .CLEAR,
+					clear_value = {0, 0, 0, 1},
+				},
+			},
+		}
+
+		core.bind.index_buffer = gfx.make_buffer(gfx.Buffer_Desc{
+			type = .INDEXBUFFER,
+			usage = .STREAM,
+
+		})
+		core.bind.ver
 	}
 	frame_cb :: proc "c" () {
 		context = runtime.default_context()
@@ -78,7 +100,21 @@ init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 
 		#partial switch e.type {
 			case .MOUSE_DOWN:
-
+			core.mouse_bits += {Mouse_Button(e.mouse_button)}
+			case .MOUSE_UP:
+			core.mouse_bits += {Mouse_Button(e.mouse_button)}
+			case .MOUSE_MOVE:
+			core.mouse_pos = {e.mouse_x, e.mouse_y}
+			case .MOUSE_SCROLL:
+			core.mouse_scroll = {e.scroll_x, e.scroll_y}
+			case .KEY_DOWN:
+			core.keys[e.key_code] = true
+			case .KEY_UP:
+			core.keys[e.key_code] = false
+			case .CHAR:
+			append(&core.runes, rune(e.char_code))
+			case .QUIT_REQUESTED:
+			// app.quit()
 		}
 	}
 
@@ -92,5 +128,7 @@ init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 		height = height,
 		fullscreen = fullscreen,
 		window_title = title,
+
+		swap_interval = 16,
 	})
 }
