@@ -7,6 +7,8 @@ import log "../sokol-odin/sokol/log"
 import glue "../sokol-odin/sokol/glue"
 
 import "core:runtime"
+import "core:math"
+import "core:math/linalg"
 
 // Private global core instance
 @private core: Core
@@ -20,10 +22,11 @@ Mouse_Bits :: bit_set[Mouse_Button]
 // The global core data
 Core :: struct {
 	pipeline: gfx.Pipeline,
-	bind: gfx.Bindings,
+	bindings: gfx.Bindings,
 	pass_action: gfx.Pass_Action,
 
 	layer_list: [dynamic]int,
+	layers: [MAX_LAYERS]Maybe(Layer),
 	// layouts: [MAX_LAYOUTS]Layout,
 	layout_idx: int,
 
@@ -43,6 +46,17 @@ Layout :: struct {
 	// contents: [dynamic]Element,
 	box: Box,
 }
+// Layer
+MAX_LAYERS :: 256
+MAX_LAYER_VERTICES :: 65536
+MAX_LAYER_INDICES :: 65536
+Layer :: struct {
+	// Buffer data
+	vertices: [MAX_LAYER_VERTICES]Vertex,
+	vertices_offset: int,
+	indices: [MAX_LAYER_INDICES]u16,
+	indices_offset: int,
+}
 
 init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 	init_cb :: proc "c" () {
@@ -52,11 +66,24 @@ init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 			logger = { func = log.func },
 		})
 		core.pipeline = gfx.make_pipeline(gfx.Pipeline_Desc{
-			shader = gfx.make_shader(shader_desc(gfx.query_backend())),
+			shader = gfx.make_shader(ui_shader_desc(gfx.query_backend())),
 			index_type = .UINT16,
 			layout = {
 				attrs = {
-
+					0 = { offset = i32(offset_of(Vertex, pos)), format = gfx.Vertex_Format.FLOAT2 },
+					1 = { offset = i32(offset_of(Vertex, uv)), format = gfx.Vertex_Format.FLOAT2 },
+					2 = { offset = i32(offset_of(Vertex, col)), format = gfx.Vertex_Format.UBYTE4N },
+				},
+			},
+			colors = {
+				0 = {
+					pixel_format = gfx.Pixel_Format.RGBA8,
+					write_mask = gfx.Color_Mask.RGB,
+					blend = {
+						enabled = true,
+						src_factor_rgb = gfx.Blend_Factor.SRC_ALPHA,
+						dst_factor_rgb = gfx.Blend_Factor.ONE_MINUS_SRC_ALPHA,
+					},
 				},
 			},
 		})
@@ -68,13 +95,19 @@ init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 				},
 			},
 		}
-
-		core.bind.index_buffer = gfx.make_buffer(gfx.Buffer_Desc{
+		/*
+			Load the index and vertex buffers for streaming
+		*/
+		core.bindings.index_buffer = gfx.make_buffer(gfx.Buffer_Desc{
 			type = .INDEXBUFFER,
 			usage = .STREAM,
-
+			size = MAX_LAYER_INDICES * size_of(u16),
 		})
-		core.bind.ver
+		core.bindings.vertex_buffers = gfx.make_buffer(gfx.Buffer_Desc{
+			type = .VERTEXBUFFER,
+			usage = .STREAM,
+			size = MAX_LAYER_VERTICES * size_of(Vertex),
+		})
 	}
 	frame_cb :: proc "c" () {
 		context = runtime.default_context()
@@ -84,9 +117,14 @@ init :: proc(width, height: i32, title: cstring, fullscreen: bool = false) {
 			swapchain = glue.swapchain(),
 		})
 		gfx.apply_pipeline(core.pipeline)
-		gfx.apply_bindings(core.bind)
 		// render layers
+		for i in core.layer_list {
+			layer := &core.layers[i].?
+			gfx.update_buffer(core.bindings.index_buffer, { ptr = &layer.indices, size = u64(layer.indices_offset * size_of(u16)) })
+			gfx.update_buffer(core.bindings.index_buffer, { ptr = &layer.vertices, size = u64(layer.vertices_offset * size_of(u16)) })
 
+			gfx.draw(0, layer.indices_offset, 1)
+		}
 		gfx.end_pass()
 		gfx.commit()
 	}
