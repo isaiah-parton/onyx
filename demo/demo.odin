@@ -10,6 +10,7 @@ main :: proc() {
 		title = "UI DEMO",
 		frame_cb = proc(data: rawptr) {
 			ui.begin_layer(ui.view_box())
+				ui.draw_box_fill({10, 100}, {255, 0, 0, 255})
 				/*ui.begin_row(align_self = .Top, align_contents = .Center, height = 30)
 					ui.button("gyatt")
 					ui.space(20)

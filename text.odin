@@ -1,4 +1,5 @@
 package ui
+/*
 
 import "core:runtime"
 import "core:os"
@@ -67,6 +68,7 @@ Text_Info :: struct {
 	wrap: Text_Wrap,
 	align: Text_Align,
 	baseline: Text_Baseline,
+	hidden: bool,
 }
 /*
 	Text iteration state
@@ -815,4 +817,4 @@ draw_text_box :: proc(ui: ^UI, info: Text_Box_Info, loc := #caller_location) -> 
 		case Text_Info: paint_text(ui.origin, text_info, color)
 	}
 	return result
-}
+}*/

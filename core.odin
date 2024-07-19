@@ -22,6 +22,7 @@ MAX_FONTS :: 10
 MAX_DRAW_STATES :: 100
 MAX_LAYER_VERTICES :: 65536
 MAX_LAYER_INDICES :: 65536
+ATLAS_SIZE :: 4096
 
 // Private global core instance
 @private core: Core
@@ -78,9 +79,12 @@ Core :: struct {
 	frame_cb_data: rawptr,
 
 	// Draw state
-	text_selection: Text_Selection,
-	fonts: [MAX_FONTS]Maybe(Font),
+	// text_selection: Text_Selection,
+	// fonts: [MAX_FONTS]Maybe(Font),
 	draw_states: Stack(Draw_State, MAX_DRAW_STATES),
+	draw_surface: ^Draw_Surface,
+
+	atlas: sg.Image,
 }
 // App descriptor
 Desc :: struct {
@@ -105,11 +109,10 @@ Layer :: struct {
 	id: Id,
 	box: Box,
 	contents: map[Id]^Maybe(Widget),
-	// Buffer data
-	vertices: [MAX_LAYER_VERTICES]Vertex,
-	vertices_offset: int,
-	indices: [MAX_LAYER_INDICES]u16,
-	indices_offset: int,
+	surface: Draw_Surface,
+}
+init_layer :: proc(layer: ^Layer) {
+	init_draw_surface(&layer.surface)
 }
 
 view_box :: proc() -> Box {
@@ -122,6 +125,10 @@ __new_layer :: proc(id: Id) -> (res: ^Maybe(Layer), ok: bool) {
 			core.layers[i] = Layer{
 				id = id,
 			}
+			layer := &core.layers[i]
+			core.layer_map[id] = &core.layers[i]
+			append(&core.layer_list, layer)
+			init_layer(&core.layers[i].?)
 			return &core.layers[i], true
 		}
 	}
@@ -132,9 +139,11 @@ begin_layer :: proc(box: Box, loc := #caller_location) {
 
 	layer := core.layer_map[id] or_else (__new_layer(id) or_else panic("Out of layer!"))
 	push(&core.layer_stack, &layer.?)
+	core.draw_surface = &core.layer_stack.items[core.layer_stack.height - 1].surface
 }
 end_layer :: proc() {
 	pop(&core.layer_stack)
+	core.draw_surface = &core.layer_stack.items[core.layer_stack.height - 1].surface if core.layer_stack.height > 0 else nil
 }
 
 run :: proc(desc: Desc) {
@@ -164,7 +173,7 @@ run :: proc(desc: Desc) {
         3 = sdtx.font_cpc(),
         4 = sdtx.font_c64(),
         5 = sdtx.font_oric(),
-      }
+      },
 		})
 		/*
 			Set up graphics pipeline
@@ -174,9 +183,12 @@ run :: proc(desc: Desc) {
 			index_type = .UINT16,
 			layout = {
 				attrs = {
-					0 = { offset = i32(offset_of(Vertex, pos)), format = sg.Vertex_Format.FLOAT2 },
-					1 = { offset = i32(offset_of(Vertex, uv)), format = sg.Vertex_Format.FLOAT2 },
-					2 = { offset = i32(offset_of(Vertex, col)), format = sg.Vertex_Format.UBYTE4N },
+					0 = { offset = i32(offset_of(Vertex, pos)), format = .FLOAT2 },
+					1 = { offset = i32(offset_of(Vertex, uv)), format = .FLOAT2 },
+					2 = { offset = i32(offset_of(Vertex, col)), format = .UBYTE4N },
+				},
+				buffers = {
+					0 = { stride = size_of(Vertex) },
 				},
 			},
 			colors = {
@@ -190,6 +202,8 @@ run :: proc(desc: Desc) {
 					},
 				},
 			},
+			label = "pipeline",
+			cull_mode = .NONE,
 		})
 		core.pass_action = {
 			colors = {
@@ -207,10 +221,22 @@ run :: proc(desc: Desc) {
 			usage = .STREAM,
 			size = MAX_LAYER_INDICES * size_of(u16),
 		})
-		core.bindings.vertex_buffers = sg.make_buffer(sg.Buffer_Desc{
+		core.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
 			type = .VERTEXBUFFER,
 			usage = .STREAM,
 			size = MAX_LAYER_VERTICES * size_of(Vertex),
+		})
+		core.bindings.fs.images[0] = sg.make_image(sg.Image_Desc{
+			type = ._2D,
+			pixel_format = .RGBA8,
+			width = ATLAS_SIZE,
+			height = ATLAS_SIZE,
+			usage = .DYNAMIC,
+			sample_count = 1,
+		})
+		core.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
+			min_filter = .DEFAULT,
+			mag_filter = .DEFAULT,
 		})
 	}
 	frame_cb :: proc "c" () {
@@ -231,16 +257,24 @@ run :: proc(desc: Desc) {
 			swapchain = sglue.swapchain(),
 		})
 		sg.apply_pipeline(core.pipeline)
+		sg.apply_bindings(core.bindings)
+		sg.apply_uniforms(.VS, 0, { ptr = &core.view, size = size_of(core.view) })
 		// render layers
 		for layer in core.layer_list {
 			layer := &layer.?
 
-			sg.update_buffer(core.bindings.index_buffer, { ptr = &layer.indices, size = u64(layer.indices_offset * size_of(u16)) })
-			sg.update_buffer(core.bindings.vertex_buffers[0], { ptr = &layer.vertices, size = u64(layer.vertices_offset * size_of(u16)) })
-			sg.apply_bindings(core.bindings)
-			sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
-			sg.draw(0, layer.indices_offset, 1)
-			sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+			// core.bindings.vertex_buffer_offsets[0] = i32(len(layer.surface.vertices) * size_of(Vertex))
+			sg.update_buffer(core.bindings.index_buffer, { 
+				ptr = raw_data(layer.surface.indices), 
+				size = u64(len(layer.surface.indices) * size_of(u16)),
+			})
+			sg.update_buffer(core.bindings.vertex_buffers[0], { 
+				ptr = raw_data(layer.surface.vertices), 
+				size = u64(len(layer.surface.vertices) * size_of(Vertex)),
+			})
+			// sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
+			sg.draw(0, len(layer.surface.indices), 1)
+			// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
 		}
 
 		sdtx.draw()

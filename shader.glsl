@@ -3,8 +3,8 @@
 @header import sg "../sokol-odin/sokol/gfx"
 
 @vs vs
-uniform Projection {
-    mat4 Matrix;
+uniform tex {
+    vec2 texSize;
 };
 
 in vec2 pos;
@@ -15,7 +15,7 @@ out vec2 texCoord;
 out vec4 color;
 
 void main() {
-    gl_Position = Matrix * vec4(pos.xy, 0.0, 1.0);
+    gl_Position = vec4(vec2(-1.0, 1.0) + (pos.xy / texSize) * vec2(1.0, -1.0), 0.0, 1.0);
     texCoord = uv;
     color = col;
 }
@@ -31,7 +31,7 @@ in      vec4        color;
 out     vec4        frag_color;
 
 void main() {
-    frag_color = texture(sampler2D(u_Texture, u_Sampler), texCoord) * color;
+    frag_color = color;
 }
 @end
 
