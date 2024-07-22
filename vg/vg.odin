@@ -25,7 +25,7 @@ Color  :: [4]f32
 Matrix :: [6]f32
 Vertex :: [4]f32 // x,y,u,v
 
-Image_Flag :: enum {
+ImageFlag :: enum {
 	GENERATE_MIPMAPS,
 	REPEAT_X,
 	REPEAT_Y,
@@ -34,7 +34,7 @@ Image_Flag :: enum {
 	NEAREST,
 	NO_DELETE,
 }
-Image_Flags :: bit_set[Image_Flag]
+ImageFlags :: bit_set[ImageFlag]
 
 Paint :: struct {
 	xform:      Matrix,
@@ -119,23 +119,23 @@ Commands :: enum {
 	WINDING,
 }
 
-Point_Flag :: enum {
+PointFlag :: enum {
 	CORNER,
 	LEFT,
 	BEVEL,
 	INNER_BEVEL,
 }
-Point_Flags :: bit_set[Point_Flag]
+PointFlags :: bit_set[PointFlag]
 
 Point :: struct {
 	x, y:     f32,
 	dx, dy:   f32,
 	len:      f32,
 	dmx, dmy: f32,
-	flags:    Point_Flags,
+	flags:    PointFlags,
 }
 
-Path_Cache :: struct {
+PathCache :: struct {
 	points: [dynamic]Point,
 	paths:  [dynamic]Path,
 	verts:  [dynamic]Vertex,
@@ -154,7 +154,7 @@ Path :: struct {
 }
 
 Surface :: struct {
-	cache: Path_Cache,
+	cache: PathCache,
 }
 
 State :: struct {
@@ -164,8 +164,8 @@ State :: struct {
 	stroke:             	Paint,
 	strokeWidth:        	f32,
 	miterLimit:         	f32,
-	lineJoin:           	Line_Cap_Type,
-	lineCap:            	Line_Cap_Type,
+	lineJoin:           	LineCapType,
+	lineCap:            	LineCapType,
 	alpha:              	f32,
 	xform:              	Matrix,
 	scissor:            	ScissorT,
@@ -220,7 +220,7 @@ Params :: struct {
 		uptr:       rawptr,
 		type:       Texture,
 		w, h:       int,
-		imageFlags: Image_Flags, 
+		imageFlags: ImageFlags, 
 		data:       []byte,
 	) -> int,
 	renderDeleteTexture: proc(uptr: rawptr, image: int) -> bool,
@@ -889,7 +889,7 @@ CurrentTransform :: proc(ctx: ^Context, xform: ^Matrix) {
 
 // Creates image by loading it from the disk from specified file name.
 // Returns handle to the image.
-create_image_path :: proc(ctx: ^Context, filename: cstring, imageFlags: Image_Flags) -> int {
+create_image_path :: proc(ctx: ^Context, filename: cstring, imageFlags: ImageFlags) -> int {
 	stbi.set_unpremultiply_on_load(1)
 	stbi.convert_iphone_png_to_rgb(1)
 	w, h, n: i32
@@ -907,7 +907,7 @@ create_image_path :: proc(ctx: ^Context, filename: cstring, imageFlags: Image_Fl
 
 // Creates image by loading it from the specified chunk of memory.
 // Returns handle to the image.
-create_image_mem :: proc(ctx: ^Context, data: []byte, imageFlags: Image_Flags) -> int {
+create_image_mem :: proc(ctx: ^Context, data: []byte, imageFlags: ImageFlags) -> int {
 	stbi.set_unpremultiply_on_load(1)
 	stbi.convert_iphone_png_to_rgb(1)
 	w, h, n: i32
@@ -927,7 +927,7 @@ create_image :: proc{create_image_path, create_image_mem}
 
 // Creates image from specified image data.
 // Returns handle to the image.
-create_image_rgba :: proc(ctx: ^Context, w, h: int, imageFlags: Image_Flags, data: []byte) -> int {
+create_image_rgba :: proc(ctx: ^Context, w, h: int, imageFlags: ImageFlags, data: []byte) -> int {
 	assert(ctx.params.renderCreateTexture != nil)
 	return ctx.params.renderCreateTexture(
 		ctx.params.userPtr,
@@ -1340,7 +1340,7 @@ __lastPoint :: proc(ctx: ^Context) -> ^Point {
 	return nil
 }
 
-__addPoint :: proc(ctx: ^Context, x, y: f32, flags: Point_Flags) {
+__addPoint :: proc(ctx: ^Context, x, y: f32, flags: PointFlags) {
 	path := __lastPath(ctx)
 
 	if path == nil {
@@ -1442,7 +1442,7 @@ __tesselateBezier :: proc(
 	x3, y3: f32,
 	x4, y4: f32,
 	level:  int,
-	flags:  Point_Flags,
+	flags:  PointFlags,
 ) {
 	if level > 10 {
 		return

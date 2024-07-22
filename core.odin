@@ -19,6 +19,7 @@ MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
 MAX_LAYOUTS :: 100
 MAX_FONTS :: 10
+MAX_PATHS :: 10
 MAX_DRAW_STATES :: 100
 MAX_LAYER_VERTICES :: 65536
 MAX_LAYER_INDICES :: 65536
@@ -82,8 +83,8 @@ Core :: struct {
 	// text_selection: Text_Selection,
 	// fonts: [MAX_FONTS]Maybe(Font),
 	draw_states: Stack(Draw_State, MAX_DRAW_STATES),
-	draw_surface: ^Draw_Surface,
-
+	draw_surface: Maybe(^Draw_Surface),
+	paths: Stack(Path, MAX_PATHS),
 	atlas: sg.Image,
 }
 // App descriptor
@@ -146,6 +147,10 @@ end_layer :: proc() {
 	core.draw_surface = &core.layer_stack.items[core.layer_stack.height - 1].surface if core.layer_stack.height > 0 else nil
 }
 
+get_mouse_pos :: proc() -> [2]f32 {
+	return core.mouse_pos
+}
+
 run :: proc(desc: Desc) {
 	core.frame_cb = desc.frame_cb
 	core.frame_cb_data = desc.frame_cb_data
@@ -201,6 +206,10 @@ run :: proc(desc: Desc) {
 						dst_factor_rgb = sg.Blend_Factor.ONE_MINUS_SRC_ALPHA,
 					},
 				},
+			},
+			depth = {
+				compare = .LESS_EQUAL,
+				write_enabled = true,
 			},
 			label = "pipeline",
 			cull_mode = .NONE,
@@ -258,7 +267,9 @@ run :: proc(desc: Desc) {
 		})
 		sg.apply_pipeline(core.pipeline)
 		sg.apply_bindings(core.bindings)
-		sg.apply_uniforms(.VS, 0, { ptr = &core.view, size = size_of(core.view) })
+
+		tex: Tex = {texSize = core.view}
+		sg.apply_uniforms(.VS, 0, { ptr = &tex, size = size_of(Tex) })
 		// render layers
 		for layer in core.layer_list {
 			layer := &layer.?
@@ -275,6 +286,7 @@ run :: proc(desc: Desc) {
 			// sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
 			sg.draw(0, len(layer.surface.indices), 1)
 			// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+			clear_draw_surface(&layer.surface)
 		}
 
 		sdtx.draw()
@@ -320,6 +332,7 @@ run :: proc(desc: Desc) {
 		cleanup_cb = cleanup_cb,
 		event_cb = event_cb,
 
+		sample_count = 4,
 		width = desc.width,
 		height = desc.height,
 		fullscreen = desc.fullscreen,

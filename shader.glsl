@@ -15,7 +15,7 @@ out vec2 texCoord;
 out vec4 color;
 
 void main() {
-    gl_Position = vec4(vec2(-1.0, 1.0) + (pos.xy / texSize) * vec2(1.0, -1.0), 0.0, 1.0);
+    gl_Position = vec4(vec2(-1.0, 1.0) + (pos.xy / texSize) * vec2(2.0, -2.0), 0.0, 1.0);
     texCoord = uv;
     color = col;
 }

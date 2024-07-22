@@ -3,10 +3,11 @@ package nanovg_sokol
 import "core:log"
 import "core:strings"
 import "core:mem"
+import "core:slice"
 import "core:math"
 import "core:fmt"
 import sg "../../../sokol-odin/sokol/gfx"
-import nvg ".."
+import nvg "../"
 
 Color :: nvg.Color
 Vertex :: nvg.Vertex
@@ -50,7 +51,9 @@ Shader :: struct {
 
 Texture :: struct {
 	id: int,
-	tex: u32,
+	image: sg.Image,
+	sampler: sg.Sampler,
+	data: []u8,
 	width, height: int,
 	type: TextureType,
 	flags: ImageFlags,
@@ -89,86 +92,12 @@ Path :: struct {
 	strokeCount: int,
 }
 
-GL_UNIFORMARRAY_SIZE :: 11
-
-when GL2_IMPLEMENTATION {
-	FragUniforms :: struct #raw_union {
-		using _: struct {
-			scissorMat: [12]f32, // matrices are actually 3 vec4s
-			paintMat: [12]f32,
-			innerColor: Color,
-			outerColor: Color,
-			scissorExt: [2]f32,
-			scissorScale: [2]f32,
-			extent: [2]f32,
-			radius: f32,
-			feather: f32,
-			strokeMult: f32,
-			strokeThr: f32,
-			texType: i32,
-			type: ShaderType,
-		},
-		uniform_array: [GL_UNIFORMARRAY_SIZE][4]f32,
-	}
-} else {
-	FragUniforms :: struct #packed {
-		scissorMat: [12]f32, // matrices are actually 3 vec4s
-		paintMat: [12]f32,
-		innerColor: Color,
-		outerColor: Color,
-		scissorExt: [2]f32,
-		scissorScale: [2]f32,
-		extent: [2]f32,
-		radius: f32,
-		feather: f32,
-		strokeMult: f32,
-		strokeThr: f32,
-		texType: i32,
-		type: ShaderType,
-	}
-}
-
-DEFAULT_IMPLEMENTATION_STRING :: #config(NANOVG_GL_IMPL, "GL3")
-GL2_IMPLEMENTATION   :: DEFAULT_IMPLEMENTATION_STRING  == "GL2"
-GL3_IMPLEMENTATION   :: DEFAULT_IMPLEMENTATION_STRING  == "GL3"
-GLES2_IMPLEMENTATION :: DEFAULT_IMPLEMENTATION_STRING  == "GLES2"
-GLES3_IMPLEMENTATION :: DEFAULT_IMPLEMENTATION_STRING  == "GLES3"
-
-when GL2_IMPLEMENTATION {
-	GL2 :: true
-	GL3 :: false
-	GLES2 :: false
-	GLES3 :: false
-	GL_IMPLEMENTATION :: true
-	GL_USE_UNIFORMBUFFER :: false
-} else when GL3_IMPLEMENTATION {
-	GL2 :: false
-	GL3 :: true
-	GLES2 :: false
-	GLES3 :: false
-	GL_IMPLEMENTATION :: true
-	GL_USE_UNIFORMBUFFER :: true
-} else when GLES2_IMPLEMENTATION {
-	GL2 :: false
-	GL3 :: false
-	GLES2 :: true
-	GLES3 :: false
-	GL_IMPLEMENTATION :: true
-	GL_USE_UNIFORMBUFFER :: false
-} else when GLES3_IMPLEMENTATION {
-	GL2 :: false
-	GL3 :: false
-	GLES2 :: false
-	GLES3 :: true
-	GL_IMPLEMENTATION :: true
-	GL_USE_UNIFORMBUFFER :: false
-}
-
 Context :: struct {
-	shader: Shader,
+	pipeline: sg.Pipeline,
+	bindings: sg.Bindings,
 	textures: [dynamic]Texture,
 	view: [2]f32,
-	textureId: int,
+	image_id: int,
 
 	vertBuf: u32,
 	vertArr: u32, // GL3
@@ -262,7 +191,7 @@ __allocTexture :: proc(ctx: ^Context) -> (tex: ^Texture) {
 	}
 
 	if tex == nil {
-		append(&ctx.textures, Texture {})
+		append(&ctx.textures, Texture{})
 		tex = &ctx.textures[len(ctx.textures) - 1]
 	}
 
@@ -286,8 +215,10 @@ __findTexture :: proc(ctx: ^Context, id: int) -> ^Texture {
 __deleteTexture :: proc(ctx: ^Context, id: int) -> bool {
 	for &texture, i in ctx.textures {
 		if texture.id == id {
-			if texture.tex != 0 && (.NO_DELETE not_in texture.flags) {
-				gl.DeleteTextures(1, &texture.tex)
+			if texture.image != {} && (.NO_DELETE not_in texture.flags) {
+				sg.destroy_image(texture.image)
+				sg.destroy_sampler(texture.sampler)
+				delete(texture.data)
 			}
 
 			ctx.textures[i] = {}
@@ -296,20 +227,6 @@ __deleteTexture :: proc(ctx: ^Context, id: int) -> bool {
 	}
 
 	return false
-}
-
-__deleteShader :: proc(shader: ^Shader) {
-	if shader.prog != 0 {
-		gl.DeleteProgram(shader.prog)
-	}
-
-	if shader.vert != 0 {
-		gl.DeleteShader(shader.vert)
-	}
-
-	if shader.frag != 0 {
-		gl.DeleteShader(shader.frag)
-	}
 }
 
 __getUniforms :: proc(shader: ^Shader) {
@@ -323,69 +240,57 @@ __getUniforms :: proc(shader: ^Shader) {
 	}
 }
 
-vert_shader := #load("vert.glsl")
-frag_shader := #load("frag.glsl")
-
 __renderCreate :: proc(uptr: rawptr) -> bool {
 	ctx := cast(^Context) uptr
 
-	// just build the string at runtime
-	builder := strings.builder_make(0, 512, context.temp_allocator)
+	ctx.pipeline = sg.make_pipeline(sg.Pipeline_Desc{
+		shader = sg.make_shader(ui_shader_desc(sg.query_backend())),
+		layout = {
+			attrs = {
+				0 = { offset = i32(offset_of(Vertex, pos)), format = .FLOAT2 },
+				1 = { offset = i32(offset_of(Vertex, uv)), format = .FLOAT2 },
+			},
+			buffers = {
+				0 = { stride = size_of(Vertex) },
+			},
+		},
+		colors = {
+			0 = {
+				pixel_format = sg.Pixel_Format.RGBA8,
+				write_mask = sg.Color_Mask.RGBA,
+				blend = {
+					enabled = true,
+					src_factor_rgb = sg.Blend_Factor.SRC_ALPHA,
+					dst_factor_rgb = sg.Blend_Factor.ONE_MINUS_SRC_ALPHA,
+				},
+			},
+		},
+		stencil = sg.Stencil_State{
+			read_mask = 0xffffffff,
+			write_mask = 0xffffffff,
+			enabled = true,
+			front = sg.Stencil_Face_State{
+				compare_func = .ALWAYS,
+				fail_op = .KEEP,
+				pass_op = .KEEP,
+				depth_fail_op = .KEEP,
+			},
+		},
+		cull_mode = .BACK,
+		label = "pipeline",
+	})
 
-	when GL2 {
-		strings.write_string(&builder, "#define NANOVG_GL2 1\n")
-	} else when GL3 {
-		strings.write_string(&builder, "#version 150 core\n#define NANOVG_GL3 1\n")
-	} else when GLES2 {
-		strings.write_string(&builder, "#version 100\n#define NANOVG_GL2 1\n")
-	} else when GLES3 {
-		strings.write_string(&builder, "#version 300 es\n#define NANOVG_GL3 1\n")
-	}
-
-	when GL_USE_UNIFORMBUFFER {
-		strings.write_string(&builder, "#define USE_UNIFORMBUFFER 1\n")
-	} else {
-		strings.write_string(&builder, "#define UNIFORMARRAY_SIZE 11\n")
-	} 
-
-	__checkError(ctx, "init")
-
-	shader_header := strings.to_string(builder)
-	anti: string = .ANTI_ALIAS in ctx.flags ? "#define EDGE_AA 1\n" : " "
-	if !__createShader(
-		&ctx.shader, 
-		shader_header,
-		anti, 
-		string(vert_shader),
-		string(frag_shader),
-	) {
-		return false
-	}
-
-	__checkError(ctx, "uniform locations")
-	__getUniforms(&ctx.shader)
-
-	when GL3 {
-		gl.GenVertexArrays(1, &ctx.vertArr)
-	} 
-
-	gl.GenBuffers(1, &ctx.vertBuf)
+	ctx.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
+		size = size_of(Vertex),
+		usage = .STREAM,
+	})
 	align := i32(4)
-
-	when GL_USE_UNIFORMBUFFER {
-		// Create UBOs
-		gl.UniformBlockBinding(ctx.shader.prog, u32(ctx.shader.loc[.FRAG]), ctx.frag_binding)
-		gl.GenBuffers(1, &ctx.fragBuf)
-		gl.GetIntegerv(gl.UNIFORM_BUFFER_OFFSET_ALIGNMENT, &align)
-	} 
 
 	ctx.fragSize = int(size_of(FragUniforms) + align - size_of(FragUniforms) % align)
 	// ctx.fragSize = size_of(FragUniforms)
 	ctx.dummyTex = __renderCreateTexture(ctx, .Alpha, 1, 1, {}, nil)
 
-	__checkError(ctx, "create done")
-	
-	gl.Finish()
+
 
 	return true
 }
@@ -405,196 +310,71 @@ __renderCreateTexture :: proc(
 		return 0
 	}
 
-	when GLES2 {
-		if __nearestPow2(uint(w)) != uint(w) || __nearestPow2(uint(h)) != uint(h) {
-			// No repeat
-			if (.REPEAT_X in imageFlags) || (.REPEAT_Y in imageFlags) {
-				log.errorf("Repeat X/Y is not supported for non power-of-two textures (%d x %d)\n", w, h)
-				excl(&imageFlags, ImageFlags { .REPEAT_X, .REPEAT_Y })
-			}
-
-			// No mips.
-			if .GENERATE_MIPMAPS in imageFlags {
-				log.errorf("Mip-maps is not support for non power-of-two textures (%d x %d)\n", w, h)
-				excl(&imageFlags, ImageFlags { .GENERATE_MIPMAPS })
-			}
-		}
-	}
-
-	gl.GenTextures(1, &tex.tex)
 	tex.width = w
 	tex.height = h
 	tex.type = type
 	tex.flags = imageFlags
-	__bindTexture(ctx, tex.tex)
-
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT,1)
-	
-	when GLES2 {
-		gl.PixelStorei(gl.UNPACK_ROW_LENGTH, i32(tex.width))
-		gl.PixelStorei(gl.UNPACK_SKIP_PIXELS, 0)
-		gl.PixelStorei(gl.UNPACK_SKIP_ROWS, 0)
+	tex.data = slice.clone(data)
+	image_desc := sg.Image_Desc{
+		width = i32(w),
+		height = i32(h),
+		data = sg.Image_Data{
+			subimage = {
+				0 = {
+					0 = {
+						ptr = raw_data(data),
+						size = u64(len(data)),
+					},
+				},
+			},
+		},
+	}
+	switch type {
+		case .Alpha:
+		image_desc.pixel_format = .R8
+		case .RGBA:
+		image_desc.pixel_format = .RGBA8
 	}
 
-	when GL2 {
-		if .GENERATE_MIPMAPS in imageFlags {
-			gl.TexParameteri(gl.TEXTURE_2D, gl.GENERATE_MIPMAP, 1)
-		}
-	}
+	tex.image = sg.make_image(image_desc)
 
-	if type == .RGBA {
-		gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, i32(w), i32(h), 0, gl.RGBA, gl.UNSIGNED_BYTE, raw_data(data))
-	} else {
-		when GLES2 || GL2 {
-			gl.TexImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, i32(w), i32(h), 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, raw_data(data))
-		} else when GLES3 {
-			gl.TexImage2D(gl.TEXTURE_2D, 0, gl.R8, i32(w), i32(h), 0, gl.RED, gl.UNSIGNED_BYTE, raw_data(data))
-		} else {
-			gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RED, i32(w), i32(h), 0, gl.RED, gl.UNSIGNED_BYTE, raw_data(data))
-		}
-	}
+	sampler_desc: sg.Sampler_Desc
 
 	if .GENERATE_MIPMAPS in imageFlags {
 		if .NEAREST in imageFlags {
-			gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_NEAREST)
+			sampler_desc.mipmap_filter = .NEAREST
 		} else {
-			gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+			sampler_desc.mipmap_filter = .LINEAR
 		}
 	} else {
 		if .NEAREST in imageFlags {
-			gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+			sampler_desc.min_filter = .NEAREST
 		} else {
-			gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+			sampler_desc.min_filter = .LINEAR
 		}
 	}
 
 	if .NEAREST in imageFlags {
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+		sampler_desc.mag_filter = .NEAREST
 	} else {
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+		sampler_desc.mag_filter = .LINEAR
 	}
 
 	if .REPEAT_X in imageFlags {
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
+		sampler_desc.wrap_u = .REPEAT
 	}	else {
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+		sampler_desc.wrap_u = .CLAMP_TO_BORDER
 	}
 
 	if .REPEAT_Y in imageFlags {
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
+		sampler_desc.wrap_v = .REPEAT
 	}	else {
-		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+		sampler_desc.wrap_v = .CLAMP_TO_BORDER
 	}
 
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
-
-	when GLES2 {
-		gl.PixelStorei(gl.UNPACK_ROW_LENGTH, 0)
-		gl.PixelStorei(gl.UNPACK_SKIP_PIXELS, 0)
-		gl.PixelStorei(gl.UNPACK_SKIP_ROWS, 0)
-	}
-
-	// The new way to build mipmaps on GLES and GL3
-	when !GL2 {
-		if .GENERATE_MIPMAPS in imageFlags {
-			gl.GenerateMipmap(gl.TEXTURE_2D)
-		}
-	}
-
-	__checkError(ctx, "create tex")
-	__bindTexture(ctx, 0)
+	tex.sampler = sg.make_sampler(sampler_desc)
 
 	return tex.id
-}
-
-__checkError :: proc(ctx: ^Context, str: string) {
-	if .DEBUG in ctx.flags {
-		err := gl.GetError()
-
-		if err != gl.NO_ERROR {
-			log.errorf("FOUND ERROR %08x:\n\t%s\n", err, str)
-		}
-	}
-}
-
-__checkProgramError :: proc(prog: u32) {
-	status: i32
-	gl.GetProgramiv(prog, gl.LINK_STATUS, &status)
-	length: i32
-	gl.GetProgramiv(prog, gl.INFO_LOG_LENGTH, &length)
-
-	if status == 0 {
-		temp := make([]byte, length)
-		defer delete(temp)
-
-		gl.GetProgramInfoLog(prog, length, nil, raw_data(temp))
-		log.errorf("Program Error:\n%s\n", string(temp[:length]))
-	}
-}
-
-__checkShaderError :: proc(shader: u32, type: string) {
-	status: i32
-	gl.GetShaderiv(shader, gl.COMPILE_STATUS, &status)
-	length: i32
-	gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &length)
-
-	if status == 0 {
-		temp := make([]byte, length)
-		defer delete(temp)
-
-		gl.GetShaderInfoLog(shader, length, nil, raw_data(temp))
-		log.errorf("Shader error:\n%s\n", string(temp[:length]))	
-	}
-}
-
-// TODO good case for or_return
-__createShader :: proc(
-	shader: ^Shader,
-	header: string,
-	opts: string,
-	vshader: string,
-	fshader: string,
-) -> bool {
-	shader^ = {}
-	str: [3]cstring
-	lengths: [3]i32
-	str[0] = cstring(raw_data(header))
-	str[1] = cstring(raw_data(opts))
-
-	lengths[0] = i32(len(header))
-	lengths[1] = i32(len(opts))
-
-	prog := gl.CreateProgram()
-	vert := gl.CreateShader(gl.VERTEX_SHADER)
-	frag := gl.CreateShader(gl.FRAGMENT_SHADER)
-	
-	// vert shader
-	str[2] = cstring(raw_data(vshader))
-	lengths[2] = i32(len(vshader))
-	gl.ShaderSource(vert, 3, &str[0], &lengths[0])
-	gl.CompileShader(vert)
-	__checkShaderError(vert, "vert")
-	
-	// fragment shader
-	str[2] = cstring(raw_data(fshader))
-	lengths[2] = i32(len(fshader))
-	gl.ShaderSource(frag, 3, &str[0], &lengths[0])
-	gl.CompileShader(frag)
-	__checkShaderError(frag, "frag")
-
-	gl.AttachShader(prog, vert)
-	gl.AttachShader(prog, frag)
-
-	gl.BindAttribLocation(prog, 0, "vertex")
-	gl.BindAttribLocation(prog, 1, "tcoord")
-
-	gl.LinkProgram(prog)
-	__checkProgramError(prog)
-
-	shader.prog = prog
-	shader.vert = vert
-	shader.frag = frag
-	return true
 }
 
 __renderDeleteTexture :: proc(uptr: rawptr, image: int) -> bool {
@@ -616,49 +396,20 @@ __renderUpdateTexture :: proc(
 		return false
 	}
 
-	__bindTexture(ctx, tex.tex)
-
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT,1)
-
-	x := x
-	w := w
-	data := data
-
-	when GLES2 {
-		gl.PixelStorei(gl.UNPACK_ROW_LENGTH, i32(tex.width))
-		gl.PixelStorei(gl.UNPACK_SKIP_PIXELS, i32(x))
-		gl.PixelStorei(gl.UNPACK_SKIP_ROWS, i32(y))
-	} else {
-		// No support for all of skip, need to update a whole row at a time.
-		if tex.type == .RGBA {
-			data = data[y * tex.width * 4:]
-		}	else {
-			data = data[y * tex.width:]
-		}
-
-		x = 0
-		w = tex.width
+	for row in 0..<h {
+		copy(tex.data[(y + row) * tex.width + x:], data[row * tex.width:][:w])
 	}
 
-	if tex.type == .RGBA {
-		gl.TexSubImage2D(gl.TEXTURE_2D, 0, i32(x), i32(y), i32(w), i32(h), gl.RGBA, gl.UNSIGNED_BYTE, raw_data(data))
-	} else {
-		when GLES2 || GL2 {
-			gl.TexSubImage2D(gl.TEXTURE_2D, 0, i32(x), i32(y), i32(w), i32(h), gl.LUMINANCE, gl.UNSIGNED_BYTE, raw_data(data))
-		} else {
-			gl.TexSubImage2D(gl.TEXTURE_2D, 0, i32(x), i32(y), i32(w), i32(h), gl.RED, gl.UNSIGNED_BYTE, raw_data(data))
-		}
-	}
-
-	gl.PixelStorei(gl.UNPACK_ALIGNMENT, 4)
-
-	when GLES2 {
-		gl.PixelStorei(gl.UNPACK_ROW_LENGTH, 0)
-		gl.PixelStorei(gl.UNPACK_SKIP_PIXELS, 0)
-		gl.PixelStorei(gl.UNPACK_SKIP_ROWS, 0)
-	}
-
-	__bindTexture(ctx, 0)
+	sg.update_image(tex.image, sg.Image_Data{
+		subimage = {
+			0 = {
+				0 = {
+					ptr = raw_data(tex.data),
+					size = u64(len(tex.data)),
+				},
+			},
+		},
+	})
 
 	return true
 }
@@ -782,14 +533,9 @@ __convertPaint :: proc(
 }
 
 __setUniforms :: proc(ctx: ^Context, uniformOffset: int, image: int) {
-	when GL_USE_UNIFORMBUFFER {
-		gl.BindBufferRange(gl.UNIFORM_BUFFER, ctx.frag_binding, ctx.fragBuf, uniformOffset, size_of(FragUniforms))
-	} else {
+
 		frag := __fragUniformPtr(ctx, uniformOffset)
 		gl.Uniform4fv(ctx.shader.loc[.FRAG], GL_UNIFORMARRAY_SIZE, cast(^f32) frag)
-	}
-
-	__checkError(ctx, "uniform4")
 
 	tex: ^Texture
 	if image != 0 {
@@ -801,8 +547,6 @@ __setUniforms :: proc(ctx: ^Context, uniformOffset: int, image: int) {
 		tex = __findTexture(ctx, ctx.dummyTex)
 	}
 
-	__bindTexture(ctx, tex != nil ? tex.tex : 0)
-	__checkError(ctx, "tex paint tex")
 }
 
 __renderViewport :: proc(uptr: rawptr, width, height, devicePixelRatio: f32) {
@@ -814,6 +558,9 @@ __renderViewport :: proc(uptr: rawptr, width, height, devicePixelRatio: f32) {
 __fill :: proc(ctx: ^Context, call: ^Call) {
 	paths := ctx.paths[call.pathOffset:]
 
+	sg.draw(i32(call.triangleOffset), i32(call.triangleCount), 0)
+	ctx.pipeline.stencil.enabled = true
+
 	// Draw shapes
 	gl.Enable(gl.STENCIL_TEST)
 	__stencilMask(ctx, 0xff)
@@ -822,7 +569,6 @@ __fill :: proc(ctx: ^Context, call: ^Call) {
 
 	// set bindpoint for solid loc
 	__setUniforms(ctx, call.uniformOffset, 0)
-	__checkError(ctx, "fill simple")
 
 	gl.StencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP)
 	gl.StencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP)
@@ -932,18 +678,18 @@ __renderCancel :: proc(uptr: rawptr) {
 	clear(&ctx.uniforms)
 }
 
-BLEND_FACTOR_TABLE :: [nvg.BlendFactor]u32 {
-	.ZERO = gl.ZERO,
-	.ONE = gl.ONE,
-	.SRC_COLOR = gl.SRC_COLOR,
-	.ONE_MINUS_SRC_COLOR = gl.ONE_MINUS_SRC_COLOR,
-	.DST_COLOR = gl.DST_COLOR,
-	.ONE_MINUS_DST_COLOR = gl.ONE_MINUS_DST_COLOR,
-	.SRC_ALPHA = gl.SRC_ALPHA,
-	.ONE_MINUS_SRC_ALPHA = gl.ONE_MINUS_SRC_ALPHA,
-	.DST_ALPHA = gl.DST_ALPHA,
-	.ONE_MINUS_DST_ALPHA = gl.ONE_MINUS_DST_ALPHA,
-	.SRC_ALPHA_SATURATE = gl.SRC_ALPHA_SATURATE,
+BLEND_FACTOR_TABLE :: [nvg.BlendFactor]sg.Blend_Factor {
+	.ZERO = .ZERO,
+	.ONE = .ONE,
+	.SRC_COLOR = .SRC_COLOR,
+	.ONE_MINUS_SRC_COLOR = .ONE_MINUS_SRC_COLOR,
+	.DST_COLOR = .DST_COLOR,
+	.ONE_MINUS_DST_COLOR = .ONE_MINUS_DST_COLOR,
+	.SRC_ALPHA = .SRC_ALPHA,
+	.ONE_MINUS_SRC_ALPHA = .ONE_MINUS_SRC_ALPHA,
+	.DST_ALPHA = .DST_ALPHA,
+	.ONE_MINUS_DST_ALPHA = .ONE_MINUS_DST_ALPHA,
+	.SRC_ALPHA_SATURATE = .SRC_ALPHA_SATURATED,
 }
 
 __blendCompositeOperation :: proc(op: nvg.CompositeOperationState) -> Blend {
@@ -961,8 +707,13 @@ __renderFlush :: proc(uptr: rawptr) {
 	ctx := cast(^Context) uptr
 
 	if len(ctx.calls) > 0 {
-		// Setup require GL state.
-		gl.UseProgram(ctx.shader.prog)
+		sg.apply_pipeline(ctx.pipeline)
+		sg.apply_bindings(sg.Bindings{
+
+		})
+		sg.apply_uniforms(.FS, 0, {ptr = &ctx.uniforms, size = size_of(Frag)})
+
+		sg.update_buffer(ctx.bindings.vertex_buffers[0], {ptr = raw_data(ctx.verts), size = size_of(Vertex) * len(ctx.verts)})
 
 		gl.Enable(gl.CULL_FACE)
 		gl.CullFace(gl.BACK)
@@ -989,18 +740,11 @@ __renderFlush :: proc(uptr: rawptr) {
 			ctx.blendFunc.dst_alpha = gl.INVALID_ENUM
 		}
 
-		when GL_USE_UNIFORMBUFFER {
-			// Upload ubo for frag shaders
-			gl.BindBuffer(gl.UNIFORM_BUFFER, ctx.fragBuf)
-			gl.BufferData(gl.UNIFORM_BUFFER, len(ctx.uniforms), raw_data(ctx.uniforms), gl.STREAM_DRAW)
-		}
-
 		// Upload vertex data
 		when GL3 {
 			gl.BindVertexArray(ctx.vertArr)
 		}
 
-		gl.BindBuffer(gl.ARRAY_BUFFER, ctx.vertBuf)
 		gl.BufferData(gl.ARRAY_BUFFER, len(ctx.verts) * size_of(Vertex), raw_data(ctx.verts), gl.STREAM_DRAW)
 		gl.EnableVertexAttribArray(0)
 		gl.EnableVertexAttribArray(1)
@@ -1283,31 +1027,13 @@ __renderTriangles :: proc(
 
 __renderDelete :: proc(uptr: rawptr) {
 	ctx := cast(^Context) uptr
-	__deleteShader(&ctx.shader)
-
-	when GL3 {
-		when GL_USE_UNIFORMBUFFER {
-			if ctx.fragBuf != 0 {
-				gl.DeleteBuffers(1, &ctx.fragBuf)
-			}
-		}
-
-		if ctx.vertArr != 0 {
-			gl.DeleteVertexArrays(1, &ctx.vertArr)
-		}
+	
+	sg.destroy_pipeline(ctx.pipeline)
+	for image in ctx.images {
+		sg.destroy_image(image)
 	}
 
-	if ctx.vertBuf != 0 {
-		gl.DeleteBuffers(1, &ctx.vertBuf)
-	}
-
-	for &texture in ctx.textures {
-		if texture.tex != 0 && (.NO_DELETE not_in texture.flags) {
-			gl.DeleteTextures(1, &texture.tex)
-		}
-	}
-
-	delete(ctx.textures)
+	delete(ctx.images)
 	delete(ctx.paths)
 	delete(ctx.verts)
 	delete(ctx.uniforms)
