@@ -1,5 +1,4 @@
 package ui
-/*
 
 import "core:runtime"
 import "core:os"
@@ -15,12 +14,25 @@ import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
 
+import sapp "../sokol-odin/sokol/app"
+
 import ttf "vendor:stb/truetype"
 
 FMT_BUFFER_COUNT 		:: 24
 FMT_BUFFER_SIZE 		:: 200
 TEXT_BREAK :: "..."
 
+Horizontal_Text_Align :: enum {
+	Left,
+	Middle,
+	Right,
+}
+Vertical_Text_Align :: enum {
+	Top,
+	Middle,
+	Baseline,
+	Bottom,
+}
 /*
 	Text editing
 */
@@ -37,28 +49,11 @@ Text_Selection_Range :: struct {
 	start,
 	end: int,
 }
-/*
-	Font usage
-*/
 Text_Wrap :: enum {
 	None,
 	Regular,
 	Word,
 }
-Text_Align :: enum {
-	Left,
-	Middle,
-	Right,
-}
-Text_Baseline :: enum {
-	Top,
-	Middle,
-	Baseline,
-	Bottom,
-}
-/*
-	Info required for text iteration
-*/
 Text_Info :: struct {
 	font: Font_Handle,
 	size: f32,
@@ -66,13 +61,10 @@ Text_Info :: struct {
 	limit: [2]Maybe(f32),
 
 	wrap: Text_Wrap,
-	align: Text_Align,
-	baseline: Text_Baseline,
+	align_h: Horizontal_Text_Align,
+	align_v: Vertical_Text_Align,
 	hidden: bool,
 }
-/*
-	Text iteration state
-*/
 Text_Iterator :: struct {
 	font: ^Font,
 	size: ^Font_Size,
@@ -88,13 +80,7 @@ Text_Iterator :: struct {
 	index,
 	next_index: int,
 }
-/*
-	Handle to internal font data
-*/
 Font_Handle :: int
-/*
-	Stores the metrics and loaded glyphs of a given size of a font
-*/
 Font_Size :: struct {
 	ascent,
 	descent,
@@ -110,9 +96,6 @@ destroy_font_size :: proc(using self: ^Font_Size) {
 	}
 	delete(glyphs)
 }
-/*
-	Stores all loaded sizes of a font along with internal data
-*/
 Font :: struct {
 	name,
 	path: string,
@@ -220,7 +203,7 @@ make_text_iterator :: proc(info: Text_Info) -> (it: Text_Iterator, ok: bool) {
 	if info.size <= 0 {
 		return
 	}
-	it.font = &core.fonts[info.font].?
+	it.font = &core.atlas.fonts[info.font].?
 	it.size, ok = get_font_size(it.font, info.size)
 	it.line_limit = info.limit.x
 	it.line_size.y = it.size.ascent - it.size.descent + it.size.line_gap
@@ -228,7 +211,7 @@ make_text_iterator :: proc(info: Text_Info) -> (it: Text_Iterator, ok: bool) {
 }
 update_text_iterator_offset :: proc(it: ^Text_Iterator, info: Text_Info) {
 	it.offset.x = 0
-	#partial switch info.align {
+	#partial switch info.align_h {
 		case .Middle: it.offset.x -= math.floor(measure_next_line(info, it^) / 2)
 		case .Right: it.offset.x -= measure_next_line(info, it^)
 	}
@@ -258,7 +241,7 @@ iterate_text_codepoint :: proc(it: ^Text_Iterator, info: Text_Info) -> bool {
 iterate_text :: proc(it: ^Text_Iterator, info: Text_Info) -> (ok: bool) {
 	// Update horizontal offset with last glyph
 	if it.glyph != nil {
-		it.offset.x += math.floor(it.glyph.advance)
+		it.offset.x += it.glyph.advance
 	}
 	/*
 		Pre-paint
@@ -365,8 +348,8 @@ load_font :: proc(file_path: string) -> (handle: Font_Handle, success: bool) {
 	if file_data, ok := os.read_entire_file(file_path); ok {
 		if ttf.InitFont(&font.data, raw_data(file_data), 0) {
 			for i in 0..<MAX_FONTS {
-				if core.fonts[i] == nil {
-					core.fonts[i] = font
+				if core.atlas.fonts[i] == nil {
+					core.atlas.fonts[i] = font
 					handle = Font_Handle(i)
 					success = true
 					break
@@ -384,9 +367,9 @@ load_font :: proc(file_path: string) -> (handle: Font_Handle, success: bool) {
 	Destroy a font and free it's handle
 */
 unload_font :: proc(handle: Font_Handle) {
-	if font, ok := &core.fonts[handle].?; ok {
+	if font, ok := &core.atlas.fonts[handle].?; ok {
 		destroy_font(font)
-		core.fonts[handle] = nil
+		core.atlas.fonts[handle] = nil
 	}
 }
 // Get the data for a given pixel size of the font
@@ -440,7 +423,7 @@ __get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^G
 				width = int(image_width),
 				height = int(image_height),
 			}
-			src = add_atlas_image(image) or_else Box{}
+			src = add_atlas_image(&core.atlas, image) or_else Box{}
 		}
 		// Set glyph data
 		data = map_insert(&size.glyphs, codepoint, Glyph({
@@ -457,9 +440,9 @@ __get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^G
 draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 	size: [2]f32 
 	origin := origin
-	if info.baseline != .Top {
+	if info.align_v != .Top {
 		size = measure_text(info)
-		#partial switch info.baseline {
+		#partial switch info.align_v {
 			case .Middle: origin.y -= math.floor(size.y / 2) 
 			case .Bottom: origin.y -= size.y
 		}
@@ -475,11 +458,12 @@ draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 			if it.codepoint != '\n' && it.codepoint != ' ' && it.glyph != nil {
 				dst: Box = {low = origin + it.offset + it.glyph.offset}
 				dst.high = dst.low + (it.glyph.src.high - it.glyph.src.low)
-				if clip, ok := info.clip.?; ok {
-					draw_clipped_textured_box(painter.texture, it.glyph.src, dst, clip, color)
-				} else {
-					draw_textured_box(painter.texture, it.glyph.src, dst, color)
-				}
+				// if clip, ok := info.clip.?; ok {
+				// 	draw_clipped_textured_box(painter.texture, it.glyph.src, dst, clip, color)
+				// } else {
+				// 	draw_textured_box(painter.texture, it.glyph.src, dst, color)
+				// }
+				draw_texture(it.glyph.src, dst, color)
 			}
 			// Update size
 			if it.new_line {
@@ -492,14 +476,22 @@ draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 	return size 
 }
 
-draw_aligned_rune :: proc(font: Font_Handle, size: f32, icon: rune, origin: [2]f32, color: Color, align: Text_Align, baseline: Text_Baseline) -> [2]f32 {
-	font := &painter.fonts[font].?
+draw_aligned_rune :: proc(
+	font: Font_Handle, 
+	size: f32, 
+	icon: rune, 
+	origin: [2]f32, 
+	color: Color, 
+	align_h: Horizontal_Text_Align, 
+	align_v: Vertical_Text_Align,
+) -> [2]f32 {
+	font := &core.atlas.fonts[font].?
 	font_size, _ := get_font_size(font, size)
 	glyph, _ := __get_glyph(font, font_size, rune(icon))
 	icon_size := glyph.src.high - glyph.src.low
 
 	box: Box
-	switch align {
+	switch align_h {
 		case .Right: 
 		box.low.x = origin.x - icon_size.x
 		box.high.x = origin.x 
@@ -510,8 +502,8 @@ draw_aligned_rune :: proc(font: Font_Handle, size: f32, icon: rune, origin: [2]f
 		box.low.x = origin.x 
 		box.high.x = origin.x + icon_size.x 
 	}
-	switch baseline {
-		case .Bottom: 
+	switch align_v {
+		case .Bottom, .Baseline: 
 		box.low.y = origin.y - icon_size.y
 		box.high.y = origin.y 
 		case .Middle: 
@@ -521,12 +513,12 @@ draw_aligned_rune :: proc(font: Font_Handle, size: f32, icon: rune, origin: [2]f
 		box.low.y = origin.y 
 		box.high.y = origin.y + icon_size.y 
 	}
-	draw_textured_box(painter.texture, glyph.src, box, color)
+	draw_texture(glyph.src, box, color)
 	return icon_size
 }
 
 draw_rune_aligned_clipped :: proc(font: Font_Handle, size: f32, icon: rune, origin: [2]f32, color: Color, align: [2]Alignment, clip: Box) -> [2]f32 {
-	font := &painter.fonts[font].?
+	font := &core.atlas.fonts[font].?
 	font_size, _ := get_font_size(font, size)
 	glyph, _ := __get_glyph(font, font_size, rune(icon))
 	icon_size := glyph.src.high - glyph.src.low
@@ -554,7 +546,7 @@ draw_rune_aligned_clipped :: proc(font: Font_Handle, size: f32, icon: rune, orig
 		box.low.y = origin.y 
 		box.high.y = origin.y + icon_size.y 
 	}
-	paint_clipped_textured_box(painter.texture, glyph.src, box, clip, color)
+	draw_texture(glyph.src, box, color)
 	return icon_size
 }
 
@@ -577,38 +569,38 @@ Interactive_Text_Result :: struct {
 /*
 	Paint interactable text
 */
-draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive_Text_Info, color: Color) -> Interactive_Text_Result {
+draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive_Text_Info, color: Color) {
 	// Initial measurement
 	size := measure_text(info)
 	origin := origin
 	// Prepare result
 	using result: Interactive_Text_Result = {
 		selection_bounds = {math.F32_MAX, {}},
-		selection = scribe.selection,
+		selection = core.text_selection,
 	}
 	// Layer to paint on
-	layer := current_layer()
+	surface := __get_draw_surface()
 	// Apply baseline if needed
-	#partial switch info.baseline {
+	#partial switch info.align_v {
 		case .Middle: origin.y -= size.y / 2 
 		case .Bottom: origin.y -= size.y
 	}
 	// Hovered index
 	hover_index: int
 	// Paint the text
-	if it, ok := make_text_iterator(ui.info); ok {
+	if it, ok := make_text_iterator(info); ok {
 		// If we've reached the end
 		at_end := false
 		// Determine hovered line
 		line_height := it.size.ascent - it.size.descent + it.size.line_gap
 		line_count := int(math.floor(size.y / line_height))
-		hovered_line := clamp(int((ui.io.mouse_point.y - origin.y) / line_height), 0, line_count - 1)
+		hovered_line := clamp(int((core.mouse_pos.y - origin.y) / line_height), 0, line_count - 1)
 		// Current line and column
 		line, column: int
 		// Keep track of smallest distance to mouse
 		min_dist: f32 = math.F32_MAX
 		// Get line offset
-		update_text_iterator_offset(it, info)
+		update_text_iterator_offset(&it, info)
 		// Top left of this line
 		line_origin := origin + it.offset
 		// Horizontal bounds of the selection on the current line
@@ -619,14 +611,14 @@ draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive
 		// Start iteration
 		for {
 			// Iterate the iterator
-			if !iterate_text(it, info) {
+			if !iterate_text(&it, info) {
 				at_end = true
 			}
 			// Get hovered state
 			if it.new_line {
 				// Allows for highlighting the last glyph in a line
 				if hovered_line == line {
-					dist1 := math.abs((origin.x + it.offset.x) - ui.io.mouse_point.x)
+					dist1 := math.abs((origin.x + it.offset.x) - core.mouse_pos.x)
 					if dist1 < min_dist {
 						min_dist = dist1
 						hover_index = it.index
@@ -634,10 +626,10 @@ draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive
 				}
 				// Check if the last line was hovered
 				line_box: Box = {line_origin, line_origin + it.line_size}
-				if point_in_box(ui.io.mouse_point, line_box) {
+				if point_in_box(core.mouse_pos, line_box) {
 					hovered = true
 				}
-				update_text_iterator_offset(it, info)
+				update_text_iterator_offset(&it, info)
 				line += 1
 				column = 0
 				line_origin = origin + it.offset
@@ -645,14 +637,14 @@ draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive
 			// Update hovered index
 			if hovered_line == line {
 				// Left side of glyph
-				dist1 := math.abs((origin.x + it.offset.x) - ui.io.mouse_point.x)
+				dist1 := math.abs((origin.x + it.offset.x) - core.mouse_pos.x)
 				if dist1 < min_dist {
 					min_dist = dist1
 					hover_index = it.index
 				}
 				if it.glyph != nil && (it.new_line || it.next_index >= len(info.text)) {
 					// Right side of glyph
-					dist2 := math.abs((origin.x + it.offset.x + it.glyph.advance) - ui.io.mouse_point.x)
+					dist2 := math.abs((origin.x + it.offset.x + it.glyph.advance) - core.mouse_pos.x)
 					if dist2 < min_dist {
 						min_dist = dist2
 						hover_index = it.next_index
@@ -664,18 +656,21 @@ draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive
 			glyph_color := color
 			// Get selection info
 			if .Focused in (widget.state) {
-				if selection.offset == it.index {
-					selection.line = line
-					selection.column = column
-				}
-				if it.index >= selection.offset && it.index <= selection.offset + selection.length {
-					line_box_bounds = {
-						min(line_box_bounds[0], point.x),
-						max(line_box_bounds[1], point.x),
+				switch &selection in core.text_selection {
+					case Text_Selection_Index:
+					if selection.index == it.index {
+						selection.line = line
+						selection.column = column
+						glyph_color = core.style.color.content
 					}
-				}
-				if selection.length > 0 && it.index >= selection.offset && it.index < selection.offset + selection.length {
-					glyph_color = ui.style.color.content
+					case Text_Selection_Range:
+					if it.index >= selection.start && it.index <= selection.end {
+						line_box_bounds = {
+							min(line_box_bounds[0], point.x),
+							max(line_box_bounds[1], point.x),
+						}
+						glyph_color = core.style.color.content
+					}
 				}
 			}
 			// Paint the glyph
@@ -684,15 +679,10 @@ draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive
 				dst: Box = {low = point + it.glyph.offset}
 				dst.high = dst.low + (it.glyph.src.high - it.glyph.src.low)
 				bounds.high = linalg.max(bounds.high, dst.high)
-				if clip, ok := info.clip.?; ok {
-					paint_clipped_textured_box(ui.ui.painter.texture, it.glyph.src, dst, clip, glyph_color)
-				} else {
-					paint_textured_box(ui.ui.painter.texture, it.glyph.src, dst, glyph_color)
-				}
+				draw_texture(it.glyph.src, dst, glyph_color)
 			}
 			// Paint this line's selection
 			if (.Focused in widget.state) && (it.index >= len(info.text) || info.text[it.index] == '\n') {
-				ui.painter.target = layer.targets[.Background]
 				// Draw it if the selection is valid
 				if line_box_bounds[1] >= line_box_bounds[0] {
 					box: Box = {
@@ -703,14 +693,9 @@ draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive
 						linalg.min(selection_bounds.low, box.low),
 						linalg.max(selection_bounds.high, box.high),
 					}
-					if clip, ok := info.clip.?; ok {
-						box = clamp_box(box, clip)
-					}
-					paint_box_fill(ui.box, ui.style.color.accent)
+					draw_box_fill(box, core.style.color.accent)
 					line_box_bounds = {math.F32_MAX, 0}
 				}
-				// Continue painting to the foreground
-				ui.painter.target = layer.targets[.Foreground]
 			}
 			// Break if reached end
 			if at_end {
@@ -722,12 +707,14 @@ draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive
 	}
 	
 	// These require `hover_index` to be determined
-	if .Focused in widget.state {
-		if (key_pressed(ui.io, .C) && (key_down(ui.io, .Left_Control) || key_down(ui.io, .Right_Control))) && selection.length > 0 {
-			set_clipboard_string(ui.io, info.text[selection.offset:][:selection.length])
+	if selection, ok := core.text_selection.(Text_Selection_Range); ok {
+		if .Focused in widget.state {
+			if (key_pressed(.C) && (key_down(.LEFT_CONTROL) || key_down(.RIGHT_CONTROL))) {
+				set_clipboard_string(info.text[selection.start:selection.end])
+			}
 		}
 	}
-	// Update selection
+	/*// Update selection
 	if .Pressed in (widget.state - widget.last_state) {
 		if widget.click_count == 3 {
 			// Select everything
@@ -775,26 +762,12 @@ draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive
 				selection.length = hover_index - ui.scribe.anchor
 			}
 		}
-	}
-	return result
+	}*/
+	return
 }
 
-Text_Box_Info :: struct {
-	using generic: Generic_Widget_Info,
-	text_info: union {
-		Text_Info,
-		Tactile_Text_Info,
-	},
-	color: Maybe(Color),
-}
-
-Text_Box_Result :: struct {
-	using generic: Generic_Widget_Result,
-	selection: [2]int,
-}
-
-draw_text_box :: proc(ui: ^UI, info: Text_Box_Info, loc := #caller_location) -> Text_Box_Result {
-	self, generic_result := get_widget(ui, info, loc)
+/*draw_text_box :: proc(info: Text_Box_Info, loc := #caller_location) -> Text_Box_Result {
+	self, generic_result := get_widget(info, loc)
 	result: Text_Box_Result = {
 		generic = generic_result,
 	}

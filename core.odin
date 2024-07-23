@@ -9,8 +9,11 @@ import sdtx "../sokol-odin/sokol/debugtext"
 
 import "vendor:fontstash"
 
+import "core:time"
 import "core:runtime"
+// import "core:funtime"
 import "core:fmt"
+import "core:strings"
 import "core:math"
 import "core:math/linalg"
 
@@ -25,6 +28,7 @@ MAX_LAYER_VERTICES :: 65536
 MAX_LAYER_INDICES :: 65536
 ATLAS_SIZE :: 4096
 
+Keyboard_Key :: sapp.Keycode
 // Private global core instance
 @private core: Core
 // Stack
@@ -54,38 +58,58 @@ Mouse_Bits :: bit_set[Mouse_Button]
 Core :: struct {
 	view: [2]f32,
 
-	pipeline: sg.Pipeline,
-	bindings: sg.Bindings,
-	pass_action: sg.Pass_Action,
+	pipeline: sg.Pipeline,				// Graphics pipeline
+	bindings: sg.Bindings,				// Buffer and image bindings
+	pass_action: sg.Pass_Action,	// 
 
-	layer_list: [dynamic]^Maybe(Layer),
-	layer_map: map[Id]^Maybe(Layer),
-	layers: [MAX_LAYERS]Maybe(Layer),
-	widgets: [MAX_WIDGETS]Maybe(Widget),
+	layer_list: [dynamic]^Layer,					// Layers ordered by their z-index
+	layer_map: map[Id]^Layer,							// Map lookup by id
+	layers: [MAX_LAYERS]Maybe(Layer),			// Static allocated layer data
+	widgets: [MAX_WIDGETS]Maybe(Widget),	// Static allocated widget data
+	widget_map: map[Id]^Widget,
 
-	hovered_layer,
-	focused_layer: Id,
+	last_hovered_widget,
+	hovered_widget,
+	next_hovered_widget: Id,
 
-	layout_stack: Stack(Layout, MAX_LAYOUTS),
-	layer_stack: Stack(^Layer, MAX_LAYERS),
-	id_stack: Stack(Id, MAX_IDS),
+	dragged_widget: Id,
 
+	root_layer: ^Layer,
+	sort_layers: bool,
+	last_top_layer,
+	top_layer,
+	scrolling_layer,
+	last_hovered_layer,
+	hovered_layer,														// The current hovered layer
+	focused_layer: Id,												// The current focused layer
+
+	layout_stack: Stack(Layout, MAX_LAYOUTS),		// The layout context stack
+	layer_stack: Stack(^Layer, MAX_LAYERS),			// The layer context stack
+	id_stack: Stack(Id, MAX_IDS),								// The ID context stack for compound hashing
+
+	mouse_button: Mouse_Button,
+	last_mouse_pos,
 	mouse_pos: [2]f32,
 	mouse_scroll: [2]f32,
 	mouse_bits, last_mouse_bits: Mouse_Bits,
 	keys, last_keys: [max(sapp.Keycode)]bool,
 	runes: [dynamic]rune,
 
-	frame_cb: proc(_: rawptr),
-	frame_cb_data: rawptr,
-
-	// Draw state
-	// text_selection: Text_Selection,
-	// fonts: [MAX_FONTS]Maybe(Font),
-	draw_states: Stack(Draw_State, MAX_DRAW_STATES),
+	text_selection: Text_Selection,
+	
 	draw_surface: Maybe(^Draw_Surface),
 	paths: Stack(Path, MAX_PATHS),
-	atlas: sg.Image,
+	atlas: Atlas,
+	style: Style,
+
+	delta_time: f32,							// Delta time in seconds
+	last_frame_time: time.Time,		// Time of last frame
+	draw_this_frame,
+	draw_next_frame: bool,
+	
+	init_cb: proc(_: rawptr),		// User init proc
+	frame_cb: proc(_: rawptr),	// User frame proc
+	user_ptr: rawptr,						//
 }
 // App descriptor
 Desc :: struct {
@@ -93,58 +117,13 @@ Desc :: struct {
 	height: i32,
 	fullscreen: bool,
 	title: cstring,
+	init_cb: proc(_: rawptr),
 	frame_cb: proc(_: rawptr),
-	frame_cb_data: rawptr,
-	// style: Style_Desc,
-}
-// Boxes
-Box :: struct {
-	low, high: [2]f32,
-}
-// Layout
-Layout :: struct {
-	box: Box,
-}
-// Layer
-Layer :: struct {
-	id: Id,
-	box: Box,
-	contents: map[Id]^Maybe(Widget),
-	surface: Draw_Surface,
-}
-init_layer :: proc(layer: ^Layer) {
-	init_draw_surface(&layer.surface)
+	user_ptr: rawptr,
 }
 
 view_box :: proc() -> Box {
 	return Box{{}, core.view}
-}
-
-__new_layer :: proc(id: Id) -> (res: ^Maybe(Layer), ok: bool) {
-	for i in 0..<MAX_LAYERS {
-		if core.layers[i] == nil {
-			core.layers[i] = Layer{
-				id = id,
-			}
-			layer := &core.layers[i]
-			core.layer_map[id] = &core.layers[i]
-			append(&core.layer_list, layer)
-			init_layer(&core.layers[i].?)
-			return &core.layers[i], true
-		}
-	}
-	return nil, false
-}
-begin_layer :: proc(box: Box, loc := #caller_location) {
-	id := hash(loc)
-
-	layer := core.layer_map[id] or_else (__new_layer(id) or_else panic("Out of layer!"))
-	push(&core.layer_stack, &layer.?)
-	core.draw_surface = &core.layer_stack.items[core.layer_stack.height - 1].surface
-}
-end_layer :: proc() {
-	pop(&core.layer_stack)
-	core.draw_surface = &core.layer_stack.items[core.layer_stack.height - 1].surface if core.layer_stack.height > 0 else nil
 }
 
 get_mouse_pos :: proc() -> [2]f32 {
@@ -152,23 +131,21 @@ get_mouse_pos :: proc() -> [2]f32 {
 }
 
 run :: proc(desc: Desc) {
+	core.init_cb = desc.init_cb
 	core.frame_cb = desc.frame_cb
-	core.frame_cb_data = desc.frame_cb_data
+	core.user_ptr = desc.user_ptr
 
 	init_cb :: proc "c" () {
 		context = runtime.default_context()
-		
+		// Set view parameters
 		core.view = {sapp.widthf(), sapp.heightf()}
-		/*
-			Initialize graphics environment
-		*/
+		core.last_frame_time = time.now()
+		// Set up graphics environment
 		sg.setup({
 			environment = sglue.environment(),
 			logger = { func = slog.func },
 		})
-		/*
-			Initialize debug text context
-		*/
+		// Prepare debug text context
 		sdtx.setup(sdtx.Desc{
 			logger = { func = slog.func },
 			fonts = {
@@ -180,9 +157,7 @@ run :: proc(desc: Desc) {
         5 = sdtx.font_oric(),
       },
 		})
-		/*
-			Set up graphics pipeline
-		*/
+		// Prepare the graphics pipeline
 		core.pipeline = sg.make_pipeline(sg.Pipeline_Desc{
 			shader = sg.make_shader(ui_shader_desc(sg.query_backend())),
 			index_type = .UINT16,
@@ -222,9 +197,7 @@ run :: proc(desc: Desc) {
 				},
 			},
 		}
-		/*
-			Load the index and vertex buffers for streaming
-		*/
+		// Prepare graphics buffers
 		core.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
 			type = .INDEXBUFFER,
 			usage = .STREAM,
@@ -235,64 +208,77 @@ run :: proc(desc: Desc) {
 			usage = .STREAM,
 			size = MAX_LAYER_VERTICES * size_of(Vertex),
 		})
-		core.bindings.fs.images[0] = sg.make_image(sg.Image_Desc{
-			type = ._2D,
-			pixel_format = .RGBA8,
-			width = ATLAS_SIZE,
-			height = ATLAS_SIZE,
-			usage = .DYNAMIC,
-			sample_count = 1,
-		})
 		core.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
-			min_filter = .DEFAULT,
-			mag_filter = .DEFAULT,
+			min_filter = .NEAREST,
+			mag_filter = .NEAREST,
+			wrap_u = .MIRRORED_REPEAT,
+			wrap_v = .MIRRORED_REPEAT,
 		})
+		// Initialize the font atlas
+		init_atlas(&core.atlas, ATLAS_SIZE, ATLAS_SIZE)
+		// User init callback
+		if core.init_cb != nil {
+			core.init_cb(core.user_ptr)
+		}
 	}
 	frame_cb :: proc "c" () {
 		context = runtime.default_context()
-
+		now := time.now()
+		core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
+		core.last_frame_time = now
+		// User functions
 		if core.frame_cb != nil {
-			core.frame_cb(core.frame_cb_data)
+			core.frame_cb(core.user_ptr)
 		}
-
+		// Process elements
+		process_layers()
+		process_widgets()
+		// Display debug text
 		sdtx.canvas(core.view.x, core.view.y)
 		sdtx.font(3)
 		sdtx.pos(1, 1)
 		sdtx.color3b(255, 255, 255)
 		sdtx.printf("frame: %f", sapp.frame_duration())
-
-		sg.begin_pass({
-			action = core.pass_action,
-			swapchain = sglue.swapchain(),
-		})
-		sg.apply_pipeline(core.pipeline)
-		sg.apply_bindings(core.bindings)
-
-		tex: Tex = {texSize = core.view}
-		sg.apply_uniforms(.VS, 0, { ptr = &tex, size = size_of(Tex) })
-		// render layers
-		for layer in core.layer_list {
-			layer := &layer.?
-
-			// core.bindings.vertex_buffer_offsets[0] = i32(len(layer.surface.vertices) * size_of(Vertex))
-			sg.update_buffer(core.bindings.index_buffer, { 
-				ptr = raw_data(layer.surface.indices), 
-				size = u64(len(layer.surface.indices) * size_of(u16)),
-			})
-			sg.update_buffer(core.bindings.vertex_buffers[0], { 
-				ptr = raw_data(layer.surface.vertices), 
-				size = u64(len(layer.surface.vertices) * size_of(Vertex)),
-			})
-			// sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
-			sg.draw(0, len(layer.surface.indices), 1)
-			// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
-			clear_draw_surface(&layer.surface)
+		// Update the atlas if needed
+		if core.atlas.was_changed {
+			core.atlas.was_changed = false
+			update_atlas(&core.atlas)
 		}
-
-		sdtx.draw()
-
-		sg.end_pass()
-		sg.commit()
+		// Draw
+		if core.draw_this_frame {
+			sg.begin_pass({
+				action = core.pass_action,
+				swapchain = sglue.swapchain(),
+			})
+			core.bindings.fs.images[0] = core.atlas.image
+			sg.apply_pipeline(core.pipeline)
+			sg.apply_bindings(core.bindings)
+			tex: Tex = {texSize = core.view}
+			sg.apply_uniforms(.VS, 0, { ptr = &tex, size = size_of(Tex) })
+			// render layers
+			for layer in core.layer_list {
+				sg.update_buffer(core.bindings.index_buffer, { 
+					ptr = raw_data(layer.surface.indices), 
+					size = u64(len(layer.surface.indices) * size_of(u16)),
+				})
+				sg.update_buffer(core.bindings.vertex_buffers[0], { 
+					ptr = raw_data(layer.surface.vertices), 
+					size = u64(len(layer.surface.vertices) * size_of(Vertex)),
+				})
+				// sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
+				sg.draw(0, len(layer.surface.indices), 1)
+				// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+				clear_draw_surface(&layer.surface)
+			}
+			sdtx.draw()
+			sg.end_pass()
+			sg.commit()
+		} else if core.draw_next_frame {
+			core.draw_next_frame = false
+			core.draw_this_frame = true
+		}
+		// Reset root layer
+		core.root_layer = nil
 	}
 	cleanup_cb :: proc "c" () {
 		context = runtime.default_context()
@@ -307,9 +293,11 @@ run :: proc(desc: Desc) {
 		#partial switch e.type {
 			case .MOUSE_DOWN:
 			core.mouse_bits += {Mouse_Button(e.mouse_button)}
+			core.mouse_button = Mouse_Button(e.mouse_button)
 			case .MOUSE_UP:
 			core.mouse_bits -= {Mouse_Button(e.mouse_button)}
 			case .MOUSE_MOVE:
+			core.last_mouse_pos = core.mouse_pos
 			core.mouse_pos = {e.mouse_x, e.mouse_y}
 			case .MOUSE_SCROLL:
 			core.mouse_scroll = {e.scroll_x, e.scroll_y}
@@ -338,4 +326,30 @@ run :: proc(desc: Desc) {
 		fullscreen = desc.fullscreen,
 		window_title = desc.title,
 	})
+}
+
+key_down :: proc(key: Keyboard_Key) -> bool {
+	return core.keys[key]
+}
+key_pressed :: proc(key: Keyboard_Key) -> bool {
+	return core.keys[key] && !core.last_keys[key]
+}
+key_released :: proc(key: Keyboard_Key) -> bool {
+	return core.last_keys[key] && !core.keys[key]
+}
+
+mouse_down :: proc(button: Mouse_Button) -> bool {
+	return button in core.mouse_bits
+}
+mouse_pressed :: proc(button: Mouse_Button) -> bool {
+	return core.mouse_bits - core.last_mouse_bits >= {button}
+}
+mouse_released :: proc(button: Mouse_Button) -> bool {
+	return core.last_mouse_bits - core.mouse_bits >= {button}
+}
+
+set_clipboard_string :: proc(str: string) {
+	cstr := strings.clone_to_cstring(str)
+	defer delete(cstr)
+	sapp.set_clipboard_string(cstr)
 }
