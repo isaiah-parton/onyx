@@ -87,6 +87,7 @@ Core :: struct {
 	layer_stack: Stack(^Layer, MAX_LAYERS),			// The layer context stack
 	id_stack: Stack(Id, MAX_IDS),								// The ID context stack for compound hashing
 
+	cursor_type: sapp.Mouse_Cursor,
 	mouse_button: Mouse_Button,
 	last_mouse_pos,
 	mouse_pos: [2]f32,
@@ -106,20 +107,6 @@ Core :: struct {
 	last_frame_time: time.Time,		// Time of last frame
 	draw_this_frame,
 	draw_next_frame: bool,
-	
-	init_cb: proc(_: rawptr),		// User init proc
-	frame_cb: proc(_: rawptr),	// User frame proc
-	user_ptr: rawptr,						//
-}
-// App descriptor
-Desc :: struct {
-	width,
-	height: i32,
-	fullscreen: bool,
-	title: cstring,
-	init_cb: proc(_: rawptr),
-	frame_cb: proc(_: rawptr),
-	user_ptr: rawptr,
 }
 
 view_box :: proc() -> Box {
@@ -130,202 +117,182 @@ get_mouse_pos :: proc() -> [2]f32 {
 	return core.mouse_pos
 }
 
-run :: proc(desc: Desc) {
-	core.init_cb = desc.init_cb
-	core.frame_cb = desc.frame_cb
-	core.user_ptr = desc.user_ptr
-
-	init_cb :: proc "c" () {
-		context = runtime.default_context()
-		// Set view parameters
-		core.view = {sapp.widthf(), sapp.heightf()}
-		core.last_frame_time = time.now()
-		// Set up graphics environment
-		sg.setup({
-			environment = sglue.environment(),
-			logger = { func = slog.func },
-		})
-		// Prepare debug text context
-		sdtx.setup(sdtx.Desc{
-			logger = { func = slog.func },
-			fonts = {
-        0 = sdtx.font_kc853(),
-        1 = sdtx.font_kc854(),
-        2 = sdtx.font_z1013(),
-        3 = sdtx.font_cpc(),
-        4 = sdtx.font_c64(),
-        5 = sdtx.font_oric(),
-      },
-		})
-		// Prepare the graphics pipeline
-		core.pipeline = sg.make_pipeline(sg.Pipeline_Desc{
-			shader = sg.make_shader(ui_shader_desc(sg.query_backend())),
-			index_type = .UINT16,
-			layout = {
-				attrs = {
-					0 = { offset = i32(offset_of(Vertex, pos)), format = .FLOAT2 },
-					1 = { offset = i32(offset_of(Vertex, uv)), format = .FLOAT2 },
-					2 = { offset = i32(offset_of(Vertex, col)), format = .UBYTE4N },
-				},
-				buffers = {
-					0 = { stride = size_of(Vertex) },
-				},
-			},
-			colors = {
-				0 = {
-					pixel_format = sg.Pixel_Format.RGBA8,
-					write_mask = sg.Color_Mask.RGB,
-					blend = {
-						enabled = true,
-						src_factor_rgb = sg.Blend_Factor.SRC_ALPHA,
-						dst_factor_rgb = sg.Blend_Factor.ONE_MINUS_SRC_ALPHA,
-					},
-				},
-			},
-			depth = {
-				compare = .LESS_EQUAL,
-				write_enabled = true,
-			},
-			label = "pipeline",
-			cull_mode = .NONE,
-		})
-		core.pass_action = {
-			colors = {
-				0 = {
-					load_action = .CLEAR,
-					clear_value = {0, 0, 0, 1},
-				},
-			},
-		}
-		// Prepare graphics buffers
-		core.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
-			type = .INDEXBUFFER,
-			usage = .STREAM,
-			size = MAX_LAYER_INDICES * size_of(u16),
-		})
-		core.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
-			type = .VERTEXBUFFER,
-			usage = .STREAM,
-			size = MAX_LAYER_VERTICES * size_of(Vertex),
-		})
-		core.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
-			min_filter = .NEAREST,
-			mag_filter = .NEAREST,
-			wrap_u = .MIRRORED_REPEAT,
-			wrap_v = .MIRRORED_REPEAT,
-		})
-		// Initialize the font atlas
-		init_atlas(&core.atlas, ATLAS_SIZE, ATLAS_SIZE)
-		// User init callback
-		if core.init_cb != nil {
-			core.init_cb(core.user_ptr)
-		}
-	}
-	frame_cb :: proc "c" () {
-		context = runtime.default_context()
-		now := time.now()
-		core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
-		core.last_frame_time = now
-		// User functions
-		if core.frame_cb != nil {
-			core.frame_cb(core.user_ptr)
-		}
-		// Process elements
-		process_layers()
-		process_widgets()
-		// Display debug text
-		sdtx.canvas(core.view.x, core.view.y)
-		sdtx.font(3)
-		sdtx.pos(1, 1)
-		sdtx.color3b(255, 255, 255)
-		sdtx.printf("frame: %f", sapp.frame_duration())
-		// Update the atlas if needed
-		if core.atlas.was_changed {
-			core.atlas.was_changed = false
-			update_atlas(&core.atlas)
-		}
-		// Draw
-		if core.draw_this_frame {
-			sg.begin_pass({
-				action = core.pass_action,
-				swapchain = sglue.swapchain(),
-			})
-			core.bindings.fs.images[0] = core.atlas.image
-			sg.apply_pipeline(core.pipeline)
-			sg.apply_bindings(core.bindings)
-			tex: Tex = {texSize = core.view}
-			sg.apply_uniforms(.VS, 0, { ptr = &tex, size = size_of(Tex) })
-			// render layers
-			for layer in core.layer_list {
-				sg.update_buffer(core.bindings.index_buffer, { 
-					ptr = raw_data(layer.surface.indices), 
-					size = u64(len(layer.surface.indices) * size_of(u16)),
-				})
-				sg.update_buffer(core.bindings.vertex_buffers[0], { 
-					ptr = raw_data(layer.surface.vertices), 
-					size = u64(len(layer.surface.vertices) * size_of(Vertex)),
-				})
-				// sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
-				sg.draw(0, len(layer.surface.indices), 1)
-				// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
-				clear_draw_surface(&layer.surface)
-			}
-			sdtx.draw()
-			sg.end_pass()
-			sg.commit()
-		} else if core.draw_next_frame {
-			core.draw_next_frame = false
-			core.draw_this_frame = true
-		}
-		// Reset root layer
-		core.root_layer = nil
-	}
-	cleanup_cb :: proc "c" () {
-		context = runtime.default_context()
-		sg.destroy_buffer(core.bindings.index_buffer)
-		sg.destroy_buffer(core.bindings.vertex_buffers[0])
-		sg.destroy_pipeline(core.pipeline)
-		sg.shutdown()
-	}
-	event_cb :: proc "c" (e: ^sapp.Event) {
-		context = runtime.default_context()
-
-		#partial switch e.type {
-			case .MOUSE_DOWN:
-			core.mouse_bits += {Mouse_Button(e.mouse_button)}
-			core.mouse_button = Mouse_Button(e.mouse_button)
-			case .MOUSE_UP:
-			core.mouse_bits -= {Mouse_Button(e.mouse_button)}
-			case .MOUSE_MOVE:
-			core.last_mouse_pos = core.mouse_pos
-			core.mouse_pos = {e.mouse_x, e.mouse_y}
-			case .MOUSE_SCROLL:
-			core.mouse_scroll = {e.scroll_x, e.scroll_y}
-			case .KEY_DOWN:
-			core.keys[e.key_code] = true
-			case .KEY_UP:
-			core.keys[e.key_code] = false
-			case .CHAR:
-			append(&core.runes, rune(e.char_code))
-			case .QUIT_REQUESTED:
-			// sapp.quit()
-			case .RESIZED:
-			core.view = {sapp.widthf(), sapp.heightf()}
-		}
-	}
-
-	sapp.run(sapp.Desc{
-		init_cb = init_cb,
-		frame_cb = frame_cb,
-		cleanup_cb = cleanup_cb,
-		event_cb = event_cb,
-
-		sample_count = 4,
-		width = desc.width,
-		height = desc.height,
-		fullscreen = desc.fullscreen,
-		window_title = desc.title,
+init :: proc () {
+	// Set view parameters
+	core.view = {sapp.widthf(), sapp.heightf()}
+	core.last_frame_time = time.now()
+	// Set up graphics environment
+	sg.setup({
+		environment = sglue.environment(),
+		logger = { func = slog.func },
 	})
+	// Prepare debug text context
+	sdtx.setup(sdtx.Desc{
+		logger = { func = slog.func },
+		fonts = {
+      0 = sdtx.font_kc853(),
+      1 = sdtx.font_kc854(),
+      2 = sdtx.font_z1013(),
+      3 = sdtx.font_cpc(),
+      4 = sdtx.font_c64(),
+      5 = sdtx.font_oric(),
+    },
+	})
+	// Prepare the graphics pipeline
+	core.pipeline = sg.make_pipeline(sg.Pipeline_Desc{
+		shader = sg.make_shader(ui_shader_desc(sg.query_backend())),
+		index_type = .UINT16,
+		layout = {
+			attrs = {
+				0 = { offset = i32(offset_of(Vertex, pos)), format = .FLOAT2 },
+				1 = { offset = i32(offset_of(Vertex, uv)), format = .FLOAT2 },
+				2 = { offset = i32(offset_of(Vertex, col)), format = .UBYTE4N },
+			},
+			buffers = {
+				0 = { stride = size_of(Vertex) },
+			},
+		},
+		colors = {
+			0 = {
+				pixel_format = sg.Pixel_Format.RGBA8,
+				write_mask = sg.Color_Mask.RGB,
+				blend = {
+					enabled = true,
+					src_factor_rgb = sg.Blend_Factor.SRC_ALPHA,
+					dst_factor_rgb = sg.Blend_Factor.ONE_MINUS_SRC_ALPHA,
+				},
+			},
+		},
+		depth = {
+			compare = .LESS_EQUAL,
+			write_enabled = true,
+		},
+		label = "pipeline",
+		cull_mode = .NONE,
+	})
+	core.pass_action = {
+		colors = {
+			0 = {
+				load_action = .CLEAR,
+				clear_value = {0, 0, 0, 1},
+			},
+		},
+	}
+	// Prepare graphics buffers
+	core.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
+		type = .INDEXBUFFER,
+		usage = .STREAM,
+		size = MAX_LAYER_INDICES * size_of(u16),
+	})
+	core.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
+		type = .VERTEXBUFFER,
+		usage = .STREAM,
+		size = MAX_LAYER_VERTICES * size_of(Vertex),
+	})
+	core.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
+		min_filter = .NEAREST,
+		mag_filter = .NEAREST,
+		wrap_u = .MIRRORED_REPEAT,
+		wrap_v = .MIRRORED_REPEAT,
+	})
+	// Initialize the font atlas
+	init_atlas(&core.atlas, ATLAS_SIZE, ATLAS_SIZE)
+}
+
+begin_frame :: proc () {
+	context = runtime.default_context()
+	now := time.now()
+	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
+	core.last_frame_time = now
+}
+
+end_frame :: proc() {
+	sapp.set_mouse_cursor(core.cursor_type)
+	core.cursor_type = sapp.Mouse_Cursor.DEFAULT
+	// Process elements
+	process_layers()
+	process_widgets()
+	// Display debug text
+	sdtx.canvas(core.view.x, core.view.y)
+	sdtx.font(3)
+	sdtx.pos(1, 1)
+	sdtx.color3b(255, 255, 255)
+	sdtx.printf("frame: %f", sapp.frame_duration())
+	// Update the atlas if needed
+	if core.atlas.was_changed {
+		core.atlas.was_changed = false
+		update_atlas(&core.atlas)
+	}
+	// Draw
+	if core.draw_this_frame {
+		sg.begin_pass({
+			action = core.pass_action,
+			swapchain = sglue.swapchain(),
+		})
+		core.bindings.fs.images[0] = core.atlas.image
+		sg.apply_pipeline(core.pipeline)
+		sg.apply_bindings(core.bindings)
+		tex: Tex = {texSize = core.view}
+		sg.apply_uniforms(.VS, 0, { ptr = &tex, size = size_of(Tex) })
+		// render layers
+		for layer in core.layer_list {
+			sg.update_buffer(core.bindings.index_buffer, { 
+				ptr = raw_data(layer.surface.indices), 
+				size = u64(len(layer.surface.indices) * size_of(u16)),
+			})
+			sg.update_buffer(core.bindings.vertex_buffers[0], { 
+				ptr = raw_data(layer.surface.vertices), 
+				size = u64(len(layer.surface.vertices) * size_of(Vertex)),
+			})
+			// sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
+			sg.draw(0, len(layer.surface.indices), 1)
+			// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+			clear_draw_surface(&layer.surface)
+		}
+		sdtx.draw()
+		sg.end_pass()
+		sg.commit()
+	} else if core.draw_next_frame {
+		core.draw_next_frame = false
+		core.draw_this_frame = true
+	}
+	// Reset root layer
+	core.root_layer = nil
+}
+
+quit :: proc () {
+	context = runtime.default_context()
+	sg.destroy_buffer(core.bindings.index_buffer)
+	sg.destroy_buffer(core.bindings.vertex_buffers[0])
+	sg.destroy_pipeline(core.pipeline)
+	sg.shutdown()
+}
+
+handle_event :: proc (e: ^sapp.Event) {
+	context = runtime.default_context()
+
+	#partial switch e.type {
+		case .MOUSE_DOWN:
+		core.mouse_bits += {Mouse_Button(e.mouse_button)}
+		core.mouse_button = Mouse_Button(e.mouse_button)
+		case .MOUSE_UP:
+		core.mouse_bits -= {Mouse_Button(e.mouse_button)}
+		case .MOUSE_MOVE:
+		core.last_mouse_pos = core.mouse_pos
+		core.mouse_pos = {e.mouse_x, e.mouse_y}
+		case .MOUSE_SCROLL:
+		core.mouse_scroll = {e.scroll_x, e.scroll_y}
+		case .KEY_DOWN:
+		core.keys[e.key_code] = true
+		case .KEY_UP:
+		core.keys[e.key_code] = false
+		case .CHAR:
+		append(&core.runes, rune(e.char_code))
+		case .QUIT_REQUESTED:
+		// sapp.quit()
+		case .RESIZED:
+		core.view = {sapp.widthf(), sapp.heightf()}
+	}
 }
 
 key_down :: proc(key: Keyboard_Key) -> bool {

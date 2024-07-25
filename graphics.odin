@@ -196,9 +196,9 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 		case .Center:
 		left = thickness / 2
 		right = left
-		case .Inner:
-		left = thickness
 		case .Outer:
+		left = thickness
+		case .Inner:
 		right = thickness
 	}
 	for i in 0..<path.count {
@@ -375,6 +375,25 @@ draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
 		}
 	}
 }
+draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color: Color) {
+	surface := __get_draw_surface()
+
+	from, to := from, to
+	if from > to do from, to = to, from
+	da := to - from
+	nsteps := int(da / ANGLE_TOLERANCE)
+
+	i := len(surface.vertices)
+
+	begin_path()
+	for n in 0..=nsteps {
+		a := from + da * f32(n) / f32(nsteps)
+		j := len(surface.vertices)
+		point(center + {math.cos(a), math.sin(a)} * radius)
+	}
+	stroke_path(thickness, color, .Inner)
+	end_path()
+}
 draw_box_fill :: proc(box: Box, color: Color) {
 	surface := __get_draw_surface()
 	i := len(surface.vertices)
@@ -393,12 +412,21 @@ draw_box_fill :: proc(box: Box, color: Color) {
 		u16(i + 3),
 		)
 }
+draw_box_stroke :: proc(box: Box, thickness: f32, color: Color) {
+	draw_box_fill({box.low, {box.high.x, box.low.y + thickness}}, color)
+	draw_box_fill({{box.low.x, box.high.y - thickness}, box.high}, color)
+	draw_box_fill({{box.low.x, box.low.y + thickness}, {box.low.x + thickness, box.high.y - thickness}}, color)
+	draw_box_fill({{box.high.x - thickness, box.low.y + thickness}, {box.high.x, box.high.y - thickness}}, color)
+}
 draw_rounded_box_fill :: proc(box: Box, radius: f32, color: Color) {
 	if box.high.x <= box.low.x || box.high.y <= box.low.y {
 		return
 	}
 	radius := min(radius, (box.high.x - box.low.x) / 2, (box.high.y - box.low.y) / 2)
-
+	if radius <= 0 {
+		draw_box_fill(box, color)
+		return
+	}
 	draw_arc_fill(box.low + radius, radius, math.PI, math.PI * 1.5, color)
 	draw_arc_fill({box.high.x - radius, box.low.y + radius}, radius, math.PI * 1.5, math.PI * 2, color)
 	draw_arc_fill(box.high - radius, radius, 0, math.PI * 0.5, color)
@@ -409,6 +437,29 @@ draw_rounded_box_fill :: proc(box: Box, radius: f32, color: Color) {
 	if box.high.y - radius > box.low.y + radius {
 		draw_box_fill({{box.low.x, box.low.y + radius}, {box.low.x + radius, box.high.y - radius}}, color)
 		draw_box_fill({{box.high.x - radius, box.low.y + radius}, {box.high.x, box.high.y - radius}}, color)
+	}
+}
+
+draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) {
+	if box.high.x <= box.low.x || box.high.y <= box.low.y {
+		return
+	}
+	radius := min(radius, (box.high.x - box.low.x) / 2, (box.high.y - box.low.y) / 2)
+	if radius <= 0 {
+		draw_box_stroke(box, thickness, color)
+		return
+	}
+	draw_arc_stroke(box.low + radius, radius, math.PI, math.PI * 1.5, thickness + 0.3, color)
+	draw_arc_stroke({box.high.x - radius, box.low.y + radius}, radius, math.PI * 1.5, math.PI * 2, thickness + 0.3, color)
+	draw_arc_stroke(box.high - radius, radius, 0, math.PI * 0.5, thickness + 0.3, color)
+	draw_arc_stroke({box.low.x + radius, box.high.y - radius}, radius, math.PI * 0.5, math.PI, thickness + 0.3, color)
+	if box.high.x - radius > box.low.x + radius {
+		draw_box_fill({{box.low.x + radius, box.low.y}, {box.high.x - radius, box.low.y + thickness}}, color)
+		draw_box_fill({{box.low.x + radius, box.high.y - thickness}, {box.high.x - radius, box.high.y}}, color)
+	}
+	if box.high.y - radius > box.low.y + radius {
+		draw_box_fill({{box.low.x, box.low.y + radius}, {box.low.x + thickness, box.high.y - radius}}, color)
+		draw_box_fill({{box.high.x - thickness, box.low.y + radius}, {box.high.x, box.high.y - radius}}, color)
 	}
 }
 
@@ -446,4 +497,9 @@ draw_texture :: proc(source, target: Box, color: Color) {
 		u16(i + 2),
 		u16(i + 3),
 		)
+}
+
+foreground :: proc() {
+	draw_rounded_box_fill(layout_box(), core.style.rounding, core.style.color.foreground)
+	draw_rounded_box_stroke(layout_box(), core.style.rounding, 1, core.style.color.substance)
 }

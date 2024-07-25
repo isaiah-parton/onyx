@@ -56,6 +56,7 @@ begin_layer :: proc(box: Box, options: Layer_Options = {}, loc := #caller_locati
 	id := hash(loc)
 
 	layer := core.layer_map[id] or_else (__new_layer(id) or_else panic("Out of layers!"))
+	layer.dead = false
 	layer.id = id
 	layer.box = box
 	layer.options = options
@@ -86,6 +87,7 @@ process_layers :: proc() {
 			when ODIN_DEBUG {
 				fmt.printf("[ui] Deleted layer %x\n", layer.id)
 			}
+			ordered_remove(&core.layer_list, i)
 			delete_key(&core.layer_map, layer.id)
 			if parent, ok := layer.parent.?; ok {
 				for child, j in parent.children {

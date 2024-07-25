@@ -430,7 +430,7 @@ __get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^G
 			image = image,
 			src = src,
 			offset = {f32(glyph_offset_x), f32(glyph_offset_y) + size.ascent},
-			advance = f32((f32(advance) + f32(left_side_bearing)) * size.scale),
+			advance = f32((f32(advance) - f32(left_side_bearing)) * size.scale),
 		}))
 		ok = true
 	}

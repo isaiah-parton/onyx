@@ -53,6 +53,11 @@ end_layout :: proc() {
 	pop_layout()
 }
 
+side :: proc(side: Side) {
+	layout := current_layout()
+	layout.content_side = side
+}
+
 padding :: proc(amount: f32) {
 	layout := current_layout()
 	layout.box = shrink_box(layout.box, amount)
