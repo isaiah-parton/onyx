@@ -363,9 +363,7 @@ load_font :: proc(file_path: string) -> (handle: Font_Handle, success: bool) {
 	}
 	return
 }
-/*
-	Destroy a font and free it's handle
-*/
+// Destroy a font
 unload_font :: proc(handle: Font_Handle) {
 	if font, ok := &core.atlas.fonts[handle].?; ok {
 		destroy_font(font)
@@ -443,7 +441,7 @@ draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 	if info.align_v != .Top {
 		size = measure_text(info)
 		#partial switch info.align_v {
-			case .Middle: origin.y -= math.floor(size.y / 2) 
+			case .Middle: origin.y -= size.y / 2 
 			case .Bottom: origin.y -= size.y
 		}
 	}

@@ -5,6 +5,7 @@ import "core:time"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
+import "core:intrinsics"
 import "core:runtime"
 
 DOUBLE_CLICK_TIME :: 450
@@ -13,6 +14,7 @@ Widget :: struct {
 	id: Id,
 	box: Box,
 	layer: ^Layer,
+	visible,
 	disabled,
 	draggable,
 	dead: bool,
@@ -24,7 +26,15 @@ Widget :: struct {
 	click_count: int,
 	click_time: time.Time,
 	click_button: Mouse_Button,
+
+	allocator: runtime.Allocator,
+	variant: Widget_Variant,
 }
+
+Widget_Variant :: union {
+	Widget_Variant_Graph,
+}
+
 // Interaction state
 Widget_Status :: enum {
 	// Has status
@@ -36,10 +46,9 @@ Widget_Status :: enum {
 	// Pressed and released
 	Clicked,
 }
+
 Widget_State :: bit_set[Widget_Status;u8]
-/*
-	Generic info for calling widgets	
-*/
+
 Generic_Widget_Info :: struct {
 	disabled: bool,
 	id: Maybe(Id),
@@ -48,9 +57,11 @@ Generic_Widget_Info :: struct {
 	// tooltip: Maybe(Tooltip_Info),
 	// options: Widget_Options,
 }
+
 Generic_Widget_Result :: struct {
 	self: Maybe(^Widget),
 }
+
 // Animation
 animate :: proc(value, duration: f32, condition: bool) -> f32 {
 	value := value
@@ -65,16 +76,21 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 	}
 	return value
 }
+
 // [SECTION] Results
+
 was_clicked :: proc(result: Generic_Widget_Result, button: Mouse_Button = .Left, times: int = 1) -> bool {
 	widget := result.self.?
 	return .Clicked in widget.state && widget.click_button == button && widget.click_count >= times
 }
+
 is_hovered :: proc(result: Generic_Widget_Result) -> bool {
 	widget := result.self.?
 	return .Hovered in widget.state
 }
+
 // [SECTION] Processing
+
 get_widget :: proc(info: Generic_Widget_Info, loc: runtime.Source_Code_Location = #caller_location) -> ^Widget {
 	id := info.id.? or_else hash(loc)
 	widget, ok := core.widget_map[id]
@@ -83,17 +99,19 @@ get_widget :: proc(info: Generic_Widget_Info, loc: runtime.Source_Code_Location 
 			if core.widgets[i] == nil {
 				core.widgets[i] = Widget{
 					id = id,
+					allocator = runtime.arena_allocator(&core.arena),
 				}
 				widget = &core.widgets[i].?
 				core.widget_map[id] = widget
 				when ODIN_DEBUG {
-					fmt.printf("[ui] Created widget %x\n", id)
+					fmt.printf("[core] Created widget %x\n", id)
 				}
 				core.draw_next_frame = true
 				break
 			}
 		}
 	}
+	widget.visible = core.draw_this_frame
 	widget.dead = false
 	widget.disabled = info.disabled
 	widget.layer = current_layer()
@@ -102,6 +120,15 @@ get_widget :: proc(info: Generic_Widget_Info, loc: runtime.Source_Code_Location 
 	}
 	return widget
 }
+
+widget_variant :: proc(widget: ^Widget, $T: typeid) -> ^T {
+	if variant, ok := &widget.variant.(T); ok {
+		return variant
+	}
+	widget.variant = T{}
+	return &widget.variant.(T)
+}
+
 // Process all widgets
 process_widgets :: proc() {
 	core.last_hovered_widget = core.hovered_widget
@@ -124,7 +151,10 @@ process_widgets :: proc() {
 	for id, widget in core.widget_map {
 		if widget.dead {
 			when ODIN_DEBUG {
-				fmt.printf("[ui] Deleted widget %x\n", id)
+				fmt.printf("[core] Deleted widget %x\n", id)
+			}
+			if err := free_all(widget.allocator); err != .None {
+				fmt.printf("[core] Error freeing widget data: %v\n", err)
 			}
 			delete_key(&core.widget_map, id)
 			(transmute(^Maybe(Widget))widget)^ = nil
@@ -134,13 +164,14 @@ process_widgets :: proc() {
 		}
 	}
 }
+
 // Commit a widget to be processed
 commit_widget :: proc(widget: ^Widget, hovered: bool) {
 	if !(core.dragged_widget != 0 && widget.id != core.hovered_widget) && core.hovered_layer == widget.layer.id && hovered {
 		core.next_hovered_widget = widget.id
 	}
-	// If hovered
 	widget.last_state = widget.state
+	widget.state -= {.Clicked}
 	// Mouse hover
 	if core.hovered_widget == widget.id {
 		// Add hovered state
@@ -181,64 +212,4 @@ commit_widget :: proc(widget: ^Widget, hovered: bool) {
 		}
 		if widget.draggable do core.dragged_widget = widget.id
 	}
-}
-// [SECTION] Buttons
-Button_Kind :: enum {
-	Primary,
-	Secondary,
-	Outlined,
-	Ghost,
-}
-Button_Info :: struct {
-	using _: Generic_Widget_Info,
-	text: string,
-	kind: Button_Kind,
-}
-Button_Result :: struct {
-	using _: Generic_Widget_Result,
-}
-measure_button :: proc(desc: Button_Info) -> (width: f32) {
-	return
-}
-button :: proc(info: Button_Info, loc := #caller_location) -> (res: Button_Result) {
-	widget := get_widget(info, loc)
-	text_info: Text_Info = {
-		text = info.text,
-		font = core.style.font,
-		size = 18,//core.style.button_text_size,
-	}
-	text_size := measure_text(text_info)
-	size := text_size + {20, 10}
-
-	layout := current_layout()
-	widget.box = cut_box(&layout.box, layout.content_side, size.x if int(layout.content_side) > 1 else size.y)
-	widget.box.low = linalg.floor(widget.box.low)
-	widget.box.high = linalg.floor(widget.box.high)
-	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
-
-	switch info.kind {
-		case .Outlined:
-		if widget.hover_time < 1 {
-			draw_rounded_box_stroke(widget.box, core.style.rounding, 1, core.style.color.substance)
-		}
-		draw_rounded_box_fill(widget.box, core.style.rounding, fade(core.style.color.substance, widget.hover_time))
-		draw_text(center(widget.box) - text_size / 2, text_info, core.style.color.content)
-		case .Secondary:
-		draw_rounded_box_fill(widget.box, core.style.rounding, blend_colors(widget.hover_time * 0.25, core.style.color.substance, core.style.color.foreground))
-		draw_text(center(widget.box) - text_size / 2, text_info, core.style.color.content)
-		case .Primary:
-		draw_rounded_box_fill(widget.box, core.style.rounding, blend_colors(widget.hover_time * 0.25, core.style.color.content, core.style.color.foreground))
-		text_info.font = core.style.thin_font
-		draw_text(center(widget.box) - text_size / 2, text_info, core.style.color.foreground)
-		case .Ghost:
-		draw_rounded_box_fill(widget.box, core.style.rounding, fade(core.style.color.substance, widget.hover_time))
-		draw_text(center(widget.box) - text_size / 2, text_info, core.style.color.content)
-	}
-
-	hovered := point_in_box(core.mouse_pos, widget.box)
-	if hovered {
-		core.cursor_type = .POINTING_HAND
-	}
-	commit_widget(widget, hovered)
-	return
 }

@@ -56,6 +56,7 @@ Mouse_Button :: enum {
 Mouse_Bits :: bit_set[Mouse_Button]
 // The global core data
 Core :: struct {
+	arena: runtime.Arena,
 	view: [2]f32,
 
 	pipeline: sg.Pipeline,				// Graphics pipeline
@@ -258,14 +259,25 @@ end_frame :: proc() {
 	}
 	// Reset root layer
 	core.root_layer = nil
+	core.last_mouse_bits = core.mouse_bits
+	core.last_keys = core.keys
 }
 
 quit :: proc () {
 	context = runtime.default_context()
+
+	for &widget in core.widgets {
+		if widget, ok := widget.?; ok {
+			free_all(widget.allocator)
+		}
+	}
+
 	sg.destroy_buffer(core.bindings.index_buffer)
 	sg.destroy_buffer(core.bindings.vertex_buffers[0])
 	sg.destroy_pipeline(core.pipeline)
 	sg.shutdown()
+
+	fmt.println("[ui] Cleaned up")
 }
 
 handle_event :: proc (e: ^sapp.Event) {

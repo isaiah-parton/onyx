@@ -229,12 +229,12 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 		}
 		line := linalg.normalize(p2 - p1)
 		normal := linalg.normalize([2]f32{-line.y, line.x})
-		tangent1 := line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
 		tangent2 := line if p2 == p3 else linalg.normalize(linalg.normalize(p3 - p2) + line)
 		miter2: [2]f32 = {-tangent2.y, tangent2.x}
 		dot2 := linalg.dot(normal, miter2)
 		// Start of segment
 		if i == 0 { 
+			tangent1 := line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
 			miter1: [2]f32 = {-tangent1.y, tangent1.x}
 			dot1 := linalg.dot(normal, miter1)
 			append(&surface.vertices, 
@@ -271,6 +271,14 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 				)
 		}
 	}
+}
+__join_miter :: proc(p0, p1, p2: [2]f32) -> (dot: f32, miter: [2]f32) {
+	line := linalg.normalize(p2 - p1)
+	normal := linalg.normalize([2]f32{-line.y, line.x})
+	tangent := line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
+	miter = {-tangent.y, tangent.x}
+	dot = linalg.dot(normal, miter)
+	return
 }
 // [SECTION] Draw surfaces
 init_draw_surface :: proc(surface: ^Draw_Surface) {
@@ -349,13 +357,38 @@ draw_line :: proc(a, b: [2]f32, thickness: f32, color: Color) {
 		}, color)
 	}
 }
+
+draw_bezier_stroke :: proc(p0, p1, p2, p3: [2]f32, segments: int, thickness: f32, color: Color) {
+	step: f32 = 1.0 / f32(segments)
+	lp: [2]f32 = p0
+	for t: f32 = step; t <= 1; t += step {
+		times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
+		weights: matrix[4, 4]f32 = {
+			1, 0, 0, 0,
+			-3, 3, 0, 0,
+			3, -6, 3, 0,
+			-1, 3, -3, 1,
+		}
+		p: [2]f32 = {
+			(times * weights * (matrix[4, 1]f32){p0.x, p1.x, p2.x, p3.x})[0][0],
+			(times * weights * (matrix[4, 1]f32){p0.y, p1.y, p2.y, p3.y})[0][0],
+		}
+		draw_line(lp, p, thickness, color)
+		lp = p
+	}
+}
+
+get_arc_steps :: proc(radius, angle: f32) -> int {
+	return max(int((angle / (math.PI * 0.25)) * (radius * 0.25)), 4)
+}
+// Draw a filled arc around a given center
 draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
 	surface := __get_draw_surface()
 
 	from, to := from, to
 	if from > to do from, to = to, from
 	da := to - from
-	nsteps := int(da / ANGLE_TOLERANCE)
+	nsteps := get_arc_steps(radius, da)
 
 	i := len(surface.vertices)
 
@@ -375,13 +408,14 @@ draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
 		}
 	}
 }
+// Draw a stroke along an arc
 draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color: Color) {
 	surface := __get_draw_surface()
 
 	from, to := from, to
 	if from > to do from, to = to, from
 	da := to - from
-	nsteps := int(da / ANGLE_TOLERANCE)
+	nsteps := get_arc_steps(radius, da)
 
 	i := len(surface.vertices)
 

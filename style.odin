@@ -7,9 +7,14 @@ Color_Scheme :: struct {
 	accent,
 	content: Color,
 }
+Font_Style :: enum {
+	Light,
+	Regular,
+	Medium,
+	Bold,
+}
 Style :: struct {
-	font: int,
-	thin_font: int,
+	fonts: [Font_Style]Font_Handle,
 	color: Color_Scheme,
 
 	header_text_size,
@@ -39,20 +44,15 @@ light_color_scheme :: proc() -> Color_Scheme {
 dark_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme{
 		background = {0, 0, 0, 255},
-		foreground = {0, 0, 0, 255},
+		foreground = {15, 15, 15, 255},
 		substance = {45, 45, 45, 255},
 		accent = {59, 130, 246, 255},
 		content = {255, 255, 255, 255},
 	}
 }
 
-set_style_font :: proc(path: string) -> bool {
-	core.style.font = load_font(path) or_return
-	return true
-}
-
-set_style_thin_font :: proc(path: string) -> bool {
-	core.style.thin_font = load_font(path) or_return
+set_style_font :: proc(style: Font_Style, path: string) -> bool {
+	core.style.fonts[style] = load_font(path) or_return
 	return true
 }
 
