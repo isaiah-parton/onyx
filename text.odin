@@ -14,7 +14,7 @@ import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
 
-import sapp "../sokol-odin/sokol/app"
+import sapp "extra:sokol-odin/sokol/app"
 
 import ttf "vendor:stb/truetype"
 

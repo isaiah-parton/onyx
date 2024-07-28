@@ -1,6 +1,6 @@
 package ui
 
-import sg "../sokol-odin/sokol/gfx"
+import sg "extra:sokol-odin/sokol/gfx"
 import "core:slice"
 import "core:fmt"
 import "core:math"

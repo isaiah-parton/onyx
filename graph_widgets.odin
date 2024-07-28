@@ -111,21 +111,22 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 
 			case Graph_Kind_Bar:
 			PADDING :: 4
+			block_size: f32
 			if kind.stacked {
 				// Draw incremental lines
 				for v := info.low; v <= info.high; v += info.increment / T(len(info.fields)) {
 					p := math.floor(box.high.y + (box.low.y - box.high.y) * (f32(v) / f32(info.high - info.low)))
 					draw_box_fill({{box.low.x, p}, {box.high.x, p + 1}}, fade(core.style.color.substance, 0.5))
 				}
-				bar_size := (box.high.x - box.low.x) / f32(len(info.entries))
+				block_size = (box.high.x - box.low.x) / f32(len(info.entries))
 				for &entry, e in info.entries {
-					offset: f32 = box.low.x + bar_size * f32(e)
-					bar: Box = {
+					offset: f32 = box.low.x + block_size * f32(e)
+					block: Box = {
 						{offset + PADDING, box.low.y},
-						{offset + bar_size - PADDING, box.high.y},
+						{offset + block_size - PADDING, box.high.y},
 					}
 					if len(entry.label) > 0 {
-						draw_text({(bar.low.x + bar.high.x) / 2, bar.high.y + 2}, {
+						draw_text({(block.low.x + block.high.x) / 2, block.high.y + 2}, {
 							text = entry.label, 
 							font = core.style.fonts[.Light],
 							size = 16,
@@ -134,9 +135,9 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 						}, core.style.color.content)
 					}
 					height: f32 = 0
-					for &field, f in info.fields {
+					#reverse for &field, f in info.fields {
 						field_height := (f32(entry.values[f]) / f32(info.high * len(info.fields))) * (box.high.y - box.low.y)
-						draw_box_fill({{bar.low.x, bar.high.y - (height + field_height)}, {bar.high.x, bar.high.y - height}}, field.color)
+						draw_box_fill({{block.low.x, block.high.y - (height + field_height)}, {block.high.x, block.high.y - height}}, field.color)
 						height += field_height
 					}
 				}
@@ -146,7 +147,7 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					p := math.floor(box.high.y + (box.low.y - box.high.y) * (f32(v) / f32(info.high - info.low)))
 					draw_box_fill({{box.low.x, p}, {box.high.x, p + 1}}, fade(core.style.color.substance, 0.5))
 				}
-				block_size := (box.high.x - box.low.x) / f32(len(info.entries))
+				block_size = (box.high.x - box.low.x) / f32(len(info.entries))
 				for &entry, e in info.entries {
 					block := cut_box_left(&box, block_size)
 					if len(info.fields) > 1 {
@@ -180,6 +181,33 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 						}
 					}
 				}
+			}
+			hovered_entry := clamp(int((core.mouse_pos.x - widget.box.low.x) / block_size), 0, len(info.entries) - 1)
+			if hovered {
+				// Tooltip
+				begin_tooltip({
+					bounds = widget.box,
+					size = {150, f32(len(info.fields)) * 26 + 6},
+				})
+					padding(3)
+					for &field, f in info.fields {
+						tip_box := shrink_box(cut_box(&current_layout().box, .Top, 26), 3)
+						draw_rounded_box_fill(cut_box_left(&tip_box, 6), core.style.rounding, field.color)
+						draw_text({tip_box.low.x + 10, (tip_box.low.y + tip_box.high.y) / 2}, {
+							text = field.name, 
+							font = core.style.fonts[.Regular], 
+							size = 18,
+							align_v = .Middle,
+						}, color = core.style.color.content)
+						draw_text({tip_box.high.x - 4, (tip_box.low.y + tip_box.high.y) / 2}, {
+							text = tmp_printf("%v", info.entries[hovered_entry].values[f]), 
+							font = core.style.fonts[.Regular], 
+							size = 18,
+							align_h = .Right,
+							align_v = .Middle,
+						}, color = core.style.color.content)
+					}
+				end_tooltip()
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 package ui
-import sg "../sokol-odin/sokol/gfx"
+import sg "extra:sokol-odin/sokol/gfx"
 /*
     #version:1# (machine generated, don't edit!)
 

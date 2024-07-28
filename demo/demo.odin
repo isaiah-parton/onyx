@@ -6,7 +6,7 @@ import "core:fmt"
 import "core:math"
 import "core:runtime"
 
-import sapp "../../sokol-odin/sokol/app"
+import sapp "extra:sokol-odin/sokol/app"
 
 mobile_data: []int = {10, 5, 0, 14, 29, 49, 36, 35, 38, 1, 7, 12, 4}
 desktop_data: []int = {2, 4, 2, 15, 25, 2, 23, 15, 15, 12, 15, 0, 5, 2, 2, 1, 9, 5, 8, 10}
@@ -18,8 +18,8 @@ main :: proc() {
 			context = runtime.default_context()
 
 			ui.init()
-			ui.set_style_font(.Medium, "Geist-Medium.ttf")
-			ui.set_style_font(.Bold, "Geist-Bold.ttf")
+			ui.set_style_font(.Medium, "fonts/Geist-Medium.ttf")
+			ui.set_style_font(.Bold, "fonts/Geist-Bold.ttf")
 			ui.set_color_scheme(ui.dark_color_scheme())
 			ui.set_style_rounding(2)
 		},
@@ -27,7 +27,9 @@ main :: proc() {
 			context = runtime.default_context()
 
 			ui.begin_frame()
-				ui.begin_layer(ui.view_box())
+				ui.begin_layer({
+					box = ui.view_box(),
+				})
 					ui.padding(100)
 					ui.begin_layout_cut(.Top, 65, .Left)
 						ui.foreground()
@@ -68,7 +70,7 @@ main :: proc() {
 							{label = "Feb", values = {12, 6}},
 							{label = "Mar", values = {4, 25}},
 							{label = "Apr", values = {5, 12}},
-							{label = "May", values = {1, 13}},
+							{label = "May", values = {2, 13}},
 							{label = "Jun", values = {1, 16}},
 							{label = "Jul", values = {8, 10}},
 							{label = "Aug", values = {26, 5}},

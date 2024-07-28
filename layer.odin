@@ -26,6 +26,12 @@ Layer :: struct {
 	children: [dynamic]^Layer,	// The layer's children
 	dead: bool,									// Should be deleted?
 }
+Layer_Info :: struct {
+	id: Id,
+	options: Layer_Options,
+	order: Layer_Order,
+	box: Box,
+}
 init_layer :: proc(layer: ^Layer) {
 	init_draw_surface(&layer.surface)
 }
@@ -52,17 +58,24 @@ __new_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
 	}
 	return
 }
-begin_layer :: proc(box: Box, options: Layer_Options = {}, loc := #caller_location) {
-	id := hash(loc)
+begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
+	id := info.id if info.id != 0 else hash(loc)
 
 	layer := core.layer_map[id] or_else (__new_layer(id) or_else panic("Out of layers!"))
 	layer.dead = false
 	layer.id = id
-	layer.box = box
-	layer.options = options
+	layer.box = info.box
+	layer.order = info.order
+	layer.options = info.options
 
 	if core.root_layer == nil {
 		core.root_layer = layer
+	} else {
+		parent := core.layer_stack.items[core.layer_stack.height - 1]
+		if layer.parent != parent {
+			layer.parent = parent
+			append(&parent.children, layer)
+		}
 	}
 	core.draw_surface = &layer.surface
 

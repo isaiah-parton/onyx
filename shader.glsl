@@ -1,6 +1,6 @@
 #version 430 core
 @header package ui
-@header import sg "../sokol-odin/sokol/gfx"
+@header import sg "extra:sokol-odin/sokol/gfx"
 
 @vs vs
 uniform tex {

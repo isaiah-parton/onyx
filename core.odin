@@ -1,11 +1,11 @@
 package ui
 
-import sapp "../sokol-odin/sokol/app"
-import sg "../sokol-odin/sokol/gfx"
-import sgl "../sokol-odin/sokol/gl"
-import slog "../sokol-odin/sokol/log"
-import sglue "../sokol-odin/sokol/glue"
-import sdtx "../sokol-odin/sokol/debugtext"
+import sapp "extra:sokol-odin/sokol/app"
+import sg "extra:sokol-odin/sokol/gfx"
+import sgl "extra:sokol-odin/sokol/gl"
+import slog "extra:sokol-odin/sokol/log"
+import sglue "extra:sokol-odin/sokol/glue"
+import sdtx "extra:sokol-odin/sokol/debugtext"
 
 import "vendor:fontstash"
 

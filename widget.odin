@@ -33,6 +33,7 @@ Widget :: struct {
 
 Widget_Variant :: union {
 	Widget_Variant_Graph,
+	Widget_Variant_Tooltip,
 }
 
 // Interaction state
