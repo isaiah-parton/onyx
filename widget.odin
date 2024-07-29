@@ -34,6 +34,7 @@ Widget :: struct {
 Widget_Variant :: union {
 	Widget_Variant_Graph,
 	Widget_Variant_Tooltip,
+	Widget_Variant_Tabs,
 }
 
 // Interaction state
@@ -207,6 +208,7 @@ commit_widget :: proc(widget: ^Widget, hovered: bool) {
 			for button in Mouse_Button {
 				if button == widget.click_button {
 					widget.state += {.Clicked}
+					widget.state -= {.Pressed}
 					break
 				}
 			}

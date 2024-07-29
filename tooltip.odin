@@ -3,6 +3,8 @@ package ui
 import "core:math"
 import "core:math/linalg"
 
+TOOLTIP_OFFSET :: 10
+
 Tooltip_Info :: struct {
 	bounds: Box,
 	size: [2]f32,
@@ -10,6 +12,7 @@ Tooltip_Info :: struct {
 
 Widget_Variant_Tooltip :: struct {
 	origin: [2]f32,
+	exists: bool,
 }
 
 begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) {
@@ -17,14 +20,18 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) {
 	variant := widget_variant(widget, Widget_Variant_Tooltip)
 
 	bounds := info.bounds if info.bounds != {} else view_box()
-	origin: [2]f32 = core.mouse_pos
+	origin: [2]f32 = core.mouse_pos + TOOLTIP_OFFSET
 	if origin.x + info.size.x > bounds.high.x {
-		origin.x -= info.size.x
+		origin.x -= info.size.x + TOOLTIP_OFFSET * 2
 	}
 	if origin.y + info.size.y > bounds.high.y {
-		origin.y -= info.size.y
+		origin.y -= info.size.y + TOOLTIP_OFFSET * 2
 	}
 	origin = linalg.clamp(origin, bounds.low, bounds.high - info.size)
+	if !variant.exists {
+		variant.exists = true
+		variant.origin = origin
+	}
 	variant.origin += (origin - variant.origin) * 3 * core.delta_time
 	box: Box = {
 		variant.origin,

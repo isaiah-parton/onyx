@@ -474,6 +474,44 @@ draw_rounded_box_fill :: proc(box: Box, radius: f32, color: Color) {
 	}
 }
 
+draw_rounded_box_corners_fill :: proc(box: Box, radius: f32, corners: Corners, color: Color) {
+	if box.high.x <= box.low.x || box.high.y <= box.low.y {
+		return
+	}
+	radius := min(radius, (box.high.x - box.low.x) / 2, (box.high.y - box.low.y) / 2)
+	if radius <= 0 || corners == {} {
+		draw_box_fill(box, color)
+		return
+	}
+	if .Top_Left in corners {
+		draw_arc_fill(box.low + radius, radius, math.PI, math.PI * 1.5, color)
+	} else {
+		draw_box_fill({box.low, box.low + radius}, color)
+	}
+	if .Top_Right in corners {
+		draw_arc_fill({box.high.x - radius, box.low.y + radius}, radius, math.PI * 1.5, math.PI * 2, color)
+	} else {
+		draw_box_fill({{box.high.x - radius, box.low.y}, {box.high.x, box.low.y + radius}}, color)
+	}
+	if .Bottom_Right in corners {
+		draw_arc_fill(box.high - radius, radius, 0, math.PI * 0.5, color)
+	} else {
+		draw_box_fill({box.high - radius, box.high}, color)
+	}
+	if .Bottom_Left in corners {
+		draw_arc_fill({box.low.x + radius, box.high.y - radius}, radius, math.PI * 0.5, math.PI, color)
+	} else {
+		draw_box_fill({{box.low.x, box.high.y - radius}, {box.low.x + radius, box.high.y}}, color)
+	}
+	if box.high.x - radius > box.low.x + radius {
+		draw_box_fill({{box.low.x + radius, box.low.y}, {box.high.x - radius, box.high.y}}, color)
+	}
+	if box.high.y - radius > box.low.y + radius {
+		draw_box_fill({{box.low.x, box.low.y + radius}, {box.low.x + radius, box.high.y - radius}}, color)
+		draw_box_fill({{box.high.x - radius, box.low.y + radius}, {box.high.x, box.high.y - radius}}, color)
+	}
+}
+
 draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) {
 	if box.high.x <= box.low.x || box.high.y <= box.low.y {
 		return

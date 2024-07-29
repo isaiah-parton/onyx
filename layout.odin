@@ -68,6 +68,11 @@ size :: proc(size: f32) {
 	current_layout().next_size = size
 }
 
+relative_size :: proc(factor: f32) {
+	layout := current_layout()
+	layout.next_size = factor * (width(layout.box) if int(layout.next_side) > 1 else height(layout.box))
+}
+
 padding :: proc(amount: f32) {
 	layout := current_layout()
 	layout.box = shrink_box(layout.box, amount)

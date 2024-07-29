@@ -110,15 +110,14 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 			}
 
 			case Graph_Kind_Bar:
-			PADDING :: 4
-			block_size: f32
+			PADDING :: 5
+			block_size: f32 = (box.high.x - box.low.x) / f32(len(info.entries))
 			if kind.stacked {
 				// Draw incremental lines
 				for v := info.low; v <= info.high; v += info.increment / T(len(info.fields)) {
 					p := math.floor(box.high.y + (box.low.y - box.high.y) * (f32(v) / f32(info.high - info.low)))
 					draw_box_fill({{box.low.x, p}, {box.high.x, p + 1}}, fade(core.style.color.substance, 0.5))
 				}
-				block_size = (box.high.x - box.low.x) / f32(len(info.entries))
 				for &entry, e in info.entries {
 					offset: f32 = box.low.x + block_size * f32(e)
 					block: Box = {
@@ -136,8 +135,18 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					}
 					height: f32 = 0
 					#reverse for &field, f in info.fields {
+						if entry.values[f] == 0 {
+							continue
+						}
 						field_height := (f32(entry.values[f]) / f32(info.high * len(info.fields))) * (box.high.y - box.low.y)
-						draw_box_fill({{block.low.x, block.high.y - (height + field_height)}, {block.high.x, block.high.y - height}}, field.color)
+						corners: Corners
+						if f == 0 {
+							corners += {.Top_Left, .Top_Right}
+						}
+						if f == len(info.fields) - 1 {
+							corners += {.Bottom_Left, .Bottom_Right}
+						}
+						draw_rounded_box_corners_fill({{block.low.x, block.high.y - (height + field_height)}, {block.high.x, block.high.y - height}}, core.style.rounding, corners, field.color)
 						height += field_height
 					}
 				}
@@ -147,12 +156,11 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					p := math.floor(box.high.y + (box.low.y - box.high.y) * (f32(v) / f32(info.high - info.low)))
 					draw_box_fill({{box.low.x, p}, {box.high.x, p + 1}}, fade(core.style.color.substance, 0.5))
 				}
-				block_size = (box.high.x - box.low.x) / f32(len(info.entries))
 				for &entry, e in info.entries {
 					block := cut_box_left(&box, block_size)
 					if len(info.fields) > 1 {
-						block.low.x += 5
-						block.high.x -= 5
+						block.low.x += PADDING
+						block.high.x -= PADDING
 					}
 					bar_size := (block.high.x - block.low.x) / f32(len(info.fields))
 					if len(entry.label) > 0 {
