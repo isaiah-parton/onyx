@@ -77,10 +77,14 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 			append(&parent.children, layer)
 		}
 	}
+	clear_draw_surface(&layer.surface)
 	core.draw_surface = &layer.surface
 
 	push(&core.layer_stack, layer)
-	begin_layout(layer.box)
+	begin_layout({
+		box = layer.box,
+	})
+	side(.Top)
 }
 end_layer :: proc() {
 	end_layout()

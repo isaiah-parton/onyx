@@ -2,9 +2,11 @@ package ui
 
 import "core:fmt"
 import "core:time"
+
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
+
 import "core:intrinsics"
 import "core:runtime"
 
@@ -56,6 +58,7 @@ Generic_Widget_Info :: struct {
 	id: Maybe(Id),
 	box: Maybe(Box),
 	corners: Corners,
+	desired_size: [2]f32,		// Calculated minimum size
 	// tooltip: Maybe(Tooltip_Info),
 	// options: Widget_Options,
 }
@@ -93,8 +96,8 @@ is_hovered :: proc(result: Generic_Widget_Result) -> bool {
 
 // [SECTION] Processing
 
-get_widget :: proc(info: Generic_Widget_Info, loc: runtime.Source_Code_Location = #caller_location) -> ^Widget {
-	id := info.id.? or_else hash(loc)
+get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
+	id := info.id.?
 	widget, ok := core.widget_map[id]
 	if !ok {
 		for i in 0..<MAX_WIDGETS {
@@ -113,7 +116,7 @@ get_widget :: proc(info: Generic_Widget_Info, loc: runtime.Source_Code_Location 
 			}
 		}
 	}
-	widget.visible = core.draw_this_frame
+	widget.visible = core.focused
 	widget.dead = false
 	widget.disabled = info.disabled
 	widget.layer = current_layer()
@@ -143,7 +146,7 @@ process_widgets :: proc() {
 	core.next_hovered_widget = 0
 	// Press whatever is hovered and focus what is pressed
 	if mouse_pressed(.Left) {
-		core.draw_this_frame = true
+		core.draw_next_frame = true
 	}
 	// Reset drag status
 	if mouse_released(.Left) {
@@ -215,4 +218,15 @@ commit_widget :: proc(widget: ^Widget, hovered: bool) {
 		}
 		if widget.draggable do core.dragged_widget = widget.id
 	}
+}
+
+compute_layout_size :: proc(padding, spacing: f32, widgets: ..Generic_Widget_Info) -> (size: [2]f32) {
+	for &widget, w in widgets {
+		size += widget.desired_size
+		if w > 0 {
+			size += spacing
+		}
+	}
+	size += padding * 2
+	return
 }

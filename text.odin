@@ -241,7 +241,7 @@ iterate_text_codepoint :: proc(it: ^Text_Iterator, info: Text_Info) -> bool {
 iterate_text :: proc(it: ^Text_Iterator, info: Text_Info) -> (ok: bool) {
 	// Update horizontal offset with last glyph
 	if it.glyph != nil {
-		it.offset.x += it.glyph.advance
+		it.offset.x += math.floor(it.glyph.advance)
 	}
 	/*
 		Pre-paint
@@ -441,8 +441,8 @@ draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 	if info.align_v != .Top {
 		size = measure_text(info)
 		#partial switch info.align_v {
-			case .Middle: origin.y -= size.y / 2 
-			case .Bottom: origin.y -= size.y
+			case .Middle: origin.y -= math.floor(size.y / 2)
+			case .Bottom: origin.y -= math.floor(size.y)
 		}
 	}
 	if it, ok := make_text_iterator(info); ok {
@@ -454,13 +454,10 @@ draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 			}
 			// Paint the glyph
 			if it.codepoint != '\n' && it.codepoint != ' ' && it.glyph != nil {
-				dst: Box = {low = origin + it.offset + it.glyph.offset}
+				dst: Box = {
+					low = origin + it.offset + it.glyph.offset,
+				}
 				dst.high = dst.low + (it.glyph.src.high - it.glyph.src.low)
-				// if clip, ok := info.clip.?; ok {
-				// 	draw_clipped_textured_box(painter.texture, it.glyph.src, dst, clip, color)
-				// } else {
-				// 	draw_textured_box(painter.texture, it.glyph.src, dst, color)
-				// }
 				draw_texture(it.glyph.src, dst, color)
 			}
 			// Update size

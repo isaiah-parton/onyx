@@ -4,55 +4,54 @@ import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 
+@(private="file") SIZE :: 22
+@(private="file") PADDING :: 4
+
 Checkbox_Info :: struct {
 	using generic: Generic_Widget_Info,
 	value: bool,
 	text: string,
 	text_side: Maybe(Side),
+
+	__text_size: [2]f32,
 }
 
-checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Generic_Widget_Result {
-	SIZE :: 22
-	HALF_SIZE :: SIZE / 2
-	PADDING :: 4
-	// Check if there is text
-	has_text := len(info.text) > 0
-	// Default orientation
-	text_side := info.text_side.? or_else .Left
-	// Determine total size
-	size, text_size: [2]f32
-	if has_text {
-		text_size = measure_text({font = core.style.fonts[.Regular], size = 18, text = info.text})
-		if text_side == .Bottom || text_side == .Top {
-			size.x = max(SIZE, text_size.x)
-			size.y = SIZE + text_size.y
+make_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Checkbox_Info {
+	info := info
+	info.id = hash(loc)
+	info.text_side = info.text_side.? or_else .Left
+	if len(info.text) > 0 {
+		info.__text_size = measure_text({font = core.style.fonts[.Regular], size = 18, text = info.text})
+		if info.text_side == .Bottom || info.text_side == .Top {
+			info.desired_size.x = max(SIZE, info.__text_size.x)
+			info.desired_size.y = SIZE + info.__text_size.y
 		} else {
-			size.x = SIZE + text_size.x + PADDING * 2
-			size.y = SIZE
+			info.desired_size.x = SIZE + info.__text_size.x + PADDING * 2
+			info.desired_size.y = SIZE
 		}
 	} else {
-		size = SIZE
+		info.desired_size = SIZE
 	}
-	layout := current_layout()
-	// Create
-	self := get_widget(info, loc)
-	// Colocate
-	self.box = info.box.? or_else align_inner(next_widget_box(), size, {.Middle, .Middle})
-	// Animate
+	return info
+}
+
+display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
+	self := get_widget(info)
+	self.box = info.box.? or_else next_widget_box(info)
 	self.hover_time = animate(self.hover_time, 0.1, .Hovered in self.state)
-	// Painting
+
 	if self.visible {
 		icon_box: Box
-		if has_text {
-			switch text_side {
+		if len(info.text) > 0 {
+			switch info.text_side {
 				case .Left:
 				icon_box = {self.box.low, SIZE}
 				case .Right:
 				icon_box = {{self.box.high.x - SIZE, self.box.low.y}, SIZE}
 				case .Top:
-				icon_box = {{center_x(self.box) - HALF_SIZE, self.box.high.y - SIZE}, SIZE}
+				icon_box = {{center_x(self.box) - SIZE / 2, self.box.high.y - SIZE}, SIZE}
 				case .Bottom:
-				icon_box = {{center_x(self.box) - HALF_SIZE, self.box.low.y}, SIZE}
+				icon_box = {{center_x(self.box) - SIZE / 2, self.box.low.y}, SIZE}
 			}
 			icon_box.low = linalg.floor(icon_box.low)
 			icon_box.high += icon_box.low
@@ -69,7 +68,7 @@ checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Generic_Widget
 		}
 		// Paint icon
 		if info.value {
-			scale: f32 = HALF_SIZE * 0.5
+			scale: f32 = SIZE / 4
 			begin_path()
 			point(center + {-1, -0.047} * scale)
 			point(center + {-0.333, 0.619} * scale)
@@ -78,16 +77,16 @@ checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Generic_Widget
 			end_path()
 		}
 		// Paint text
-		if has_text {
-			switch text_side {
+		if len(info.text) > 0 {
+			switch info.text_side {
 				case .Left: 	
-				draw_text({icon_box.high.x + PADDING, center.y - text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
+				draw_text({icon_box.high.x + PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
 				case .Right: 	
-				draw_text({icon_box.low.x - PADDING, center.y - text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18, align_h = .Right}, fade(core.style.color.content, opacity))
+				draw_text({icon_box.low.x - PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18, align_h = .Right}, fade(core.style.color.content, opacity))
 				case .Top: 		
 				draw_text(self.box.low, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
 				case .Bottom: 	
-				draw_text({self.box.low.x, self.box.high.y - text_size.y}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
+				draw_text({self.box.low.x, self.box.high.y - info.__text_size.y}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
 			}
 		}
 	}
@@ -95,4 +94,8 @@ checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Generic_Widget
 	commit_widget(self, point_in_box(core.mouse_pos, self.box))
 	// We're done here
 	return Generic_Widget_Result{self = self},
+}
+
+do_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Generic_Widget_Result {
+	return display_checkbox(make_checkbox(info, loc))
 }

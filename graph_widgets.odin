@@ -35,8 +35,12 @@ Graph_Field_Info :: struct {
 
 Graph_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	using _: Generic_Widget_Info,
+
 	low, high, increment: T,
 	kind: Graph_Kind,
+
+	spacing: f32,
+
 	fields: []Graph_Field_Info,
 	entries: []Graph_Entry(T),
 }
@@ -46,34 +50,45 @@ Widget_Variant_Graph :: struct{
 	bar_time: f32,
 }
 
-graph :: proc(info: Graph_Info($T), loc := #caller_location) {
-	widget := get_widget(info, loc)
+make_graph :: proc(info: Graph_Info($T), loc := #caller_location) -> Graph_Info(T) {
+	info := info
+	info.id = hash(loc)
+	info.desired_size = {
+		info.spacing * f32(len(info.entries)),
+		f32(info.high - info.low) * 2,
+	}
+	return info
+}
+
+display_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
+	widget := get_widget(info)
 	context.allocator = widget.allocator
-	// Layout
-	widget.box = next_widget_box()
-	// Draw the graph
+
+	widget.box = next_widget_box(info)
+	variant := widget_variant(widget, Widget_Variant_Graph)
+
 	box := widget.box
-	// Hover state
+
 	hovered := point_in_box(core.mouse_pos, widget.box)
 	widget.hover_time = animate(widget.hover_time, 0.1, hovered)
+
 	if len(info.entries) > 1 {
 		switch kind in info.kind {
+
 			case Graph_Kind_Line:
-			// Draw incremental lines
+
 			for v := info.low; v <= info.high; v += info.increment {
 				p := math.floor(box.high.y + (box.low.y - box.high.y) * (f32(v) / f32(info.high - info.low)))
 				draw_box_fill({{box.low.x, p}, {box.high.x, p + 1}}, fade(core.style.color.substance, 0.5))
 			}
-			// Get variant
-			variant := widget_variant(widget, Widget_Variant_Graph)
 			resize(&variant.dot_times, len(info.entries))
-			// Draw the line
+
 			hn := int(math.round((core.mouse_pos.x - box.low.x) / ((box.high.x -  box.low.x) / f32(len(info.entries) - 1))))
 			if hn >= 0 && hn < len(info.entries) {
 				p := box.low.x + (f32(hn) / f32(len(info.entries) - 1)) * (box.high.x - box.low.x)
 				draw_line({p, box.low.y}, {p, box.high.y}, 2, fade(core.style.color.content, widget.hover_time * 0.5))
 			}
-			// Iterate fields
+
 			for &field, f in info.fields {
 				lp: [2]f32
 				begin_path()
@@ -87,6 +102,7 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 				stroke_path(2.5, field.color)
 				end_path()
 			}
+
 			for &field, f in info.fields {
 				lp: [2]f32
 				for &entry, e in info.entries {
@@ -110,20 +126,30 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 			}
 
 			case Graph_Kind_Bar:
+
 			PADDING :: 5
 			block_size: f32 = (box.high.x - box.low.x) / f32(len(info.entries))
+			hovered_entry := clamp(int((core.mouse_pos.x - widget.box.low.x) / block_size), 0, len(info.entries) - 1)
+
+			if hovered {
+				draw_box_fill({{box.low.x + f32(hovered_entry) * block_size, box.low.y}, {box.low.x + f32(hovered_entry) * block_size + block_size, box.high.y}}, fade(core.style.color.substance, 0.5))
+			}
+
 			if kind.stacked {
-				// Draw incremental lines
+
 				for v := info.low; v <= info.high; v += info.increment / T(len(info.fields)) {
 					p := math.floor(box.high.y + (box.low.y - box.high.y) * (f32(v) / f32(info.high - info.low)))
 					draw_box_fill({{box.low.x, p}, {box.high.x, p + 1}}, fade(core.style.color.substance, 0.5))
 				}
+
 				for &entry, e in info.entries {
+
 					offset: f32 = box.low.x + block_size * f32(e)
 					block: Box = {
 						{offset + PADDING, box.low.y},
 						{offset + block_size - PADDING, box.high.y},
 					}
+
 					if len(entry.label) > 0 {
 						draw_text({(block.low.x + block.high.x) / 2, block.high.y + 2}, {
 							text = entry.label, 
@@ -133,7 +159,9 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 							align_v = .Top,
 						}, core.style.color.content)
 					}
+
 					height: f32 = 0
+
 					#reverse for &field, f in info.fields {
 						if entry.values[f] == 0 {
 							continue
@@ -190,18 +218,16 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					}
 				}
 			}
-			hovered_entry := clamp(int((core.mouse_pos.x - widget.box.low.x) / block_size), 0, len(info.entries) - 1)
 			if hovered {
 				// Tooltip
 				begin_tooltip({
 					bounds = widget.box,
 					size = {150, f32(len(info.fields)) * 26 + 6},
 				})
-					padding(3)
 					for &field, f in info.fields {
 						tip_box := shrink_box(cut_box(&current_layout().box, .Top, 26), 3)
 						draw_rounded_box_fill(cut_box_left(&tip_box, 6), core.style.rounding, field.color)
-						draw_text({tip_box.low.x + 10, (tip_box.low.y + tip_box.high.y) / 2}, {
+						draw_text({tip_box.low.x + 8, (tip_box.low.y + tip_box.high.y) / 2}, {
 							text = field.name, 
 							font = core.style.fonts[.Regular], 
 							size = 18,
@@ -219,4 +245,8 @@ graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 			}
 		}
 	}
+}
+
+do_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
+	display_graph(make_graph(info, loc))
 }

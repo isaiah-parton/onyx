@@ -12,8 +12,12 @@ import "vendor:fontstash"
 import "core:time"
 import "core:runtime"
 // import "core:funtime"
+
 import "core:fmt"
 import "core:strings"
+
+import "core:thread"
+
 import "core:math"
 import "core:math/linalg"
 
@@ -61,7 +65,6 @@ Core :: struct {
 
 	pipeline: sg.Pipeline,				// Graphics pipeline
 	bindings: sg.Bindings,				// Buffer and image bindings
-	pass_action: sg.Pass_Action,	// 
 
 	layer_list: [dynamic]^Layer,					// Layers ordered by their z-index
 	layer_map: map[Id]^Layer,							// Map lookup by id
@@ -104,6 +107,8 @@ Core :: struct {
 	atlas: Atlas,
 	style: Style,
 
+	focused: bool,
+	frame_count: int,
 	delta_time: f32,							// Delta time in seconds
 	last_frame_time: time.Time,		// Time of last frame
 	draw_this_frame,
@@ -120,8 +125,10 @@ get_mouse_pos :: proc() -> [2]f32 {
 
 init :: proc () {
 	// Set view parameters
+	core.focused = true
 	core.view = {sapp.widthf(), sapp.heightf()}
 	core.last_frame_time = time.now()
+	core.draw_next_frame = true
 	// Set up graphics environment
 	sg.setup({
 		environment = sglue.environment(),
@@ -171,14 +178,6 @@ init :: proc () {
 		label = "pipeline",
 		cull_mode = .NONE,
 	})
-	core.pass_action = {
-		colors = {
-			0 = {
-				load_action = .CLEAR,
-				clear_value = {0, 0, 0, 1},
-			},
-		},
-	}
 	// Prepare graphics buffers
 	core.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
 		type = .INDEXBUFFER,
@@ -198,10 +197,13 @@ init :: proc () {
 	})
 	// Initialize the font atlas
 	init_atlas(&core.atlas, ATLAS_SIZE, ATLAS_SIZE)
+
+	core.style.button_text_size = 18
+	core.style.content_text_size = 16
+	core.style.header_text_size = 28
 }
 
 begin_frame :: proc () {
-	context = runtime.default_context()
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
@@ -213,21 +215,31 @@ end_frame :: proc() {
 	// Process elements
 	process_layers()
 	process_widgets()
-	// Display debug text
-	sdtx.canvas(core.view.x, core.view.y)
-	sdtx.font(3)
-	sdtx.pos(1, 1)
-	sdtx.color3b(255, 255, 255)
-	sdtx.printf("frame: %f", sapp.frame_duration())
+	// Draw
 	// Update the atlas if needed
 	if core.atlas.was_changed {
 		core.atlas.was_changed = false
 		update_atlas(&core.atlas)
 	}
-	// Draw
+	// Display debug text
+	sdtx.canvas(core.view.x, core.view.y)
+	sdtx.font(3)
+	sdtx.pos(1, 1)
+	sdtx.color3b(255, 255, 255)
+	sdtx.printf("time: %f\n", sapp.frame_duration())
+	sdtx.printf("frame: %i\n", core.frame_count)
+
 	if core.draw_this_frame {
+		// Normal render pass
 		sg.begin_pass({
-			action = core.pass_action,
+			action = {
+				colors = {
+					0 = {
+						load_action = .CLEAR,
+						clear_value = {0, 0, 0, 1},
+					},
+				},
+			},
 			swapchain = sglue.swapchain(),
 		})
 		core.bindings.fs.images[0] = core.atlas.image
@@ -248,24 +260,38 @@ end_frame :: proc() {
 			// sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
 			sg.draw(0, len(layer.surface.indices), 1)
 			// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
-			clear_draw_surface(&layer.surface)
 		}
-		sdtx.draw()
+		core.frame_count += 1
+		core.draw_this_frame = false
 		sg.end_pass()
-		sg.commit()
 	} else if core.draw_next_frame {
 		core.draw_next_frame = false
 		core.draw_this_frame = true
 	}
+	// Blank render pass
+	sg.begin_pass(sg.Pass{
+		action = sg.Pass_Action{
+			colors = {
+				0 = {
+					load_action = .LOAD,
+					store_action = .STORE,
+				},
+			},
+		},
+		swapchain = sglue.swapchain(),
+	})
+	sdtx.draw()
+	sg.end_pass()
+	sg.commit()
+	
 	// Reset root layer
 	core.root_layer = nil
+	core.last_mouse_pos = core.mouse_pos
 	core.last_mouse_bits = core.mouse_bits
 	core.last_keys = core.keys
 }
 
 quit :: proc () {
-	context = runtime.default_context()
-
 	for &widget in core.widgets {
 		if widget, ok := widget.?; ok {
 			free_all(widget.allocator)
@@ -281,29 +307,38 @@ quit :: proc () {
 }
 
 handle_event :: proc (e: ^sapp.Event) {
-	context = runtime.default_context()
-
 	#partial switch e.type {
+		case .FOCUSED:
+		core.focused = true
+		case .UNFOCUSED:
+		core.focused = false
 		case .MOUSE_DOWN:
 		core.mouse_bits += {Mouse_Button(e.mouse_button)}
 		core.mouse_button = Mouse_Button(e.mouse_button)
+		core.draw_next_frame = true
 		case .MOUSE_UP:
 		core.mouse_bits -= {Mouse_Button(e.mouse_button)}
+		core.draw_next_frame = true
 		case .MOUSE_MOVE:
-		core.last_mouse_pos = core.mouse_pos
 		core.mouse_pos = {e.mouse_x, e.mouse_y}
+		core.draw_next_frame = true
 		case .MOUSE_SCROLL:
 		core.mouse_scroll = {e.scroll_x, e.scroll_y}
+		core.draw_next_frame = true
 		case .KEY_DOWN:
 		core.keys[e.key_code] = true
+		core.draw_next_frame = true
 		case .KEY_UP:
 		core.keys[e.key_code] = false
+		core.draw_next_frame = true
 		case .CHAR:
 		append(&core.runes, rune(e.char_code))
+		core.draw_next_frame = true
 		case .QUIT_REQUESTED:
 		// sapp.quit()
 		case .RESIZED:
 		core.view = {sapp.widthf(), sapp.heightf()}
+		core.draw_next_frame = true
 	}
 }
 

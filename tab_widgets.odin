@@ -15,13 +15,24 @@ Tabs_Result :: struct {
 	index: Maybe(int),
 }
 
-tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Result) {
-	widget := get_widget(info, loc)
+make_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> Tabs_Info {
+	info := info
+	info.id = hash(loc)
+	info.desired_size = {
+		0,
+		30,
+	}
+	return info
+}
+
+display_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Result) {
+	widget := get_widget(info)
 	context.allocator = widget.allocator
-	variant := widget_variant(widget, Widget_Variant_Tabs)
-	widget.box = next_widget_box()
+	widget.box = next_widget_box(info)
 	result.self = widget
 
+	variant := widget_variant(widget, Widget_Variant_Tabs)
+	
 	draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.substance)
 
 	box := shrink_box(widget.box, 4)
@@ -52,4 +63,8 @@ tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Result) 
 	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
 
 	return
+}
+
+do_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> Tabs_Result {
+	return display_tabs(make_tabs(info, loc))
 }

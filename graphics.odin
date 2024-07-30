@@ -572,6 +572,7 @@ draw_texture :: proc(source, target: Box, color: Color) {
 }
 
 foreground :: proc() {
-	draw_rounded_box_fill(layout_box(), core.style.rounding, core.style.color.foreground)
-	draw_rounded_box_stroke(layout_box(), core.style.rounding, 1, core.style.color.substance)
+	layout := current_layout()
+	draw_rounded_box_fill(layout.box, core.style.rounding, core.style.color.foreground)
+	draw_rounded_box_stroke(layout.box, core.style.rounding, 1, core.style.color.substance)
 }

@@ -1,5 +1,6 @@
 package ui
 
+import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
@@ -32,10 +33,15 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) {
 		variant.exists = true
 		variant.origin = origin
 	}
-	variant.origin += (origin - variant.origin) * 3 * core.delta_time
 	box: Box = {
-		variant.origin,
-		variant.origin + info.size,
+		linalg.floor(variant.origin),
+		linalg.floor(variant.origin + info.size),
+	}
+
+	diff := (origin - variant.origin)
+	if abs(diff.x) >= 0.1 || abs(diff.y) >= 0.1 {
+		variant.origin += diff * 10 * core.delta_time
+		core.draw_this_frame = true
 	}
 
 	begin_layer({

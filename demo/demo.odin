@@ -32,41 +32,59 @@ main :: proc() {
 				ui.begin_layer({
 					box = ui.view_box(),
 				})
-					ui.padding(100)
-					ui.begin_layout_cut(.Top, 65, .Left)
+					ui.shrink(100)
+					ui.begin_layout({
+						size = 65,
+					})
 						ui.foreground()
-						ui.padding(15)
-						ui.button({text = "your", kind = .Primary})
+						my_button := ui.make_button({text = "ok"})
+						other_button := ui.make_button({text = "and?"})
+						ui.begin_layout({
+							side = .Right,
+							show_lines = true,
+							size = ui.compute_layout_size(15, 10, my_button, other_button).x,
+						})
+							ui.shrink(15)
+							ui.side(.Right)
+							ui.display_button(other_button)
+							ui.space(10)
+							ui.display_button(my_button)
+						ui.end_layout()
+						ui.shrink(15)
+						ui.do_button({text = "your", kind = .Primary})
 						ui.space(10)
-						ui.button({text = "house", kind = .Secondary})
+						ui.do_button({text = "house", kind = .Secondary})
 						ui.space(10)
-						ui.button({text = "is", kind = .Outlined})
+						ui.do_button({text = "is", kind = .Outlined})
 						ui.space(10)
-						ui.button({text = "flammable", kind = .Ghost})
+						ui.do_button({text = "flammable", kind = .Ghost})
 					ui.end_layout()
 					ui.space(20)
-					ui.begin_layout_cut(.Top, 65, .Left)
+					ui.begin_layout({
+						size = 65,
+					})
 						ui.foreground()
-						ui.padding(15)
 						ui.size(200)
-						if ui.was_clicked(ui.checkbox({text = "checkbox", value = graph_stacked})) {
+						if ui.was_clicked(ui.do_checkbox({text = "checkbox", value = graph_stacked})) {
 							graph_stacked = !graph_stacked
 						}
 						ui.space(10)
-						slider_value = ui.slider(ui.Slider_Info(f32){
+						slider_value = ui.do_slider(ui.Slider_Info(f32){
 							value = slider_value,
 							low = 0,
 							high = 100,
 						}).value.? or_else slider_value
 					ui.end_layout()
 					ui.space(20)
-					ui.begin_layout_cut(.Top, 300, .Top)
+					ui.begin_layout({
+						size = 300,
+					})
 						ui.foreground()
-						ui.padding(30)
+						ui.side(.Top)
 						ui.relative_size(1)
-						ui.graph(ui.Graph_Info(int){
+						ui.shrink(30)
+						ui.do_graph(ui.Graph_Info(int){
 							kind = ui.Graph_Kind_Bar{
-								show_labels = true,
 								stacked = graph_stacked,
 							},
 							low = 0,
@@ -83,7 +101,7 @@ main :: proc() {
 								{label = "Apr", values = {5, 12}},
 								{label = "May", values = {2, 13}},
 								{label = "Jun", values = {1, 16}},
-								{label = "Jul", values = {8, 10}},
+								{label = "Jul", values = {0, 10}},
 								{label = "Aug", values = {26, 5}},
 								{label = "Sep", values = {43, 6}},
 								{label = "Oct", values = {41, 26}},
@@ -94,7 +112,7 @@ main :: proc() {
 					ui.end_layout()
 					ui.space(50)
 					ui.size(40)
-					tab_index = ui.tabs({
+					tab_index = ui.do_tabs({
 						options = {"when", "the", "lights", "go", "out"},
 						index = tab_index,
 					}).index.? or_else tab_index
@@ -112,6 +130,8 @@ main :: proc() {
 			ui.handle_event(e)
 		},
 
+		enable_clipboard = true,
+		enable_dragndrop = true,
 		sample_count = 4,
 		width = 1000,
 		height = 800,

@@ -208,36 +208,26 @@ cut_box :: proc(box: ^Box, side: Side, amount: f32) -> Box {
 	}
 	return {}
 }
-
 // extend a box and return the attached piece
-grow_box_left :: proc(box: ^Box, a: f32) -> (res: Box) {
-	box.low.x -= a
-	res = {box.low, {box.low.x + a, box.high.y}}
-	return
+grow_box_left :: proc(box: ^Box, a: f32) {
+	box.high.x = max(box.high.x, box.low.x + a)
 }
-grow_box_top :: proc(box: ^Box, a: f32) -> (res: Box) {
-	box.low.y -= a
-	res = {box.low, {box.high.x, box.low.y + a}}
-	return
+grow_box_top :: proc(box: ^Box, a: f32) {
+	box.high.y = max(box.high.y, box.low.y + a)
 }
-grow_box_right :: proc(box: ^Box, a: f32) -> (res: Box) {
-	box.high.x -= a 
-	res = {{box.high.x - a, box.low.y}, box.high}
-	return
+grow_box_right :: proc(box: ^Box, a: f32) {
+	box.low.x = min(box.low.x, box.high.x - a)
 }
-grow_box_bottom :: proc(box: ^Box, a: f32) -> (res: Box) {
-	res = {{box.low.x, box.high.y}, {box.high.x, box.high.y + a}}
-	box.high.y += a 
-	return
+grow_box_bottom :: proc(box: ^Box, a: f32) {
+	box.low.y = min(box.low.y, box.high.y - a)
 }
-grow_box :: proc(box: ^Box, side: Side, amount: f32) -> Box {
+grow_box :: proc(box: ^Box, side: Side, amount: f32) {
 	switch side {
-		case .Bottom: 	return grow_box_top(box, amount)
-		case .Top: 			return grow_box_bottom(box, amount)
-		case .Right: 		return grow_box_left(box, amount)
-		case .Left: 		return grow_box_right(box, amount)
+		case .Bottom: 	grow_box_top(box, amount)
+		case .Top: 			grow_box_bottom(box, amount)
+		case .Right: 		grow_box_left(box, amount)
+		case .Left: 		grow_box_right(box, amount)
 	}
-	return {}
 }
 
 // get a cut piece of a box
