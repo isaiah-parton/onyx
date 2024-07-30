@@ -224,6 +224,7 @@ display_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					bounds = widget.box,
 					size = {150, f32(len(info.fields)) * 26 + 6},
 				})
+					shrink(3)
 					for &field, f in info.fields {
 						tip_box := shrink_box(cut_box(&current_layout().box, .Top, 26), 3)
 						draw_rounded_box_fill(cut_box_left(&tip_box, 6), core.style.rounding, field.color)

@@ -116,7 +116,7 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 			}
 		}
 	}
-	widget.visible = core.focused
+	widget.visible = core.visible && core.draw_this_frame
 	widget.dead = false
 	widget.disabled = info.disabled
 	widget.layer = current_layer()

@@ -7,6 +7,8 @@ import slog "extra:sokol-odin/sokol/log"
 import sglue "extra:sokol-odin/sokol/glue"
 import sdtx "extra:sokol-odin/sokol/debugtext"
 
+import pq "extra:libpq"
+
 import "vendor:fontstash"
 
 import "core:time"
@@ -107,6 +109,7 @@ Core :: struct {
 	atlas: Atlas,
 	style: Style,
 
+	visible,
 	focused: bool,
 	frame_count: int,
 	delta_time: f32,							// Delta time in seconds
@@ -125,6 +128,7 @@ get_mouse_pos :: proc() -> [2]f32 {
 
 init :: proc () {
 	// Set view parameters
+	core.visible = true
 	core.focused = true
 	core.view = {sapp.widthf(), sapp.heightf()}
 	core.last_frame_time = time.now()
@@ -207,6 +211,15 @@ begin_frame :: proc () {
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
+
+	if core.mouse_pos != core.last_mouse_pos {
+		core.draw_this_frame = true
+	}
+
+	if core.draw_next_frame {
+		core.draw_next_frame = false
+		core.draw_this_frame = true
+	}
 }
 
 end_frame :: proc() {
@@ -228,6 +241,7 @@ end_frame :: proc() {
 	sdtx.color3b(255, 255, 255)
 	sdtx.printf("time: %f\n", sapp.frame_duration())
 	sdtx.printf("frame: %i\n", core.frame_count)
+
 
 	if core.draw_this_frame {
 		// Normal render pass
@@ -264,9 +278,6 @@ end_frame :: proc() {
 		core.frame_count += 1
 		core.draw_this_frame = false
 		sg.end_pass()
-	} else if core.draw_next_frame {
-		core.draw_next_frame = false
-		core.draw_this_frame = true
 	}
 	// Blank render pass
 	sg.begin_pass(sg.Pass{
@@ -308,37 +319,41 @@ quit :: proc () {
 
 handle_event :: proc (e: ^sapp.Event) {
 	#partial switch e.type {
-		case .FOCUSED:
+		case .FOCUSED, .SUSPENDED:
 		core.focused = true
-		case .UNFOCUSED:
+		case .UNFOCUSED, .RESUMED:
 		core.focused = false
+		case .ICONIFIED:
+		core.visible = false
+		case .RESTORED:
+		core.visible = true
 		case .MOUSE_DOWN:
 		core.mouse_bits += {Mouse_Button(e.mouse_button)}
 		core.mouse_button = Mouse_Button(e.mouse_button)
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 		case .MOUSE_UP:
 		core.mouse_bits -= {Mouse_Button(e.mouse_button)}
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 		case .MOUSE_MOVE:
 		core.mouse_pos = {e.mouse_x, e.mouse_y}
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 		case .MOUSE_SCROLL:
 		core.mouse_scroll = {e.scroll_x, e.scroll_y}
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 		case .KEY_DOWN:
 		core.keys[e.key_code] = true
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 		case .KEY_UP:
 		core.keys[e.key_code] = false
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 		case .CHAR:
 		append(&core.runes, rune(e.char_code))
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 		case .QUIT_REQUESTED:
 		// sapp.quit()
 		case .RESIZED:
 		core.view = {sapp.widthf(), sapp.heightf()}
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 	}
 }
 

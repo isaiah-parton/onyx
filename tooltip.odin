@@ -41,7 +41,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) {
 	diff := (origin - variant.origin)
 	if abs(diff.x) >= 0.1 || abs(diff.y) >= 0.1 {
 		variant.origin += diff * 10 * core.delta_time
-		core.draw_this_frame = true
+		core.draw_next_frame = true
 	}
 
 	begin_layer({
