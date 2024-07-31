@@ -1,6 +1,6 @@
 package demo
 
-import ui ".."
+import ui "../ui"
 
 import "core:fmt"
 import "core:math"
@@ -64,6 +64,7 @@ main :: proc() {
 						size = 65,
 					})
 						ui.foreground()
+						ui.shrink(15)
 						ui.size(200)
 						if ui.was_clicked(ui.do_checkbox({text = "checkbox", value = graph_stacked})) {
 							graph_stacked = !graph_stacked
@@ -74,6 +75,10 @@ main :: proc() {
 							low = 0,
 							high = 100,
 						}).value.? or_else slider_value
+						ui.space(10)
+						ui.do_text_input({
+							data = nil,
+						})
 					ui.end_layout()
 					ui.space(20)
 					ui.begin_layout({

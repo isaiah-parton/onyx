@@ -68,11 +68,11 @@ display_button :: proc(info: Button_Info) -> (res: Button_Result) {
 		}
 	}
 
-	hovered := point_in_box(core.mouse_pos, widget.box)
-	if hovered {
+	if .Hovered in widget.state {
 		core.cursor_type = .POINTING_HAND
 	}
-	commit_widget(widget, hovered)
+
+	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
 	return
 }
 

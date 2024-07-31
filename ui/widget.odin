@@ -123,60 +123,8 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 	if box, ok := info.box.?; ok {
 		widget.box = box
 	}
-	return widget
-}
-
-widget_variant :: proc(widget: ^Widget, $T: typeid) -> ^T {
-	if variant, ok := &widget.variant.(T); ok {
-		return variant
-	}
-	widget.variant = T{}
-	return &widget.variant.(T)
-}
-
-// Process all widgets
-process_widgets :: proc() {
-	core.last_hovered_widget = core.hovered_widget
-	core.hovered_widget = core.next_hovered_widget
-	// Make sure dragged widgets are hovered
-	if core.dragged_widget != 0 {
-		core.hovered_widget = core.dragged_widget
-	}
-	// Reset next hover id so if nothing is hovered nothing will be hovered
-	core.next_hovered_widget = 0
-	// Press whatever is hovered and focus what is pressed
-	if mouse_pressed(.Left) {
-		core.draw_next_frame = true
-	}
-	// Reset drag status
-	if mouse_released(.Left) {
-		core.dragged_widget = 0
-	}
-	// Free unused widgets
-	for id, widget in core.widget_map {
-		if widget.dead {
-			when ODIN_DEBUG {
-				fmt.printf("[core] Deleted widget %x\n", id)
-			}
-			if err := free_all(widget.allocator); err != .None {
-				fmt.printf("[core] Error freeing widget data: %v\n", err)
-			}
-			delete_key(&core.widget_map, id)
-			(transmute(^Maybe(Widget))widget)^ = nil
-			core.draw_next_frame = true
-		} else {
-			widget.dead = false
-		}
-	}
-}
-
-// Commit a widget to be processed
-commit_widget :: proc(widget: ^Widget, hovered: bool) {
-	if !(core.dragged_widget != 0 && widget.id != core.hovered_widget) && core.hovered_layer == widget.layer.id && hovered {
-		core.next_hovered_widget = widget.id
-	}
 	widget.last_state = widget.state
-	widget.state -= {.Clicked}
+	widget.state -= {.Clicked, .Focused}
 	// Mouse hover
 	if core.hovered_widget == widget.id {
 		// Add hovered state
@@ -217,6 +165,62 @@ commit_widget :: proc(widget: ^Widget, hovered: bool) {
 			}
 		}
 		if widget.draggable do core.dragged_widget = widget.id
+	}
+	if core.focused_widget == widget.id {
+		widget.state += {.Focused}
+	}
+	return widget
+}
+
+widget_variant :: proc(widget: ^Widget, $T: typeid) -> ^T {
+	if variant, ok := &widget.variant.(T); ok {
+		return variant
+	}
+	widget.variant = T{}
+	return &widget.variant.(T)
+}
+
+// Process all widgets
+process_widgets :: proc() {
+	core.last_hovered_widget = core.hovered_widget
+	core.hovered_widget = core.next_hovered_widget
+	// Make sure dragged widgets are hovered
+	if core.dragged_widget != 0 {
+		core.hovered_widget = core.dragged_widget
+	}
+	// Reset next hover id so if nothing is hovered nothing will be hovered
+	core.next_hovered_widget = 0
+	// Press whatever is hovered and focus what is pressed
+	if mouse_pressed(.Left) {
+		core.focused_widget = core.hovered_widget
+		core.draw_next_frame = true
+	}
+	// Reset drag status
+	if mouse_released(.Left) {
+		core.dragged_widget = 0
+	}
+	// Free unused widgets
+	for id, widget in core.widget_map {
+		if widget.dead {
+			when ODIN_DEBUG {
+				fmt.printf("[core] Deleted widget %x\n", id)
+			}
+			if err := free_all(widget.allocator); err != .None {
+				fmt.printf("[core] Error freeing widget data: %v\n", err)
+			}
+			delete_key(&core.widget_map, id)
+			(transmute(^Maybe(Widget))widget)^ = nil
+			core.draw_next_frame = true
+		} else {
+			widget.dead = false
+		}
+	}
+}
+
+// Commit a widget to be processed
+commit_widget :: proc(widget: ^Widget, hovered: bool) {
+	if !(core.dragged_widget != 0 && widget.id != core.hovered_widget) && core.hovered_layer == widget.layer.id && hovered {
+		core.next_hovered_widget = widget.id
 	}
 }
 

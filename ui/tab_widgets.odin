@@ -42,7 +42,7 @@ display_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_
 		hover_time := variant.timers[o]
 		option_box := cut_box_left(&box, option_size)
 		if info.index != o {
-			if point_in_box(core.mouse_pos, option_box) {
+			if widget.state >= {.Hovered} && point_in_box(core.mouse_pos, option_box) {
 				if was_clicked(result) {
 					result.index = o
 				}

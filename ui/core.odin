@@ -77,7 +77,7 @@ Core :: struct {
 	last_hovered_widget,
 	hovered_widget,
 	next_hovered_widget: Id,
-
+	focused_widget,
 	dragged_widget: Id,
 
 	root_layer: ^Layer,
@@ -212,7 +212,7 @@ begin_frame :: proc () {
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
 
-	if core.mouse_pos != core.last_mouse_pos {
+	if core.mouse_pos != core.last_mouse_pos || core.mouse_bits != core.last_mouse_bits {
 		core.draw_this_frame = true
 	}
 
@@ -242,7 +242,6 @@ end_frame :: proc() {
 	sdtx.printf("time: %f\n", sapp.frame_duration())
 	sdtx.printf("frame: %i\n", core.frame_count)
 
-
 	if core.draw_this_frame {
 		// Normal render pass
 		sg.begin_pass({
@@ -271,15 +270,15 @@ end_frame :: proc() {
 				ptr = raw_data(layer.surface.vertices), 
 				size = u64(len(layer.surface.vertices) * size_of(Vertex)),
 			})
-			// sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
+			sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
 			sg.draw(0, len(layer.surface.indices), 1)
-			// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+			sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
 		}
 		core.frame_count += 1
 		core.draw_this_frame = false
 		sg.end_pass()
 	}
-	// Blank render pass
+	// Blank render pass to copy framebuffers
 	sg.begin_pass(sg.Pass{
 		action = sg.Pass_Action{
 			colors = {

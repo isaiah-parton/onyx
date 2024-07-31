@@ -546,7 +546,7 @@ draw_rune_aligned_clipped :: proc(font: Font_Handle, size: f32, icon: rune, orig
 }
 
 Interactive_Text_Info :: struct {
-	using base: Text_Info,
+	using _: Text_Info,
 	focus_selects_all,
 	read_only: bool,
 }
@@ -561,10 +561,10 @@ Interactive_Text_Result :: struct {
 	// New selection
 	selection: Text_Selection,
 }
-/*
-	Paint interactable text
-*/
-draw_interactive_text :: proc(widget: ^Widget, origin: [2]f32, info: Interactive_Text_Info, color: Color) {
+
+// Draw interactive text
+draw_interactive_text :: proc(result: Generic_Widget_Result, origin: [2]f32, info: Interactive_Text_Info, color: Color) {
+	widget := result.self.?
 	// Initial measurement
 	size := measure_text(info)
 	origin := origin
