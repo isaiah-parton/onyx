@@ -37,6 +37,7 @@ Widget_Variant :: union {
 	Widget_Variant_Graph,
 	Widget_Variant_Tooltip,
 	Widget_Variant_Tabs,
+	Text_Input_Widget_Variant,
 }
 
 // Interaction state

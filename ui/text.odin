@@ -10,6 +10,7 @@ import "core:math/linalg"
 
 import "core:fmt"
 
+import "core:text/edit"
 import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
@@ -27,33 +28,20 @@ Horizontal_Text_Align :: enum {
 	Middle,
 	Right,
 }
+
 Vertical_Text_Align :: enum {
 	Top,
 	Middle,
 	Baseline,
 	Bottom,
 }
-/*
-	Text editing
-*/
-Text_Selection :: union {
-	Text_Selection_Index,
-	Text_Selection_Range,
-}
-Text_Selection_Index :: struct {
-	index,
-	line,
-	column: int,
-}
-Text_Selection_Range :: struct {
-	start,
-	end: int,
-}
+
 Text_Wrap :: enum {
 	None,
 	Regular,
 	Word,
 }
+
 Text_Info :: struct {
 	font: Font_Handle,
 	size: f32,
@@ -65,6 +53,7 @@ Text_Info :: struct {
 	align_v: Vertical_Text_Align,
 	hidden: bool,
 }
+
 Text_Iterator :: struct {
 	font: ^Font,
 	size: ^Font_Size,
@@ -545,11 +534,6 @@ draw_rune_aligned_clipped :: proc(font: Font_Handle, size: f32, icon: rune, orig
 	return icon_size
 }
 
-Interactive_Text_Info :: struct {
-	using _: Text_Info,
-	focus_selects_all,
-	read_only: bool,
-}
 Interactive_Text_Result :: struct {
 	// If a selection or a change was made
 	changed: bool,
@@ -558,21 +542,15 @@ Interactive_Text_Result :: struct {
 	// Text and selection bounds
 	bounds,
 	selection_bounds: Box,
-	// New selection
-	selection: Text_Selection,
 }
 
 // Draw interactive text
-draw_interactive_text :: proc(result: Generic_Widget_Result, origin: [2]f32, info: Interactive_Text_Info, color: Color) {
+draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, origin: [2]f32, info: Text_Info, color: Color) -> Interactive_Text_Result {
 	widget := result.self.?
+	using result: Interactive_Text_Result
 	// Initial measurement
 	size := measure_text(info)
 	origin := origin
-	// Prepare result
-	using result: Interactive_Text_Result = {
-		selection_bounds = {math.F32_MAX, {}},
-		selection = core.text_selection,
-	}
 	// Layer to paint on
 	surface := __get_draw_surface()
 	// Apply baseline if needed
@@ -589,7 +567,7 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, origin: [2]f32, inf
 		// Determine hovered line
 		line_height := it.size.ascent - it.size.descent + it.size.line_gap
 		line_count := int(math.floor(size.y / line_height))
-		hovered_line := clamp(int((core.mouse_pos.y - origin.y) / line_height), 0, line_count - 1)
+		hovered_line := clamp(int((core.mouse_pos.y - origin.y) / line_height), 0, line_count)
 		// Current line and column
 		line, column: int
 		// Keep track of smallest distance to mouse
@@ -651,20 +629,23 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, origin: [2]f32, inf
 			glyph_color := color
 			// Get selection info
 			if .Focused in (widget.state) {
-				switch &selection in core.text_selection {
-					case Text_Selection_Index:
-					if selection.index == it.index {
-						selection.line = line
-						selection.column = column
-						glyph_color = core.style.color.content
-					}
-					case Text_Selection_Range:
-					if it.index >= selection.start && it.index <= selection.end {
+				lo, hi := edit.sorted_selection(s)
+				if hi == lo {
+					if lo == it.index {
 						line_box_bounds = {
-							min(line_box_bounds[0], point.x),
-							max(line_box_bounds[1], point.x),
+							point.x,
+							point.x,
 						}
-						glyph_color = core.style.color.content
+						draw_box_fill({{point.x - 1, point.y - 2}, {point.x + 1, point.y + it.size.ascent - it.size.descent + 2}}, core.style.color.accent)
+					}
+				} else if it.index >= lo && hi > it.index {
+					glyph_color = core.style.color.content
+					line_box_bounds = {
+						min(line_box_bounds[0], point.x),
+						max(line_box_bounds[1], point.x),
+					}
+					if it.glyph != nil {
+						draw_box_fill({{point.x - 1, point.y - 2}, {point.x + it.glyph.advance + 1, point.y + it.size.ascent - it.size.descent + 2}}, core.style.color.accent)
 					}
 				}
 			}
@@ -674,7 +655,9 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, origin: [2]f32, inf
 				dst: Box = {low = point + it.glyph.offset}
 				dst.high = dst.low + (it.glyph.src.high - it.glyph.src.low)
 				bounds.high = linalg.max(bounds.high, dst.high)
+				surface.z = -0.001
 				draw_texture(it.glyph.src, dst, glyph_color)
+				surface.z = 0
 			}
 			// Paint this line's selection
 			if (.Focused in widget.state) && (it.index >= len(info.text) || info.text[it.index] == '\n') {
@@ -688,7 +671,7 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, origin: [2]f32, inf
 						linalg.min(selection_bounds.low, box.low),
 						linalg.max(selection_bounds.high, box.high),
 					}
-					draw_box_fill(box, core.style.color.accent)
+					
 					line_box_bounds = {math.F32_MAX, 0}
 				}
 			}
@@ -700,65 +683,39 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, origin: [2]f32, inf
 			column += 1
 		}
 	}
-	
-	// These require `hover_index` to be determined
-	if selection, ok := core.text_selection.(Text_Selection_Range); ok {
-		if .Focused in widget.state {
-			if (key_pressed(.C) && (key_down(.LEFT_CONTROL) || key_down(.RIGHT_CONTROL))) {
-				set_clipboard_string(info.text[selection.start:selection.end])
+
+	if .Pressed in widget.state {
+		if .Pressed not_in widget.last_state {
+			if widget.click_count == 3 {
+				edit.perform_command(s, .Select_All)
+			} else {
+				s.selection = {hover_index, hover_index}
 			}
 		}
-	}
-	/*// Update selection
-	if .Pressed in (widget.state - widget.last_state) {
-		if widget.click_count == 3 {
-			// Select everything
-			selection.offset = strings.last_index_byte(info.text[:hover_index], '\n') + 1
-			ui.scribe.anchor = selection.offset
-			selection.length = strings.index_byte(info.text[ui.scribe.anchor:], '\n')
-			if selection.length == -1 {
-				selection.length = len(info.text) - selection.offset
-			}
-		} else {
-			// Normal select
-			selection.offset = hover_index
-			ui.scribe.anchor = hover_index
-			selection.length = 0
-		}
-	}
-	// Dragging
-	if (.Pressed in widget.state) && (widget.click_count < 3) {
-		// Selection by dragging
 		if widget.click_count == 2 {
 			next, last: int
-			if hover_index < ui.scribe.anchor {
+			if hover_index < s.selection[1] {
 				last = hover_index if info.text[hover_index] == ' ' else max(0, strings.last_index_any(info.text[:hover_index], " \n") + 1)
-				next = strings.index_any(info.text[ui.scribe.anchor:], " \n")
+				next = strings.index_any(info.text[s.selection[1]:], " \n")
 				if next == -1 {
-					next = len(info.text) - ui.scribe.anchor
+					next = len(info.text)
+				} else {
+					next += s.selection[1]
 				}
-				next += ui.scribe.anchor
 			} else {
-				last = max(0, strings.last_index_any(info.text[:ui.scribe.anchor], " \n") + 1)
+				last = max(0, strings.last_index_any(info.text[:s.selection[1]], " \n") + 1)
 				next = 0 if (hover_index > 0 && info.text[hover_index - 1] == ' ') else strings.index_any(info.text[hover_index:], " \n")
 				if next == -1 {
 					next = len(info.text) - hover_index
 				}
 				next += hover_index
 			}
-			selection.offset = last
-			selection.length = next - last
+			s.selection = {last, next}
 		} else {
-			if hover_index < ui.scribe.anchor {
-				selection.offset = hover_index
-				selection.length = ui.scribe.anchor - hover_index
-			} else {
-				selection.offset = ui.scribe.anchor
-				selection.length = hover_index - ui.scribe.anchor
-			}
+			s.selection[1] = hover_index
 		}
-	}*/
-	return
+	}
+	return result
 }
 
 /*draw_text_box :: proc(info: Text_Box_Info, loc := #caller_location) -> Text_Box_Result {

@@ -15,28 +15,36 @@ Stroke_Justify :: enum {
 }
 
 Color :: [4]u8
+
 Image ::struct {
 	width, height: int,
 	data: []u8,
 	channels: int,
 }
+
 Vertex :: struct {
 	pos: [2]f32,
 	uv: [2]f32,
 	col: [4]u8,
+	z: f32,
 }
+
 Draw_State :: struct {
 	font: int,
 }
+
 Draw_Surface :: struct {
 	vertices: [dynamic]Vertex,
 	indices: [dynamic]u16,
+	z: f32,
 }
+
 Path :: struct {
 	points: [MAX_PATH_POINTS][2]f32,
 	count: int,
 	closed: bool,
 }
+
 // [SECTION] Colors
 blend_colors :: proc(time: f32, colors: ..Color) -> Color {
 	if len(colors) > 0 {
@@ -60,6 +68,7 @@ blend_colors :: proc(time: f32, colors: ..Color) -> Color {
 	}
 	return {}
 }
+
 // Color processing
 set_color_brightness :: proc(color: Color, value: f32) -> Color {
 	delta := clamp(i32(255.0 * value), -255, 255)
@@ -70,17 +79,21 @@ set_color_brightness :: proc(color: Color, value: f32) -> Color {
 		color.a,
 	}
 }
+
 color_to_hsv :: proc(color: Color) -> [4]f32 {
 	hsva := linalg.vector4_rgb_to_hsl(linalg.Vector4f32{f32(color.r) / 255.0, f32(color.g) / 255.0, f32(color.b) / 255.0, f32(color.a) / 255.0})
 	return hsva.xyzw
 }
+
 color_from_hsv :: proc(hue, saturation, value: f32) -> Color {
 	rgba := linalg.vector4_hsl_to_rgb(hue, saturation, value, 1.0)
 	return {u8(rgba.r * 255.0), u8(rgba.g * 255.0), u8(rgba.b * 255.0), u8(rgba.a * 255.0)}
 }
+
 fade :: proc(color: Color, alpha: f32) -> Color {
 	return {color.r, color.g, color.b, u8(f32(color.a) * alpha)}
 }
+
 alpha_blend_colors_tint :: proc(dst, src, tint: Color) -> (out: Color) {
 	out = 255
 
@@ -106,29 +119,37 @@ alpha_blend_colors_tint :: proc(dst, src, tint: Color) -> (out: Color) {
 	}
 	return
 }
+
 alpha_blend_colors_time :: proc(dst, src: Color, time: f32) -> (out: Color) {
 	return alpha_blend_colors_tint(dst, src, fade(255, time))
 }
+
 alpha_blend_colors :: proc {
 	alpha_blend_colors_time,
 	alpha_blend_colors_tint,
 }
+
 // [SECTION] Paths
 clear_path :: proc(path: ^Path) {
 	path.count = 0
 }
+
 __get_path :: proc() -> ^Path {
 	return &core.paths.items[core.paths.height - 1]
 }
+
 begin_path :: proc() {
 	push(&core.paths, Path{})
 }
+
 end_path :: proc() {
 	pop(&core.paths)
 }
+
 close_path :: proc() {
 	__get_path().closed = true
 }
+
 point :: proc(point: [2]f32) {
 	path := __get_path()
 	if path.count >= MAX_PATH_POINTS {
@@ -137,6 +158,7 @@ point :: proc(point: [2]f32) {
 	path.points[path.count] = point
 	path.count += 1
 }
+
 bezier :: proc(p0, p1, p2, p3: [2]f32, segments: int) {
 	step: f32 = 1.0 / f32(segments)
 	for t: f32 = step; t <= 1; t += step {
@@ -153,6 +175,7 @@ bezier :: proc(p0, p1, p2, p3: [2]f32, segments: int) {
 		})
 	}
 }
+
 arc :: proc(center: [2]f32, radius, from, to: f32) {
 	da := to - from
 	nsteps := int(abs(da) / ANGLE_TOLERANCE)
@@ -161,6 +184,7 @@ arc :: proc(center: [2]f32, radius, from, to: f32) {
 		point(center + {math.cos(a), math.sin(a)} * radius)
 	}
 }
+
 fill_path :: proc(color: Color) {
 	path := __get_path()
 	if path.count < 3 {
@@ -169,11 +193,11 @@ fill_path :: proc(color: Color) {
 	surface := __get_draw_surface()
 	i := u16(len(surface.vertices))
 	append(&surface.vertices, 
-		Vertex{pos = path.points[0], col = color},
+		Vertex{pos = path.points[0], col = color, z = surface.z},
 		)
 	for j in 1..<path.count {
 		append(&surface.vertices, 
-			Vertex{pos = path.points[j], col = color},
+			Vertex{pos = path.points[j], col = color, z = surface.z},
 			)
 		if j < path.count - 1 {
 			append(&surface.indices,
@@ -184,6 +208,7 @@ fill_path :: proc(color: Color) {
 		}
 	}
 }
+
 stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Center) {
 	path := __get_path()
 	if path.count < 2 {
@@ -237,41 +262,42 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 			tangent1 := line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
 			miter1: [2]f32 = {-tangent1.y, tangent1.x}
 			dot1 := linalg.dot(normal, miter1)
-			append(&surface.vertices, 
-				Vertex{pos = p1 - (left / dot1) * miter1, col = color},
-				Vertex{pos = p1 + (right / dot1) * miter1, col = color},
+			__vertices(surface, 
+				Vertex{pos = p1 + (right / dot1) * miter1, col = color, z = surface.z},
+				Vertex{pos = p1 - (left / dot1) * miter1, col = color, z = surface.z},
 			)
 		}
 
 		// End of segment
-		append(&surface.vertices, 
-			Vertex{pos = p2 - (left / dot2) * miter2, col = color},
-			Vertex{pos = p2 + (right / dot2) * miter2, col = color},
+		__vertices(surface, 
+			Vertex{pos = p2 + (right / dot2) * miter2, col = color, z = surface.z},
+			Vertex{pos = p2 - (left / dot2) * miter2, col = color, z = surface.z},
 		)
 		// Join vertices
 		if path.closed && i == path.count - 1 {
 			// Join to first endpoint
-			append(&surface.indices, 
+			__indices(surface, 
 				base_index + u16(i * 2), 
 				base_index + u16(i * 2 + 1), 
 				base_index,
 				base_index + u16(i * 2 + 1),
-				base_index,
 				base_index + 1,
+				base_index,
 				)
 		} else if i < path.count - 1 {
 			// Join to next endpoint
-			append(&surface.indices, 
+			__indices(surface, 
 				base_index + u16(i * 2),
 				base_index + u16(i * 2 + 1),
 				base_index + u16(i * 2 + 2),
 				base_index + u16(i * 2 + 3),
-				base_index + u16(i * 2 + 1),
 				base_index + u16(i * 2 + 2),
+				base_index + u16(i * 2 + 1),
 				)
 		}
 	}
 }
+
 __join_miter :: proc(p0, p1, p2: [2]f32) -> (dot: f32, miter: [2]f32) {
 	line := linalg.normalize(p2 - p1)
 	normal := linalg.normalize([2]f32{-line.y, line.x})
@@ -280,42 +306,57 @@ __join_miter :: proc(p0, p1, p2: [2]f32) -> (dot: f32, miter: [2]f32) {
 	dot = linalg.dot(normal, miter)
 	return
 }
+
 // [SECTION] Draw surfaces
 init_draw_surface :: proc(surface: ^Draw_Surface) {
-	reserve(&surface.vertices, 65536)
-	reserve(&surface.indices, 65536)
+	reserve(&surface.vertices, 8096)
+	reserve(&surface.indices, 8096)
 }
+
 make_draw_surface :: proc() -> Draw_Surface {
 	res: Draw_Surface
 	init_draw_surface(&res)
 	return res
 }
+
 destroy_draw_surface :: proc(surface: ^Draw_Surface) {
 	delete(surface.indices)
 	delete(surface.vertices)
 }
+
 clear_draw_surface :: proc(surface: ^Draw_Surface) {
 	clear(&surface.vertices)
 	clear(&surface.indices)
 }
+
 __get_draw_surface :: proc() -> ^Draw_Surface {
 	return core.draw_surface.?
 }
+
 destroy_image :: proc(using self: ^Image) {
 	delete(data)
 }
+
+__vertices :: proc(s: ^Draw_Surface, vertices: ..Vertex) {
+	append(&s.vertices, ..vertices)
+}
+
+__indices :: proc(s: ^Draw_Surface, indices: ..u16) {
+	append(&s.indices, ..indices)
+}
+
 /*
 	Basic shapes drawn in immediate mode
 */
 draw_triangle_fill :: proc(a, b, c: [2]f32, color: Color) {
 	surface := __get_draw_surface()
 	i := len(surface.vertices)
-	append(&surface.vertices, 
+	__vertices(surface, 
 		Vertex{pos = a, col = color},
 		Vertex{pos = b, col = color},
 		Vertex{pos = c, col = color},
 		)
-	append(&surface.indices,
+	__indices(surface,
 		u16(i),
 		u16(i + 1),
 		u16(i + 2),
@@ -392,15 +433,15 @@ draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
 
 	i := len(surface.vertices)
 
-	append(&surface.vertices, Vertex{pos = center, col = color})
+	__vertices(surface, Vertex{pos = center, col = color})
 	for n in 0..=nsteps {
 		a := from + da * f32(n) / f32(nsteps)
 		j := len(surface.vertices)
-		append(&surface.vertices, 
+		__vertices(surface, 
 			Vertex{pos = center + {math.cos(a), math.sin(a)} * radius, col = color},
 			)
 		if n < nsteps {
-			append(&surface.indices, 
+			__indices(surface, 
 				u16(i), 
 				u16(j), 
 				u16(j + 1),
@@ -431,19 +472,19 @@ draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color:
 draw_box_fill :: proc(box: Box, color: Color) {
 	surface := __get_draw_surface()
 	i := len(surface.vertices)
-	append(&surface.vertices, 
-		Vertex{pos = box.low, col = color},
-		Vertex{pos = {box.low.x, box.high.y}, col = color},
-		Vertex{pos = box.high, col = color},
-		Vertex{pos = {box.high.x, box.low.y}, col = color},
+	__vertices(surface, 
+		Vertex{pos = box.low, col = color, z = surface.z},
+		Vertex{pos = {box.low.x, box.high.y}, col = color, z = surface.z},
+		Vertex{pos = box.high, col = color, z = surface.z},
+		Vertex{pos = {box.high.x, box.low.y}, col = color, z = surface.z},
 		)
-	append(&surface.indices,
+	__indices(surface,
 		u16(i),
+		u16(i + 2),
 		u16(i + 1),
-		u16(i + 2),
 		u16(i),
-		u16(i + 2),
 		u16(i + 3),
+		u16(i + 2),
 		)
 }
 draw_box_stroke :: proc(box: Box, thickness: f32, color: Color) {
@@ -539,35 +580,39 @@ draw_texture :: proc(source, target: Box, color: Color) {
 	surface := __get_draw_surface()
 	i := len(surface.vertices)
 	tex_size: [2]f32 = {f32(core.atlas.width), f32(core.atlas.height)}
-	append(&surface.vertices, 
+	__vertices(surface, 
 		Vertex{
 			pos = target.low, 
 			col = color, 
 			uv = source.low / tex_size,
+			z = surface.z,
 		},
 		Vertex{
 			pos = {target.low.x, target.high.y}, 
 			col = color, 
 			uv = [2]f32{source.low.x, source.high.y} / tex_size,
+			z = surface.z,
 		},
 		Vertex{
 			pos = target.high, 
 			col = color, 
 			uv = source.high / tex_size,
+			z = surface.z,
 		},
 		Vertex{
 			pos = {target.high.x, target.low.y}, 
 			col = color, 
 			uv = [2]f32{source.high.x, source.low.y} / tex_size,
+			z = surface.z,
 		},
 		)
-	append(&surface.indices,
+	__indices(surface,
 		u16(i),
+		u16(i + 2),
 		u16(i + 1),
-		u16(i + 2),
 		u16(i),
-		u16(i + 2),
 		u16(i + 3),
+		u16(i + 2),
 		)
 }
 

@@ -4,6 +4,7 @@ import ui "../ui"
 
 import "core:fmt"
 import "core:math"
+import "core:strings"
 import "core:runtime"
 
 import sapp "extra:sokol-odin/sokol/app"
@@ -13,8 +14,10 @@ desktop_data: []int = {2, 4, 2, 15, 25, 2, 23, 15, 15, 12, 15, 0, 5, 2, 2, 1, 9,
 graph_stacked: bool
 tab_index: int
 slider_value: f32
+builder := strings.Builder{}
 
 main :: proc() {
+	strings.write_string(&builder, "sample text")
 	sapp.run(sapp.Desc{
 		init_cb = proc "c" () {
 			context = runtime.default_context()
@@ -77,7 +80,7 @@ main :: proc() {
 						}).value.? or_else slider_value
 						ui.space(10)
 						ui.do_text_input({
-							data = nil,
+							builder = &builder,
 						})
 					ui.end_layout()
 					ui.space(20)

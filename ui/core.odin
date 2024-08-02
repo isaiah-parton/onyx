@@ -134,8 +134,9 @@ init :: proc () {
 	core.last_frame_time = time.now()
 	core.draw_next_frame = true
 	// Set up graphics environment
-	sg.setup({
-		environment = sglue.environment(),
+	environment := sglue.environment()
+	sg.setup(sg.Desc{
+		environment = environment,
 		logger = { func = slog.func },
 	})
 	// Prepare debug text context
@@ -159,6 +160,7 @@ init :: proc () {
 				0 = { offset = i32(offset_of(Vertex, pos)), format = .FLOAT2 },
 				1 = { offset = i32(offset_of(Vertex, uv)), format = .FLOAT2 },
 				2 = { offset = i32(offset_of(Vertex, col)), format = .UBYTE4N },
+				3 = { offset = i32(offset_of(Vertex, z)), format = .FLOAT },
 			},
 			buffers = {
 				0 = { stride = size_of(Vertex) },
@@ -176,11 +178,12 @@ init :: proc () {
 			},
 		},
 		depth = {
+			pixel_format = .DEPTH,
 			compare = .LESS_EQUAL,
 			write_enabled = true,
 		},
 		label = "pipeline",
-		cull_mode = .NONE,
+		cull_mode = .BACK,
 	})
 	// Prepare graphics buffers
 	core.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
@@ -245,12 +248,15 @@ end_frame :: proc() {
 	if core.draw_this_frame {
 		// Normal render pass
 		sg.begin_pass({
-			action = {
+			action = sg.Pass_Action{
 				colors = {
 					0 = {
 						load_action = .CLEAR,
 						clear_value = {0, 0, 0, 1},
 					},
+				},
+				depth = {
+					load_action = .CLEAR,
 				},
 			},
 			swapchain = sglue.swapchain(),
@@ -287,6 +293,10 @@ end_frame :: proc() {
 					store_action = .STORE,
 				},
 			},
+			depth = {
+				load_action = .LOAD,
+				store_action = .STORE,
+			},
 		},
 		swapchain = sglue.swapchain(),
 	})
@@ -298,6 +308,7 @@ end_frame :: proc() {
 	core.root_layer = nil
 	core.last_mouse_pos = core.mouse_pos
 	core.last_mouse_bits = core.mouse_bits
+	clear(&core.runes)
 	core.last_keys = core.keys
 }
 
@@ -341,6 +352,9 @@ handle_event :: proc (e: ^sapp.Event) {
 		core.draw_this_frame = true
 		case .KEY_DOWN:
 		core.keys[e.key_code] = true
+		if e.key_repeat {
+			core.last_keys[e.key_code] = false
+		}
 		core.draw_this_frame = true
 		case .KEY_UP:
 		core.keys[e.key_code] = false
