@@ -19,7 +19,7 @@ make_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> Tabs_Info {
 	info := info
 	info.id = hash(loc)
 	info.desired_size = {
-		0,
+		f32(len(info.options)) * 100,
 		30,
 	}
 	return info

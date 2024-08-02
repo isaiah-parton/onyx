@@ -15,9 +15,9 @@ Layout :: struct {
 	original_box,				// Original box
 	box: Box,						// Current box to cut from
 	next_side: Side,		// Next side to cut from
-	next_size: f32,			// Next cut size
+	next_size: [2]f32,	// Next cut size
 
-	show_lines: bool,
+	show_lines: bool,		
 	side: Maybe(Side),	// What side was the layout cut from (if it was cut)
 }
 
@@ -45,7 +45,19 @@ cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32)
 }
 
 next_widget_box :: proc(info: Generic_Widget_Info) -> Box {
-	box := cut_layout(current_layout(), nil, info.desired_size)
+	layout := current_layout()
+	size := linalg.min(linalg.max(layout.next_size, info.desired_size), layout.box.high - layout.box.low)
+	box := cut_layout(layout, nil, size)
+	if int(layout.next_side) > 1 {
+		if size.y < box_height(box) {
+			box.low.y = box_center_y(box) - size.y / 2
+			box.high.y = box.low.y + size.y
+		}
+	} else {
+		if size.x < box_width(box) {
+			box.high.x = box.low.x + size.x
+		}
+	}
 	return {
 		linalg.floor(box.low),
 		linalg.floor(box.high),
@@ -97,13 +109,33 @@ side :: proc(side: Side) {
 	layout.next_side = side
 }
 
-size :: proc(size: f32) {
-	current_layout().next_size = size
+set_width :: proc(width: f32) {
+	current_layout().next_size.x = width
 }
-
-relative_size :: proc(factor: f32) {
+set_width_auto :: proc() {
+	current_layout().next_size.x = 0
+}
+set_width_fill :: proc() {
 	layout := current_layout()
-	layout.next_size = factor * (width(layout.box) if int(layout.next_side) > 1 else height(layout.box))
+	layout.next_size.x = box_width(layout.box)
+}
+set_width_percent :: proc(width: f32) {
+	layout := current_layout()
+	layout.next_size.x = box_width(layout.box) * (width / 100)
+}
+set_height :: proc(height: f32) {
+	current_layout().next_size.y = height
+}
+set_height_auto :: proc() {
+	current_layout().next_size.y = 0
+}
+set_height_fill :: proc() {
+	layout := current_layout()
+	layout.next_size.y = box_height(layout.box)
+}
+set_height_percent :: proc(height: f32) {
+	layout := current_layout()
+	layout.next_size.y = box_height(layout.box) * (height / 100)
 }
 
 shrink :: proc(amount: f32) {

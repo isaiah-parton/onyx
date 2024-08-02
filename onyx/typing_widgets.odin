@@ -3,8 +3,9 @@ package ui
 import "core:fmt"
 import "core:strings"
 import "core:slice"
+import "core:time"
 
-import "core:text/edit"
+import edit "../scri"
 
 Text_Input_Info :: struct {
 	using _: Generic_Widget_Info,
@@ -49,11 +50,28 @@ display_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result)
 		edit.init(s, widget.allocator, widget.allocator)
 	}
 
+	widget.focus_time = animate(widget.focus_time, 0.15, .Focused in widget.state)
+
 	text_info: Text_Info = {
 		font = core.style.fonts[.Regular],
 		text = strings.to_string(info.builder^),
+		spacing = 1,
 		size = core.style.content_text_size,
-		align_v = .Middle,
+	}
+
+	text_origin: [2]f32 = {
+		widget.box.low.x + 5, 
+		0,
+	}
+
+	if font, ok := &core.atlas.fonts[text_info.font].?; ok {
+		if font_size, ok := get_font_size(font, text_info.size); ok {
+			if info.multiline {
+				text_origin.y = widget.box.low.y + (font_size.ascent - font_size.descent) / 2
+			} else {
+				text_origin.y = (widget.box.high.y + widget.box.low.y) / 2 - (font_size.ascent - font_size.descent) / 2
+			}
+		}
 	}
 
 	if .Focused in (widget.state - widget.last_state) {
@@ -64,16 +82,28 @@ display_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result)
 
 	result.self = widget
 
+	begin_layer({
+		box = widget.box,
+		options = {.Attached},
+	})
 	if widget.visible || .Focused in widget.state {
 		draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.background)
 		draw_rounded_box_stroke(widget.box, core.style.rounding, 1, core.style.color.substance)
+		if len(text_info.text) == 0 {
+			text_info := text_info
+			text_info.text = info.placeholder
+			draw_text(text_origin, text_info, fade(core.style.color.content, 0.5))
+		}
 		if .Focused in widget.state {
-			draw_rounded_box_stroke(expand_box(widget.box, 4), core.style.rounding + 2, 2, core.style.color.accent)
-			draw_interactive_text(result, s, {widget.box.low.x + 5, (widget.box.high.y + widget.box.low.y) / 2}, text_info, core.style.color.content)
+			draw_interactive_text(result, s, text_origin, text_info, core.style.color.content)
 		} else {
-			draw_text({widget.box.low.x + 5, (widget.box.high.y + widget.box.low.y) / 2}, text_info, core.style.color.content)
+			draw_text(text_origin, text_info, core.style.color.content)
+		}
+		if widget.focus_time > 0 {
+			draw_rounded_box_stroke(expand_box(widget.box, 4), core.style.rounding + 2.5, 2, fade(core.style.color.accent, widget.focus_time))
 		}
 	}
+	end_layer()
 
 	if .Focused in widget.state {
 		cmd: edit.Command
@@ -85,11 +115,13 @@ display_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result)
 			if !info.read_only {
 				if key_pressed(.V) do cmd = .Paste
 				if key_pressed(.X) do cmd = .Cut
+				if key_pressed(.Z) do cmd = .Undo
+				if key_pressed(.Y) do cmd = .Redo
 			}
 		}
 		if !info.read_only {
 			edit.input_runes(s, core.runes[:])
-			if key_pressed(.BACKSPACE) do cmd = .Backspace
+			if key_pressed(.BACKSPACE) do cmd = .Delete_Word_Left if control_down else .Backspace
 			if key_pressed(.DELETE) do cmd = .Delete
 			if key_pressed(.ENTER) do cmd = .New_Line
 		}
@@ -122,8 +154,6 @@ display_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result)
 			edit.perform_command(s, cmd)
 			core.draw_next_frame = true
 		}
-	} else if .Focused in widget.last_state {
-		edit.end(s)
 	}
 
 	if .Hovered in widget.state {

@@ -20,6 +20,9 @@ Style :: struct {
 	header_text_size,
 	button_text_size,
 	content_text_size: f32,
+
+	text_input_height,
+	button_height: f32,
 	
 	tooltip_rounding,
 	tooltip_padding,

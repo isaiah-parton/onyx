@@ -101,8 +101,6 @@ Core :: struct {
 	keys, last_keys: [max(sapp.Keycode)]bool,
 	runes: [dynamic]rune,
 
-	text_selection: Text_Selection,
-	
 	draw_surface: Maybe(^Draw_Surface),
 	paths: Stack(Path, MAX_PATHS),
 	atlas: Atlas,
@@ -142,12 +140,7 @@ init :: proc () {
 	sdtx.setup(sdtx.Desc{
 		logger = { func = slog.func },
 		fonts = {
-      0 = sdtx.font_kc853(),
-      1 = sdtx.font_kc854(),
-      2 = sdtx.font_z1013(),
-      3 = sdtx.font_cpc(),
-      4 = sdtx.font_c64(),
-      5 = sdtx.font_oric(),
+      0 = sdtx.font_cpc(),
     },
 	})
 	// Prepare the graphics pipeline
@@ -248,7 +241,6 @@ end_frame :: proc() {
 	}
 	// Display debug text
 	sdtx.canvas(core.view.x, core.view.y)
-	sdtx.font(3)
 	sdtx.pos(1, 1)
 	sdtx.color3b(255, 255, 255)
 	sdtx.printf("time: %f\n", sapp.frame_duration())

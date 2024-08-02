@@ -1,6 +1,6 @@
 package demo
 
-import ui "../ui"
+import ui "../onyx"
 
 import "core:fmt"
 import "core:math"
@@ -17,7 +17,6 @@ slider_value: f32
 builder := strings.Builder{}
 
 main :: proc() {
-	strings.write_string(&builder, "sample text")
 	sapp.run(sapp.Desc{
 		init_cb = proc "c" () {
 			context = runtime.default_context()
@@ -68,7 +67,7 @@ main :: proc() {
 					})
 						ui.foreground()
 						ui.shrink(15)
-						ui.size(200)
+						ui.set_width_auto()
 						if ui.was_clicked(ui.do_checkbox({text = "checkbox", value = graph_stacked})) {
 							graph_stacked = !graph_stacked
 						}
@@ -84,17 +83,19 @@ main :: proc() {
 						})
 					ui.end_layout()
 					ui.space(20)
-					/*ui.begin_layout({
+					ui.begin_layout({
 						size = 300,
 					})
 						ui.foreground()
 						ui.side(.Top)
-						ui.relative_size(1)
 						ui.shrink(30)
+						ui.set_width_fill()
+						ui.set_height_fill()
 						ui.do_graph(ui.Graph_Info(int){
 							kind = ui.Graph_Kind_Bar{
 								stacked = graph_stacked,
 							},
+							spacing = 50,
 							low = 0,
 							high = 50,
 							increment = 10,
@@ -117,18 +118,18 @@ main :: proc() {
 								{label = "Dec", values = {25, 17}},
 							},
 						})
-					ui.end_layout()*/
-					ui.space(50)
-					ui.size(40)
+					ui.end_layout()
+					ui.space(20)
 					tab_index = ui.do_tabs({
 						options = {"when", "the", "lights", "go", "out"},
 						index = tab_index,
 					}).index.? or_else tab_index
 					ui.space(20)
-					ui.size(200)
+					ui.set_height(200)
 					ui.do_text_input({
 						builder = &builder,
 						multiline = true,
+						placeholder = "Multiline text input",
 					})
 				ui.end_layer()
 			ui.end_frame()

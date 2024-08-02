@@ -30,16 +30,16 @@ Clip :: enum {
 	Full,				// hidden
 }
 
-width :: proc(box: Box) -> f32 {
+box_width :: proc(box: Box) -> f32 {
 	return box.high.x - box.low.x
 }
-height :: proc(box: Box) -> f32 {
+box_height :: proc(box: Box) -> f32 {
 	return box.high.y - box.low.y
 }
-center_x :: proc(box: Box) -> f32 {
+box_center_x :: proc(box: Box) -> f32 {
 	return (box.low.x + box.high.x) * 0.5
 }
-center_y :: proc(box: Box) -> f32 {
+box_center_y :: proc(box: Box) -> f32 {
 	return (box.low.y + box.high.y) * 0.5
 }
 

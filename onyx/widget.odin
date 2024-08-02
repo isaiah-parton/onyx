@@ -10,7 +10,7 @@ import "core:math/linalg"
 import "core:intrinsics"
 import "core:runtime"
 
-DOUBLE_CLICK_TIME :: 450
+DOUBLE_CLICK_TIME :: time.Millisecond * 450
 
 Widget :: struct {
 	id: Id,
@@ -23,6 +23,7 @@ Widget :: struct {
 	last_state,
 	state: Widget_State,
 
+	focus_time,
 	hover_time: f32,
 
 	click_count: int,
@@ -222,7 +223,7 @@ process_widgets :: proc() {
 
 // Commit a widget to be processed
 commit_widget :: proc(widget: ^Widget, hovered: bool) {
-	if core.hovered_layer == widget.layer.id && hovered {
+	if .Hovered in widget.layer.state && hovered {
 		core.next_hovered_widget = widget.id
 	}
 }

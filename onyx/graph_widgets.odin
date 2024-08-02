@@ -53,6 +53,7 @@ Widget_Variant_Graph :: struct{
 make_graph :: proc(info: Graph_Info($T), loc := #caller_location) -> Graph_Info(T) {
 	info := info
 	info.id = hash(loc)
+	info.spacing = max(info.spacing, 10)
 	info.desired_size = {
 		info.spacing * f32(len(info.entries)),
 		f32(info.high - info.low) * 2,

@@ -3,29 +3,43 @@ package ui
 import "core:fmt"
 import "core:slice"
 
+Layer_Status :: enum {
+	Hovered,
+	Focused,
+	Pressed,
+}
+
+Layer_State :: bit_set[Layer_Status]
+
 Layer_Order :: enum {
 	Background,
 	Floating,
 	Debug,
 }
+
 Layer_Option :: enum {
 	Scroll_X,
 	Scroll_Y,
 	Isolated,
 	No_Sort,
+	Attached,
 }
+
 Layer_Options :: bit_set[Layer_Option]
+
 Layer :: struct {
 	id: Id,
+	state: Layer_State,
 	index: int, 								// z-index
 	options: Layer_Options,			// Option bit flags
 	order: Layer_Order,					// Basically the type of layer, affects it's place in the list
 	box: Box,		
 	surface: Draw_Surface,			// The graphical drawing surface
-	parent: Maybe(^Layer),			// The layer's parent
+	parent: ^Layer,							// The layer's parent
 	children: [dynamic]^Layer,	// The layer's children
 	dead: bool,									// Should be deleted?
 }
+
 Layer_Info :: struct {
 	id: Id,
 	options: Layer_Options,
@@ -88,7 +102,6 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 }
 end_layer :: proc() {
 	end_layout()
-
 	pop(&core.layer_stack)
 	core.draw_surface = &core.layer_stack.items[core.layer_stack.height - 1].surface if core.layer_stack.height > 0 else nil
 }
@@ -99,6 +112,7 @@ process_layers :: proc() {
 	if core.mouse_pos != core.last_mouse_pos {
 		core.scrolling_layer = 0
 	}
+	hovered_layer: ^Layer
 	for layer, i in core.layer_list {
 		if layer.dead {
 			when ODIN_DEBUG {
@@ -106,10 +120,10 @@ process_layers :: proc() {
 			}
 			ordered_remove(&core.layer_list, i)
 			delete_key(&core.layer_map, layer.id)
-			if parent, ok := layer.parent.?; ok {
-				for child, j in parent.children {
+			if layer.parent != nil {
+				for child, j in layer.parent.children {
 					if child == layer {
-						ordered_remove(&parent.children, j)
+						ordered_remove(&layer.parent.children, j)
 						break
 					}
 				}
@@ -119,9 +133,11 @@ process_layers :: proc() {
 			core.sort_layers = true
 			core.draw_next_frame = true
 		} else {
+			layer.state = {}
 			layer.dead = true
 			if point_in_box(core.mouse_pos, layer.box) {
 				core.hovered_layer = layer.id
+				hovered_layer = layer
 				if core.mouse_pos != core.last_mouse_pos && layer.options & {.Scroll_X, .Scroll_Y} != {} {
 					core.scrolling_layer = layer.id
 				}
@@ -134,14 +150,22 @@ process_layers :: proc() {
 			}
 		}
 	}
+	for hovered_layer != nil {
+		hovered_layer.state += {.Hovered}
+		if .Attached in hovered_layer.options {
+			hovered_layer = hovered_layer.parent
+		} else {
+			break
+		}
+	}
 	// If a sorted layer was selected, then find it's root attached parent
 	if sorted_layer != nil {
 		child := sorted_layer
 		for {
-			if parent, ok := child.parent.?; ok {
+			if child.parent != nil {
 				core.top_layer = child.id
 				sorted_layer = child
-				child = parent
+				child = child.parent
 			} else {
 				break
 			}
@@ -149,11 +173,11 @@ process_layers :: proc() {
 	}
 	// Then reorder it with it's siblings
 	if core.top_layer != core.last_top_layer {
-		if parent, ok := sorted_layer.parent.?; ok {
-			for child in parent.children {
+		if sorted_layer.parent != nil {
+			for child in sorted_layer.parent.children {
 				if child.order == sorted_layer.order {
 					if child.id == core.top_layer {
-						child.index = len(parent.children)
+						child.index = len(sorted_layer.parent.children)
 					} else {
 						child.index -= 1
 					}

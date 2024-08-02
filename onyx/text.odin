@@ -1,5 +1,7 @@
 package ui
 
+import edit "../scri"
+
 import "core:runtime"
 import "core:os"
 
@@ -10,7 +12,6 @@ import "core:math/linalg"
 
 import "core:fmt"
 
-import "core:text/edit"
 import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
@@ -21,7 +22,7 @@ import ttf "vendor:stb/truetype"
 
 FMT_BUFFER_COUNT 		:: 24
 FMT_BUFFER_SIZE 		:: 200
-TEXT_BREAK :: "..."
+TEXT_BREAK 					:: "..."
 
 Horizontal_Text_Align :: enum {
 	Left,
@@ -44,6 +45,7 @@ Text_Wrap :: enum {
 
 Text_Info :: struct {
 	font: Font_Handle,
+	spacing,
 	size: f32,
 	text: string,
 	limit: [2]Maybe(f32),
@@ -230,7 +232,7 @@ iterate_text_codepoint :: proc(it: ^Text_Iterator, info: Text_Info) -> bool {
 iterate_text :: proc(it: ^Text_Iterator, info: Text_Info) -> (ok: bool) {
 	// Update horizontal offset with last glyph
 	if it.glyph != nil {
-		it.offset.x += math.floor(it.glyph.advance)
+		it.offset.x += math.floor(it.glyph.advance) + info.spacing
 	}
 	/*
 		Pre-paint
@@ -647,7 +649,9 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 							point.x,
 							point.x,
 						}
+						surface.z = 0.1
 						draw_box_fill({{point.x - 1, point.y - 2}, {point.x + 1, point.y + it.size.ascent - it.size.descent + 2}}, core.style.color.accent)
+						surface.z = 0
 					}
 				} else if it.index >= lo && hi > it.index {
 					glyph_color = core.style.color.background

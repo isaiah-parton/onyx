@@ -49,9 +49,9 @@ display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 				case .Right:
 				icon_box = {{self.box.high.x - SIZE, self.box.low.y}, SIZE}
 				case .Top:
-				icon_box = {{center_x(self.box) - SIZE / 2, self.box.high.y - SIZE}, SIZE}
+				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.high.y - SIZE}, SIZE}
 				case .Bottom:
-				icon_box = {{center_x(self.box) - SIZE / 2, self.box.low.y}, SIZE}
+				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.low.y}, SIZE}
 			}
 			icon_box.low = linalg.floor(icon_box.low)
 			icon_box.high += icon_box.low

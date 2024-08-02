@@ -31,20 +31,20 @@ display_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 	widget.draggable = true
 	widget.box = next_widget_box(info)
 
-	h := height(widget.box)
+	h := box_height(widget.box)
 		
 	widget.box.low.y += h / 4
 	widget.box.high.y -= h / 4
 
-	radius := height(widget.box) / 2
+	radius := box_height(widget.box) / 2
 	time := f32(info.value - info.low) / f32(info.high - info.low)
-	range_width := width(widget.box) - radius * 2
+	range_width := box_width(widget.box) - radius * 2
 
 	if widget.visible {
 		draw_rounded_box_fill(widget.box, radius, core.style.color.substance)
-		draw_rounded_box_fill({widget.box.low, {widget.box.low.x + width(widget.box) * time, widget.box.high.y}}, radius, core.style.color.content)
+		draw_rounded_box_fill({widget.box.low, {widget.box.low.x + box_width(widget.box) * time, widget.box.high.y}}, radius, core.style.color.content)
 		draw_arc_fill(widget.box.low + radius + {time * range_width, 0}, h / 2, 0, math.TAU, core.style.color.background)
-		draw_arc_stroke(widget.box.low + radius + {time * range_width, 0}, h / 2, 0, math.TAU, 1.5, core.style.color.content)
+		draw_arc_stroke(widget.box.low + radius + {time * range_width, 0}, h / 2, 0, math.TAU, 1.5, core.style.color.substance)
 	}
 
 	if .Pressed in widget.state {
