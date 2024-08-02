@@ -148,6 +148,7 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 			widget.click_button = core.mouse_button
 			widget.click_time = time.now()
 			widget.state += {.Pressed}
+			if widget.draggable do core.dragged_widget = widget.id
 		}
 	} else {
 		widget.state -= {.Pressed, .Hovered}
@@ -165,7 +166,6 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 				}
 			}
 		}
-		if widget.draggable do core.dragged_widget = widget.id
 	}
 	if core.focused_widget == widget.id {
 		widget.state += {.Focused}
@@ -183,20 +183,22 @@ widget_variant :: proc(widget: ^Widget, $T: typeid) -> ^T {
 
 // Process all widgets
 process_widgets :: proc() {
+	core.last_focused_widget = core.focused_widget
 	core.last_hovered_widget = core.hovered_widget
-	core.hovered_widget = core.next_hovered_widget
 	// Make sure dragged widgets are hovered
 	if core.dragged_widget != 0 {
 		core.hovered_widget = core.dragged_widget
+	} else {
+		core.hovered_widget = core.next_hovered_widget
 	}
 	// Reset next hover id so if nothing is hovered nothing will be hovered
 	core.next_hovered_widget = 0
 	// Press whatever is hovered and focus what is pressed
 	if mouse_pressed(.Left) {
 		core.focused_widget = core.hovered_widget
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 	}
-	// Reset drag status
+	// Reset drag state
 	if mouse_released(.Left) {
 		core.dragged_widget = 0
 	}
@@ -211,7 +213,7 @@ process_widgets :: proc() {
 			}
 			delete_key(&core.widget_map, id)
 			(transmute(^Maybe(Widget))widget)^ = nil
-			core.draw_next_frame = true
+			core.draw_this_frame = true
 		} else {
 			widget.dead = false
 		}
@@ -220,7 +222,7 @@ process_widgets :: proc() {
 
 // Commit a widget to be processed
 commit_widget :: proc(widget: ^Widget, hovered: bool) {
-	if !(core.dragged_widget != 0 && widget.id != core.hovered_widget) && core.hovered_layer == widget.layer.id && hovered {
+	if core.hovered_layer == widget.layer.id && hovered {
 		core.next_hovered_widget = widget.id
 	}
 }

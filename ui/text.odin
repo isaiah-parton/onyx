@@ -581,6 +581,9 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 		// Set bounds
 		bounds.low = line_origin
 		bounds.high = bounds.low
+
+		s.line_start = -1
+
 		// Start iteration
 		for {
 			// Iterate the iterator
@@ -603,12 +606,20 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 					hovered = true
 				}
 				update_text_iterator_offset(&it, info)
+				if line == hovered_line {
+					s.line_end = it.index
+				}
 				line += 1
 				column = 0
 				line_origin = origin + it.offset
 			}
 			// Update hovered index
 			if hovered_line == line {
+				if !unicode.is_white_space(it.codepoint) {
+					if s.line_start == -1 {
+						s.line_start = it.index
+					}
+				}
 				// Left side of glyph
 				dist1 := math.abs((origin.x + it.offset.x) - core.mouse_pos.x)
 				if dist1 < min_dist {
@@ -628,8 +639,8 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 			point: [2]f32 = origin + it.offset
 			glyph_color := color
 			// Get selection info
-			if .Focused in (widget.state) {
-				lo, hi := edit.sorted_selection(s)
+			if .Focused in (widget.last_state) {
+				lo, hi := min(s.selection[0], s.selection[1]), max(s.selection[0], s.selection[1])
 				if hi == lo {
 					if lo == it.index {
 						line_box_bounds = {
@@ -639,7 +650,7 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 						draw_box_fill({{point.x - 1, point.y - 2}, {point.x + 1, point.y + it.size.ascent - it.size.descent + 2}}, core.style.color.accent)
 					}
 				} else if it.index >= lo && hi > it.index {
-					glyph_color = core.style.color.content
+					glyph_color = core.style.color.background
 					line_box_bounds = {
 						min(line_box_bounds[0], point.x),
 						max(line_box_bounds[1], point.x),
@@ -655,12 +666,12 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 				dst: Box = {low = point + it.glyph.offset}
 				dst.high = dst.low + (it.glyph.src.high - it.glyph.src.low)
 				bounds.high = linalg.max(bounds.high, dst.high)
-				surface.z = -0.001
+				surface.z = 0.01
 				draw_texture(it.glyph.src, dst, glyph_color)
 				surface.z = 0
 			}
 			// Paint this line's selection
-			if (.Focused in widget.state) && (it.index >= len(info.text) || info.text[it.index] == '\n') {
+			if (.Focused in widget.last_state) && (it.index >= len(info.text) || info.text[it.index] == '\n') {
 				// Draw it if the selection is valid
 				if line_box_bounds[1] >= line_box_bounds[0] {
 					box: Box = {
@@ -677,6 +688,7 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 			}
 			// Break if reached end
 			if at_end {
+				s.line_end = it.index
 				break
 			}
 			// Increment column
@@ -684,6 +696,9 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 		}
 	}
 
+	s.line_start = max(s.line_start, 0)
+
+	last_selection := s.selection
 	if .Pressed in widget.state {
 		if .Pressed not_in widget.last_state {
 			if widget.click_count == 3 {
@@ -714,6 +729,9 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 		} else {
 			s.selection[1] = hover_index
 		}
+	}
+	if last_selection != s.selection {
+		core.draw_next_frame = true
 	}
 	return result
 }

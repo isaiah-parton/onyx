@@ -7,8 +7,6 @@ import slog "extra:sokol-odin/sokol/log"
 import sglue "extra:sokol-odin/sokol/glue"
 import sdtx "extra:sokol-odin/sokol/debugtext"
 
-import pq "extra:libpq"
-
 import "vendor:fontstash"
 
 import "core:time"
@@ -77,6 +75,7 @@ Core :: struct {
 	last_hovered_widget,
 	hovered_widget,
 	next_hovered_widget: Id,
+	last_focused_widget,
 	focused_widget,
 	dragged_widget: Id,
 
@@ -179,7 +178,7 @@ init :: proc () {
 		},
 		depth = {
 			pixel_format = .DEPTH,
-			compare = .LESS_EQUAL,
+			compare = .GREATER_EQUAL,
 			write_enabled = true,
 		},
 		label = "pipeline",
@@ -215,14 +214,25 @@ begin_frame :: proc () {
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
 
-	if core.mouse_pos != core.last_mouse_pos || core.mouse_bits != core.last_mouse_bits {
-		core.draw_this_frame = true
+	if key_pressed(.ESCAPE) {
+		core.focused_widget = 0
 	}
 
 	if core.draw_next_frame {
 		core.draw_next_frame = false
 		core.draw_this_frame = true
 	}
+
+	if (core.mouse_pos != core.last_mouse_pos 
+	|| core.mouse_bits != core.last_mouse_bits 
+	|| len(core.runes) > 0
+	|| core.last_focused_widget != core.focused_widget
+	|| core.last_hovered_widget != core.hovered_widget) {
+		core.draw_this_frame = true
+		core.draw_next_frame = true
+	}
+
+	process_widgets()
 }
 
 end_frame :: proc() {
@@ -230,7 +240,6 @@ end_frame :: proc() {
 	core.cursor_type = sapp.Mouse_Cursor.DEFAULT
 	// Process elements
 	process_layers()
-	process_widgets()
 	// Draw
 	// Update the atlas if needed
 	if core.atlas.was_changed {
@@ -244,6 +253,8 @@ end_frame :: proc() {
 	sdtx.color3b(255, 255, 255)
 	sdtx.printf("time: %f\n", sapp.frame_duration())
 	sdtx.printf("frame: %i\n", core.frame_count)
+	sdtx.printf("hovered widget: %i\n", core.hovered_widget)
+	sdtx.printf("focused widget: %i\n", core.focused_widget)
 
 	if core.draw_this_frame {
 		// Normal render pass
@@ -340,33 +351,26 @@ handle_event :: proc (e: ^sapp.Event) {
 		case .MOUSE_DOWN:
 		core.mouse_bits += {Mouse_Button(e.mouse_button)}
 		core.mouse_button = Mouse_Button(e.mouse_button)
-		core.draw_this_frame = true
 		case .MOUSE_UP:
 		core.mouse_bits -= {Mouse_Button(e.mouse_button)}
-		core.draw_this_frame = true
 		case .MOUSE_MOVE:
 		core.mouse_pos = {e.mouse_x, e.mouse_y}
-		core.draw_this_frame = true
 		case .MOUSE_SCROLL:
 		core.mouse_scroll = {e.scroll_x, e.scroll_y}
-		core.draw_this_frame = true
 		case .KEY_DOWN:
 		core.keys[e.key_code] = true
 		if e.key_repeat {
 			core.last_keys[e.key_code] = false
 		}
-		core.draw_this_frame = true
 		case .KEY_UP:
 		core.keys[e.key_code] = false
-		core.draw_this_frame = true
 		case .CHAR:
 		append(&core.runes, rune(e.char_code))
-		core.draw_this_frame = true
 		case .QUIT_REQUESTED:
 		// sapp.quit()
 		case .RESIZED:
 		core.view = {sapp.widthf(), sapp.heightf()}
-		core.draw_this_frame = true
+		core.draw_next_frame = true
 	}
 }
 
@@ -390,8 +394,18 @@ mouse_released :: proc(button: Mouse_Button) -> bool {
 	return core.last_mouse_bits - core.mouse_bits >= {button}
 }
 
-set_clipboard_string :: proc(str: string) {
+set_clipboard_string :: proc(_: rawptr, str: string) -> bool {
 	cstr := strings.clone_to_cstring(str)
 	defer delete(cstr)
 	sapp.set_clipboard_string(cstr)
+	return true
+}
+get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
+	cstr := sapp.get_clipboard_string()
+	if cstr == nil {
+		return
+	}
+	str = string(cstr)
+	ok = true
+	return
 }

@@ -84,7 +84,7 @@ main :: proc() {
 						})
 					ui.end_layout()
 					ui.space(20)
-					ui.begin_layout({
+					/*ui.begin_layout({
 						size = 300,
 					})
 						ui.foreground()
@@ -117,13 +117,19 @@ main :: proc() {
 								{label = "Dec", values = {25, 17}},
 							},
 						})
-					ui.end_layout()
+					ui.end_layout()*/
 					ui.space(50)
 					ui.size(40)
 					tab_index = ui.do_tabs({
 						options = {"when", "the", "lights", "go", "out"},
 						index = tab_index,
 					}).index.? or_else tab_index
+					ui.space(20)
+					ui.size(200)
+					ui.do_text_input({
+						builder = &builder,
+						multiline = true,
+					})
 				ui.end_layer()
 			ui.end_frame()
 		},

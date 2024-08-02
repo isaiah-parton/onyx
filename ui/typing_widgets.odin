@@ -27,7 +27,7 @@ make_text_input :: proc(info: Text_Input_Info, loc := #caller_location) -> Text_
 	info.id = hash(loc)
 	info.desired_size = {
 		200,
-		30,
+		100,
 	}
 	return info
 }
@@ -40,7 +40,7 @@ display_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result)
 	widget := get_widget(info)
 	context.allocator = widget.allocator
 	widget.box = next_widget_box(info)
-	result.self = widget
+	widget.draggable = true
 
 	v := widget.variant
 	variant := widget_variant(widget, Text_Input_Widget_Variant)
@@ -58,7 +58,11 @@ display_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result)
 
 	if .Focused in (widget.state - widget.last_state) {
 		edit.begin(s, 0, info.builder)
+		s.set_clipboard = set_clipboard_string
+		s.get_clipboard = get_clipboard_string
 	}
+
+	result.self = widget
 
 	if widget.visible || .Focused in widget.state {
 		draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.background)
@@ -87,30 +91,29 @@ display_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result)
 			edit.input_runes(s, core.runes[:])
 			if key_pressed(.BACKSPACE) do cmd = .Backspace
 			if key_pressed(.DELETE) do cmd = .Delete
+			if key_pressed(.ENTER) do cmd = .New_Line
 		}
 		if key_pressed(.LEFT) {
-			cmd = .Left
-			if shift_down {
-				cmd = .Select_Word_Left if control_down else .Select_Left
-			}
+			if shift_down do cmd = .Select_Word_Left if control_down else .Select_Left
+			else do cmd = .Word_Left if control_down else .Left
 		}
 		if key_pressed(.RIGHT) {
-			cmd = .Right
-			if shift_down {
-				cmd = .Select_Word_Right if control_down else .Select_Right
-			}
+			if shift_down do cmd = .Select_Word_Right if control_down else .Select_Right
+			else do cmd = .Word_Right if control_down else .Right
 		}
 		if key_pressed(.UP) {
-			cmd = .Up
-			if shift_down {
-				cmd = .Select_Up
-			}
+			if shift_down do cmd = .Select_Up
+			else do cmd = .Up
 		}
 		if key_pressed(.DOWN) {
-			cmd = .Down
-			if shift_down {
-				cmd = .Select_Down
-			}
+			if shift_down do cmd = .Select_Down
+			else do cmd = .Down
+		}
+		if key_pressed(.HOME) {
+			cmd = .Select_Line_Start if control_down else .Line_Start
+		}
+		if key_pressed(.END) {
+			cmd = .Select_Line_End if control_down else .Line_End
 		}
 		if !info.multiline && (cmd in edit.MULTILINE_COMMANDS) {
 			cmd = .None
