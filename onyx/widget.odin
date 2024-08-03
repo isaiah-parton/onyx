@@ -39,6 +39,7 @@ Widget_Variant :: union {
 	Widget_Variant_Tooltip,
 	Widget_Variant_Tabs,
 	Text_Input_Widget_Variant,
+	Switch_Widget_Variant,
 }
 
 // Interaction state
@@ -60,6 +61,7 @@ Generic_Widget_Info :: struct {
 	id: Maybe(Id),
 	box: Maybe(Box),
 	corners: Corners,
+	fixed_size: bool,
 	desired_size: [2]f32,		// Calculated minimum size
 	// tooltip: Maybe(Tooltip_Info),
 	// options: Widget_Options,

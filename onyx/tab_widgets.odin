@@ -1,5 +1,7 @@
 package ui
 
+import "core:intrinsics"
+
 Tabs_Info :: struct {
 	using _: Generic_Widget_Info,
 	index: int,
@@ -35,12 +37,13 @@ display_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_
 	
 	draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.substance)
 
-	box := shrink_box(widget.box, 4)
-	option_size := (box.high.x - box.low.x) / f32(len(info.options))
+	inner_box := shrink_box(widget.box, 3)
+	option_rounding := core.style.rounding * (box_height(inner_box) / box_height(widget.box))
+	option_size := (inner_box.high.x - inner_box.low.x) / f32(len(info.options))
 	resize(&variant.timers, len(info.options))
 	for option, o in info.options {
 		hover_time := variant.timers[o]
-		option_box := cut_box_left(&box, option_size)
+		option_box := cut_box_left(&inner_box, option_size)
 		if info.index != o {
 			if widget.state >= {.Hovered} && point_in_box(core.mouse_pos, option_box) {
 				if was_clicked(result) {
@@ -49,7 +52,7 @@ display_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_
 				core.cursor_type = .POINTING_HAND
 			}
 		}
-		draw_rounded_box_fill(option_box, core.style.rounding, fade(core.style.color.foreground, hover_time))
+		draw_rounded_box_fill(option_box, option_rounding, fade(core.style.color.foreground, hover_time))
 		draw_text(center(option_box), {
 			text = option,
 			font = core.style.fonts[.Regular],

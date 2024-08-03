@@ -1,23 +1,41 @@
 package demo
 
-import ui "../onyx"
-
 import "core:fmt"
 import "core:math"
 import "core:strings"
 import "core:runtime"
+import "core:reflect"
 
+import ui "extra:onyx/onyx"
 import sapp "extra:sokol-odin/sokol/app"
 
-mobile_data: []int = {10, 5, 0, 14, 29, 49, 36, 35, 38, 1, 7, 12, 4}
-desktop_data: []int = {2, 4, 2, 15, 25, 2, 23, 15, 15, 12, 15, 0, 5, 2, 2, 1, 9, 5, 8, 10}
-graph_stacked: bool
-tab_index: int
-slider_value: f32
-builder := strings.Builder{}
+Section :: enum {
+	Buttons,
+	Text,
+	Graphs,
+	Charts,
+	Boolean,
+}
+
+Option :: enum {
+	Process,
+	Wave,
+	Manifold,
+	Function,
+}
+
+State :: struct {
+	light_mode: bool,
+	section: Section,
+
+	checkboxes: [Option]bool,
+}
 
 main :: proc() {
+	state: State
+
 	sapp.run(sapp.Desc{
+		user_data = &state,
 		init_cb = proc "c" () {
 			context = runtime.default_context()
 
@@ -27,110 +45,74 @@ main :: proc() {
 			ui.set_color_scheme(ui.dark_color_scheme())
 			ui.set_style_rounding(4)
 		},
-		frame_cb = proc "c" () {
+		frame_userdata_cb = proc "c" (userdata: rawptr) {
 			context = runtime.default_context()
+			state := transmute(^State)userdata
 
 			ui.begin_frame()
 				ui.begin_layer({
-					box = ui.view_box(),
+					box = ui.shrink_box(ui.view_box(), 100),
 				})
-					ui.shrink(100)
+					ui.foreground()
 					ui.begin_layout({
 						size = 65,
+						side = .Top,
+						show_lines = true,
 					})
-						ui.foreground()
-						my_button := ui.make_button({text = "ok"})
-						other_button := ui.make_button({text = "and?"})
-						ui.begin_layout({
-							side = .Right,
-							show_lines = true,
-							size = ui.compute_layout_size(15, 10, my_button, other_button).x,
-						})
-							ui.shrink(15)
-							ui.side(.Right)
-							ui.display_button(other_button)
-							ui.space(10)
-							ui.display_button(my_button)
-						ui.end_layout()
 						ui.shrink(15)
-						ui.do_button({text = "your", kind = .Primary})
-						ui.space(10)
-						ui.do_button({text = "house", kind = .Secondary})
-						ui.space(10)
-						ui.do_button({text = "is", kind = .Outlined})
-						ui.space(10)
-						ui.do_button({text = "flammable", kind = .Ghost})
+						state.section = Section(ui.do_tabs({
+							index = int(state.section),
+							options = reflect.enum_field_names(Section),
+						}).index.? or_else int(state.section))
+						ui.side(.Right)
+						state.light_mode = ui.do_switch({on = state.light_mode}).on
 					ui.end_layout()
-					ui.space(20)
-					ui.begin_layout({
-						size = 65,
-					})
-						ui.foreground()
-						ui.shrink(15)
-						ui.set_width_auto()
-						if ui.was_clicked(ui.do_checkbox({text = "checkbox", value = graph_stacked})) {
-							graph_stacked = !graph_stacked
+
+					ui.shrink(30)
+					switch state.section {
+
+						case .Boolean:
+						for member, m in Option {
+							ui.push_id(m)
+								if m > 0 {
+									ui.space(10)
+								}
+								if ui.was_clicked(ui.do_checkbox({
+									value = state.checkboxes[member],
+									text = ui.tmp_print(member),
+								})) {
+									state.checkboxes[member] = !state.checkboxes[member]
+								}
+							ui.pop_id()
 						}
-						ui.space(10)
-						slider_value = ui.do_slider(ui.Slider_Info(f32){
-							value = slider_value,
-							low = 0,
-							high = 100,
-						}).value.? or_else slider_value
-						ui.space(10)
-						ui.do_text_input({
-							builder = &builder,
+
+						case .Buttons:
+						ui.begin_layout({
+							size = 30,
 						})
-					ui.end_layout()
-					ui.space(20)
-					ui.begin_layout({
-						size = 300,
-					})
-						ui.foreground()
-						ui.side(.Top)
-						ui.shrink(30)
-						ui.set_width_fill()
-						ui.set_height_fill()
-						ui.do_graph(ui.Graph_Info(int){
-							kind = ui.Graph_Kind_Bar{
-								stacked = graph_stacked,
-							},
-							spacing = 50,
-							low = 0,
-							high = 50,
-							increment = 10,
-							fields = {
-								{name = "mobile", color = {80, 255, 100, 255}},
-								{name = "desktop", color = {120, 60, 255, 255}},
-							},
-							entries = {
-								{label = "Jan", values = {15, 25}},
-								{label = "Feb", values = {12, 6}},
-								{label = "Mar", values = {4, 25}},
-								{label = "Apr", values = {5, 12}},
-								{label = "May", values = {2, 13}},
-								{label = "Jun", values = {1, 16}},
-								{label = "Jul", values = {0, 10}},
-								{label = "Aug", values = {26, 5}},
-								{label = "Sep", values = {43, 6}},
-								{label = "Oct", values = {41, 26}},
-								{label = "Nov", values = {34, 22}},
-								{label = "Dec", values = {25, 17}},
-							},
-						})
-					ui.end_layout()
-					ui.space(20)
-					tab_index = ui.do_tabs({
-						options = {"when", "the", "lights", "go", "out"},
-						index = tab_index,
-					}).index.? or_else tab_index
-					ui.space(20)
-					ui.set_height(200)
-					ui.do_text_input({
-						builder = &builder,
-						multiline = true,
-						placeholder = "Multiline text input",
-					})
+							ui.set_width_auto()
+							for member, m in ui.Button_Kind {
+								ui.push_id(m)
+									if m > 0 {
+										ui.space(10)
+									}
+									if ui.was_clicked(ui.do_button({
+										text = ui.tmp_print(member),
+										kind = member,
+									})) {
+
+									}
+								ui.pop_id()
+							}
+						ui.end_layout()
+
+						case .Charts:
+
+						case .Graphs:
+
+						case .Text:
+
+					}
 				ui.end_layer()
 			ui.end_frame()
 		},

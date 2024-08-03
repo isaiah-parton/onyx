@@ -37,8 +37,9 @@ make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 	return info
 }
 
-display_button :: proc(info: Button_Info) -> (res: Button_Result) {
+display_button :: proc(info: Button_Info) -> (result: Button_Result) {
 	widget := get_widget(info)
+	result.self = widget
 	layout := current_layout()
 	widget.box = next_widget_box(info)
 	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)

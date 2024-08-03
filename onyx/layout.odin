@@ -46,7 +46,7 @@ cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32)
 
 next_widget_box :: proc(info: Generic_Widget_Info) -> Box {
 	layout := current_layout()
-	size := linalg.min(linalg.max(layout.next_size, info.desired_size), layout.box.high - layout.box.low)
+	size := linalg.min(info.desired_size if info.fixed_size else linalg.max(layout.next_size, info.desired_size), layout.box.high - layout.box.low)
 	box := cut_layout(layout, nil, size)
 	if int(layout.next_side) > 1 {
 		if size.y < box_height(box) {
@@ -92,9 +92,9 @@ end_layout :: proc() {
 			box := layout.original_box
 			switch layout.side {
 				case .Top:
-				draw_box_fill({box.low, {box.high.x, box.low.y + 1}}, core.style.color.substance)
-				case .Bottom:
 				draw_box_fill({{box.low.x, box.high.y - 1}, box.high}, core.style.color.substance)
+				case .Bottom:
+				draw_box_fill({box.low, {box.high.x, box.low.y + 1}}, core.style.color.substance)
 				case .Left:
 				draw_box_fill({{box.high.x - 1, box.low.y}, box.high}, core.style.color.substance)
 				case .Right:

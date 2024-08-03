@@ -32,6 +32,7 @@ make_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Checkbox_
 	} else {
 		info.desired_size = SIZE
 	}
+	info.fixed_size = true
 	return info
 }
 
@@ -58,14 +59,18 @@ display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 		} else {
 			icon_box = self.box
 		}
-		// Paint box
-		opacity: f32 = 0.5 if self.disabled else 1
-		draw_rounded_box_stroke(icon_box, core.style.rounding, 1, core.style.color.substance)
-		center := box_center(icon_box)
 		// Hover 
 		if self.hover_time > 0 {
 			draw_rounded_box_fill(self.box, core.style.rounding, fade(core.style.color.substance, 0.5 * self.hover_time))
 		}
+		// Paint box
+		opacity: f32 = 0.5 if self.disabled else 1
+		if info.value {
+			draw_rounded_box_fill(icon_box, core.style.rounding, fade(core.style.color.accent, opacity))
+		} else {
+			draw_rounded_box_stroke(icon_box, core.style.rounding, 1, fade(core.style.color.accent, opacity))
+		}
+		center := box_center(icon_box)
 		// Paint icon
 		if info.value {
 			scale: f32 = SIZE / 4
@@ -73,7 +78,7 @@ display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 			point(center + {-1, -0.047} * scale)
 			point(center + {-0.333, 0.619} * scale)
 			point(center + {1, -0.713} * scale)
-			stroke_path(2, core.style.color.content)
+			stroke_path(2, core.style.color.background)
 			end_path()
 		}
 		// Paint text
@@ -89,6 +94,9 @@ display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 				draw_text({self.box.low.x, self.box.high.y - info.__text_size.y}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
 			}
 		}
+	}
+	if .Hovered in self.state {
+		core.cursor_type = .POINTING_HAND
 	}
 	//
 	commit_widget(self, point_in_box(core.mouse_pos, self.box))
