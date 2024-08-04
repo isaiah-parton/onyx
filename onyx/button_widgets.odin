@@ -60,7 +60,7 @@ display_button :: proc(info: Button_Info) -> (result: Button_Result) {
 
 			case .Primary:
 			draw_rounded_box_fill(widget.box, core.style.rounding, blend_colors(widget.hover_time * 0.25, core.style.color.content, core.style.color.foreground))
-			text_info.font = core.style.fonts[.Medium]
+			// text_info.font = core.style.fonts[.Medium]
 			draw_text(center(widget.box) - info.__text_size / 2, text_info, core.style.color.foreground)
 
 			case .Ghost:

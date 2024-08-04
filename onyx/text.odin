@@ -39,21 +39,35 @@ Vertical_Text_Align :: enum {
 
 Text_Wrap :: enum {
 	None,
-	Regular,
+	Normal,
 	Word,
 }
 
 Text_Info :: struct {
-	font: Font_Handle,
-	spacing,
-	size: f32,
+	using options: Text_Options,
 	text: string,
-	limit: [2]Maybe(f32),
+}
 
-	wrap: Text_Wrap,
-	align_h: Horizontal_Text_Align,
+Text_Options :: struct {
+	font: int,							// Font index
+	spacing,							// Glyph spacing
+	size: f32,							// Font size
+	width: Maybe(f32),					// Maximum line width
+	max_lines: Maybe(int),				// Maximum number of lines
+	wrap: Text_Wrap,					// Wrapping type
+	align_h: Horizontal_Text_Align,		// Alignment
 	align_v: Vertical_Text_Align,
-	hidden: bool,
+	hidden: bool,						// Every glyph appears as a bullet
+}
+
+Interactive_Text_Result :: struct {
+	// If a selection or a change was made
+	changed: bool,
+	// If the text is hovered
+	hovered: bool,
+	// Text and selection bounds
+	bounds,
+	selection_bounds: Box,
 }
 
 Text_Iterator :: struct {
@@ -71,7 +85,9 @@ Text_Iterator :: struct {
 	index,
 	next_index: int,
 }
+
 Font_Handle :: int
+
 Font_Size :: struct {
 	ascent,
 	descent,
@@ -81,18 +97,21 @@ Font_Size :: struct {
 	// Helpers
 	break_size: f32,
 }
+
 destroy_font_size :: proc(using self: ^Font_Size) {
 	for _, &glyph in glyphs {
 		destroy_glyph_data(&glyph)
 	}
 	delete(glyphs)
 }
+
 Font :: struct {
 	name,
 	path: string,
 	data: ttf.fontinfo,
 	sizes: map[f32]Font_Size,
 }
+
 destroy_font :: proc(using self: ^Font) {
 	for _, &size in sizes {
 		destroy_font_size(&size)
@@ -100,23 +119,18 @@ destroy_font :: proc(using self: ^Font) {
 	delete(name)
 	delete(path)
 }
-/*
-	A rasterized glyph
-*/
+
 Glyph :: struct {
 	image: Image,
 	src: Box,
 	offset: [2]f32,
 	advance: f32,
 }
+
 destroy_glyph_data :: proc(using self: ^Glyph) {
 	destroy_image(&image)
 }
 
-/*
-	Text formatting for short term usage
-	each string is valid until it's home buffer is reused
-*/
 @private fmt_buffers: [FMT_BUFFER_COUNT][FMT_BUFFER_SIZE]u8
 @private fmt_buffer_index: u8
 
@@ -124,20 +138,24 @@ get_tmp_builder :: proc() -> strings.Builder {
 	buf := get_tmp_buffer()
 	return strings.builder_from_bytes(buf)
 }
+
 get_tmp_buffer :: proc() -> []u8 {
 	defer	fmt_buffer_index = (fmt_buffer_index + 1) % FMT_BUFFER_COUNT
 	return fmt_buffers[fmt_buffer_index][:]
 }
+
 tmp_print :: proc(args: ..any) -> string {
 	str := fmt.bprint(fmt_buffers[fmt_buffer_index][:], ..args)
 	fmt_buffer_index = (fmt_buffer_index + 1) % FMT_BUFFER_COUNT
 	return str
 }
+
 tmp_printf :: proc(text: string, args: ..any) -> string {
 	str := fmt.bprintf(fmt_buffers[fmt_buffer_index][:], text, ..args)
 	fmt_buffer_index = (fmt_buffer_index + 1) % FMT_BUFFER_COUNT
 	return str
 }
+
 tmp_join :: proc(args: []string, sep := " ") -> string {
 	size := 0
 	buffer := &fmt_buffers[fmt_buffer_index]
@@ -153,6 +171,7 @@ tmp_join :: proc(args: []string, sep := " ") -> string {
 	fmt_buffer_index = (fmt_buffer_index + 1) % FMT_BUFFER_COUNT
 	return str
 }
+
 trim_zeroes :: proc(text: string) -> string {
 	text := text
 	for i := len(text) - 1; i >= 0; i -= 1 {
@@ -167,6 +186,7 @@ trim_zeroes :: proc(text: string) -> string {
 	}
 	return text
 }
+
 tmp_print_bit_set :: proc(set: $S/bit_set[$E;$U], sep := " ") -> string {
 	size := 0
 	buffer := &fmt_buffers[fmt_buffer_index]
@@ -196,10 +216,11 @@ make_text_iterator :: proc(info: Text_Info) -> (it: Text_Iterator, ok: bool) {
 	}
 	it.font = &core.atlas.fonts[info.font].?
 	it.size, ok = get_font_size(it.font, info.size)
-	it.line_limit = info.limit.x
+	it.line_limit = info.width
 	it.line_size.y = it.size.ascent - it.size.descent + it.size.line_gap
 	return
 }
+
 update_text_iterator_offset :: proc(it: ^Text_Iterator, info: Text_Info) {
 	it.offset.x = 0
 	#partial switch info.align_h {
@@ -207,6 +228,7 @@ update_text_iterator_offset :: proc(it: ^Text_Iterator, info: Text_Info) {
 		case .Right: it.offset.x -= measure_next_line(info, it^)
 	}
 }
+
 iterate_text_codepoint :: proc(it: ^Text_Iterator, info: Text_Info) -> bool {
 	it.last_codepoint = it.codepoint
 	if it.next_index >= len(info.text) {
@@ -229,10 +251,11 @@ iterate_text_codepoint :: proc(it: ^Text_Iterator, info: Text_Info) -> bool {
 	}
 	return true
 }
+
 iterate_text :: proc(it: ^Text_Iterator, info: Text_Info) -> (ok: bool) {
 	// Update horizontal offset with last glyph
 	if it.glyph != nil {
-		it.offset.x += math.floor(it.glyph.advance) + info.spacing
+		it.offset.x += it.glyph.advance + info.spacing
 	}
 	/*
 		Pre-paint
@@ -289,13 +312,11 @@ iterate_text :: proc(it: ^Text_Iterator, info: Text_Info) -> (ok: bool) {
 		it.line_size.x = 0
 		it.offset.y += it.size.ascent - it.size.descent + it.size.line_gap
 	} else if it.glyph != nil {
-		it.line_size.x += it.glyph.advance
+		it.line_size.x += it.glyph.advance + info.spacing
 	}
 	return
 }
-/*
-	Measures until the next line
-*/
+
 measure_next_line :: proc(info: Text_Info, it: Text_Iterator) -> f32 {
 	it := it
 	for iterate_text(&it, info) {
@@ -305,11 +326,12 @@ measure_next_line :: proc(info: Text_Info, it: Text_Iterator) -> f32 {
 	}
 	return it.line_size.x
 }
+
 measure_next_word :: proc(info: Text_Info, it: Text_Iterator) -> (size: f32, end: int) {
 	it := it
 	for iterate_text_codepoint(&it, info) {
 		if it.glyph != nil {
-			size += it.glyph.advance
+			size += it.glyph.advance + info.spacing
 		}
 		if it.codepoint == ' ' {
 			break
@@ -318,6 +340,7 @@ measure_next_word :: proc(info: Text_Info, it: Text_Iterator) -> (size: f32, end
 	end = it.index
 	return
 }
+
 measure_text :: proc(info: Text_Info) -> [2]f32 {
 	size: [2]f32
 	if it, ok := make_text_iterator(info); ok {
@@ -331,9 +354,7 @@ measure_text :: proc(info: Text_Info) -> [2]f32 {
 	}
 	return size
 }
-/*
-	Load a font from a given file path
-*/
+
 load_font :: proc(file_path: string) -> (handle: Font_Handle, success: bool) {
 	font: Font
 	if file_data, ok := os.read_entire_file(file_path); ok {
@@ -354,14 +375,14 @@ load_font :: proc(file_path: string) -> (handle: Font_Handle, success: bool) {
 	}
 	return
 }
-// Destroy a font
+
 unload_font :: proc(handle: Font_Handle) {
 	if font, ok := &core.atlas.fonts[handle].?; ok {
 		destroy_font(font)
 		core.atlas.fonts[handle] = nil
 	}
 }
-// Get the data for a given pixel size of the font
+
 get_font_size :: proc(font: ^Font, size: f32) -> (data: ^Font_Size, ok: bool) {
 	size := math.round(size)
 	data, ok = &font.sizes[size]
@@ -380,6 +401,7 @@ get_font_size :: proc(font: ^Font, size: f32) -> (data: ^Font_Size, ok: bool) {
 	}
 	return
 }
+
 // First creates the glyph if it doesn't exist, then returns its data
 __get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^Glyph, ok: bool) {
 	// Try fetching from map
@@ -432,10 +454,11 @@ draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 	if info.align_v != .Top {
 		size = measure_text(info)
 		#partial switch info.align_v {
-			case .Middle: origin.y -= math.floor(size.y / 2)
-			case .Bottom: origin.y -= math.floor(size.y)
+			case .Middle: origin.y -= size.y / 2
+			case .Bottom: origin.y -= size.y
 		}
 	}
+	origin = linalg.floor(origin)
 	if it, ok := make_text_iterator(info); ok {
 		update_text_iterator_offset(&it, info)
 		for iterate_text(&it, info) {
@@ -534,16 +557,6 @@ draw_rune_aligned_clipped :: proc(font: Font_Handle, size: f32, icon: rune, orig
 	}
 	draw_texture(glyph.src, box, color)
 	return icon_size
-}
-
-Interactive_Text_Result :: struct {
-	// If a selection or a change was made
-	changed: bool,
-	// If the text is hovered
-	hovered: bool,
-	// Text and selection bounds
-	bounds,
-	selection_bounds: Box,
 }
 
 // Draw interactive text
@@ -765,3 +778,29 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 	}
 	return result
 }*/
+
+Text_Content_Info :: struct {
+	using _: Generic_Widget_Info,
+	using text_info: Text_Info,
+	interactive: bool,
+}
+
+make_text_content :: proc(info: Text_Content_Info, loc := #caller_location) -> Text_Content_Info {
+	info := info
+	info.id = hash(loc)
+	info.desired_size = measure_text(info.text_info)
+	return info
+}
+
+display_text_content :: proc(info: Text_Content_Info) {
+	widget := get_widget(info)
+	context.allocator = widget.allocator
+	widget.box = next_widget_box(info)
+
+
+
+}
+
+do_text_content :: proc(info: Text_Content_Info, loc := #caller_location) {
+	display_text_content(make_text_content(info, loc))
+}

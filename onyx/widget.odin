@@ -57,12 +57,14 @@ Widget_Status :: enum {
 Widget_State :: bit_set[Widget_Status;u8]
 
 Generic_Widget_Info :: struct {
-	disabled: bool,
 	id: Maybe(Id),
 	box: Maybe(Box),
-	corners: Corners,
+
 	fixed_size: bool,
-	desired_size: [2]f32,		// Calculated minimum size
+	desired_size: [2]f32,
+	
+	disabled: bool,
+
 	// tooltip: Maybe(Tooltip_Info),
 	// options: Widget_Options,
 }
@@ -170,9 +172,11 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 			}
 		}
 	}
+
 	if core.focused_widget == widget.id {
 		widget.state += {.Focused}
 	}
+
 	return widget
 }
 
@@ -227,6 +231,10 @@ process_widgets :: proc() {
 commit_widget :: proc(widget: ^Widget, hovered: bool) {
 	if .Hovered in widget.layer.state && hovered {
 		core.next_hovered_widget = widget.id
+	}
+
+	if core.show_debug_stats {
+		draw_box_stroke(widget.box, 1, {0, 255, 0, 255})
 	}
 }
 

@@ -420,7 +420,7 @@ draw_bezier_stroke :: proc(p0, p1, p2, p3: [2]f32, segments: int, thickness: f32
 }
 
 get_arc_steps :: proc(radius, angle: f32) -> int {
-	return max(int((angle / (math.PI * 0.25)) * (radius * 0.25)), 4)
+	return max(int((angle / (math.PI * 0.1)) * (radius * 0.25)), 4)
 }
 // Draw a filled arc around a given center
 draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
@@ -562,10 +562,10 @@ draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) 
 		draw_box_stroke(box, thickness, color)
 		return
 	}
-	draw_arc_stroke(box.low + radius, radius, math.PI, math.PI * 1.5, thickness + 0.3, color)
-	draw_arc_stroke({box.high.x - radius, box.low.y + radius}, radius, math.PI * 1.5, math.PI * 2, thickness + 0.3, color)
-	draw_arc_stroke(box.high - radius, radius, 0, math.PI * 0.5, thickness + 0.3, color)
-	draw_arc_stroke({box.low.x + radius, box.high.y - radius}, radius, math.PI * 0.5, math.PI, thickness + 0.3, color)
+	draw_arc_stroke(box.low + radius, radius, math.PI, math.PI * 1.5, thickness, color)
+	draw_arc_stroke({box.high.x - radius, box.low.y + radius}, radius, math.PI * 1.5, math.PI * 2, thickness, color)
+	draw_arc_stroke(box.high - radius, radius, 0, math.PI * 0.5, thickness, color)
+	draw_arc_stroke({box.low.x + radius, box.high.y - radius}, radius, math.PI * 0.5, math.PI, thickness, color)
 	if box.high.x - radius > box.low.x + radius {
 		draw_box_fill({{box.low.x + radius, box.low.y}, {box.high.x - radius, box.low.y + thickness}}, color)
 		draw_box_fill({{box.low.x + radius, box.high.y - thickness}, {box.high.x - radius, box.high.y}}, color)

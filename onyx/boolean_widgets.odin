@@ -5,7 +5,7 @@ import "core:math/ease"
 import "core:math/linalg"
 
 @(private="file") SIZE :: 22
-@(private="file") PADDING :: 4
+@(private="file") TEXT_PADDING :: 5
 
 Checkbox_Info :: struct {
 	using generic: Generic_Widget_Info,
@@ -26,7 +26,7 @@ make_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Checkbox_
 			info.desired_size.x = max(SIZE, info.__text_size.x)
 			info.desired_size.y = SIZE + info.__text_size.y
 		} else {
-			info.desired_size.x = SIZE + info.__text_size.x + PADDING * 2
+			info.desired_size.x = SIZE + info.__text_size.x + TEXT_PADDING * 2
 			info.desired_size.y = SIZE
 		}
 	} else {
@@ -85,9 +85,9 @@ display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 		if len(info.text) > 0 {
 			switch info.text_side {
 				case .Left: 	
-				draw_text({icon_box.high.x + PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
+				draw_text({icon_box.high.x + TEXT_PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
 				case .Right: 	
-				draw_text({icon_box.low.x - PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18, align_h = .Right}, fade(core.style.color.content, opacity))
+				draw_text({icon_box.low.x - TEXT_PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18, align_h = .Right}, fade(core.style.color.content, opacity))
 				case .Top: 		
 				draw_text(self.box.low, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
 				case .Bottom: 	
@@ -95,12 +95,13 @@ display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 			}
 		}
 	}
+
 	if .Hovered in self.state {
 		core.cursor_type = .POINTING_HAND
 	}
-	//
+
 	commit_widget(self, point_in_box(core.mouse_pos, self.box))
-	// We're done here
+
 	return Generic_Widget_Result{self = self},
 }
 

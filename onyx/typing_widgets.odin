@@ -28,7 +28,7 @@ make_text_input :: proc(info: Text_Input_Info, loc := #caller_location) -> Text_
 	info.id = hash(loc)
 	info.desired_size = {
 		200,
-		100,
+		core.style.text_input_height,
 	}
 	return info
 }

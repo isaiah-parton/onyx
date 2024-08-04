@@ -60,6 +60,8 @@ Mouse_Button :: enum {
 Mouse_Bits :: bit_set[Mouse_Button]
 // The global core data
 Core :: struct {
+	show_debug_stats: bool,
+
 	arena: runtime.Arena,
 	view: [2]f32,
 
@@ -200,6 +202,8 @@ init :: proc () {
 	core.style.button_text_size = 18
 	core.style.content_text_size = 16
 	core.style.header_text_size = 28
+
+	core.style.text_input_height = 30
 }
 
 begin_frame :: proc () {
@@ -209,6 +213,10 @@ begin_frame :: proc () {
 
 	if key_pressed(.ESCAPE) {
 		core.focused_widget = 0
+	}
+
+	if key_pressed(.F3) {
+		core.show_debug_stats = !core.show_debug_stats
 	}
 
 	if core.draw_next_frame {
@@ -240,13 +248,15 @@ end_frame :: proc() {
 		update_atlas(&core.atlas)
 	}
 	// Display debug text
-	sdtx.canvas(core.view.x, core.view.y)
-	sdtx.pos(1, 1)
-	sdtx.color3b(255, 255, 255)
-	sdtx.printf("time: %f\n", sapp.frame_duration())
-	sdtx.printf("frame: %i\n", core.frame_count)
-	sdtx.printf("hovered widget: %i\n", core.hovered_widget)
-	sdtx.printf("focused widget: %i\n", core.focused_widget)
+	if core.show_debug_stats {
+		sdtx.canvas(core.view.x, core.view.y)
+		sdtx.pos(1, 1)
+		sdtx.color3b(255, 255, 255)
+		sdtx.printf("time: %f\n", sapp.frame_duration())
+		sdtx.printf("frame: %i\n", core.frame_count)
+		sdtx.printf("hovered widget: %i\n", core.hovered_widget)
+		sdtx.printf("focused widget: %i\n", core.focused_widget)
+	}
 
 	if core.draw_this_frame {
 		// Normal render pass
@@ -303,7 +313,9 @@ end_frame :: proc() {
 		},
 		swapchain = sglue.swapchain(),
 	})
-	sdtx.draw()
+	if core.show_debug_stats {
+		sdtx.draw()
+	}
 	sg.end_pass()
 	sg.commit()
 	

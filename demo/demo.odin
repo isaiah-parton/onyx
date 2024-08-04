@@ -11,10 +11,11 @@ import sapp "extra:sokol-odin/sokol/app"
 
 Section :: enum {
 	Buttons,
-	Text,
+	Fields,
 	Graphs,
 	Charts,
-	Boolean,
+	Booleans,
+	Analog,
 }
 
 Option :: enum {
@@ -29,6 +30,10 @@ State :: struct {
 	section: Section,
 
 	checkboxes: [Option]bool,
+
+	text_builder: strings.Builder,
+
+	slider_value: f32,
 }
 
 main :: proc() {
@@ -43,7 +48,7 @@ main :: proc() {
 			ui.set_style_font(.Medium, "fonts/Geist-Medium.ttf")
 			ui.set_style_font(.Bold, "fonts/Geist-Bold.ttf")
 			ui.set_color_scheme(ui.dark_color_scheme())
-			ui.set_style_rounding(4)
+			ui.set_style_rounding(0)
 		},
 		frame_userdata_cb = proc "c" (userdata: rawptr) {
 			context = runtime.default_context()
@@ -71,7 +76,13 @@ main :: proc() {
 					ui.shrink(30)
 					switch state.section {
 
-						case .Boolean:
+						case .Booleans:
+						ui.do_label({
+							text = "Checkboxes",
+							font_style = .Bold,
+							font_size = 24,
+						})
+						ui.space(10)
 						for member, m in Option {
 							ui.push_id(m)
 								if m > 0 {
@@ -87,6 +98,12 @@ main :: proc() {
 						}
 
 						case .Buttons:
+						ui.do_label({
+							text = "Fit to label",
+							font_style = .Bold,
+							font_size = 24,
+						})
+						ui.space(10)
 						ui.begin_layout({
 							size = 30,
 						})
@@ -110,8 +127,18 @@ main :: proc() {
 
 						case .Graphs:
 
-						case .Text:
+						case .Fields:
+						ui.do_label({
+							text = "Text",
+							font_style = .Bold,
+							font_size = 24,
+						})
+						ui.space(10)
+						ui.set_height_auto()
+						ui.do_text_input({builder = &state.text_builder})
 
+						case .Analog:
+						state.slider_value = ui.do_slider(ui.Slider_Info(f32){value = state.slider_value}).value.? or_else state.slider_value
 					}
 				ui.end_layer()
 			ui.end_frame()
