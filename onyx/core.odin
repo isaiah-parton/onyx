@@ -217,6 +217,7 @@ begin_frame :: proc () {
 
 	if key_pressed(.F3) {
 		core.show_debug_stats = !core.show_debug_stats
+		core.draw_this_frame = true
 	}
 
 	if core.draw_next_frame {
@@ -277,10 +278,17 @@ end_frame :: proc() {
 		core.bindings.fs.images[0] = core.atlas.image
 		sg.apply_pipeline(core.pipeline)
 		sg.apply_bindings(core.bindings)
-		tex: Tex = {texSize = core.view}
-		sg.apply_uniforms(.VS, 0, { ptr = &tex, size = size_of(Tex) })
 		// render layers
 		for layer in core.layer_list {
+			u: Uniform = {
+				texSize = core.view,
+				origin = layer.box.low,
+				scale = 1,
+			}
+			sg.apply_uniforms(.VS, 0, { 
+				ptr = &u,
+				size = size_of(Uniform),
+			})
 			sg.update_buffer(core.bindings.index_buffer, { 
 				ptr = raw_data(layer.surface.indices), 
 				size = u64(len(layer.surface.indices) * size_of(u16)),
@@ -289,7 +297,13 @@ end_frame :: proc() {
 				ptr = raw_data(layer.surface.vertices), 
 				size = u64(len(layer.surface.vertices) * size_of(Vertex)),
 			})
-			sg.apply_scissor_rectf(layer.box.low.x, layer.box.low.y, (layer.box.high.x - layer.box.low.x), (layer.box.high.y - layer.box.low.y), true)
+			sg.apply_scissor_rectf(
+				u.origin.x + (layer.box.low.x - u.origin.x) * u.scale, 
+				u.origin.y + (layer.box.low.y - u.origin.y) * u.scale, 
+				(layer.box.high.x - layer.box.low.x) * u.scale, 
+				(layer.box.high.y - layer.box.low.y) * u.scale, 
+				true,
+				)
 			sg.draw(0, len(layer.surface.indices), 1)
 			sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
 		}

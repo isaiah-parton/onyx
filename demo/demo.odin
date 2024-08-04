@@ -9,15 +9,6 @@ import "core:reflect"
 import ui "extra:onyx/onyx"
 import sapp "extra:sokol-odin/sokol/app"
 
-Section :: enum {
-	Buttons,
-	Fields,
-	Graphs,
-	Charts,
-	Booleans,
-	Analog,
-}
-
 Option :: enum {
 	Process,
 	Wave,
@@ -25,9 +16,20 @@ Option :: enum {
 	Function,
 }
 
+Component_Section :: struct {
+	component: enum {
+		Button,
+		Checkbox,
+		Bar_Graph,
+		Line_Graph,
+	},
+}
+
 State :: struct {
 	light_mode: bool,
-	section: Section,
+	section: union {
+		Component_Section,
+	},
 
 	checkboxes: [Option]bool,
 
@@ -65,15 +67,47 @@ main :: proc() {
 						show_lines = true,
 					})
 						ui.shrink(15)
-						state.section = Section(ui.do_tabs({
-							index = int(state.section),
-							options = reflect.enum_field_names(Section),
-						}).index.? or_else int(state.section))
+						ui.do_breadcrumb({text = "Components"})
+						ui.do_breadcrumb({text = "Buttons", options = {"Fields", "Charts"}})
 						ui.side(.Right)
 						state.light_mode = ui.do_switch({on = state.light_mode}).on
 					ui.end_layout()
 
 					ui.shrink(30)
+					switch section in state.section {
+					
+						case Component_Section:
+						#partial switch state.component {
+						
+							case .Button:
+							ui.do_label({
+								text = "Fit to label",
+								font_style = .Bold,
+								font_size = 24,
+							})
+							ui.space(10)
+							ui.begin_layout({
+								size = 30,
+							})
+								ui.set_width_auto()
+								for member, m in ui.Button_Kind {
+									ui.push_id(m)
+										if m > 0 {
+											ui.space(10)
+										}
+										if ui.was_clicked(ui.do_button({
+											text = ui.tmp_print(member),
+											kind = member,
+										})) {
+
+										}
+									ui.pop_id()
+								}
+							ui.end_layout()
+							
+						}
+					}
+					
 					switch state.section {
 
 						case .Booleans:

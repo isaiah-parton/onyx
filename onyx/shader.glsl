@@ -3,8 +3,10 @@
 @header import sg "extra:sokol-odin/sokol/gfx"
 
 @vs vs
-uniform tex {
+uniform Uniform {
     vec2 texSize;
+    vec2 origin;
+    float scale;
 };
 
 in vec2 pos;
@@ -16,7 +18,9 @@ out vec2 texCoord;
 out vec4 color;
 
 void main() {
-    gl_Position = vec4(vec2(-1.0, 1.0) + (pos.xy / texSize) * vec2(2.0, -2.0), z, 1.0);
+    vec2 diff = (pos - origin);
+    vec2 scaledPos = origin + diff * scale;
+    gl_Position = vec4(vec2(-1.0, 1.0) + (scaledPos / texSize) * vec2(2.0, -2.0), z, 1.0);
     texCoord = uv;
     color = col;
 }

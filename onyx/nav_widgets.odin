@@ -1,9 +1,14 @@
 package ui
 
+import "core:math"
+import "core:math/ease"
+import "core:math/linalg"
+
 Breadcrumb_Info :: struct {
 	using _: Generic_Widget_Info,
 	text: string,
 	is_tail: bool,
+	options: []string,
 }
 
 Breadcrumb_Result :: struct {
@@ -15,7 +20,7 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 	info.id = hash(loc)
 	text_options := Text_Options{
 		font = core.style.fonts[.Regular],
-		size = core.style.header_text_size,
+		size = core.style.button_text_size,
 	}
 	text_size := measure_text({
 		text = info.text,
@@ -23,7 +28,10 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 	})
 	info.desired_size = text_size
 	if !info.is_tail {
-		info.desired_size += 15
+		info.desired_size.x += 14
+	}
+	if len(info.options) > 0 {
+		info.desired_size.x += 20
 	}
 	info.fixed_size = true
 	return info
@@ -35,18 +43,53 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 	context.allocator = widget.allocator
 	result.self = widget
 
+	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
+
 	if widget.visible {
 		draw_text(widget.box.low, {
 			text = info.text,
 			options = Text_Options{
 				font = core.style.fonts[.Regular],
-				size = core.style.header_text_size,
+				size = core.style.button_text_size,
 			},
-		}, core.style.color.content)
-		if info.is_tail {
-			draw_aligned_rune(core.style.fonts[.Bold], 20, '>', {widget.box.high.x, box_center_y(widget.box)}, core.style.color.substance, .Right, .Middle)
+		}, fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time))
+		if len(info.options) > 0 {
+			origin: [2]f32 = {math.floor(widget.box.high.x - 24), box_center_y(widget.box)}
+			begin_path()
+				point(origin + {-3, -2})
+				point(origin + {0, 2})
+				point(origin + {3, -3})
+				stroke_path(2, fade(core.style.color.content, 0.5))
+			end_path()
+		}
+		if !info.is_tail {
+			origin: [2]f32 = {math.floor(widget.box.high.x - 7), box_center_y(widget.box)}
+			begin_path()
+				// Arrow
+				// point(origin + {-2, -4})
+				// point(origin + {2, 0})
+				// point(origin + {-2, 4})
+				// Slash
+				point(origin + {-2, 6})
+				point(origin + {2, -6})
+				stroke_path(2, fade(core.style.color.content, 0.5))
+			end_path()
 		}
 	}
 
+	if .Focused in widget.state {
+		begin_layer({
+			box = attach_box_bottom(widget.box, 100),
+		})
+			foreground()
+		end_layer()
+	}
+
+	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
+
 	return
+}
+
+do_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Breadcrumb_Result {
+	return display_breadcrumb(make_breadcrumb(info, loc))
 }
