@@ -1,17 +1,18 @@
-package ui
+package draw
 
-import edit "../scri"
+/*
+	make_text_iterator() 	- Prepare a `Text_Iterator` for iteration
+	make_text_job() 			- Given a `Text_Info` as an input, it will create a `Text_Job` to be rendered or processed
+*/
 
-import "core:runtime"
+import "base:runtime"
+
 import "core:os"
-
+import "core:fmt"
 import "core:c/libc"
 import "core:math"
 import "core:math/bits"
 import "core:math/linalg"
-
-import "core:fmt"
-
 import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
@@ -20,8 +21,8 @@ import sapp "extra:sokol-odin/sokol/app"
 
 import ttf "vendor:stb/truetype"
 
-FMT_BUFFER_COUNT 		:: 24
-FMT_BUFFER_SIZE 		:: 200
+FMT_BUFFER_COUNT 		:: 128
+FMT_BUFFER_SIZE 		:: 1024
 TEXT_BREAK 					:: "..."
 
 Horizontal_Text_Align :: enum {
@@ -67,7 +68,16 @@ Interactive_Text_Result :: struct {
 	hovered: bool,
 	// Text and selection bounds
 	bounds,
-	selection_bounds: Box,
+	selection_bounds: [2][2]f32,
+}
+
+Text_Job_Glyph :: struct {
+	origin: [2]f32,
+	glyph: ^Glyph,
+}
+
+Text_Job :: struct {
+	glyphs: [dynamic]Text_Job_Glyph,
 }
 
 Text_Iterator :: struct {
@@ -76,17 +86,16 @@ Text_Iterator :: struct {
 	glyph: ^Glyph,
 	line_limit: Maybe(f32),
 	line_size: [2]f32,
-	new_line: bool, // Set if `codepoint` is the first rune on a new line
+	new_line: bool, 					// Set if `codepoint` is the first rune on a new line
 	offset: [2]f32,
 
 	last_codepoint,
 	codepoint: rune,
+
 	next_word,
 	index,
 	next_index: int,
 }
-
-Font_Handle :: int
 
 Font_Size :: struct {
 	ascent,
@@ -94,7 +103,6 @@ Font_Size :: struct {
 	line_gap,
 	scale: f32,
 	glyphs: map[rune]Glyph,
-	// Helpers
 	break_size: f32,
 }
 
@@ -122,7 +130,7 @@ destroy_font :: proc(using self: ^Font) {
 
 Glyph :: struct {
 	image: Image,
-	src: Box,
+	src: [2][2]f32,
 	offset: [2]f32,
 	advance: f32,
 }
@@ -355,14 +363,14 @@ measure_text :: proc(info: Text_Info) -> [2]f32 {
 	return size
 }
 
-load_font :: proc(file_path: string) -> (handle: Font_Handle, success: bool) {
+load_font :: proc(file_path: string) -> (handle: int, success: bool) {
 	font: Font
 	if file_data, ok := os.read_entire_file(file_path); ok {
 		if ttf.InitFont(&font.data, raw_data(file_data), 0) {
 			for i in 0..<MAX_FONTS {
 				if core.atlas.fonts[i] == nil {
 					core.atlas.fonts[i] = font
-					handle = Font_Handle(i)
+					handle = int(i)
 					success = true
 					break
 				}
@@ -376,7 +384,7 @@ load_font :: proc(file_path: string) -> (handle: Font_Handle, success: bool) {
 	return
 }
 
-unload_font :: proc(handle: Font_Handle) {
+unload_font :: proc(handle: int) {
 	if font, ok := &core.atlas.fonts[handle].?; ok {
 		destroy_font(font)
 		core.atlas.fonts[handle] = nil
@@ -448,7 +456,7 @@ __get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^G
 	return
 }
 
-draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
+fill_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 	size: [2]f32 
 	origin := origin
 	if info.align_v != .Top {
@@ -486,7 +494,7 @@ draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 }
 
 draw_aligned_rune :: proc(
-	font: Font_Handle, 
+	font: int, 
 	size: f32, 
 	icon: rune, 
 	origin: [2]f32, 
@@ -526,7 +534,7 @@ draw_aligned_rune :: proc(
 	return icon_size
 }
 
-draw_rune_aligned_clipped :: proc(font: Font_Handle, size: f32, icon: rune, origin: [2]f32, color: Color, align: [2]Alignment, clip: Box) -> [2]f32 {
+draw_rune_aligned_clipped :: proc(font: int, size: f32, icon: rune, origin: [2]f32, color: Color, align: [2]Alignment, clip: Box) -> [2]f32 {
 	font := &core.atlas.fonts[font].?
 	font_size, _ := get_font_size(font, size)
 	glyph, _ := __get_glyph(font, font_size, rune(icon))
@@ -560,6 +568,7 @@ draw_rune_aligned_clipped :: proc(font: Font_Handle, size: f32, icon: rune, orig
 }
 
 // Draw interactive text
+/*
 draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, origin: [2]f32, info: Text_Info, color: Color) -> Interactive_Text_Result {
 	widget := result.self.?
 	using result: Interactive_Text_Result
@@ -752,55 +761,4 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 	}
 	return result
 }
-
-/*draw_text_box :: proc(info: Text_Box_Info, loc := #caller_location) -> Text_Box_Result {
-	self, generic_result := get_widget(info, loc)
-	result: Text_Box_Result = {
-		generic = generic_result,
-	}
-	self.box = next_box(ui)
-	text_info := info.text_info.(Text_Info) or_else info.text_info.(Tactile_Text_Info).base
-	origin: [2]f32
-	switch text_info.align {
-		case .Left: origin.x = self.box.low.x
-		case .Middle: origin.x = (self.box.low.x + self.box.high.x) / 2
-		case .Right: origin.x = self.box.high.x
-	}
-	switch text_info.baseline {
-		case .Top: origin.y = self.box.low.y
-		case .Middle: origin.y = (self.box.low.y + self.box.high.y) / 2
-		case .Bottom: origin.y = self.box.high.y
-	}
-	color := info.color.? or_else ui.style.color.content
-	switch text_info in info.text_info {
-		case Tactile_Text_Info: paint_tactile_text(ui, self, origin, text_info, color)
-		case Text_Info: paint_text(ui.origin, text_info, color)
-	}
-	return result
-}*/
-
-Text_Content_Info :: struct {
-	using _: Generic_Widget_Info,
-	using text_info: Text_Info,
-	interactive: bool,
-}
-
-make_text_content :: proc(info: Text_Content_Info, loc := #caller_location) -> Text_Content_Info {
-	info := info
-	info.id = hash(loc)
-	info.desired_size = measure_text(info.text_info)
-	return info
-}
-
-display_text_content :: proc(info: Text_Content_Info) {
-	widget := get_widget(info)
-	context.allocator = widget.allocator
-	widget.box = next_widget_box(info)
-
-
-
-}
-
-do_text_content :: proc(info: Text_Content_Info, loc := #caller_location) {
-	display_text_content(make_text_content(info, loc))
-}
+*/

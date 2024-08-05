@@ -1,4 +1,4 @@
-package ui
+package onyx
 
 import sapp "extra:sokol-odin/sokol/app"
 import sg "extra:sokol-odin/sokol/gfx"
@@ -7,10 +7,13 @@ import slog "extra:sokol-odin/sokol/log"
 import sglue "extra:sokol-odin/sokol/glue"
 import sdtx "extra:sokol-odin/sokol/debugtext"
 
+import "extra:common"
+import "../draw"
+
 import "vendor:fontstash"
 
 import "core:time"
-import "core:runtime"
+import "base:runtime"
 // import "core:funtime"
 
 import "core:fmt"
@@ -32,25 +35,11 @@ MAX_LAYER_VERTICES :: 65536
 MAX_LAYER_INDICES :: 65536
 ATLAS_SIZE :: 4096
 
+Color :: draw.Color
+
 Keyboard_Key :: sapp.Keycode
 // Private global core instance
 @private core: Core
-// Stack
-Stack :: struct($T: typeid, $N: int) {
-	items: [N]T,
-	height: int,
-}
-push :: proc(stack: ^Stack($T, $N), item: T) -> bool {
-	if stack.height >= N {
-		return false
-	}
-	stack.items[stack.height] = item
-	stack.height += 1
-	return true
-}
-pop :: proc(stack: ^Stack($T, $N)) {
-	stack.height -= 1
-}
 // Input events should be localized to layers
 Mouse_Button :: enum {
 	Left,
@@ -90,9 +79,9 @@ Core :: struct {
 	hovered_layer,														// The current hovered layer
 	focused_layer: Id,												// The current focused layer
 
-	layout_stack: Stack(Layout, MAX_LAYOUTS),		// The layout context stack
-	layer_stack: Stack(^Layer, MAX_LAYERS),			// The layer context stack
-	id_stack: Stack(Id, MAX_IDS),								// The ID context stack for compound hashing
+	layout_stack: common.Stack(Layout, MAX_LAYOUTS),		// The layout context stack
+	layer_stack: common.Stack(^Layer, MAX_LAYERS),			// The layer context stack
+	id_stack: common.Stack(Id, MAX_IDS),								// The ID context stack for compound hashing
 
 	cursor_type: sapp.Mouse_Cursor,
 	mouse_button: Mouse_Button,
@@ -103,9 +92,7 @@ Core :: struct {
 	keys, last_keys: [max(sapp.Keycode)]bool,
 	runes: [dynamic]rune,
 
-	draw_surface: Maybe(^Draw_Surface),
-	paths: Stack(Path, MAX_PATHS),
-	atlas: Atlas,
+	ctx: ^draw.Context,
 	style: Style,
 
 	visible,
@@ -151,10 +138,9 @@ init :: proc () {
 		index_type = .UINT16,
 		layout = {
 			attrs = {
-				0 = { offset = i32(offset_of(Vertex, pos)), format = .FLOAT2 },
+				0 = { offset = i32(offset_of(Vertex, pos)), format = .FLOAT3 },
 				1 = { offset = i32(offset_of(Vertex, uv)), format = .FLOAT2 },
 				2 = { offset = i32(offset_of(Vertex, col)), format = .UBYTE4N },
-				3 = { offset = i32(offset_of(Vertex, z)), format = .FLOAT },
 			},
 			buffers = {
 				0 = { stride = size_of(Vertex) },
@@ -204,6 +190,8 @@ init :: proc () {
 	core.style.header_text_size = 28
 
 	core.style.text_input_height = 30
+	
+	core.ctx = draw.make_context()
 }
 
 begin_frame :: proc () {
@@ -339,6 +327,7 @@ end_frame :: proc() {
 	core.last_mouse_bits = core.mouse_bits
 	clear(&core.runes)
 	core.last_keys = core.keys
+
 }
 
 quit :: proc () {
@@ -347,6 +336,8 @@ quit :: proc () {
 			free_all(widget.allocator)
 		}
 	}
+
+	draw.destroy_context(&core.ctx)
 
 	sg.destroy_buffer(core.bindings.index_buffer)
 	sg.destroy_buffer(core.bindings.vertex_buffers[0])

@@ -1,4 +1,4 @@
-package ui
+package onyx
 
 Table_Field_Type :: enum {
 	Integer,

@@ -1,12 +1,21 @@
-package ui
+package draw
 
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
-import "vendor:fontstash"
+
+import sg "extra:sokol-odin/sokol/gfx"
+import "extra:common"
 
 ANGLE_TOLERANCE :: 0.1
 MAX_PATH_POINTS :: 400
+MAX_MATRICES :: 40
+MAX_DRAW_CALLS :: 50
+MAX_DRAW_CALL_TEXTURES :: 8
+MAX_FONTS :: 100
+MAX_ATLASES :: 8
+MAX_IMAGES :: 256
+ATLAS_SIZE :: 1024
 
 Stroke_Justify :: enum {
 	Inner,
@@ -14,23 +23,43 @@ Stroke_Justify :: enum {
 	Outer,
 }
 
-Color :: [4]u8
-
-Image ::struct {
-	width, height: int,
-	data: []u8,
-	channels: int,
-}
-
 Vertex :: struct {
-	pos: [2]f32,
+	pos: [3]f32,
 	uv: [2]f32,
 	col: [4]u8,
-	z: f32,
 }
 
-Draw_State :: struct {
-	font: int,
+// Matrix used for vertex transforms
+Matrix :: matrix[4, 4]f32
+
+// A draw call to the GPU these are managed internally
+Draw_Call :: struct {
+	bindings: sg.Bindings,
+	textures: [MAX_DRAW_CALL_TEXTURES]sg.Image,
+	vertices: [dynamic]Vertex,
+	indices: [dynamic]u16,
+}
+
+// The current rendering context
+Context :: struct {
+	fonts: [MAX_FONTS]Maybe(Font),
+	current_font: int,
+
+	images: [MAX_IMAGES]Maybe(Image),
+
+	atlases: [MAX_ATLASES]Maybe(Atlas),
+	current_atlas: ^Atlas,
+
+	text_job: Text_Job,
+
+	vertex_color: Color,
+	vertex_uv: [2]f32,
+	vertex_z: f32,
+
+	draw_call_stack: common.Stack(Draw_Call, MAX_DRAW_CALLS),
+	current_draw_call: ^Draw_Call,
+	matrix_stack: common.Stack(Matrix, MAX_MATRICES),
+	current_matrix: ^Matrix,
 }
 
 Draw_Surface :: struct {
@@ -45,90 +74,155 @@ Path :: struct {
 	closed: bool,
 }
 
-// [SECTION] Colors
-blend_colors :: proc(time: f32, colors: ..Color) -> Color {
-	if len(colors) > 0 {
-		if len(colors) == 1 {
-			return colors[0]
-		}
-		if time <= 0 {
-			return colors[0]
-		} else if time >= f32(len(colors) - 1) {
-			return colors[len(colors) - 1]
-		} else {
-			i := int(math.floor(time))
-			t := time - f32(i)
-			return colors[i] + {
-				u8((f32(colors[i + 1].r) - f32(colors[i].r)) * t),
-				u8((f32(colors[i + 1].g) - f32(colors[i].g)) * t),
-				u8((f32(colors[i + 1].b) - f32(colors[i].b)) * t),
-				u8((f32(colors[i + 1].a) - f32(colors[i].a)) * t),
-			}
-		}
-	}
-	return {}
+make_context :: proc() -> ^Context {
+	ctx := new(Context)
+
+	return ctx
 }
 
-// Color processing
-set_color_brightness :: proc(color: Color, value: f32) -> Color {
-	delta := clamp(i32(255.0 * value), -255, 255)
+color :: proc(ctx: ^Context, color: Color) {
+	ctx.vertex_color = color
+}
+
+uv :: proc(ctx: ^Context, uv: [2]f32) {
+	ctx.vertex_uv = uv
+}
+
+// Append a vertex and return it's index
+vertex_3f32 :: proc(ctx: ^Context, x, y, z: f32) -> int {
+	pos: [3]f32 = {
+		ctx.current_matrix[0, 0] * x + ctx.current_matrix[0, 1] * y + ctx.current_matrix[0, 2] * z + ctx.current_matrix[0, 3],
+		ctx.current_matrix[1, 0] * x + ctx.current_matrix[1, 1] * y + ctx.current_matrix[1, 2] * z + ctx.current_matrix[1, 3],
+		ctx.current_matrix[2, 0] * x + ctx.current_matrix[2, 1] * y + ctx.current_matrix[2, 2] * z + ctx.current_matrix[2, 3],
+	}
+
+	return append(&ctx.current_draw_call.vertices, Vertex{
+		pos = pos,
+		uv = ctx.vertex_uv,
+		col = ctx.vertex_color,
+	})
+}
+
+vertex_2f32 :: proc(ctx: ^Context, x, y: f32) -> int {
+	return vertex_3f32(ctx, x, y, ctx.vertex_z)
+}
+
+push_matrix :: proc(ctx: ^Context) {
+	common.push(&ctx.matrix_stack, matrix_identity())
+	ctx.current_matrix = &ctx.matrix_stack.items[ctx.matrix_stack.height - 1]
+}
+
+pop_matrix :: proc(ctx: ^Context) {
+	stack.pop(&ctx.matrix_stack)
+	assert(ctx.matrix_stack.height >= 1)
+	ctx.current_matrix = &ctx.matrix_stack.items[ctx.matrix_stack.height - 1]
+}
+
+push_draw_call :: proc(ctx: ^Context) {
+	common.push(&ctx.draw_call_stack, Draw_Call{})
+	ctx.current_draw_call = &ctx.draw_call_stack.items[ctx.draw_call_stack.height - 1]
+}
+
+matrix_identity :: proc() -> Matrix {
 	return {
-		cast(u8)clamp(i32(color.r) + delta, 0, 255),
-		cast(u8)clamp(i32(color.g) + delta, 0, 255),
-		cast(u8)clamp(i32(color.b) + delta, 0, 255),
-		color.a,
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 1, 0,
+		0, 0, 0, 1,
 	}
 }
 
-color_to_hsv :: proc(color: Color) -> [4]f32 {
-	hsva := linalg.vector4_rgb_to_hsl(linalg.Vector4f32{f32(color.r) / 255.0, f32(color.g) / 255.0, f32(color.b) / 255.0, f32(color.a) / 255.0})
-	return hsva.xyzw
-}
-
-color_from_hsv :: proc(hue, saturation, value: f32) -> Color {
-	rgba := linalg.vector4_hsl_to_rgb(hue, saturation, value, 1.0)
-	return {u8(rgba.r * 255.0), u8(rgba.g * 255.0), u8(rgba.b * 255.0), u8(rgba.a * 255.0)}
-}
-
-fade :: proc(color: Color, alpha: f32) -> Color {
-	return {color.r, color.g, color.b, u8(f32(color.a) * alpha)}
-}
-
-alpha_blend_colors_tint :: proc(dst, src, tint: Color) -> (out: Color) {
-	out = 255
-
-	src := src
-	src.r = u8((u32(src.r) * (u32(tint.r) + 1)) >> 8)
-	src.g = u8((u32(src.g) * (u32(tint.g) + 1)) >> 8)
-	src.b = u8((u32(src.b) * (u32(tint.b) + 1)) >> 8)
-	src.a = u8((u32(src.a) * (u32(tint.a) + 1)) >> 8)
-
-	if (src.a == 0) {
-		out = dst
-	} else if src.a == 255 {
-		out = src
-	} else {
-		alpha := u32(src.a) + 1
-		out.a = u8((u32(alpha) * 256 + u32(dst.a) * (256 - alpha)) >> 8)
-
-		if out.a > 0 {
-			out.r = u8(((u32(src.r) * alpha * 256 + u32(dst.r) * u32(dst.a) * (256 - alpha)) / u32(out.a)) >> 8)
-			out.g = u8(((u32(src.g) * alpha * 256 + u32(dst.g) * u32(dst.a) * (256 - alpha)) / u32(out.a)) >> 8)
-			out.b = u8(((u32(src.b) * alpha * 256 + u32(dst.b) * u32(dst.a) * (256 - alpha)) / u32(out.a)) >> 8)
-		}
+translate :: proc(ctx: ^Context, x, y, z: f32) {
+	translation_matrix: Matrix = {
+		1, 0, 0, x,
+	    0, 1, 0, y,
+	    0, 0, 1, z,
+	    0, 0, 0, 1,
 	}
-	return
+
+	ctx.current_matrix^ *= translation_matrix
 }
 
-alpha_blend_colors_time :: proc(dst, src: Color, time: f32) -> (out: Color) {
-	return alpha_blend_colors_tint(dst, src, fade(255, time))
+rotate :: proc(ctx: ^Context, angle, x, y, z: f32) {
+	rotation_matrix := matrix_identity()
+	
+	x, y, z := x, y, z
+	
+	len_squared := x * x + y * y + z * z
+	if len_squared != 1 && len_squared != 0 {
+		inverse_len := 1 / math.sqrt(len_squared)
+		x *= inverse_len
+		y *= inverse_len
+		z *= inverse_len
+	}
+	sinres := math.sin(angle)
+	cosres := math.cos(angle)
+	t := 1 - cosres
+
+	rotation_matrix[0, 0] = x*x*y + cosres
+	rotation_matrix[1, 0] = y*x*t - z*sinres
+	rotation_matrix[2, 0] = z*x*y - y*sinres
+	rotation_matrix[3, 0] = 0
+
+	rotation_matrix[0, 1] = x*y*t - z*sinres
+	rotation_matrix[1, 1] = y*y*y + cosres
+	rotation_matrix[2, 1] = z*y*t + x*sinres
+	rotation_matrix[3, 1] = 0
+
+	rotation_matrix[0, 2] = x*z*t + y*sinres
+	rotation_matrix[1, 2] = y*z*t + x*sinres
+	rotation_matrix[2, 2] = z*z*y + cosres
+	rotation_matrix[3, 2] = 0
+
+	rotation_matrix[0, 3] = 0
+	rotation_matrix[1, 3] = 0
+	rotation_matrix[2, 3] = 0
+	rotation_matrix[3, 3] = 1
+
+	ctx.current_matrix^ *= rotation_matrix
 }
 
-alpha_blend_colors :: proc {
-	alpha_blend_colors_time,
-	alpha_blend_colors_tint,
+scale :: proc(ctx: ^Context, x, y, z: f32) {
+	scale_matrix: matrix[4, 4]f32 = {
+		x, 0, 0, 0,
+		0, y, 0, 0,
+		0, 0, z, 0,
+		0, 0, 0, 1,
+	}
+
+	ctx.current_matrix^ *= scale_matrix
 }
 
+present :: proc(ctx: ^Context) {
+	u: Uniform = {
+				texSize = core.view,
+				origin = layer.box.low,
+				scale = 1,
+			}
+			sg.apply_uniforms(.VS, 0, { 
+				ptr = &u,
+				size = size_of(Uniform),
+			})
+			sg.update_buffer(core.bindings.index_buffer, { 
+				ptr = raw_data(layer.surface.indices), 
+				size = u64(len(layer.surface.indices) * size_of(u16)),
+			})
+			sg.update_buffer(core.bindings.vertex_buffers[0], { 
+				ptr = raw_data(layer.surface.vertices), 
+				size = u64(len(layer.surface.vertices) * size_of(Vertex)),
+			})
+			sg.apply_scissor_rectf(
+				u.origin.x + (layer.box.low.x - u.origin.x) * u.scale, 
+				u.origin.y + (layer.box.low.y - u.origin.y) * u.scale, 
+				(layer.box.high.x - layer.box.low.x) * u.scale, 
+				(layer.box.high.y - layer.box.low.y) * u.scale, 
+				true,
+				)
+			sg.draw(0, len(layer.surface.indices), 1)
+			sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+}
+
+/*
 // [SECTION] Paths
 clear_path :: proc(path: ^Path) {
 	path.count = 0
@@ -620,4 +714,4 @@ foreground :: proc() {
 	layout := current_layout()
 	draw_rounded_box_fill(layout.box, core.style.rounding, core.style.color.foreground)
 	draw_rounded_box_stroke(layout.box, core.style.rounding, 1, core.style.color.substance)
-}
+}*/

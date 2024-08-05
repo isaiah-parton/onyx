@@ -1,10 +1,10 @@
 # Onyx
 
-**Mode**: immediate
-**Backend**: sokol
-**Tested on**: windows
-**Visual style inspired by**: https://ui.shadcn.com/
-**Hotel**: Trivago
+- **Mode**: immediate
+- **Backend**: sokol
+- **Tested on**: windows and linux amd64
+- **Visual style inspired by**: https://ui.shadcn.com/
+- **Hotel**: trivago
 
 ## Design theory
 
@@ -14,5 +14,5 @@ My goal for this library is that less would be more; provide the user with suffi
 
 ## Plans
 
-Once I deem the library stable, all the necessary widgets are added and I have a complete demo, I will test it on Linux and Android.
+Once the library is more or less complete and the demo serves as a complete exhibit of all its features, I plan to test this on Android.
 

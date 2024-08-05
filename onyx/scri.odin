@@ -3,7 +3,7 @@ package text_edit
 // Based on "code:text/edit"
 
 import "core:fmt"
-import "core:runtime"
+import "base:runtime"
 import "core:time"
 import "core:strings"
 import "core:unicode/utf8"

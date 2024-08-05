@@ -3,7 +3,7 @@ package demo
 import "core:fmt"
 import "core:math"
 import "core:strings"
-import "core:runtime"
+import "base:runtime"
 import "core:reflect"
 
 import ui "extra:onyx/onyx"
@@ -60,7 +60,7 @@ main :: proc() {
 				ui.begin_layer({
 					box = ui.shrink_box(ui.view_box(), 100),
 				})
-					ui.foreground()
+					/*ui.foreground()
 					ui.begin_layout({
 						size = 65,
 						side = .Top,
@@ -77,7 +77,7 @@ main :: proc() {
 					switch section in state.section {
 					
 						case Component_Section:
-						#partial switch state.component {
+						#partial switch section.component {
 						
 							case .Button:
 							ui.do_label({
@@ -107,73 +107,7 @@ main :: proc() {
 							
 						}
 					}
-					
-					switch state.section {
-
-						case .Booleans:
-						ui.do_label({
-							text = "Checkboxes",
-							font_style = .Bold,
-							font_size = 24,
-						})
-						ui.space(10)
-						for member, m in Option {
-							ui.push_id(m)
-								if m > 0 {
-									ui.space(10)
-								}
-								if ui.was_clicked(ui.do_checkbox({
-									value = state.checkboxes[member],
-									text = ui.tmp_print(member),
-								})) {
-									state.checkboxes[member] = !state.checkboxes[member]
-								}
-							ui.pop_id()
-						}
-
-						case .Buttons:
-						ui.do_label({
-							text = "Fit to label",
-							font_style = .Bold,
-							font_size = 24,
-						})
-						ui.space(10)
-						ui.begin_layout({
-							size = 30,
-						})
-							ui.set_width_auto()
-							for member, m in ui.Button_Kind {
-								ui.push_id(m)
-									if m > 0 {
-										ui.space(10)
-									}
-									if ui.was_clicked(ui.do_button({
-										text = ui.tmp_print(member),
-										kind = member,
-									})) {
-
-									}
-								ui.pop_id()
-							}
-						ui.end_layout()
-
-						case .Charts:
-
-						case .Graphs:
-
-						case .Fields:
-						ui.do_label({
-							text = "Text",
-							font_style = .Bold,
-							font_size = 24,
-						})
-						ui.space(10)
-						ui.set_height_auto()
-						ui.do_text_input({builder = &state.text_builder})
-
-						case .Analog:
-						state.slider_value = ui.do_slider(ui.Slider_Info(f32){value = state.slider_value}).value.? or_else state.slider_value
-					}
+					*/
 				ui.end_layer()
 			ui.end_frame()
 		},

@@ -1,23 +1,23 @@
-package ui
+package draw
 
-import sg "extra:sokol-odin/sokol/gfx"
 import "core:slice"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
-MAX_RING_RADIUS :: 30
+import sg "extra:sokol-odin/sokol/gfx"
 
 Atlas :: struct {
 	width,
 	height: int,
-	image: sg.Image,
+	images: sg.Image,
 	data: []u8,
 	cursor: [2]f32,
 	row_height: f32,
-	was_changed: bool,
 
-	fonts: [MAX_FONTS]Maybe(Font),
+	full,
+	was_changed: bool,
+	times_accessed: int,
 }
 
 init_atlas :: proc(atlas: ^Atlas, width, height: int) {

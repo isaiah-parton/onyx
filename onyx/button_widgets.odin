@@ -1,4 +1,6 @@
-package ui
+package onyx
+
+import "../draw"
 
 import "core:math"
 import "core:math/ease"
@@ -17,7 +19,7 @@ Button_Info :: struct {
 	kind: Button_Kind,
 
 	__text_size: [2]f32,
-	__text_info: Text_Info,
+	__text_info: draw.Text_Info,
 }
 
 Button_Result :: struct {
@@ -32,7 +34,7 @@ make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 		font = core.style.fonts[.Bold],
 		size = core.style.button_text_size,
 	}
-	info.__text_size = measure_text(info.__text_info)
+	info.__text_size = draw.measure_text(info.__text_info)
 	info.desired_size = info.__text_size + {20, 16}
 	return info
 }

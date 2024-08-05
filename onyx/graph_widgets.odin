@@ -1,10 +1,10 @@
-package ui
+package onyx
 
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 
-import "core:intrinsics"
+import "base:intrinsics"
 
 Graph_Kind_Bar :: struct {
 	stacked,

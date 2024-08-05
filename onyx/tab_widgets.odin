@@ -1,6 +1,4 @@
-package ui
-
-import "core:intrinsics"
+package onyx
 
 Tabs_Info :: struct {
 	using _: Generic_Widget_Info,

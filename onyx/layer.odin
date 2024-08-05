@@ -1,4 +1,4 @@
-package ui
+package onyx
 
 import "core:fmt"
 import "core:slice"
@@ -34,7 +34,6 @@ Layer :: struct {
 	options: Layer_Options,			// Option bit flags
 	order: Layer_Order,					// Basically the type of layer, affects it's place in the list
 	box: Box,		
-	surface: Draw_Surface,			// The graphical drawing surface
 	parent: ^Layer,							// The layer's parent
 	children: [dynamic]^Layer,	// The layer's children
 	dead: bool,									// Should be deleted?
@@ -46,12 +45,15 @@ Layer_Info :: struct {
 	order: Layer_Order,
 	box: Box,
 }
+
 init_layer :: proc(layer: ^Layer) {
-	init_draw_surface(&layer.surface)
+	// init_draw_surface(&layer.surface)
 }
+
 destroy_layer :: proc(layer: ^Layer) {
-	destroy_draw_surface(&layer.surface)
+	// destroy_draw_surface(&layer.surface)
 }
+
 current_layer :: proc(loc := #caller_location) -> ^Layer {
 	assert(core.layer_stack.height > 0, "No current layer", loc)
 	return core.layer_stack.items[core.layer_stack.height - 1]
@@ -91,8 +93,6 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 			append(&parent.children, layer)
 		}
 	}
-	clear_draw_surface(&layer.surface)
-	core.draw_surface = &layer.surface
 
 	push(&core.layer_stack, layer)
 	begin_layout({
@@ -102,7 +102,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 }
 end_layer :: proc() {
 	end_layout()
-	pop(&core.layer_stack)
+	common.pop(&core.layer_stack)
 	core.draw_surface = &core.layer_stack.items[core.layer_stack.height - 1].surface if core.layer_stack.height > 0 else nil
 }
 process_layers :: proc() {

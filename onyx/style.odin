@@ -1,20 +1,24 @@
-package ui
+package onyx
+
+import "../draw"
 
 Color_Scheme :: struct {
 	background,
 	foreground,
 	substance,
 	accent,
-	content: Color,
+	content: draw.Color,
 }
+
 Font_Style :: enum {
 	Light,
 	Regular,
 	Medium,
 	Bold,
 }
+
 Style :: struct {
-	fonts: [Font_Style]Font_Handle,
+	fonts: [Font_Style]int,
 	color: Color_Scheme,
 
 	header_text_size,
@@ -55,7 +59,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 }
 
 set_style_font :: proc(style: Font_Style, path: string) -> bool {
-	core.style.fonts[style] = load_font(path) or_return
+	core.style.fonts[style] = draw.load_font(path) or_return
 	return true
 }
 

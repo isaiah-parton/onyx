@@ -1,4 +1,4 @@
-package ui
+package onyx
 
 import sapp "extra:sokol-odin/sokol/app"
 

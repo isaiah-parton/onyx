@@ -1,4 +1,4 @@
-package ui
+package onyx
 
 import "core:math"
 import "core:math/ease"
@@ -56,19 +56,15 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 		if len(info.options) > 0 {
 			origin: [2]f32 = {math.floor(widget.box.high.x - 24), box_center_y(widget.box)}
 			begin_path()
-				point(origin + {-3, -2})
+				point(origin + {-4, -2})
 				point(origin + {0, 2})
-				point(origin + {3, -3})
+				point(origin + {4, -2})
 				stroke_path(2, fade(core.style.color.content, 0.5))
 			end_path()
 		}
 		if !info.is_tail {
 			origin: [2]f32 = {math.floor(widget.box.high.x - 7), box_center_y(widget.box)}
 			begin_path()
-				// Arrow
-				// point(origin + {-2, -4})
-				// point(origin + {2, 0})
-				// point(origin + {-2, 4})
 				// Slash
 				point(origin + {-2, 6})
 				point(origin + {2, -6})

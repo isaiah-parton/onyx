@@ -1,4 +1,4 @@
-package ui
+package onyx
 
 import "core:fmt"
 import "core:strings"

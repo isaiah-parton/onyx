@@ -1,4 +1,6 @@
-package ui
+package onyx
+
+import "extra:common"
 
 import "core:math"
 import "core:math/linalg"
@@ -13,19 +15,12 @@ Layout_Info :: struct {
 // Layout
 Layout :: struct {
 	original_box,				// Original box
-	box: Box,						// Current box to cut from
+	box: Box,			// Current box to cut from
 	next_side: Side,		// Next side to cut from
 	next_size: [2]f32,	// Next cut size
 
 	show_lines: bool,		
 	side: Maybe(Side),	// What side was the layout cut from (if it was cut)
-}
-
-Side :: enum {
-	Top,
-	Bottom,
-	Left,
-	Right,
 }
 
 current_layout :: proc(loc := #caller_location) -> ^Layout {
@@ -65,11 +60,11 @@ next_widget_box :: proc(info: Generic_Widget_Info) -> Box {
 }
 
 push_layout :: proc(layout: Layout) {
-	push(&core.layout_stack, layout)
+	common.push(&core.layout_stack, layout)
 }
 
 pop_layout :: proc() {
-	pop(&core.layout_stack)
+	common.pop(&core.layout_stack)
 }
 
 begin_layout :: proc(info: Layout_Info) {

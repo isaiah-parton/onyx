@@ -1,4 +1,6 @@
-package ui
+package onyx
+
+import "../draw"
 
 import "core:fmt"
 import "core:time"
@@ -7,8 +9,8 @@ import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 
-import "core:intrinsics"
-import "core:runtime"
+import "base:intrinsics"
+import "base:runtime"
 
 DOUBLE_CLICK_TIME :: time.Millisecond * 450
 
@@ -234,7 +236,7 @@ commit_widget :: proc(widget: ^Widget, hovered: bool) {
 	}
 
 	if core.show_debug_stats {
-		draw_box_stroke(widget.box, 1, {0, 255, 0, 255})
+		draw.stroke_box(widget.box, 1, {0, 255, 0, 255})
 	}
 }
 

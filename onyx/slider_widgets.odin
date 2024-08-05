@@ -1,6 +1,6 @@
-package ui
+package onyx
 
-import "core:intrinsics"
+import "base:intrinsics"
 import "core:math"
 import "core:math/linalg"
 

@@ -1,4 +1,4 @@
-package ui
+package onyx
 
 Tree_Node_Info :: struct {
 	using _: Generic_Widget_Info,
