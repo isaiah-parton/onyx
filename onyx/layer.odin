@@ -102,8 +102,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 }
 end_layer :: proc() {
 	end_layout()
-	common.pop(&core.layer_stack)
-	core.draw_surface = &core.layer_stack.items[core.layer_stack.height - 1].surface if core.layer_stack.height > 0 else nil
+	pop(&core.layer_stack)
 }
 process_layers :: proc() {
 	sorted_layer: ^Layer

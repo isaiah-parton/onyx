@@ -7,20 +7,12 @@ import slog "extra:sokol-odin/sokol/log"
 import sglue "extra:sokol-odin/sokol/glue"
 import sdtx "extra:sokol-odin/sokol/debugtext"
 
-import "extra:common"
-import "../draw"
-
 import "vendor:fontstash"
 
 import "core:time"
 import "base:runtime"
-// import "core:funtime"
-
 import "core:fmt"
 import "core:strings"
-
-import "core:thread"
-
 import "core:math"
 import "core:math/linalg"
 
@@ -28,14 +20,24 @@ MAX_IDS :: 10
 MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
 MAX_LAYOUTS :: 100
-MAX_FONTS :: 10
-MAX_PATHS :: 10
-MAX_DRAW_STATES :: 100
-MAX_LAYER_VERTICES :: 65536
-MAX_LAYER_INDICES :: 65536
-ATLAS_SIZE :: 4096
 
-Color :: draw.Color
+Stack :: struct($T: typeid, $N: int) {
+	items: [N]T,
+	height: int,
+}
+
+push :: proc(stack: ^Stack($T, $N), item: T) -> bool {
+	if stack.height >= N {
+		return false
+	}
+	stack.items[stack.height] = item
+	stack.height += 1
+	return true
+}
+
+pop :: proc(stack: ^Stack($T, $N)) {
+	stack.height -= 1
+}
 
 Keyboard_Key :: sapp.Keycode
 // Private global core instance
@@ -79,9 +81,9 @@ Core :: struct {
 	hovered_layer,														// The current hovered layer
 	focused_layer: Id,												// The current focused layer
 
-	layout_stack: common.Stack(Layout, MAX_LAYOUTS),		// The layout context stack
-	layer_stack: common.Stack(^Layer, MAX_LAYERS),			// The layer context stack
-	id_stack: common.Stack(Id, MAX_IDS),								// The ID context stack for compound hashing
+	layout_stack: Stack(Layout, MAX_LAYOUTS),		// The layout context stack
+	layer_stack: Stack(^Layer, MAX_LAYERS),			// The layer context stack
+	id_stack: Stack(Id, MAX_IDS),								// The ID context stack for compound hashing
 
 	cursor_type: sapp.Mouse_Cursor,
 	mouse_button: Mouse_Button,
@@ -92,7 +94,6 @@ Core :: struct {
 	keys, last_keys: [max(sapp.Keycode)]bool,
 	runes: [dynamic]rune,
 
-	ctx: ^draw.Context,
 	style: Style,
 
 	visible,
@@ -102,6 +103,25 @@ Core :: struct {
 	last_frame_time: time.Time,		// Time of last frame
 	draw_this_frame,
 	draw_next_frame: bool,
+
+	fonts: [MAX_FONTS]Maybe(Font),
+	current_font: int,
+
+	images: [MAX_IMAGES]Maybe(Image),
+
+	atlases: [MAX_ATLASES]Maybe(Atlas),
+	current_atlas: ^Atlas,
+
+	text_job: Text_Job,
+
+	vertex_color: Color,
+	vertex_uv: [2]f32,
+	vertex_z: f32,
+
+	draw_call_stack: Stack(Draw_Call, MAX_DRAW_CALLS),
+	current_draw_call: ^Draw_Call,
+	matrix_stack: Stack(Matrix, MAX_MATRICES),
+	current_matrix: ^Matrix,
 }
 
 view_box :: proc() -> Box {
@@ -141,6 +161,7 @@ init :: proc () {
 				0 = { offset = i32(offset_of(Vertex, pos)), format = .FLOAT3 },
 				1 = { offset = i32(offset_of(Vertex, uv)), format = .FLOAT2 },
 				2 = { offset = i32(offset_of(Vertex, col)), format = .UBYTE4N },
+				3 = { offset = i32(offset_of(Vertex, tex)), format = .UBYTE4N },
 			},
 			buffers = {
 				0 = { stride = size_of(Vertex) },
@@ -182,8 +203,6 @@ init :: proc () {
 		wrap_u = .MIRRORED_REPEAT,
 		wrap_v = .MIRRORED_REPEAT,
 	})
-	// Initialize the font atlas
-	init_atlas(&core.atlas, ATLAS_SIZE, ATLAS_SIZE)
 
 	core.style.button_text_size = 18
 	core.style.content_text_size = 16
@@ -191,7 +210,7 @@ init :: proc () {
 
 	core.style.text_input_height = 30
 	
-	core.ctx = draw.make_context()
+	core.ctx = make_draw_context()
 }
 
 begin_frame :: proc () {
@@ -264,14 +283,17 @@ end_frame :: proc() {
 			swapchain = sglue.swapchain(),
 		})
 		core.bindings.fs.images[0] = core.atlas.image
+		
+		projection_matrix: matrix[4, 4]f32 = {
+			
+		}
+
 		sg.apply_pipeline(core.pipeline)
 		sg.apply_bindings(core.bindings)
 		// render layers
 		for layer in core.layer_list {
 			u: Uniform = {
-				texSize = core.view,
-				origin = layer.box.low,
-				scale = 1,
+				mat = projection_matrix,
 			}
 			sg.apply_uniforms(.VS, 0, { 
 				ptr = &u,
@@ -327,7 +349,6 @@ end_frame :: proc() {
 	core.last_mouse_bits = core.mouse_bits
 	clear(&core.runes)
 	core.last_keys = core.keys
-
 }
 
 quit :: proc () {
@@ -337,7 +358,7 @@ quit :: proc () {
 		}
 	}
 
-	draw.destroy_context(&core.ctx)
+	destroy_draw_context(&core.ctx)
 
 	sg.destroy_buffer(core.bindings.index_buffer)
 	sg.destroy_buffer(core.bindings.vertex_buffers[0])
@@ -349,34 +370,47 @@ quit :: proc () {
 
 handle_event :: proc (e: ^sapp.Event) {
 	#partial switch e.type {
+
 		case .FOCUSED, .SUSPENDED:
 		core.focused = true
+
 		case .UNFOCUSED, .RESUMED:
 		core.focused = false
+
 		case .ICONIFIED:
 		core.visible = false
+
 		case .RESTORED:
 		core.visible = true
+
 		case .MOUSE_DOWN:
 		core.mouse_bits += {Mouse_Button(e.mouse_button)}
 		core.mouse_button = Mouse_Button(e.mouse_button)
+		
 		case .MOUSE_UP:
 		core.mouse_bits -= {Mouse_Button(e.mouse_button)}
+		
 		case .MOUSE_MOVE:
 		core.mouse_pos = {e.mouse_x, e.mouse_y}
+		
 		case .MOUSE_SCROLL:
 		core.mouse_scroll = {e.scroll_x, e.scroll_y}
+		
 		case .KEY_DOWN:
 		core.keys[e.key_code] = true
 		if e.key_repeat {
 			core.last_keys[e.key_code] = false
 		}
+		
 		case .KEY_UP:
 		core.keys[e.key_code] = false
+		
 		case .CHAR:
 		append(&core.runes, rune(e.char_code))
+		
 		case .QUIT_REQUESTED:
 		// sapp.quit()
+		
 		case .RESIZED:
 		core.view = {sapp.widthf(), sapp.heightf()}
 		core.draw_next_frame = true

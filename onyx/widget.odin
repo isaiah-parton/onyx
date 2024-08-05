@@ -1,7 +1,5 @@
 package onyx
 
-import "../draw"
-
 import "core:fmt"
 import "core:time"
 
@@ -236,7 +234,7 @@ commit_widget :: proc(widget: ^Widget, hovered: bool) {
 	}
 
 	if core.show_debug_stats {
-		draw.stroke_box(widget.box, 1, {0, 255, 0, 255})
+		draw_box_stroke(widget.box, 1, {0, 255, 0, 255})
 	}
 }
 

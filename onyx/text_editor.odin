@@ -1,4 +1,4 @@
-package text_edit
+package onyx
 
 // Based on "code:text/edit"
 
@@ -10,7 +10,7 @@ import "core:unicode/utf8"
 
 MAX_UNDO :: 10
 
-State :: struct {
+Text_Editor :: struct {
 	selection: [2]int,
 
 	line_start, 
@@ -54,124 +54,124 @@ Translation :: enum u32 {
 	Soft_Line_End,
 }
 
-init :: proc(s: ^State, undo_text_allocator, undo_state_allocator: runtime.Allocator) {
+make_text_editor :: proc(e: ^Text_Editor, undo_text_allocator, undo_state_allocator: runtime.Allocator) {
 	// Used for allocating `Undo_State`
-	s.undo_text_allocator = undo_text_allocator
+	e.undo_text_allocator = undo_text_allocator
 
-	s.undo.allocator = undo_state_allocator
-	s.redo.allocator = undo_state_allocator
+	e.undo.allocator = undo_state_allocator
+	e.redo.allocator = undo_state_allocator
 }
 
-destroy :: proc(s: ^State) {
-	undo_clear(s, &s.undo)
-	undo_clear(s, &s.redo)
-	delete(s.undo)
-	delete(s.redo)
-	s.builder = nil
+destroy_text_editor :: proc(e: ^Text_Editor) {
+	undo_clear(s, &e.undo)
+	undo_clear(s, &e.redo)
+	delete(e.undo)
+	delete(e.redo)
+	e.builder = nil
 }
 
 // Call at the beginning of each frame
-begin :: proc(s: ^State, id: u64, builder: ^strings.Builder) {
+begin :: proc(e: ^Text_Editor, id: u64, builder: ^strings.Builder) {
 	assert(builder != nil)
-	s.selection = {len(builder.buf), 0}
-	s.builder = builder
-	set_text(s, string(s.builder.buf[:]))
-	undo_clear(s, &s.undo)
-	undo_clear(s, &s.redo)
+	e.selection = {len(builder.buf), 0}
+	e.builder = builder
+	set_text(s, string(e.builder.buf[:]))
+	undo_clear(s, &e.undo)
+	undo_clear(s, &e.redo)
 }
 
-set_text :: proc(s: ^State, text: string) {
-	strings.builder_reset(s.builder)
-	strings.write_string(s.builder, text)
+set_text :: proc(e: ^Text_Editor, text: string) {
+	strings.builder_reset(e.builder)
+	strings.write_string(e.builder, text)
 }
 
-undo :: proc(s: ^State, undo, redo: ^[dynamic]Undo_Action) {
+undo :: proc(e: ^Text_Editor, undo, redo: ^[dynamic]Undo_Action) {
 	if len(undo) > 0 {
 		item := pop(undo)
 		append(redo, Undo_Action{
-			selection = s.selection,
-			text = strings.clone_from_bytes(s.builder.buf[:], s.undo_text_allocator),
+			selection = e.selection,
+			text = strings.clone_from_bytes(e.builder.buf[:], e.undo_text_allocator),
 		})
-		s.selection = item.selection
-		clear(&s.builder.buf)
-		append(&s.builder.buf, item.text)
+		e.selection = item.selection
+		clear(&e.builder.buf)
+		append(&e.builder.buf, item.text)
 	}
 }
 
-undo_clear :: proc(s: ^State, undo: ^[dynamic]Undo_Action) {
+undo_clear :: proc(e: ^Text_Editor, undo: ^[dynamic]Undo_Action) {
 	for len(undo) > 0 {
 		item := pop(undo)
-		delete(item.text, s.undo_text_allocator)
+		delete(item.text, e.undo_text_allocator)
 	}
 }
 
-input_text :: proc(s: ^State, text: string) {
+input_text :: proc(e: ^Text_Editor, text: string) {
 	if len(text) == 0 {
 		return
 	}
 	if has_selection(s) {
 		selection_delete(s)
 	}
-	insert(s, s.selection[0], text)
-	offset := s.selection[0] + len(text)
-	s.selection = {offset, offset}
+	insert(s, e.selection[0], text)
+	offset := e.selection[0] + len(text)
+	e.selection = {offset, offset}
 }
 
-input_runes :: proc(s: ^State, text: []rune) {
+input_runes :: proc(e: ^Text_Editor, text: []rune) {
 	if len(text) == 0 {
 		return
 	}
-	undo_clear(s, &s.redo)
-	append(&s.undo, Undo_Action{
-		selection = s.selection,
-		text = strings.clone_from_bytes(s.builder.buf[:], s.undo_text_allocator),
+	undo_clear(s, &e.redo)
+	append(&e.undo, Undo_Action{
+		selection = e.selection,
+		text = strings.clone_from_bytes(e.builder.buf[:], e.undo_text_allocator),
 	})
-	if len(s.undo) > MAX_UNDO {
-		pop_front(&s.undo)
+	if len(e.undo) > MAX_UNDO {
+		pop_front(&e.undo)
 	}
 	if has_selection(s) {
 		selection_delete(s)
 	}
-	offset := s.selection[0]
+	offset := e.selection[0]
 	for r in text {
 		b, w := utf8.encode_rune(r)
 		text := string(b[:w])
 		insert(s, offset, text)
 		offset += w
 	}
-	s.selection = {offset, offset}
+	e.selection = {offset, offset}
 }
 
-insert :: proc(s: ^State, at: int, text: string) {
-	inject_at(&s.builder.buf, at, text)
+insert :: proc(e: ^Text_Editor, at: int, text: string) {
+	inject_at(&e.builder.buf, at, text)
 }
 
-remove :: proc(s: ^State, lo, hi: int) {
-	remove_range(&s.builder.buf, lo, hi)
+remove :: proc(e: ^Text_Editor, lo, hi: int) {
+	remove_range(&e.builder.buf, lo, hi)
 }
 
-has_selection :: proc(s: ^State) -> bool {
-	return s.selection[0] != s.selection[1]
+has_selection :: proc(e: ^Text_Editor) -> bool {
+	return e.selection[0] != e.selection[1]
 }
 
-sorted_selection :: proc(s: ^State) -> (lo, hi: int) {
-	lo = min(s.selection[0], s.selection[1])
-	hi = max(s.selection[0], s.selection[1])
-	lo = clamp(lo, 0, len(s.builder.buf))
-	hi = clamp(hi, 0, len(s.builder.buf))
-	s.selection[0] = lo
-	s.selection[1] = hi
+sorted_selection :: proc(e: ^Text_Editor) -> (lo, hi: int) {
+	lo = min(e.selection[0], e.selection[1])
+	hi = max(e.selection[0], e.selection[1])
+	lo = clamp(lo, 0, len(e.builder.buf))
+	hi = clamp(hi, 0, len(e.builder.buf))
+	e.selection[0] = lo
+	e.selection[1] = hi
 	return
 }
 
 
-selection_delete :: proc(s: ^State) {
+selection_delete :: proc(e: ^Text_Editor) {
 	lo, hi := sorted_selection(s)
 	remove(s, lo, hi)
-	s.selection = {lo, lo}
+	e.selection = {lo, lo}
 }
 
-translate_position :: proc(s: ^State, pos: int, t: Translation) -> int {
+translate_position :: proc(e: ^Text_Editor, pos: int, t: Translation) -> int {
 	is_continuation_byte :: proc(b: byte) -> bool {
 		return b >= 0x80 && b < 0xc0
 	}
@@ -179,7 +179,7 @@ translate_position :: proc(s: ^State, pos: int, t: Translation) -> int {
 		return b == ' ' || b == '\t' || b == '\n'
 	}
 
-	buf := s.builder.buf[:]
+	buf := e.builder.buf[:]
 
 	pos := pos
 	pos = clamp(pos, 0, len(buf))
@@ -200,9 +200,9 @@ translate_position :: proc(s: ^State, pos: int, t: Translation) -> int {
 			pos += 1
 		}
 	case .Up:
-		pos = s.up_index
+		pos = e.up_index
 	case .Down:
-		pos = s.down_index
+		pos = e.down_index
 	case .Word_Left:
 		for pos > 0 && is_space(buf[pos-1]) {
 			pos -= 1
@@ -226,68 +226,68 @@ translate_position :: proc(s: ^State, pos: int, t: Translation) -> int {
 			pos += 1
 		}
 	case .Soft_Line_Start:
-		pos = s.line_start
+		pos = e.line_start
 	case .Soft_Line_End:
-		pos = s.line_end
+		pos = e.line_end
 	}
 	return clamp(pos, 0, len(buf))
 }
 
-move_to :: proc(s: ^State, t: Translation) {
+move_to :: proc(e: ^Text_Editor, t: Translation) {
 	if t == .Left && has_selection(s) {
 		lo, _ := sorted_selection(s)
-		s.selection = {lo, lo}
+		e.selection = {lo, lo}
 	} else if t == .Right && has_selection(s) {
 		_, hi := sorted_selection(s)
-		s.selection = {hi, hi}
+		e.selection = {hi, hi}
 	} else {
-		pos := translate_position(s, s.selection[0], t)
-		s.selection = {pos, pos}
+		pos := translate_position(s, e.selection[0], t)
+		e.selection = {pos, pos}
 	}
 }
-select_to :: proc(s: ^State, t: Translation) {
-	s.selection[0] = translate_position(s, s.selection[0], t)
+select_to :: proc(e: ^Text_Editor, t: Translation) {
+	e.selection[0] = translate_position(s, e.selection[0], t)
 }
-delete_to :: proc(s: ^State, t: Translation) {
+delete_to :: proc(e: ^Text_Editor, t: Translation) {
 	if has_selection(s) {
 		selection_delete(s)
 	} else {
-		lo := s.selection[0]
+		lo := e.selection[0]
 		hi := translate_position(s, lo, t)
 		lo, hi = min(lo, hi), max(lo, hi)
 		remove(s, lo, hi)
-		s.selection = {lo, lo}
+		e.selection = {lo, lo}
 	}
 }
 
 
-current_selected_text :: proc(s: ^State) -> string {
+current_selected_text :: proc(e: ^Text_Editor) -> string {
 	lo, hi := sorted_selection(s)
-	return string(s.builder.buf[lo:hi])
+	return string(e.builder.buf[lo:hi])
 }
 
 
-cut :: proc(s: ^State) -> bool {
+cut :: proc(e: ^Text_Editor) -> bool {
 	if copy(s) {
-		lo, hi := min(s.selection[0], s.selection[1]), max(s.selection[0], s.selection[1])
+		lo, hi := min(e.selection[0], e.selection[1]), max(e.selection[0], e.selection[1])
 		selection_delete(s)
 		return true
 	}
 	return false
 }
 
-copy :: proc(s: ^State) -> bool {
-	if s.set_clipboard != nil {
-		return s.set_clipboard(s.clipboard_user_data, current_selected_text(s))
+copy :: proc(e: ^Text_Editor) -> bool {
+	if e.set_clipboard != nil {
+		return e.set_clipboard(e.clipboard_user_data, current_selected_text(s))
 	}
-	return s.set_clipboard != nil
+	return e.set_clipboard != nil
 }
 
-paste :: proc(s: ^State) -> bool {
-	if s.get_clipboard != nil {
-		input_text(s, s.get_clipboard(s.clipboard_user_data) or_return)
+paste :: proc(e: ^Text_Editor) -> bool {
+	if e.get_clipboard != nil {
+		input_text(s, e.get_clipboard(e.clipboard_user_data) or_return)
 	}
-	return s.get_clipboard != nil
+	return e.get_clipboard != nil
 }
 
 Command_Set :: distinct bit_set[Command; u32]
@@ -329,26 +329,26 @@ Command :: enum u32 {
 
 MULTILINE_COMMANDS :: Command_Set{.New_Line, .Up, .Down, .Select_Up, .Select_Down}
 
-perform_command :: proc(s: ^State, cmd: Command) {
+perform_command :: proc(e: ^Text_Editor, cmd: Command) {
 	if int(cmd) > 2 {
-		undo_clear(s, &s.redo)
-		append(&s.undo, Undo_Action{
-			selection = s.selection,
-			text = strings.clone_from_bytes(s.builder.buf[:], s.undo_text_allocator),
+		undo_clear(s, &e.redo)
+		append(&e.undo, Undo_Action{
+			selection = e.selection,
+			text = strings.clone_from_bytes(e.builder.buf[:], e.undo_text_allocator),
 		})
-		if len(s.undo) > MAX_UNDO {
-			pop_front(&s.undo)
+		if len(e.undo) > MAX_UNDO {
+			pop_front(&e.undo)
 		}
 	}
 	switch cmd {
 	case .None:              /**/
-	case .Undo:              undo(s, &s.undo, &s.redo)
-	case .Redo:              undo(s, &s.redo, &s.undo)
+	case .Undo:              undo(s, &e.undo, &e.redo)
+	case .Redo:              undo(s, &e.redo, &e.undo)
 	case .New_Line:          input_text(s, "\n")
 	case .Cut:               cut(s)
 	case .Copy:              copy(s)
 	case .Paste:             paste(s)
-	case .Select_All:        s.selection = {len(s.builder.buf), 0}
+	case .Select_All:        e.selection = {len(e.builder.buf), 0}
 	case .Backspace:         delete_to(s, .Left)
 	case .Delete:            delete_to(s, .Right)
 	case .Delete_Word_Left:  delete_to(s, .Word_Left)

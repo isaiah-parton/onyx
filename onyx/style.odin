@@ -1,13 +1,11 @@
 package onyx
 
-import "../draw"
-
 Color_Scheme :: struct {
 	background,
 	foreground,
 	substance,
 	accent,
-	content: draw.Color,
+	content: Color,
 }
 
 Font_Style :: enum {
@@ -59,7 +57,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 }
 
 set_style_font :: proc(style: Font_Style, path: string) -> bool {
-	core.style.fonts[style] = draw.load_font(path) or_return
+	core.style.fonts[style] = load_font(path) or_return
 	return true
 }
 

@@ -1,14 +1,12 @@
 package onyx
 
-import "../draw"
-
 Label_Info :: struct {
 	using _: Generic_Widget_Info,
 	font_style: Font_Style,
 	font_size: f32,
 	text: string,
 
-	__text_info: draw.Text_Info,
+	__text_info: Text_Info,
 }
 
 make_label :: proc(info: Label_Info, loc := #caller_location) -> Label_Info {
@@ -22,7 +20,7 @@ make_label :: proc(info: Label_Info, loc := #caller_location) -> Label_Info {
 		align_v = .Top,
 	}
 	info.fixed_size = true
-	info.desired_size = draw.measure_text(info.__text_info)
+	info.desired_size = measure_text(info.__text_info)
 	return info
 }
 

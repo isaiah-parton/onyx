@@ -5,8 +5,6 @@ import "core:strings"
 import "core:slice"
 import "core:time"
 
-import edit "../scri"
-
 Text_Input_Info :: struct {
 	using _: Generic_Widget_Info,
 	builder: ^strings.Builder,
@@ -16,7 +14,7 @@ Text_Input_Info :: struct {
 }
 
 Text_Input_Widget_Variant :: struct {
-	state: edit.State,
+	editor: Text_Editor,
 }
 
 Text_Input_Result :: struct {

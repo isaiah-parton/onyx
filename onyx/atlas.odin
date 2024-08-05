@@ -1,4 +1,4 @@
-package draw
+package onyx
 
 import "core:slice"
 import "core:fmt"
@@ -10,7 +10,7 @@ import sg "extra:sokol-odin/sokol/gfx"
 Atlas :: struct {
 	width,
 	height: int,
-	images: sg.Image,
+	image: sg.Image,
 	data: []u8,
 	cursor: [2]f32,
 	row_height: f32,
@@ -81,11 +81,7 @@ get_atlas_ring :: proc(atlas: ^Atlas, inner, outer: f32) -> (src: Box, ok: bool)
 	return ring^.?
 }
 */
-/*
-	Clear the atlas
-		then add the one white pixel to the corner
-		update the texture
-*/
+
 reset_atlas :: proc(atlas: ^Atlas) -> bool {
 	width, height := atlas.width, atlas.height
 	destroy_atlas(atlas)
@@ -93,21 +89,17 @@ reset_atlas :: proc(atlas: ^Atlas) -> bool {
 	
 	return true
 }
-/*
-	Add an image to the atlas and return it's location
-*/
-add_atlas_image :: proc(atlas: ^Atlas, content: Image) -> (src: Box, ok: bool) {
+
+add_atlas_image :: proc(atlas: ^Atlas, content: Image) -> (src: [2][2]f32, ok: bool) {
 	box := get_atlas_box(atlas, {f32(content.width), f32(content.height)})
-	for y in 0..<int(box.high.y - box.low.y) {
-		copy(atlas.data[(int(box.low.y) + y) * atlas.width + int(box.low.x):], content.data[y * content.width:][:content.width])
+	for y in 0..<int(box.hi.y - box.lo.y) {
+		copy(atlas.data[(int(box.lo.y) + y) * atlas.width + int(box.lo.x):], content.data[y * content.width:][:content.width])
 	}
 	atlas.was_changed = true
 	return box, true
 }
-/*
-	Find space for something on the atlas
-*/
-get_atlas_box :: proc(atlas: ^Atlas, size: [2]f32) -> (box: Box) {
+
+get_atlas_box :: proc(atlas: ^Atlas, size: [2]f32) -> (box: [2][2]f32) {
 	if atlas.cursor.x + size.x > f32(atlas.width) {
 		atlas.cursor.x = 0
 		atlas.cursor.y += atlas.row_height + 1
@@ -125,7 +117,7 @@ get_atlas_box :: proc(atlas: ^Atlas, size: [2]f32) -> (box: Box) {
 	Generate a anti-aliased ring and place in on the atlas
 		Returns the location if it was successful
 */
-add_atlas_ring :: proc(atlas: ^Atlas, inner, outer: f32) -> (src: Box, ok: bool) {
+add_atlas_ring :: proc(atlas: ^Atlas, inner, outer: f32) -> (src: [2][2]f32, ok: bool) {
 	if inner >= outer {
 		return
 	}
@@ -133,8 +125,8 @@ add_atlas_ring :: proc(atlas: ^Atlas, inner, outer: f32) -> (src: Box, ok: bool)
 	center: [2]f32 = box_center(box) - 0.5
 	outer := outer - 0.5
 	inner := inner - 0.5
-	for y in int(box.low.y)..<int(box.high.y) {
-		for x in int(box.low.x)..<int(box.high.x) {
+	for y in int(box.lo.y)..<int(box.hi.y) {
+		for x in int(box.lo.x)..<int(box.hi.x) {
 			point: [2]f32 = {f32(x), f32(y)}
 			diff := point - center
 			dist := math.sqrt((diff.x * diff.x) + (diff.y * diff.y))

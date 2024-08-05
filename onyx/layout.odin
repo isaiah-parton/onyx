@@ -1,7 +1,5 @@
 package onyx
 
-import "extra:common"
-
 import "core:math"
 import "core:math/linalg"
 
@@ -41,30 +39,30 @@ cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32)
 
 next_widget_box :: proc(info: Generic_Widget_Info) -> Box {
 	layout := current_layout()
-	size := linalg.min(info.desired_size if info.fixed_size else linalg.max(layout.next_size, info.desired_size), layout.box.high - layout.box.low)
+	size := linalg.min(info.desired_size if info.fixed_size else linalg.max(layout.next_size, info.desired_size), layout.box.hi - layout.box.lo)
 	box := cut_layout(layout, nil, size)
 	if int(layout.next_side) > 1 {
 		if size.y < box_height(box) {
-			box.low.y = box_center_y(box) - size.y / 2
-			box.high.y = box.low.y + size.y
+			box.lo.y = box_center_y(box) - size.y / 2
+			box.hi.y = box.lo.y + size.y
 		}
 	} else {
 		if size.x < box_width(box) {
-			box.high.x = box.low.x + size.x
+			box.hi.x = box.lo.x + size.x
 		}
 	}
 	return {
-		linalg.floor(box.low),
-		linalg.floor(box.high),
+		linalg.floor(box.lo),
+		linalg.floor(box.hi),
 	}
 }
 
 push_layout :: proc(layout: Layout) {
-	common.push(&core.layout_stack, layout)
+	push(&core.layout_stack, layout)
 }
 
 pop_layout :: proc() {
-	common.pop(&core.layout_stack)
+	pop(&core.layout_stack)
 }
 
 begin_layout :: proc(info: Layout_Info) {
@@ -87,13 +85,13 @@ end_layout :: proc() {
 			box := layout.original_box
 			switch layout.side {
 				case .Top:
-				draw_box_fill({{box.low.x, box.high.y - 1}, box.high}, core.style.color.substance)
+				draw_box_fill({{box.lo.x, box.hi.y - 1}, box.hi}, core.style.color.substance)
 				case .Bottom:
-				draw_box_fill({box.low, {box.high.x, box.low.y + 1}}, core.style.color.substance)
+				draw_box_fill({box.lo, {box.hi.x, box.lo.y + 1}}, core.style.color.substance)
 				case .Left:
-				draw_box_fill({{box.high.x - 1, box.low.y}, box.high}, core.style.color.substance)
+				draw_box_fill({{box.hi.x - 1, box.lo.y}, box.hi}, core.style.color.substance)
 				case .Right:
-				draw_box_fill({box.low, {box.low.x + 1, box.high.y}}, core.style.color.substance)
+				draw_box_fill({box.lo, {box.lo.x + 1, box.hi.y}}, core.style.color.substance)
 			}
 		}
 	}
@@ -135,20 +133,20 @@ set_height_percent :: proc(height: f32) {
 
 shrink :: proc(amount: f32) {
 	layout := current_layout()
-	layout.box.low += amount
-	layout.box.high -= amount
+	layout.box.lo += amount
+	layout.box.hi -= amount
 }
 
 shrink_x :: proc(amount: f32) {
 	layout := current_layout()
-	layout.box.low.x += amount
-	layout.box.high.x -= amount
+	layout.box.lo.x += amount
+	layout.box.hi.x -= amount
 }
 
 shrink_y :: proc(amount: f32) {
 	layout := current_layout()
-	layout.box.low.y += amount
-	layout.box.high.y -= amount
+	layout.box.lo.y += amount
+	layout.box.hi.y -= amount
 }
 
 space :: proc(amount: f32) {

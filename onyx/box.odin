@@ -5,9 +5,8 @@ import "core:math/linalg"
 
 import "base:intrinsics"
 
-// The glorious box in all its glory
 Box :: struct {
-	lo, 
+	lo,
 	hi: [2]f32,
 }
 

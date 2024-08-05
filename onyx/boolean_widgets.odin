@@ -46,16 +46,16 @@ display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 		if len(info.text) > 0 {
 			switch info.text_side {
 				case .Left:
-				icon_box = {self.box.low, SIZE}
+				icon_box = {self.box.lo, SIZE}
 				case .Right:
-				icon_box = {{self.box.high.x - SIZE, self.box.low.y}, SIZE}
+				icon_box = {{self.box.hi.x - SIZE, self.box.lo.y}, SIZE}
 				case .Top:
-				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.high.y - SIZE}, SIZE}
+				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.hi.y - SIZE}, SIZE}
 				case .Bottom:
-				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.low.y}, SIZE}
+				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.lo.y}, SIZE}
 			}
-			icon_box.low = linalg.floor(icon_box.low)
-			icon_box.high += icon_box.low
+			icon_box.lo = linalg.floor(icon_box.lo)
+			icon_box.hi += icon_box.lo
 		} else {
 			icon_box = self.box
 		}
@@ -85,13 +85,13 @@ display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 		if len(info.text) > 0 {
 			switch info.text_side {
 				case .Left: 	
-				draw_text({icon_box.high.x + TEXT_PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
+				draw_text({icon_box.hi.x + TEXT_PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
 				case .Right: 	
-				draw_text({icon_box.low.x - TEXT_PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18, align_h = .Right}, fade(core.style.color.content, opacity))
+				draw_text({icon_box.lo.x - TEXT_PADDING, center.y - info.__text_size.y / 2}, {text = info.text, font = core.style.fonts[.Regular], size = 18, align_h = .Right}, fade(core.style.color.content, opacity))
 				case .Top: 		
-				draw_text(self.box.low, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
+				draw_text(self.box.lo, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
 				case .Bottom: 	
-				draw_text({self.box.low.x, self.box.high.y - info.__text_size.y}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
+				draw_text({self.box.lo.x, self.box.hi.y - info.__text_size.y}, {text = info.text, font = core.style.fonts[.Regular], size = 18}, fade(core.style.color.content, opacity))
 			}
 		}
 	}
