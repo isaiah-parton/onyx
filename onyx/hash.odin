@@ -58,13 +58,13 @@ hash_loc :: proc(loc: runtime.Source_Code_Location) -> Id {
 }
 
 push_id_int :: proc(num: int) {
-	push(&core.id_stack, hash_int(num))
+	push_stack(&core.id_stack, hash_int(num))
 }
 push_id_string :: proc(str: string) {
-	push(&core.id_stack, hash_string(str))
+	push_stack(&core.id_stack, hash_string(str))
 }
 push_id_other :: proc(id: Id) {
-	push(&core.id_stack, id)
+	push_stack(&core.id_stack, id)
 }
 push_id :: proc {
 	push_id_int,
@@ -73,5 +73,5 @@ push_id :: proc {
 }
 
 pop_id :: proc() {
-	pop(&core.id_stack)
+	pop_stack(&core.id_stack)
 }

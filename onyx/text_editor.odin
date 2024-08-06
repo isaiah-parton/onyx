@@ -63,8 +63,8 @@ make_text_editor :: proc(e: ^Text_Editor, undo_text_allocator, undo_state_alloca
 }
 
 destroy_text_editor :: proc(e: ^Text_Editor) {
-	undo_clear(s, &e.undo)
-	undo_clear(s, &e.redo)
+	undo_clear(e, &e.undo)
+	undo_clear(e, &e.redo)
 	delete(e.undo)
 	delete(e.redo)
 	e.builder = nil
@@ -75,9 +75,9 @@ begin :: proc(e: ^Text_Editor, id: u64, builder: ^strings.Builder) {
 	assert(builder != nil)
 	e.selection = {len(builder.buf), 0}
 	e.builder = builder
-	set_text(s, string(e.builder.buf[:]))
-	undo_clear(s, &e.undo)
-	undo_clear(s, &e.redo)
+	set_text(e, string(e.builder.buf[:]))
+	undo_clear(e, &e.undo)
+	undo_clear(e, &e.redo)
 }
 
 set_text :: proc(e: ^Text_Editor, text: string) {
@@ -85,7 +85,7 @@ set_text :: proc(e: ^Text_Editor, text: string) {
 	strings.write_string(e.builder, text)
 }
 
-undo :: proc(e: ^Text_Editor, undo, redo: ^[dynamic]Undo_Action) {
+text_editor_undo :: proc(e: ^Text_Editor, undo, redo: ^[dynamic]Undo_Action) {
 	if len(undo) > 0 {
 		item := pop(undo)
 		append(redo, Undo_Action{
@@ -109,10 +109,10 @@ input_text :: proc(e: ^Text_Editor, text: string) {
 	if len(text) == 0 {
 		return
 	}
-	if has_selection(s) {
-		selection_delete(s)
+	if has_selection(e) {
+		selection_delete(e)
 	}
-	insert(s, e.selection[0], text)
+	insert(e, e.selection[0], text)
 	offset := e.selection[0] + len(text)
 	e.selection = {offset, offset}
 }
@@ -121,7 +121,7 @@ input_runes :: proc(e: ^Text_Editor, text: []rune) {
 	if len(text) == 0 {
 		return
 	}
-	undo_clear(s, &e.redo)
+	undo_clear(e, &e.redo)
 	append(&e.undo, Undo_Action{
 		selection = e.selection,
 		text = strings.clone_from_bytes(e.builder.buf[:], e.undo_text_allocator),
@@ -129,14 +129,14 @@ input_runes :: proc(e: ^Text_Editor, text: []rune) {
 	if len(e.undo) > MAX_UNDO {
 		pop_front(&e.undo)
 	}
-	if has_selection(s) {
-		selection_delete(s)
+	if has_selection(e) {
+		selection_delete(e)
 	}
 	offset := e.selection[0]
 	for r in text {
 		b, w := utf8.encode_rune(r)
 		text := string(b[:w])
-		insert(s, offset, text)
+		insert(e, offset, text)
 		offset += w
 	}
 	e.selection = {offset, offset}
@@ -166,8 +166,8 @@ sorted_selection :: proc(e: ^Text_Editor) -> (lo, hi: int) {
 
 
 selection_delete :: proc(e: ^Text_Editor) {
-	lo, hi := sorted_selection(s)
-	remove(s, lo, hi)
+	lo, hi := sorted_selection(e)
+	remove(e, lo, hi)
 	e.selection = {lo, lo}
 }
 
@@ -234,58 +234,58 @@ translate_position :: proc(e: ^Text_Editor, pos: int, t: Translation) -> int {
 }
 
 move_to :: proc(e: ^Text_Editor, t: Translation) {
-	if t == .Left && has_selection(s) {
-		lo, _ := sorted_selection(s)
+	if t == .Left && has_selection(e) {
+		lo, _ := sorted_selection(e)
 		e.selection = {lo, lo}
-	} else if t == .Right && has_selection(s) {
-		_, hi := sorted_selection(s)
+	} else if t == .Right && has_selection(e) {
+		_, hi := sorted_selection(e)
 		e.selection = {hi, hi}
 	} else {
-		pos := translate_position(s, e.selection[0], t)
+		pos := translate_position(e, e.selection[0], t)
 		e.selection = {pos, pos}
 	}
 }
 select_to :: proc(e: ^Text_Editor, t: Translation) {
-	e.selection[0] = translate_position(s, e.selection[0], t)
+	e.selection[0] = translate_position(e, e.selection[0], t)
 }
 delete_to :: proc(e: ^Text_Editor, t: Translation) {
-	if has_selection(s) {
-		selection_delete(s)
+	if has_selection(e) {
+		selection_delete(e)
 	} else {
 		lo := e.selection[0]
-		hi := translate_position(s, lo, t)
+		hi := translate_position(e, lo, t)
 		lo, hi = min(lo, hi), max(lo, hi)
-		remove(s, lo, hi)
+		remove(e, lo, hi)
 		e.selection = {lo, lo}
 	}
 }
 
 
 current_selected_text :: proc(e: ^Text_Editor) -> string {
-	lo, hi := sorted_selection(s)
+	lo, hi := sorted_selection(e)
 	return string(e.builder.buf[lo:hi])
 }
 
 
-cut :: proc(e: ^Text_Editor) -> bool {
-	if copy(s) {
+text_editor_cut :: proc(e: ^Text_Editor) -> bool {
+	if text_editor_copy(e) {
 		lo, hi := min(e.selection[0], e.selection[1]), max(e.selection[0], e.selection[1])
-		selection_delete(s)
+		selection_delete(e)
 		return true
 	}
 	return false
 }
 
-copy :: proc(e: ^Text_Editor) -> bool {
+text_editor_copy :: proc(e: ^Text_Editor) -> bool {
 	if e.set_clipboard != nil {
-		return e.set_clipboard(e.clipboard_user_data, current_selected_text(s))
+		return e.set_clipboard(e.clipboard_user_data, current_selected_text(e))
 	}
 	return e.set_clipboard != nil
 }
 
-paste :: proc(e: ^Text_Editor) -> bool {
+text_editor_paste :: proc(e: ^Text_Editor) -> bool {
 	if e.get_clipboard != nil {
-		input_text(s, e.get_clipboard(e.clipboard_user_data) or_return)
+		input_text(e, e.get_clipboard(e.clipboard_user_data) or_return)
 	}
 	return e.get_clipboard != nil
 }
@@ -331,7 +331,7 @@ MULTILINE_COMMANDS :: Command_Set{.New_Line, .Up, .Down, .Select_Up, .Select_Dow
 
 perform_command :: proc(e: ^Text_Editor, cmd: Command) {
 	if int(cmd) > 2 {
-		undo_clear(s, &e.redo)
+		undo_clear(e, &e.redo)
 		append(&e.undo, Undo_Action{
 			selection = e.selection,
 			text = strings.clone_from_bytes(e.builder.buf[:], e.undo_text_allocator),
@@ -342,36 +342,36 @@ perform_command :: proc(e: ^Text_Editor, cmd: Command) {
 	}
 	switch cmd {
 	case .None:              /**/
-	case .Undo:              undo(s, &e.undo, &e.redo)
-	case .Redo:              undo(s, &e.redo, &e.undo)
-	case .New_Line:          input_text(s, "\n")
-	case .Cut:               cut(s)
-	case .Copy:              copy(s)
-	case .Paste:             paste(s)
+	case .Undo:              text_editor_undo(e, &e.undo, &e.redo)
+	case .Redo:              text_editor_undo(e, &e.redo, &e.undo)
+	case .New_Line:          input_text(e, "\n")
+	case .Cut:               text_editor_cut(e)
+	case .Copy:              text_editor_copy(e)
+	case .Paste:             text_editor_paste(e)
 	case .Select_All:        e.selection = {len(e.builder.buf), 0}
-	case .Backspace:         delete_to(s, .Left)
-	case .Delete:            delete_to(s, .Right)
-	case .Delete_Word_Left:  delete_to(s, .Word_Left)
-	case .Delete_Word_Right: delete_to(s, .Word_Right)
-	case .Left:              move_to(s, .Left)
-	case .Right:             move_to(s, .Right)
-	case .Up:                move_to(s, .Up)
-	case .Down:              move_to(s, .Down)
-	case .Word_Left:         move_to(s, .Word_Left)
-	case .Word_Right:        move_to(s, .Word_Right)
-	case .Start:             move_to(s, .Start)
-	case .End:               move_to(s, .End)
-	case .Line_Start:        move_to(s, .Soft_Line_Start)
-	case .Line_End:          move_to(s, .Soft_Line_End)
-	case .Select_Left:       select_to(s, .Left)
-	case .Select_Right:      select_to(s, .Right)
-	case .Select_Up:         select_to(s, .Up)
-	case .Select_Down:       select_to(s, .Down)
-	case .Select_Word_Left:  select_to(s, .Word_Left)
-	case .Select_Word_Right: select_to(s, .Word_Right)
-	case .Select_Start:      select_to(s, .Start)
-	case .Select_End:        select_to(s, .End)
-	case .Select_Line_Start: select_to(s, .Soft_Line_Start)
-	case .Select_Line_End:   select_to(s, .Soft_Line_End)
+	case .Backspace:         delete_to(e, .Left)
+	case .Delete:            delete_to(e, .Right)
+	case .Delete_Word_Left:  delete_to(e, .Word_Left)
+	case .Delete_Word_Right: delete_to(e, .Word_Right)
+	case .Left:              move_to(e, .Left)
+	case .Right:             move_to(e, .Right)
+	case .Up:                move_to(e, .Up)
+	case .Down:              move_to(e, .Down)
+	case .Word_Left:         move_to(e, .Word_Left)
+	case .Word_Right:        move_to(e, .Word_Right)
+	case .Start:             move_to(e, .Start)
+	case .End:               move_to(e, .End)
+	case .Line_Start:        move_to(e, .Soft_Line_Start)
+	case .Line_End:          move_to(e, .Soft_Line_End)
+	case .Select_Left:       select_to(e, .Left)
+	case .Select_Right:      select_to(e, .Right)
+	case .Select_Up:         select_to(e, .Up)
+	case .Select_Down:       select_to(e, .Down)
+	case .Select_Word_Left:  select_to(e, .Word_Left)
+	case .Select_Word_Right: select_to(e, .Word_Right)
+	case .Select_Start:      select_to(e, .Start)
+	case .Select_End:        select_to(e, .End)
+	case .Select_Line_Start: select_to(e, .Soft_Line_Start)
+	case .Select_Line_End:   select_to(e, .Soft_Line_End)
 	}
 }

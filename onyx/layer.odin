@@ -94,7 +94,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 		}
 	}
 
-	push(&core.layer_stack, layer)
+	push_stack(&core.layer_stack, layer)
 	begin_layout({
 		box = layer.box,
 	})
@@ -102,7 +102,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 }
 end_layer :: proc() {
 	end_layout()
-	pop(&core.layer_stack)
+	pop_stack(&core.layer_stack)
 }
 process_layers :: proc() {
 	sorted_layer: ^Layer

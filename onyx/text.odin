@@ -107,9 +107,6 @@ Font_Size :: struct {
 }
 
 destroy_font_size :: proc(using self: ^Font_Size) {
-	for _, &glyph in glyphs {
-		destroy_glyph_data(&glyph)
-	}
 	delete(glyphs)
 }
 
@@ -129,14 +126,9 @@ destroy_font :: proc(using self: ^Font) {
 }
 
 Glyph :: struct {
-	image: Image,
-	src: [2][2]f32,
+	texture: Texture,
 	offset: [2]f32,
 	advance: f32,
-}
-
-destroy_glyph_data :: proc(using self: ^Glyph) {
-	destroy_image(&image)
 }
 
 @private fmt_buffers: [FMT_BUFFER_COUNT][FMT_BUFFER_SIZE]u8
@@ -222,7 +214,7 @@ make_text_iterator :: proc(info: Text_Info) -> (it: Text_Iterator, ok: bool) {
 	if info.size <= 0 {
 		return
 	}
-	it.font = &core.atlas.fonts[info.font].?
+	it.font = &core.fonts[info.font].?
 	it.size, ok = get_font_size(it.font, info.size)
 	it.line_limit = info.width
 	it.line_size.y = it.size.ascent - it.size.descent + it.size.line_gap
@@ -368,8 +360,8 @@ load_font :: proc(file_path: string) -> (handle: int, success: bool) {
 	if file_data, ok := os.read_entire_file(file_path); ok {
 		if ttf.InitFont(&font.data, raw_data(file_data), 0) {
 			for i in 0..<MAX_FONTS {
-				if core.atlas.fonts[i] == nil {
-					core.atlas.fonts[i] = font
+				if core.fonts[i] == nil {
+					core.fonts[i] = font
 					handle = int(i)
 					success = true
 					break
@@ -385,9 +377,9 @@ load_font :: proc(file_path: string) -> (handle: int, success: bool) {
 }
 
 unload_font :: proc(handle: int) {
-	if font, ok := &core.atlas.fonts[handle].?; ok {
+	if font, ok := &core.fonts[handle].?; ok {
 		destroy_font(font)
-		core.atlas.fonts[handle] = nil
+		core.fonts[handle] = nil
 	}
 }
 
@@ -433,21 +425,9 @@ __get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^G
 			&glyph_offset_x,
 			&glyph_offset_y,
 		)
-		image: Image 
-		src: Box
-		if image_data != nil {
-			image = {
-				data = transmute([]u8)runtime.Raw_Slice({data = image_data, len = int(image_width * image_height)}),
-				channels = 1,
-				width = int(image_width),
-				height = int(image_height),
-			}
-			src = add_atlas_image(&core.atlas, image) or_else Box{}
-		}
 		// Set glyph data
 		data = map_insert(&size.glyphs, codepoint, Glyph({
-			image = image,
-			src = src,
+			texture = load_texture_from_memory(image_data, int(image_width), int(image_height), 1).? or_return,
 			offset = {f32(glyph_offset_x), f32(glyph_offset_y) + size.ascent},
 			advance = f32((f32(advance) - f32(left_side_bearing)) * size.scale),
 		}))
@@ -456,7 +436,7 @@ __get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^G
 	return
 }
 
-fill_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
+draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 	size: [2]f32 
 	origin := origin
 	if info.align_v != .Top {
@@ -477,10 +457,10 @@ fill_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 			// Paint the glyph
 			if it.codepoint != '\n' && it.codepoint != ' ' && it.glyph != nil {
 				dst: Box = {
-					low = origin + it.offset + it.glyph.offset,
+					lo = origin + it.offset + it.glyph.offset,
 				}
-				dst.high = dst.low + (it.glyph.src.high - it.glyph.src.low)
-				draw_texture(it.glyph.src, dst, color)
+				dst.hi = dst.lo + (it.glyph.texture.source.hi - it.glyph.texture.source.lo)
+				draw_texture(it.glyph.texture, dst, color)
 			}
 			// Update size
 			if it.new_line {
@@ -502,68 +482,68 @@ draw_aligned_rune :: proc(
 	align_h: Horizontal_Text_Align, 
 	align_v: Vertical_Text_Align,
 ) -> [2]f32 {
-	font := &core.atlas.fonts[font].?
+	font := &core.fonts[font].?
 	font_size, _ := get_font_size(font, size)
 	glyph, _ := __get_glyph(font, font_size, rune(icon))
-	icon_size := glyph.src.high - glyph.src.low
+	icon_size := glyph.texture.source.hi - glyph.texture.source.lo
 
 	box: Box
 	switch align_h {
 		case .Right: 
-		box.low.x = origin.x - icon_size.x
-		box.high.x = origin.x 
+		box.lo.x = origin.x - icon_size.x
+		box.hi.x = origin.x 
 		case .Middle: 
-		box.low.x = origin.x - math.floor(icon_size.x / 2) 
-		box.high.x = origin.x + math.floor(icon_size.x / 2)
+		box.lo.x = origin.x - math.floor(icon_size.x / 2) 
+		box.hi.x = origin.x + math.floor(icon_size.x / 2)
 		case .Left: 
-		box.low.x = origin.x 
-		box.high.x = origin.x + icon_size.x 
+		box.lo.x = origin.x 
+		box.hi.x = origin.x + icon_size.x 
 	}
 	switch align_v {
 		case .Bottom, .Baseline: 
-		box.low.y = origin.y - icon_size.y
-		box.high.y = origin.y 
+		box.lo.y = origin.y - icon_size.y
+		box.hi.y = origin.y 
 		case .Middle: 
-		box.low.y = origin.y - math.floor(icon_size.y / 2) 
-		box.high.y = origin.y + math.floor(icon_size.y / 2)
+		box.lo.y = origin.y - math.floor(icon_size.y / 2) 
+		box.hi.y = origin.y + math.floor(icon_size.y / 2)
 		case .Top: 
-		box.low.y = origin.y 
-		box.high.y = origin.y + icon_size.y 
+		box.lo.y = origin.y 
+		box.hi.y = origin.y + icon_size.y 
 	}
-	draw_texture(glyph.src, box, color)
+	draw_texture(glyph.texture, box, color)
 	return icon_size
 }
 
 draw_rune_aligned_clipped :: proc(font: int, size: f32, icon: rune, origin: [2]f32, color: Color, align: [2]Alignment, clip: Box) -> [2]f32 {
-	font := &core.atlas.fonts[font].?
+	font := &core.fonts[font].?
 	font_size, _ := get_font_size(font, size)
 	glyph, _ := __get_glyph(font, font_size, rune(icon))
-	icon_size := glyph.src.high - glyph.src.low
+	icon_size := glyph.texture.source.hi - glyph.texture.source.lo
 
 	box: Box
 	switch align.x {
 		case .Far: 
-		box.low.x = origin.x - icon_size.x
-		box.high.x = origin.x 
+		box.lo.x = origin.x - icon_size.x
+		box.hi.x = origin.x 
 		case .Middle: 
-		box.low.x = origin.x - icon_size.x / 2 
-		box.high.x = origin.x + icon_size.x / 2
+		box.lo.x = origin.x - icon_size.x / 2 
+		box.hi.x = origin.x + icon_size.x / 2
 		case .Near: 
-		box.low.x = origin.x 
-		box.high.x = origin.x + icon_size.x 
+		box.lo.x = origin.x 
+		box.hi.x = origin.x + icon_size.x 
 	}
 	switch align.y {
 		case .Far: 
-		box.low.y = origin.y - icon_size.y
-		box.high.y = origin.y 
+		box.lo.y = origin.y - icon_size.y
+		box.hi.y = origin.y 
 		case .Middle: 
-		box.low.y = origin.y - icon_size.y / 2 
-		box.high.y = origin.y + icon_size.y / 2
+		box.lo.y = origin.y - icon_size.y / 2 
+		box.hi.y = origin.y + icon_size.y / 2
 		case .Near: 
-		box.low.y = origin.y 
-		box.high.y = origin.y + icon_size.y 
+		box.lo.y = origin.y 
+		box.hi.y = origin.y + icon_size.y 
 	}
-	draw_texture(glyph.src, box, color)
+	draw_texture(glyph.texture, box, color)
 	return icon_size
 }
 
@@ -603,8 +583,8 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 		// Horizontal bounds of the selection on the current line
 		line_box_bounds: [2]f32 = {math.F32_MAX, 0}
 		// Set bounds
-		bounds.low = line_origin
-		bounds.high = bounds.low
+		bounds.lo = line_origin
+		bounds.hi = bounds.lo
 
 		s.line_start = -1
 
@@ -690,8 +670,8 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 			if it.glyph != nil {
 				// Paint the glyph
 				dst: Box = {low = point + it.glyph.offset}
-				dst.high = dst.low + (it.glyph.src.high - it.glyph.src.low)
-				bounds.high = linalg.max(bounds.high, dst.high)
+				dst.hi = dst.lo + (it.glyph.src.hi - it.glyph.src.lo)
+				bounds.hi = linalg.max(bounds.hi, dst.hi)
 				surface.z = 0.01
 				draw_texture(it.glyph.src, dst, glyph_color)
 				surface.z = 0
@@ -705,8 +685,8 @@ draw_interactive_text :: proc(result: Generic_Widget_Result, s: ^edit.State, ori
 						{line_box_bounds[1] + 1, line_origin.y + it.line_size.y},
 					}
 					selection_bounds = {
-						linalg.min(selection_bounds.low, box.low),
-						linalg.max(selection_bounds.high, box.high),
+						linalg.min(selection_bounds.lo, box.lo),
+						linalg.max(selection_bounds.hi, box.hi),
 					}
 					
 					line_box_bounds = {math.F32_MAX, 0}

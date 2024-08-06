@@ -60,7 +60,7 @@ main :: proc() {
 				ui.begin_layer({
 					box = ui.shrink_box(ui.view_box(), 100),
 				})
-					/*ui.foreground()
+					ui.foreground()
 					ui.begin_layout({
 						size = 65,
 						side = .Top,
@@ -107,7 +107,6 @@ main :: proc() {
 							
 						}
 					}
-					*/
 				ui.end_layer()
 			ui.end_frame()
 		},

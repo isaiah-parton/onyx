@@ -22,13 +22,13 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) {
 
 	bounds := info.bounds if info.bounds != {} else view_box()
 	origin: [2]f32 = core.mouse_pos + TOOLTIP_OFFSET
-	if origin.x + info.size.x > bounds.high.x {
+	if origin.x + info.size.x > bounds.hi.x {
 		origin.x -= info.size.x + TOOLTIP_OFFSET * 2
 	}
-	if origin.y + info.size.y > bounds.high.y {
+	if origin.y + info.size.y > bounds.hi.y {
 		origin.y -= info.size.y + TOOLTIP_OFFSET * 2
 	}
-	origin = linalg.clamp(origin, bounds.low, bounds.high - info.size)
+	origin = linalg.clamp(origin, bounds.lo, bounds.hi - info.size)
 	if !variant.exists {
 		variant.exists = true
 		variant.origin = origin

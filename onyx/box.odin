@@ -40,31 +40,31 @@ Clip :: enum {
 	Full,				// hidden
 }
 
-width :: proc(box: Box) -> f32 {
+box_width :: proc(box: Box) -> f32 {
 	return box.hi.x - box.lo.x
 }
-height :: proc(box: Box) -> f32 {
+box_height :: proc(box: Box) -> f32 {
 	return box.hi.y - box.lo.y
 }
-center_x :: proc(box: Box) -> f32 {
+box_center_x :: proc(box: Box) -> f32 {
 	return (box.lo.x + box.hi.x) * 0.5
 }
-center_y :: proc(box: Box) -> f32 {
+box_center_y :: proc(box: Box) -> f32 {
 	return (box.lo.y + box.hi.y) * 0.5
 }
 
 // If `a` is inside of `b`
-contains_point :: proc(a: [2]f32, b: Box) -> bool {
+point_in_box :: proc(a: [2]f32, b: Box) -> bool {
 	return (a.x >= b.lo.x) && (a.x < b.hi.x) && (a.y >= b.lo.y) && (a.y < b.hi.y)
 }
 
 // If `a` is touching `b`
-touches_box :: proc(a, b: Box) -> bool {
+box_touches_box :: proc(a, b: Box) -> bool {
 	return (a.hi.x >= b.lo.x) && (a.lo.x <= b.hi.x) && (a.hi.y >= b.lo.y) && (a.lo.y <= b.hi.y)
 }
 
 // If `a` is contained entirely in `b`
-contains_box :: proc(a, b: Box) -> bool {
+box_contains_box :: proc(a, b: Box) -> bool {
 	return (b.lo.x >= a.lo.x) && (b.hi.x <= a.hi.x) && (b.lo.y >= a.lo.y) && (b.hi.y <= a.hi.y)
 }
 
@@ -90,14 +90,14 @@ update_bounding :: proc(a, b: Box) -> Box {
 }
 
 // Clamps `a` inside `b`
-clamp :: proc(a, b: Box) -> Box {
+clamp_box :: proc(a, b: Box) -> Box {
 	return {
 		linalg.clamp(a.lo, b.lo, b.hi),
 		linalg.clamp(a.hi, b.lo, b.hi),
 	}
 }
 
-center :: proc(a: Box) -> [2]f32 {
+box_center :: proc(a: Box) -> [2]f32 {
 	return {(a.lo.x + a.hi.x) * 0.5, (a.lo.y + a.hi.y) * 0.5}
 }
 
@@ -321,7 +321,7 @@ Ray_Box_Info :: struct {
 	normal: [2]f32,
 	time: f32,
 }
-touches_line :: proc(box: Box, a, b: [2]f32) -> (info: Ray_Box_Info, ok: bool) {
+box_touches_line :: proc(box: Box, a, b: [2]f32) -> (info: Ray_Box_Info, ok: bool) {
 	start := a
 	direction := b - a
 	

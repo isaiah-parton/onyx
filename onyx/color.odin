@@ -1,6 +1,7 @@
 package onyx
 
 import "core:math"
+import "core:math/linalg"
 
 Color :: [4]u8
 

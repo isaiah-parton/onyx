@@ -26,7 +26,12 @@ Vertex :: struct {
 	pos: [3]f32,
 	uv: [2]f32,
 	col: [4]u8,
-	tex: i32,
+}
+
+Vertex_State :: struct {
+	uv: [2]f32,
+	col: [4]u8,
+	z: f32,
 }
 
 // Matrix used for vertex transforms
@@ -34,10 +39,10 @@ Matrix :: matrix[4, 4]f32
 
 // A draw call to the GPU these are managed internally
 Draw_Call :: struct {
-	bindings: sg.Bindings,
-	textures: [MAX_DRAW_CALL_TEXTURES]sg.Image,
+	texture: sg.Image,
 	vertices: [dynamic]Vertex,
 	indices: [dynamic]u16,
+	scissor_box: Box,
 }
 
 Draw_Surface :: struct {
@@ -52,12 +57,8 @@ Path :: struct {
 	closed: bool,
 }
 
-set_vertex_color :: proc(color: Color) {
-	core.vertex_color = color
-}
-
-set_vertex_uv :: proc(uv: [2]f32) {
-	core.vertex_uv = uv
+vertex_uv :: proc(uv: [2]f32) {
+	core.vertex_state.uv = uv
 }
 
 // Append a vertex and return it's index
@@ -70,33 +71,46 @@ add_vertex_3f32 :: proc(x, y, z: f32) -> int {
 
 	return append(&core.current_draw_call.vertices, Vertex{
 		pos = pos,
-		uv = core.vertex_uv,
-		col = core.vertex_color,
+		uv = core.vertex_state.uv,
+		col = core.vertex_state.col,
 	})
 }
 
-add_vertex_2f32 :: proc(x, y: f32) -> int {
-	return add_vertex_3f32(ctx, x, y, core.vertex_z)
+add_vertex_2f32 :: proc(x, y: f32) -> u16 {
+	return u16(add_vertex_3f32(x, y, core.vertex_state.z))
+}
+
+add_vertex_point :: proc(point: [2]f32) -> u16 {
+	return add_vertex_2f32(point.x, point.y)
 }
 
 add_vertex :: proc {
 	add_vertex_3f32,
 	add_vertex_2f32,
+	add_vertex_point,
+}
+
+add_index :: proc(i: u16) {
+	append(&core.current_draw_call.indices, i)
+}
+
+add_indices :: proc(i: ..u16) {
+	append(&core.current_draw_call.indices, ..i)
 }
 
 push_matrix :: proc() {
-	push(&core.matrix_stack, matrix_identity())
+	push_stack(&core.matrix_stack, matrix_identity())
 	core.current_matrix = &core.matrix_stack.items[core.matrix_stack.height - 1]
 }
 
 pop_matrix :: proc() {
-	stack.pop(&core.matrix_stack)
-	assert(core.matrix_stack.height >= 1)
-	core.current_matrix = &core.matrix_stack.items[core.matrix_stack.height - 1]
+	assert(core.matrix_stack.height > 0)
+	pop_stack(&core.matrix_stack)
+	core.current_matrix = &core.matrix_stack.items[max(0, core.matrix_stack.height - 1)]
 }
 
 push_draw_call :: proc() {
-	push(&core.draw_call_stack, Draw_Call{})
+	push_stack(&core.draw_call_stack, Draw_Call{})
 	core.current_draw_call = &core.draw_call_stack.items[core.draw_call_stack.height - 1]
 }
 

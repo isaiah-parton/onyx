@@ -46,7 +46,7 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
 
 	if widget.visible {
-		draw_text(widget.box.low, {
+		draw_text(widget.box.lo, {
 			text = info.text,
 			options = Text_Options{
 				font = core.style.fonts[.Regular],
@@ -54,7 +54,7 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 			},
 		}, fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time))
 		if len(info.options) > 0 {
-			origin: [2]f32 = {math.floor(widget.box.high.x - 24), box_center_y(widget.box)}
+			origin: [2]f32 = {math.floor(widget.box.hi.x - 24), box_center_y(widget.box)}
 			begin_path()
 				point(origin + {-4, -2})
 				point(origin + {0, 2})
@@ -63,7 +63,7 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 			end_path()
 		}
 		if !info.is_tail {
-			origin: [2]f32 = {math.floor(widget.box.high.x - 7), box_center_y(widget.box)}
+			origin: [2]f32 = {math.floor(widget.box.hi.x - 7), box_center_y(widget.box)}
 			begin_path()
 				// Slash
 				point(origin + {-2, 6})

@@ -29,7 +29,7 @@ display_label :: proc(info: Label_Info) {
 	widget.box = next_widget_box(info)
 
 	if widget.visible {
-		draw_text(widget.box.low, info.__text_info, core.style.color.content)
+		draw_text(widget.box.lo, info.__text_info, core.style.color.content)
 	}
 }
 

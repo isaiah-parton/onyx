@@ -43,7 +43,7 @@ display_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
 		inner_box := shrink_box(widget.box, 2)
 		inner_radius := box_height(inner_box) / 2
 		lever_center: [2]f32 = {
-			inner_box.low.x + inner_radius + (box_width(inner_box) - box_height(inner_box)) * how_on,
+			inner_box.lo.x + inner_radius + (box_width(inner_box) - box_height(inner_box)) * how_on,
 			box_center_y(inner_box),
 		}
 

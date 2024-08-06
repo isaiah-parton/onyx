@@ -58,11 +58,11 @@ next_widget_box :: proc(info: Generic_Widget_Info) -> Box {
 }
 
 push_layout :: proc(layout: Layout) {
-	push(&core.layout_stack, layout)
+	push_stack(&core.layout_stack, layout)
 }
 
 pop_layout :: proc() {
-	pop(&core.layout_stack)
+	pop_stack(&core.layout_stack)
 }
 
 begin_layout :: proc(info: Layout_Info) {

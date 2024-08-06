@@ -3,21 +3,21 @@ package onyx
 import "core:math"
 import "core:math/linalg"
 
-// [SECTION] Paths
+
 clear_path :: proc(path: ^Path) {
 	path.count = 0
 }
 
 __get_path :: proc() -> ^Path {
-	return &core.paths.items[core.paths.height - 1]
+	return &core.path_stack.items[core.path_stack.height - 1]
 }
 
 begin_path :: proc() {
-	push(&core.paths, Path{})
+	push_stack(&core.path_stack, Path{})
 }
 
 end_path :: proc() {
-	pop(&core.paths)
+	pop_stack(&core.path_stack)
 }
 
 close_path :: proc() {
@@ -64,20 +64,14 @@ fill_path :: proc(color: Color) {
 	if path.count < 3 {
 		return
 	}
-	surface := __get_draw_surface()
-	i := u16(len(surface.vertices))
-	append(&surface.vertices, 
-		Vertex{pos = path.points[0], col = color, z = surface.z},
-		)
-	for j in 1..<path.count {
-		append(&surface.vertices, 
-			Vertex{pos = path.points[j], col = color, z = surface.z},
-			)
-		if j < path.count - 1 {
-			append(&surface.indices,
-				i,
-				i + u16(j),
-				i + u16(j) + 1,
+	index := add_vertex(path.points[0])
+	for i in 1..<path.count {
+		add_vertex(path.points[i])
+		if i < path.count - 1 {
+			add_indices(
+				index,
+				index + u16(i),
+				index + u16(i) + 1,
 				)
 		}
 	}
@@ -85,21 +79,29 @@ fill_path :: proc(color: Color) {
 
 stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Center) {
 	path := __get_path()
+
 	if path.count < 2 {
 		return
 	}
-	surface := __get_draw_surface()
-	base_index := u16(len(surface.vertices))
+
+	first_index := u16(len(core.current_draw_call.vertices))
+
 	left, right: f32
 	switch justify {
+
 		case .Center:
 		left = thickness / 2
 		right = left
+
 		case .Outer:
 		left = thickness
+
 		case .Inner:
 		right = thickness
 	}
+
+	core.vertex_state.col = color
+
 	for i in 0..<path.count {
 		a := i - 1
 		b := i 
@@ -136,37 +138,34 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 			tangent1 := line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
 			miter1: [2]f32 = {-tangent1.y, tangent1.x}
 			dot1 := linalg.dot(normal, miter1)
-			__vertices(surface, 
-				Vertex{pos = p1 + (right / dot1) * miter1, col = color, z = surface.z},
-				Vertex{pos = p1 - (left / dot1) * miter1, col = color, z = surface.z},
-			)
+			
+			add_vertex(p1 + (right / dot1) * miter1)
+			add_vertex(p1 - (left / dot1) * miter1)
 		}
 
 		// End of segment
-		__vertices(surface, 
-			Vertex{pos = p2 + (right / dot2) * miter2, col = color, z = surface.z},
-			Vertex{pos = p2 - (left / dot2) * miter2, col = color, z = surface.z},
-		)
+		add_vertex(p2 + (right / dot2) * miter2)
+		add_vertex(p2 - (left / dot2) * miter2)
 		// Join vertices
 		if path.closed && i == path.count - 1 {
 			// Join to first endpoint
-			__indices(surface, 
-				base_index + u16(i * 2), 
-				base_index + u16(i * 2 + 1), 
-				base_index,
-				base_index + u16(i * 2 + 1),
-				base_index + 1,
-				base_index,
+			add_indices( 
+				first_index + u16(i * 2), 
+				first_index + u16(i * 2 + 1), 
+				first_index,
+				first_index + u16(i * 2 + 1),
+				first_index + 1,
+				first_index,
 				)
 		} else if i < path.count - 1 {
 			// Join to next endpoint
-			__indices(surface, 
-				base_index + u16(i * 2),
-				base_index + u16(i * 2 + 1),
-				base_index + u16(i * 2 + 2),
-				base_index + u16(i * 2 + 3),
-				base_index + u16(i * 2 + 2),
-				base_index + u16(i * 2 + 1),
+			add_indices( 
+				first_index + u16(i * 2),
+				first_index + u16(i * 2 + 1),
+				first_index + u16(i * 2 + 2),
+				first_index + u16(i * 2 + 3),
+				first_index + u16(i * 2 + 2),
+				first_index + u16(i * 2 + 1),
 				)
 		}
 	}
@@ -181,60 +180,21 @@ __join_miter :: proc(p0, p1, p2: [2]f32) -> (dot: f32, miter: [2]f32) {
 	return
 }
 
-// [SECTION] Draw surfaces
-init_draw_surface :: proc(surface: ^Draw_Surface) {
-	reserve(&surface.vertices, 8096)
-	reserve(&surface.indices, 8096)
-}
-
-make_draw_surface :: proc() -> Draw_Surface {
-	res: Draw_Surface
-	init_draw_surface(&res)
-	return res
-}
-
-destroy_draw_surface :: proc(surface: ^Draw_Surface) {
-	delete(surface.indices)
-	delete(surface.vertices)
-}
-
-clear_draw_surface :: proc(surface: ^Draw_Surface) {
-	clear(&surface.vertices)
-	clear(&surface.indices)
-}
-
-__get_draw_surface :: proc() -> ^Draw_Surface {
-	return core.draw_surface.?
-}
 
 destroy_image :: proc(using self: ^Image) {
 	delete(data)
-}
-
-__vertices :: proc(s: ^Draw_Surface, vertices: ..Vertex) {
-	append(&s.vertices, ..vertices)
-}
-
-__indices :: proc(s: ^Draw_Surface, indices: ..u16) {
-	append(&s.indices, ..indices)
 }
 
 /*
 	Basic shapes drawn in immediate mode
 */
 draw_triangle_fill :: proc(a, b, c: [2]f32, color: Color) {
-	surface := __get_draw_surface()
-	i := len(surface.vertices)
-	__vertices(surface, 
-		Vertex{pos = a, col = color},
-		Vertex{pos = b, col = color},
-		Vertex{pos = c, col = color},
-		)
-	__indices(surface,
-		u16(i),
-		u16(i + 1),
-		u16(i + 2),
-		)
+	core.vertex_state = {
+		col = color,
+	}
+	add_index(add_vertex(a.x, a.y))
+	add_index(add_vertex(b.x, b.y))
+	add_index(add_vertex(c.x, c.y))
 }
 draw_triangle_strip_fill :: proc(points: [][2]f32, color: Color) {
 	if len(points) < 4 {
@@ -298,196 +258,135 @@ get_arc_steps :: proc(radius, angle: f32) -> int {
 }
 // Draw a filled arc around a given center
 draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
-	surface := __get_draw_surface()
-
 	from, to := from, to
 	if from > to do from, to = to, from
 	da := to - from
 	nsteps := get_arc_steps(radius, da)
 
-	i := len(surface.vertices)
-
-	__vertices(surface, Vertex{pos = center, col = color})
+	core.vertex_state = {
+		col = color,
+	}	
+	first_index := add_vertex(center.x, center.y)
 	for n in 0..=nsteps {
 		a := from + da * f32(n) / f32(nsteps)
-		j := len(surface.vertices)
-		__vertices(surface, 
-			Vertex{pos = center + {math.cos(a), math.sin(a)} * radius, col = color},
-			)
+		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
 		if n < nsteps {
-			__indices(surface, 
-				u16(i), 
-				u16(j), 
-				u16(j + 1),
-				)
+			add_indices(first_index, index, index + 1)
 		}
 	}
 }
 // Draw a stroke along an arc
 draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color: Color) {
-	surface := __get_draw_surface()
-
 	from, to := from, to
 	if from > to do from, to = to, from
 	da := to - from
 	nsteps := get_arc_steps(radius, da)
 
-	i := len(surface.vertices)
-
 	begin_path()
 	for n in 0..=nsteps {
 		a := from + da * f32(n) / f32(nsteps)
-		j := len(surface.vertices)
 		point(center + {math.cos(a), math.sin(a)} * radius)
 	}
 	stroke_path(thickness, color, .Inner)
 	end_path()
 }
 draw_box_fill :: proc(box: Box, color: Color) {
-	surface := __get_draw_surface()
-	i := len(surface.vertices)
-	__vertices(surface, 
-		Vertex{pos = box.low, col = color, z = surface.z},
-		Vertex{pos = {box.low.x, box.high.y}, col = color, z = surface.z},
-		Vertex{pos = box.high, col = color, z = surface.z},
-		Vertex{pos = {box.high.x, box.low.y}, col = color, z = surface.z},
-		)
-	__indices(surface,
-		u16(i),
-		u16(i + 2),
-		u16(i + 1),
-		u16(i),
-		u16(i + 3),
-		u16(i + 2),
-		)
+	core.vertex_state = {
+		col = color,
+	}
+	tl := add_vertex(box.lo)
+	bl := add_vertex({box.lo.x, box.hi.y})
+	br := add_vertex(box.hi)
+	tr := add_vertex({box.hi.x, box.lo.y})
+	add_indices(tl, br, bl, tl, tr, br)
 }
 draw_box_stroke :: proc(box: Box, thickness: f32, color: Color) {
-	draw_box_fill({box.low, {box.high.x, box.low.y + thickness}}, color)
-	draw_box_fill({{box.low.x, box.high.y - thickness}, box.high}, color)
-	draw_box_fill({{box.low.x, box.low.y + thickness}, {box.low.x + thickness, box.high.y - thickness}}, color)
-	draw_box_fill({{box.high.x - thickness, box.low.y + thickness}, {box.high.x, box.high.y - thickness}}, color)
+	draw_box_fill({box.lo, {box.hi.x, box.lo.y + thickness}}, color)
+	draw_box_fill({{box.lo.x, box.hi.y - thickness}, box.hi}, color)
+	draw_box_fill({{box.lo.x, box.lo.y + thickness}, {box.lo.x + thickness, box.hi.y - thickness}}, color)
+	draw_box_fill({{box.hi.x - thickness, box.lo.y + thickness}, {box.hi.x, box.hi.y - thickness}}, color)
 }
 draw_rounded_box_fill :: proc(box: Box, radius: f32, color: Color) {
-	if box.high.x <= box.low.x || box.high.y <= box.low.y {
+	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
-	radius := min(radius, (box.high.x - box.low.x) / 2, (box.high.y - box.low.y) / 2)
+	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
 	if radius <= 0 {
 		draw_box_fill(box, color)
 		return
 	}
-	draw_arc_fill(box.low + radius, radius, math.PI, math.PI * 1.5, color)
-	draw_arc_fill({box.high.x - radius, box.low.y + radius}, radius, math.PI * 1.5, math.PI * 2, color)
-	draw_arc_fill(box.high - radius, radius, 0, math.PI * 0.5, color)
-	draw_arc_fill({box.low.x + radius, box.high.y - radius}, radius, math.PI * 0.5, math.PI, color)
-	if box.high.x - radius > box.low.x + radius {
-		draw_box_fill({{box.low.x + radius, box.low.y}, {box.high.x - radius, box.high.y}}, color)
+	draw_arc_fill(box.lo + radius, radius, math.PI, math.PI * 1.5, color)
+	draw_arc_fill({box.hi.x - radius, box.lo.y + radius}, radius, math.PI * 1.5, math.PI * 2, color)
+	draw_arc_fill(box.hi - radius, radius, 0, math.PI * 0.5, color)
+	draw_arc_fill({box.lo.x + radius, box.hi.y - radius}, radius, math.PI * 0.5, math.PI, color)
+	if box.hi.x - radius > box.lo.x + radius {
+		draw_box_fill({{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.hi.y}}, color)
 	}
-	if box.high.y - radius > box.low.y + radius {
-		draw_box_fill({{box.low.x, box.low.y + radius}, {box.low.x + radius, box.high.y - radius}}, color)
-		draw_box_fill({{box.high.x - radius, box.low.y + radius}, {box.high.x, box.high.y - radius}}, color)
+	if box.hi.y - radius > box.lo.y + radius {
+		draw_box_fill({{box.lo.x, box.lo.y + radius}, {box.lo.x + radius, box.hi.y - radius}}, color)
+		draw_box_fill({{box.hi.x - radius, box.lo.y + radius}, {box.hi.x, box.hi.y - radius}}, color)
 	}
 }
 
 draw_rounded_box_corners_fill :: proc(box: Box, radius: f32, corners: Corners, color: Color) {
-	if box.high.x <= box.low.x || box.high.y <= box.low.y {
+	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
-	radius := min(radius, (box.high.x - box.low.x) / 2, (box.high.y - box.low.y) / 2)
+	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
 	if radius <= 0 || corners == {} {
 		draw_box_fill(box, color)
 		return
 	}
 	if .Top_Left in corners {
-		draw_arc_fill(box.low + radius, radius, math.PI, math.PI * 1.5, color)
+		draw_arc_fill(box.lo + radius, radius, math.PI, math.PI * 1.5, color)
 	} else {
-		draw_box_fill({box.low, box.low + radius}, color)
+		draw_box_fill({box.lo, box.lo + radius}, color)
 	}
 	if .Top_Right in corners {
-		draw_arc_fill({box.high.x - radius, box.low.y + radius}, radius, math.PI * 1.5, math.PI * 2, color)
+		draw_arc_fill({box.hi.x - radius, box.lo.y + radius}, radius, math.PI * 1.5, math.PI * 2, color)
 	} else {
-		draw_box_fill({{box.high.x - radius, box.low.y}, {box.high.x, box.low.y + radius}}, color)
+		draw_box_fill({{box.hi.x - radius, box.lo.y}, {box.hi.x, box.lo.y + radius}}, color)
 	}
 	if .Bottom_Right in corners {
-		draw_arc_fill(box.high - radius, radius, 0, math.PI * 0.5, color)
+		draw_arc_fill(box.hi - radius, radius, 0, math.PI * 0.5, color)
 	} else {
-		draw_box_fill({box.high - radius, box.high}, color)
+		draw_box_fill({box.hi - radius, box.hi}, color)
 	}
 	if .Bottom_Left in corners {
-		draw_arc_fill({box.low.x + radius, box.high.y - radius}, radius, math.PI * 0.5, math.PI, color)
+		draw_arc_fill({box.lo.x + radius, box.hi.y - radius}, radius, math.PI * 0.5, math.PI, color)
 	} else {
-		draw_box_fill({{box.low.x, box.high.y - radius}, {box.low.x + radius, box.high.y}}, color)
+		draw_box_fill({{box.lo.x, box.hi.y - radius}, {box.lo.x + radius, box.hi.y}}, color)
 	}
-	if box.high.x - radius > box.low.x + radius {
-		draw_box_fill({{box.low.x + radius, box.low.y}, {box.high.x - radius, box.high.y}}, color)
+	if box.hi.x - radius > box.lo.x + radius {
+		draw_box_fill({{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.hi.y}}, color)
 	}
-	if box.high.y - radius > box.low.y + radius {
-		draw_box_fill({{box.low.x, box.low.y + radius}, {box.low.x + radius, box.high.y - radius}}, color)
-		draw_box_fill({{box.high.x - radius, box.low.y + radius}, {box.high.x, box.high.y - radius}}, color)
+	if box.hi.y - radius > box.lo.y + radius {
+		draw_box_fill({{box.lo.x, box.lo.y + radius}, {box.lo.x + radius, box.hi.y - radius}}, color)
+		draw_box_fill({{box.hi.x - radius, box.lo.y + radius}, {box.hi.x, box.hi.y - radius}}, color)
 	}
 }
 
 draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) {
-	if box.high.x <= box.low.x || box.high.y <= box.low.y {
+	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
-	radius := min(radius, (box.high.x - box.low.x) / 2, (box.high.y - box.low.y) / 2)
+	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
 	if radius <= 0 {
 		draw_box_stroke(box, thickness, color)
 		return
 	}
-	draw_arc_stroke(box.low + radius, radius, math.PI, math.PI * 1.5, thickness, color)
-	draw_arc_stroke({box.high.x - radius, box.low.y + radius}, radius, math.PI * 1.5, math.PI * 2, thickness, color)
-	draw_arc_stroke(box.high - radius, radius, 0, math.PI * 0.5, thickness, color)
-	draw_arc_stroke({box.low.x + radius, box.high.y - radius}, radius, math.PI * 0.5, math.PI, thickness, color)
-	if box.high.x - radius > box.low.x + radius {
-		draw_box_fill({{box.low.x + radius, box.low.y}, {box.high.x - radius, box.low.y + thickness}}, color)
-		draw_box_fill({{box.low.x + radius, box.high.y - thickness}, {box.high.x - radius, box.high.y}}, color)
+	draw_arc_stroke(box.lo + radius, radius, math.PI, math.PI * 1.5, thickness, color)
+	draw_arc_stroke({box.hi.x - radius, box.lo.y + radius}, radius, math.PI * 1.5, math.PI * 2, thickness, color)
+	draw_arc_stroke(box.hi - radius, radius, 0, math.PI * 0.5, thickness, color)
+	draw_arc_stroke({box.lo.x + radius, box.hi.y - radius}, radius, math.PI * 0.5, math.PI, thickness, color)
+	if box.hi.x - radius > box.lo.x + radius {
+		draw_box_fill({{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.lo.y + thickness}}, color)
+		draw_box_fill({{box.lo.x + radius, box.hi.y - thickness}, {box.hi.x - radius, box.hi.y}}, color)
 	}
-	if box.high.y - radius > box.low.y + radius {
-		draw_box_fill({{box.low.x, box.low.y + radius}, {box.low.x + thickness, box.high.y - radius}}, color)
-		draw_box_fill({{box.high.x - thickness, box.low.y + radius}, {box.high.x, box.high.y - radius}}, color)
+	if box.hi.y - radius > box.lo.y + radius {
+		draw_box_fill({{box.lo.x, box.lo.y + radius}, {box.lo.x + thickness, box.hi.y - radius}}, color)
+		draw_box_fill({{box.hi.x - thickness, box.lo.y + radius}, {box.hi.x, box.hi.y - radius}}, color)
 	}
-}
-
-draw_texture :: proc(source, target: Box, color: Color) {
-	surface := __get_draw_surface()
-	i := len(surface.vertices)
-	tex_size: [2]f32 = {f32(core.atlas.width), f32(core.atlas.height)}
-	__vertices(surface, 
-		Vertex{
-			pos = target.low, 
-			col = color, 
-			uv = source.low / tex_size,
-			z = surface.z,
-		},
-		Vertex{
-			pos = {target.low.x, target.high.y}, 
-			col = color, 
-			uv = [2]f32{source.low.x, source.high.y} / tex_size,
-			z = surface.z,
-		},
-		Vertex{
-			pos = target.high, 
-			col = color, 
-			uv = source.high / tex_size,
-			z = surface.z,
-		},
-		Vertex{
-			pos = {target.high.x, target.low.y}, 
-			col = color, 
-			uv = [2]f32{source.high.x, source.low.y} / tex_size,
-			z = surface.z,
-		},
-		)
-	__indices(surface,
-		u16(i),
-		u16(i + 2),
-		u16(i + 1),
-		u16(i),
-		u16(i + 3),
-		u16(i + 2),
-		)
 }
 
 foreground :: proc() {

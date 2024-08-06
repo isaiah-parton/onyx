@@ -37,7 +37,7 @@ display_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_
 
 	inner_box := shrink_box(widget.box, 3)
 	option_rounding := core.style.rounding * (box_height(inner_box) / box_height(widget.box))
-	option_size := (inner_box.high.x - inner_box.low.x) / f32(len(info.options))
+	option_size := (inner_box.hi.x - inner_box.lo.x) / f32(len(info.options))
 	resize(&variant.timers, len(info.options))
 	for option, o in info.options {
 		hover_time := variant.timers[o]
@@ -51,7 +51,7 @@ display_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_
 			}
 		}
 		draw_rounded_box_fill(option_box, option_rounding, fade(core.style.color.foreground, hover_time))
-		draw_text(center(option_box), {
+		draw_text(box_center(option_box), {
 			text = option,
 			font = core.style.fonts[.Regular],
 			size = 18,

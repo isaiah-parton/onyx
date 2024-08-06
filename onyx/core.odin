@@ -21,12 +21,17 @@ MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
 MAX_LAYOUTS :: 100
 
+MAX_TEXTURES :: 200
+
+MAX_DRAW_CALL_VERTICES :: 65536
+MAX_DRAW_CALL_INDICES :: 65536
+
 Stack :: struct($T: typeid, $N: int) {
 	items: [N]T,
 	height: int,
 }
 
-push :: proc(stack: ^Stack($T, $N), item: T) -> bool {
+push_stack :: proc(stack: ^Stack($T, $N), item: T) -> bool {
 	if stack.height >= N {
 		return false
 	}
@@ -35,7 +40,7 @@ push :: proc(stack: ^Stack($T, $N), item: T) -> bool {
 	return true
 }
 
-pop :: proc(stack: ^Stack($T, $N)) {
+pop_stack :: proc(stack: ^Stack($T, $N)) {
 	stack.height -= 1
 }
 
@@ -107,17 +112,14 @@ Core :: struct {
 	fonts: [MAX_FONTS]Maybe(Font),
 	current_font: int,
 
-	images: [MAX_IMAGES]Maybe(Image),
-
-	atlases: [MAX_ATLASES]Maybe(Atlas),
-	current_atlas: ^Atlas,
+	textures: [MAX_TEXTURES]Maybe(Texture),
+	atlas: Atlas,
 
 	text_job: Text_Job,
 
-	vertex_color: Color,
-	vertex_uv: [2]f32,
-	vertex_z: f32,
+	vertex_state: Vertex_State,
 
+	path_stack: Stack(Path, 10),
 	draw_call_stack: Stack(Draw_Call, MAX_DRAW_CALLS),
 	current_draw_call: ^Draw_Call,
 	matrix_stack: Stack(Matrix, MAX_MATRICES),
@@ -161,7 +163,6 @@ init :: proc () {
 				0 = { offset = i32(offset_of(Vertex, pos)), format = .FLOAT3 },
 				1 = { offset = i32(offset_of(Vertex, uv)), format = .FLOAT2 },
 				2 = { offset = i32(offset_of(Vertex, col)), format = .UBYTE4N },
-				3 = { offset = i32(offset_of(Vertex, tex)), format = .UBYTE4N },
 			},
 			buffers = {
 				0 = { stride = size_of(Vertex) },
@@ -190,12 +191,12 @@ init :: proc () {
 	core.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
 		type = .INDEXBUFFER,
 		usage = .STREAM,
-		size = MAX_LAYER_INDICES * size_of(u16),
+		size = MAX_DRAW_CALL_INDICES * size_of(u16),
 	})
 	core.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
 		type = .VERTEXBUFFER,
 		usage = .STREAM,
-		size = MAX_LAYER_VERTICES * size_of(Vertex),
+		size = MAX_DRAW_CALL_VERTICES * size_of(Vertex),
 	})
 	core.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
 		min_filter = .NEAREST,
@@ -209,8 +210,10 @@ init :: proc () {
 	core.style.header_text_size = 28
 
 	core.style.text_input_height = 30
-	
-	core.ctx = make_draw_context()
+
+	init_atlas(&core.atlas, ATLAS_SIZE, ATLAS_SIZE)
+
+	fmt.println("ʕ·ᴥ·ʔ Onyx is awake and feeling great!")
 }
 
 begin_frame :: proc () {
@@ -242,18 +245,22 @@ begin_frame :: proc () {
 	}
 
 	process_widgets()
+
+	push_draw_call()
+	push_matrix()
 }
 
 end_frame :: proc() {
+	pop_matrix()
+
 	sapp.set_mouse_cursor(core.cursor_type)
 	core.cursor_type = sapp.Mouse_Cursor.DEFAULT
 	// Process elements
 	process_layers()
-	// Draw
 	// Update the atlas if needed
 	if core.atlas.was_changed {
-		core.atlas.was_changed = false
 		update_atlas(&core.atlas)
+		core.atlas.was_changed = false
 	}
 	// Display debug text
 	if core.show_debug_stats {
@@ -282,45 +289,68 @@ end_frame :: proc() {
 			},
 			swapchain = sglue.swapchain(),
 		})
+
 		core.bindings.fs.images[0] = core.atlas.image
-		
-		projection_matrix: matrix[4, 4]f32 = {
-			
-		}
 
 		sg.apply_pipeline(core.pipeline)
 		sg.apply_bindings(core.bindings)
+
+		t := -core.view.y / 2
+		b := core.view.y / 2
+		l := -core.view.x / 2
+		r := core.view.x / 2
+		f := f32(0)
+		n := f32(1)
+		
+		rl := r - l
+		tb := t - b
+		fn := f - n
+
+		projection_matrix: Matrix = {
+			2 / rl, 0, 			0, 				-(r + l) / rl,
+			0, 			2 / tb, 0, 				-(t + b) / tb,
+			0, 			0, 			-2 / fn,	-(f + n) / fn,
+			0, 			0, 			0, 				1,
+		}
+
+		sg.apply_uniforms(.VS, 0, { 
+			ptr = &projection_matrix,
+			size = size_of(Matrix),
+		})
+
 		// render layers
-		for layer in core.layer_list {
-			u: Uniform = {
-				mat = projection_matrix,
-			}
-			sg.apply_uniforms(.VS, 0, { 
-				ptr = &u,
-				size = size_of(Uniform),
-			})
+		for c in 0..<core.draw_call_stack.height {
+			call := &core.draw_call_stack.items[c]
+
 			sg.update_buffer(core.bindings.index_buffer, { 
-				ptr = raw_data(layer.surface.indices), 
-				size = u64(len(layer.surface.indices) * size_of(u16)),
+				ptr = raw_data(call.indices), 
+				size = u64(len(call.indices) * size_of(u16)),
 			})
 			sg.update_buffer(core.bindings.vertex_buffers[0], { 
-				ptr = raw_data(layer.surface.vertices), 
-				size = u64(len(layer.surface.vertices) * size_of(Vertex)),
+				ptr = raw_data(call.vertices), 
+				size = u64(len(call.vertices) * size_of(Vertex)),
 			})
-			sg.apply_scissor_rectf(
-				u.origin.x + (layer.box.low.x - u.origin.x) * u.scale, 
-				u.origin.y + (layer.box.low.y - u.origin.y) * u.scale, 
-				(layer.box.high.x - layer.box.low.x) * u.scale, 
-				(layer.box.high.y - layer.box.low.y) * u.scale, 
-				true,
-				)
-			sg.draw(0, len(layer.surface.indices), 1)
-			sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+
+			// sg.apply_scissor_rectf(
+			// 	call.scissor_box.lo.x, 
+			// 	call.scissor_box.lo.y, 
+			// 	(call.scissor_box.hi.x - call.scissor_box.lo.x), 
+			// 	(call.scissor_box.hi.y - call.scissor_box.lo.y), 
+			// 	true,
+			// 	)
+
+			sg.draw(0, len(call.indices), 1)
+
+			// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+
+			clear(&call.vertices)
+			clear(&call.indices)
 		}
 		core.frame_count += 1
 		core.draw_this_frame = false
 		sg.end_pass()
 	}
+	core.draw_call_stack.height = 0
 	// Blank render pass to copy framebuffers
 	sg.begin_pass(sg.Pass{
 		action = sg.Pass_Action{
@@ -342,6 +372,9 @@ end_frame :: proc() {
 	}
 	sg.end_pass()
 	sg.commit()
+
+	// Reset drawing system
+	core.vertex_state = {}
 	
 	// Reset root layer
 	core.root_layer = nil
@@ -358,14 +391,12 @@ quit :: proc () {
 		}
 	}
 
-	destroy_draw_context(&core.ctx)
-
 	sg.destroy_buffer(core.bindings.index_buffer)
 	sg.destroy_buffer(core.bindings.vertex_buffers[0])
 	sg.destroy_pipeline(core.pipeline)
 	sg.shutdown()
 
-	fmt.println("[ui] Cleaned up")
+	fmt.println("ʕ-ᴥ-ʔ Onyx went to sleep peacefully.")
 }
 
 handle_event :: proc (e: ^sapp.Event) {
