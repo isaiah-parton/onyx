@@ -62,7 +62,7 @@ Core :: struct {
 	view: [2]f32,
 
 	pipeline: sg.Pipeline,				// Graphics pipeline
-	bindings: sg.Bindings,				// Buffer and image bindings
+	limits: sg.Limits,
 
 	layer_list: [dynamic]^Layer,					// Layers ordered by their z-index
 	layer_map: map[Id]^Layer,							// Map lookup by id
@@ -112,15 +112,15 @@ Core :: struct {
 	fonts: [MAX_FONTS]Maybe(Font),
 	current_font: int,
 
-	textures: [MAX_TEXTURES]Maybe(Texture),
-	atlas: Atlas,
+	font_atlas: Atlas,
 
 	text_job: Text_Job,
 
 	vertex_state: Vertex_State,
 
 	path_stack: Stack(Path, 10),
-	draw_call_stack: Stack(Draw_Call, MAX_DRAW_CALLS),
+	draw_calls: [MAX_DRAW_CALLS]Draw_Call,
+	draw_call_count: int,
 	current_draw_call: ^Draw_Call,
 	matrix_stack: Stack(Matrix, MAX_MATRICES),
 	current_matrix: ^Matrix,
@@ -147,6 +147,10 @@ init :: proc () {
 		environment = environment,
 		logger = { func = slog.func },
 	})
+
+	// Query hardware limitations
+	core.limits = sg.query_limits()
+
 	// Prepare debug text context
 	sdtx.setup(sdtx.Desc{
 		logger = { func = slog.func },
@@ -187,23 +191,6 @@ init :: proc () {
 		label = "pipeline",
 		cull_mode = .BACK,
 	})
-	// Prepare graphics buffers
-	core.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
-		type = .INDEXBUFFER,
-		usage = .STREAM,
-		size = MAX_DRAW_CALL_INDICES * size_of(u16),
-	})
-	core.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
-		type = .VERTEXBUFFER,
-		usage = .STREAM,
-		size = MAX_DRAW_CALL_VERTICES * size_of(Vertex),
-	})
-	core.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
-		min_filter = .NEAREST,
-		mag_filter = .NEAREST,
-		wrap_u = .MIRRORED_REPEAT,
-		wrap_v = .MIRRORED_REPEAT,
-	})
 
 	core.style.button_text_size = 18
 	core.style.content_text_size = 16
@@ -211,9 +198,14 @@ init :: proc () {
 
 	core.style.text_input_height = 30
 
-	init_atlas(&core.atlas, ATLAS_SIZE, ATLAS_SIZE)
+	max_atlas_size := int(core.limits.max_image_size_2d)
+	if max_atlas_size < MIN_ATLAS_SIZE {
+		fmt.printf("\nʕ+ᴥ+ʔ The maximum supported texture size is only %ix%i!\n\n", max_atlas_size)
+	}
+	atlas_size: int = min(max_atlas_size, MAX_ATLAS_SIZE)
+	init_atlas(&core.font_atlas, atlas_size, atlas_size)
 
-	fmt.println("ʕ·ᴥ·ʔ Onyx is awake and feeling great!")
+	fmt.println("\nʕ·ᴥ·ʔ Onyx is awake and feeling great!\n")
 }
 
 begin_frame :: proc () {
@@ -246,7 +238,9 @@ begin_frame :: proc () {
 
 	process_widgets()
 
+	core.draw_call_count = 0
 	push_draw_call()
+	core.current_draw_call.bindings.fs.images[0] = core.font_atlas.image
 	push_matrix()
 }
 
@@ -258,9 +252,9 @@ end_frame :: proc() {
 	// Process elements
 	process_layers()
 	// Update the atlas if needed
-	if core.atlas.was_changed {
-		update_atlas(&core.atlas)
-		core.atlas.was_changed = false
+	if core.font_atlas.modified {
+		update_atlas(&core.font_atlas)
+		core.font_atlas.modified = false
 	}
 	// Display debug text
 	if core.show_debug_stats {
@@ -271,6 +265,21 @@ end_frame :: proc() {
 		sdtx.printf("frame: %i\n", core.frame_count)
 		sdtx.printf("hovered widget: %i\n", core.hovered_widget)
 		sdtx.printf("focused widget: %i\n", core.focused_widget)
+	}
+
+	for &call in core.draw_calls[:core.draw_call_count] {
+		if len(call.indices) == 0 {
+			continue
+		}
+		sg.apply_bindings(call.bindings)
+		sg.update_buffer(call.bindings.index_buffer, { 
+			ptr = raw_data(call.indices), 
+			size = u64(len(call.indices) * size_of(u16)),
+		})
+		sg.update_buffer(call.bindings.vertex_buffers[0], { 
+			ptr = raw_data(call.vertices), 
+			size = u64(len(call.vertices) * size_of(Vertex)),
+		})
 	}
 
 	if core.draw_this_frame {
@@ -290,67 +299,80 @@ end_frame :: proc() {
 			swapchain = sglue.swapchain(),
 		})
 
-		core.bindings.fs.images[0] = core.atlas.image
-
 		sg.apply_pipeline(core.pipeline)
-		sg.apply_bindings(core.bindings)
 
-		t := -core.view.y / 2
-		b := core.view.y / 2
-		l := -core.view.x / 2
-		r := core.view.x / 2
-		f := f32(0)
-		n := f32(1)
-		
-		rl := r - l
-		tb := t - b
-		fn := f - n
+		// Render draw calls
+		for &call in core.draw_calls[:core.draw_call_count] {
+			sg.apply_bindings(call.bindings)
 
-		projection_matrix: Matrix = {
-			2 / rl, 0, 			0, 				-(r + l) / rl,
-			0, 			2 / tb, 0, 				-(t + b) / tb,
-			0, 			0, 			-2 / fn,	-(f + n) / fn,
-			0, 			0, 			0, 				1,
-		}
+			// Set view bounds
+			t := f32(0)
+			b := f32(core.view.y)
+			l := f32(0)
+			r := f32(core.view.x)
+			f := f32(100)
+			n := f32(0)
+			
+			// Calculate projection matrix
+			rl := r - l
+			tb := t - b
+			fn := f - n
 
-		sg.apply_uniforms(.VS, 0, { 
-			ptr = &projection_matrix,
-			size = size_of(Matrix),
-		})
+			projection_matrix: Matrix = {
+				2 / rl, 0, 			0, 				-(r + l) / rl,
+				0, 			2 / tb, 0, 				-(t + b) / tb,
+				0, 			0, 			-2 / fn,	-(f + n) / fn,
+				0, 			0, 			0, 				1,
+			}
 
-		// render layers
-		for c in 0..<core.draw_call_stack.height {
-			call := &core.draw_call_stack.items[c]
-
-			sg.update_buffer(core.bindings.index_buffer, { 
-				ptr = raw_data(call.indices), 
-				size = u64(len(call.indices) * size_of(u16)),
-			})
-			sg.update_buffer(core.bindings.vertex_buffers[0], { 
-				ptr = raw_data(call.vertices), 
-				size = u64(len(call.vertices) * size_of(Vertex)),
+			// Apply projection matrix
+			sg.apply_uniforms(.VS, 0, { 
+				ptr = &projection_matrix,
+				size = size_of(Matrix),
 			})
 
-			// sg.apply_scissor_rectf(
-			// 	call.scissor_box.lo.x, 
-			// 	call.scissor_box.lo.y, 
-			// 	(call.scissor_box.hi.x - call.scissor_box.lo.x), 
-			// 	(call.scissor_box.hi.y - call.scissor_box.lo.y), 
-			// 	true,
-			// 	)
+			u_gradient := U_Gradient{
 
+			}
+			sg.apply_uniforms(.FS, 0, {
+				ptr = &u_gradient,
+				size = size_of(u_gradient),
+			})
+
+			
+
+			// Apply scissor
+			if box, ok := call.scissor_box.?; ok {
+				sg.apply_scissor_rectf(
+					box.lo.x, 
+					box.lo.y, 
+					(box.hi.x - box.lo.x), 
+					(box.hi.y - box.lo.y), 
+					true,
+					)
+			}
+
+			// Draw elements
 			sg.draw(0, len(call.indices), 1)
 
-			// sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+			// Reset scissor
+			if call.scissor_box != nil {
+				sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
+			}
 
+			// Clear draw call
 			clear(&call.vertices)
 			clear(&call.indices)
 		}
+
 		core.frame_count += 1
 		core.draw_this_frame = false
+
+		if core.show_debug_stats {
+			sdtx.draw()
+		}
 		sg.end_pass()
 	}
-	core.draw_call_stack.height = 0
 	// Blank render pass to copy framebuffers
 	sg.begin_pass(sg.Pass{
 		action = sg.Pass_Action{
@@ -367,9 +389,7 @@ end_frame :: proc() {
 		},
 		swapchain = sglue.swapchain(),
 	})
-	if core.show_debug_stats {
-		sdtx.draw()
-	}
+	sg.apply_bindings({})
 	sg.end_pass()
 	sg.commit()
 
@@ -391,8 +411,12 @@ quit :: proc () {
 		}
 	}
 
-	sg.destroy_buffer(core.bindings.index_buffer)
-	sg.destroy_buffer(core.bindings.vertex_buffers[0])
+	for &call in core.draw_calls {
+		if call.ready {
+			sg.destroy_buffer(call.bindings.index_buffer)
+			sg.destroy_buffer(call.bindings.vertex_buffers[0])
+		}
+	}
 	sg.destroy_pipeline(core.pipeline)
 	sg.shutdown()
 

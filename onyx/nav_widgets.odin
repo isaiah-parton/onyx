@@ -28,7 +28,7 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 	})
 	info.desired_size = text_size
 	if !info.is_tail {
-		info.desired_size.x += 14
+		info.desired_size.x += 20
 	}
 	if len(info.options) > 0 {
 		info.desired_size.x += 20
@@ -54,7 +54,7 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 			},
 		}, fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time))
 		if len(info.options) > 0 {
-			origin: [2]f32 = {math.floor(widget.box.hi.x - 24), box_center_y(widget.box)}
+			origin: [2]f32 = {math.floor(widget.box.hi.x - 30), box_center_y(widget.box)}
 			begin_path()
 				point(origin + {-4, -2})
 				point(origin + {0, 2})
@@ -63,7 +63,7 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 			end_path()
 		}
 		if !info.is_tail {
-			origin: [2]f32 = {math.floor(widget.box.hi.x - 7), box_center_y(widget.box)}
+			origin: [2]f32 = {math.floor(widget.box.hi.x - 10), box_center_y(widget.box)}
 			begin_path()
 				// Slash
 				point(origin + {-2, 6})

@@ -8,6 +8,7 @@ import "core:reflect"
 
 import ui "extra:onyx/onyx"
 import sapp "extra:sokol-odin/sokol/app"
+import sg "extra:sokol-odin/sokol/gfx"
 
 Option :: enum {
 	Process,
@@ -36,6 +37,8 @@ State :: struct {
 	text_builder: strings.Builder,
 
 	slider_value: f32,
+
+	images: [4]ui.Image,
 }
 
 main :: proc() {
@@ -43,14 +46,19 @@ main :: proc() {
 
 	sapp.run(sapp.Desc{
 		user_data = &state,
-		init_cb = proc "c" () {
+		init_userdata_cb = proc "c" (userdata: rawptr) {
 			context = runtime.default_context()
+			state := transmute(^State)userdata
 
 			ui.init()
 			ui.set_style_font(.Medium, "fonts/Geist-Medium.ttf")
 			ui.set_style_font(.Bold, "fonts/Geist-Bold.ttf")
 			ui.set_color_scheme(ui.dark_color_scheme())
 			ui.set_style_rounding(0)
+
+			for i in 0..<4 {
+				state.images[i] = ui.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic("failed lol")
+			}
 		},
 		frame_userdata_cb = proc "c" (userdata: rawptr) {
 			context = runtime.default_context()
@@ -107,7 +115,15 @@ main :: proc() {
 							
 						}
 					}
+
 				ui.end_layer()
+				for i in 0..<4 {
+					origin: [2]f32 = {
+						0 + f32(i) * 200,
+						sapp.heightf() - 200,
+					}
+					ui.draw_image(state.images[i], {origin, origin + 200}, {255, 255, 255, 255})
+				}
 			ui.end_frame()
 		},
 		cleanup_cb = proc "c" () {
@@ -126,6 +142,6 @@ main :: proc() {
 		sample_count = 4,
 		width = 1000,
 		height = 800,
-		window_title = "UI DEMO",
+		window_title = "o n y x",
 	})
 }

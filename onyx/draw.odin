@@ -14,7 +14,24 @@ MAX_DRAW_CALL_TEXTURES :: 8
 MAX_FONTS :: 100
 MAX_ATLASES :: 8
 MAX_IMAGES :: 256
-ATLAS_SIZE :: 1024
+MIN_ATLAS_SIZE :: 1024
+MAX_ATLAS_SIZE :: 4096
+
+Gradient :: union {
+	Linear_Gradient,
+	Radial_Gradient,
+}
+
+Linear_Gradient :: struct {
+	points: [2][2]f32,
+	colors: [2]Color,
+}
+
+Radial_Gradient :: struct {
+	center: [2]f32,
+	radius: f32,
+	colors: [2]Color,
+}
 
 Stroke_Justify :: enum {
 	Inner,
@@ -39,10 +56,15 @@ Matrix :: matrix[4, 4]f32
 
 // A draw call to the GPU these are managed internally
 Draw_Call :: struct {
-	texture: sg.Image,
+	gradient: Gradient,
+	scissor_box: Maybe(Box),
+
+	bindings: sg.Bindings,
+
 	vertices: [dynamic]Vertex,
 	indices: [dynamic]u16,
-	scissor_box: Box,
+
+	ready: bool,
 }
 
 Draw_Surface :: struct {
@@ -61,23 +83,28 @@ vertex_uv :: proc(uv: [2]f32) {
 	core.vertex_state.uv = uv
 }
 
+vertex_col :: proc(color: Color) {
+	core.vertex_state.col = color
+}
+
 // Append a vertex and return it's index
-add_vertex_3f32 :: proc(x, y, z: f32) -> int {
+add_vertex_3f32 :: proc(x, y, z: f32) -> (i: u16) {
 	pos: [3]f32 = {
 		core.current_matrix[0, 0] * x + core.current_matrix[0, 1] * y + core.current_matrix[0, 2] * z + core.current_matrix[0, 3],
 		core.current_matrix[1, 0] * x + core.current_matrix[1, 1] * y + core.current_matrix[1, 2] * z + core.current_matrix[1, 3],
 		core.current_matrix[2, 0] * x + core.current_matrix[2, 1] * y + core.current_matrix[2, 2] * z + core.current_matrix[2, 3],
 	}
-
-	return append(&core.current_draw_call.vertices, Vertex{
+	i = u16(len(core.current_draw_call.vertices))
+	append(&core.current_draw_call.vertices, Vertex{
 		pos = pos,
 		uv = core.vertex_state.uv,
 		col = core.vertex_state.col,
 	})
+	return
 }
 
 add_vertex_2f32 :: proc(x, y: f32) -> u16 {
-	return u16(add_vertex_3f32(x, y, core.vertex_state.z))
+	return add_vertex_3f32(x, y, core.vertex_state.z)
 }
 
 add_vertex_point :: proc(point: [2]f32) -> u16 {
@@ -110,8 +137,27 @@ pop_matrix :: proc() {
 }
 
 push_draw_call :: proc() {
-	push_stack(&core.draw_call_stack, Draw_Call{})
-	core.current_draw_call = &core.draw_call_stack.items[core.draw_call_stack.height - 1]
+	core.current_draw_call = &core.draw_calls[core.draw_call_count]
+	if !core.current_draw_call.ready {
+		core.current_draw_call.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
+			type = .INDEXBUFFER,
+			usage = .STREAM,
+			size = MAX_DRAW_CALL_INDICES * size_of(u16),
+		})
+		core.current_draw_call.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
+			type = .VERTEXBUFFER,
+			usage = .STREAM,
+			size = MAX_DRAW_CALL_VERTICES * size_of(Vertex),
+		})
+		core.current_draw_call.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
+			min_filter = .NEAREST,
+			mag_filter = .NEAREST,
+			wrap_u = .MIRRORED_REPEAT,
+			wrap_v = .MIRRORED_REPEAT,
+		})
+		core.current_draw_call.ready = true
+	}
+	core.draw_call_count += 1
 }
 
 matrix_identity :: proc() -> Matrix {
@@ -126,9 +172,9 @@ matrix_identity :: proc() -> Matrix {
 translate_matrix :: proc(x, y, z: f32) {
 	translation_matrix: Matrix = {
 		1, 0, 0, x,
-	    0, 1, 0, y,
-	    0, 0, 1, z,
-	    0, 0, 0, 1,
+    0, 1, 0, y,
+    0, 0, 1, z,
+    0, 0, 0, 1,
 	}
 
 	core.current_matrix^ *= translation_matrix
@@ -174,7 +220,7 @@ rotate_matrix :: proc(angle, x, y, z: f32) {
 }
 
 scale_matrix :: proc(x, y, z: f32) {
-	scale_matrix: matrix[4, 4]f32 = {
+	scale_matrix: Matrix = {
 		x, 0, 0, 0,
 		0, y, 0, 0,
 		0, 0, z, 0,

@@ -117,6 +117,15 @@ Font :: struct {
 	sizes: map[f32]Font_Size,
 }
 
+Glyph :: struct {
+	source: Box,
+	offset: [2]f32,
+	advance: f32,
+}
+
+@private fmt_buffers: [FMT_BUFFER_COUNT][FMT_BUFFER_SIZE]u8
+@private fmt_buffer_index: u8
+
 destroy_font :: proc(using self: ^Font) {
 	for _, &size in sizes {
 		destroy_font_size(&size)
@@ -124,15 +133,6 @@ destroy_font :: proc(using self: ^Font) {
 	delete(name)
 	delete(path)
 }
-
-Glyph :: struct {
-	texture: Texture,
-	offset: [2]f32,
-	advance: f32,
-}
-
-@private fmt_buffers: [FMT_BUFFER_COUNT][FMT_BUFFER_SIZE]u8
-@private fmt_buffer_index: u8
 
 get_tmp_builder :: proc() -> strings.Builder {
 	buf := get_tmp_buffer()
@@ -427,7 +427,7 @@ __get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^G
 		)
 		// Set glyph data
 		data = map_insert(&size.glyphs, codepoint, Glyph({
-			texture = load_texture_from_memory(image_data, int(image_width), int(image_height), 1).? or_return,
+			source = add_glyph_to_atlas(image_data, int(image_width), int(image_height), &core.font_atlas),
 			offset = {f32(glyph_offset_x), f32(glyph_offset_y) + size.ascent},
 			advance = f32((f32(advance) - f32(left_side_bearing)) * size.scale),
 		}))
@@ -456,11 +456,11 @@ draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 			}
 			// Paint the glyph
 			if it.codepoint != '\n' && it.codepoint != ' ' && it.glyph != nil {
-				dst: Box = {
+				target: Box = {
 					lo = origin + it.offset + it.glyph.offset,
 				}
-				dst.hi = dst.lo + (it.glyph.texture.source.hi - it.glyph.texture.source.lo)
-				draw_texture(it.glyph.texture, dst, color)
+				target.hi = target.lo + (it.glyph.source.hi - it.glyph.source.lo)
+				draw_image_portion(core.font_atlas, it.glyph.source, target, color)
 			}
 			// Update size
 			if it.new_line {
@@ -485,7 +485,7 @@ draw_aligned_rune :: proc(
 	font := &core.fonts[font].?
 	font_size, _ := get_font_size(font, size)
 	glyph, _ := __get_glyph(font, font_size, rune(icon))
-	icon_size := glyph.texture.source.hi - glyph.texture.source.lo
+	icon_size := glyph.source.hi - glyph.source.lo
 
 	box: Box
 	switch align_h {
@@ -510,7 +510,7 @@ draw_aligned_rune :: proc(
 		box.lo.y = origin.y 
 		box.hi.y = origin.y + icon_size.y 
 	}
-	draw_texture(glyph.texture, box, color)
+	draw_image_portion(core.font_atlas, glyph.source, box, color)
 	return icon_size
 }
 
@@ -518,7 +518,7 @@ draw_rune_aligned_clipped :: proc(font: int, size: f32, icon: rune, origin: [2]f
 	font := &core.fonts[font].?
 	font_size, _ := get_font_size(font, size)
 	glyph, _ := __get_glyph(font, font_size, rune(icon))
-	icon_size := glyph.texture.source.hi - glyph.texture.source.lo
+	icon_size := glyph.source.hi - glyph.source.lo
 
 	box: Box
 	switch align.x {
@@ -543,7 +543,7 @@ draw_rune_aligned_clipped :: proc(font: int, size: f32, icon: rune, origin: [2]f
 		box.lo.y = origin.y 
 		box.hi.y = origin.y + icon_size.y 
 	}
-	draw_texture(glyph.texture, box, color)
+	draw_image_portion(core.font_atlas, glyph.source, box, color)
 	return icon_size
 }
 

@@ -15,13 +15,20 @@ out vec2 tex_coord;
 out vec4 diffuse_color;
 
 void main() {
-    gl_Position = vec4(pos, 1.0) * mat;
+    gl_Position = mat * vec4(pos, 1.0);
     tex_coord = uv;
     diffuse_color = col;
 }
 @end
 
 @fs fs
+uniform u_gradient {
+    int gradient_mode;
+    vec4 gradient_colors[2];
+    vec2 gradient_start;
+    vec2 gradient_end;
+};
+
 uniform texture2D u_texture;
 uniform sampler u_sampler;
 
@@ -31,7 +38,21 @@ in vec4 diffuse_color;
 out vec4 frag_color;
 
 void main() {
-    frag_color = diffuse_color * vec4(1.0, 1.0, 1.0, texture(sampler2D(u_texture, u_sampler), tex_coord));
+    frag_color = diffuse_color * texture(sampler2D(u_texture, u_sampler), tex_coord);
+    switch(gradient_mode) {
+
+        // None
+        case 0:
+        break;
+
+        // Linear gradient
+        case 1:
+        frag_color *= vec4(1.0, 0.0, 1.0, 1.0);//diffuse_color * gradient_color0 + (gradient_color1 - gradient_color0) 
+
+        // Radial gradient
+        case 2:
+        frag_color *= vec4(1.0, 0.0, 1.0, 1.0);
+    }
 }
 @end
 

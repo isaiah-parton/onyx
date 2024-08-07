@@ -1,5 +1,6 @@
 package onyx
 
+import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
@@ -101,6 +102,7 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 	}
 
 	core.vertex_state.col = color
+	core.vertex_state.uv = {}
 
 	for i in 0..<path.count {
 		a := i - 1
@@ -178,11 +180,6 @@ __join_miter :: proc(p0, p1, p2: [2]f32) -> (dot: f32, miter: [2]f32) {
 	miter = {-tangent.y, tangent.x}
 	dot = linalg.dot(normal, miter)
 	return
-}
-
-
-destroy_image :: proc(using self: ^Image) {
-	delete(data)
 }
 
 /*
@@ -291,9 +288,7 @@ draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color:
 	end_path()
 }
 draw_box_fill :: proc(box: Box, color: Color) {
-	core.vertex_state = {
-		col = color,
-	}
+	core.vertex_state.col = color
 	tl := add_vertex(box.lo)
 	bl := add_vertex({box.lo.x, box.hi.y})
 	br := add_vertex(box.hi)
