@@ -122,7 +122,7 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 			}
 		}
 	}
-	widget.visible = core.visible && core.draw_this_frame
+	widget.visible = core.visible && core.draw_this_frame && !(core.debug.enabled && core.debug.boxes)
 	widget.dead = false
 	widget.disabled = info.disabled
 	widget.layer = current_layer()
@@ -233,8 +233,9 @@ commit_widget :: proc(widget: ^Widget, hovered: bool) {
 		core.next_hovered_widget = widget.id
 	}
 
-	if core.show_debug_stats {
+	if core.debug.enabled && core.debug.boxes {
 		draw_box_stroke(widget.box, 1, {0, 255, 0, 255})
+		draw_line(widget.box.lo + 1, widget.box.hi - 1, 0.5, {0, 255, 0, 255})
 	}
 }
 

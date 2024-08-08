@@ -58,9 +58,16 @@ Mouse_Button :: enum {
 
 Mouse_Bits :: bit_set[Mouse_Button]
 
+Debug_State :: struct {
+	enabled,
+	widgets,
+	boxes,
+	layers: bool,
+}
+
 // The global core data
 Core :: struct {
-	show_debug_stats: bool,
+	debug: Debug_State,
 
 	arena: runtime.Arena,
 	view: [2]f32,
@@ -224,7 +231,7 @@ begin_frame :: proc () {
 	}
 
 	if key_pressed(.F3) {
-		core.show_debug_stats = !core.show_debug_stats
+		core.debug.enabled = !core.debug.enabled
 		core.draw_this_frame = true
 	}
 
@@ -252,6 +259,61 @@ begin_frame :: proc () {
 
 end_frame :: proc() {
 	pop_matrix()
+
+	// Display debug text
+	if core.debug.enabled {
+		sdtx.canvas(core.view.x, core.view.y)
+
+		sdtx.color3b(255, 255, 255)
+
+		sdtx.printf("frame %i\n", core.frame_count)
+		sdtx.color3b(170, 170, 170)
+		sdtx.printf("\ttime: %f\n", sapp.frame_duration())
+		// sdtx.printf("hovered widget: %i\n", core.hovered_widget)
+		// sdtx.printf("focused widget: %i\n", core.focused_widget)
+		sdtx.color3b(255, 255, 255)
+
+		sdtx.move_y(1)
+
+		sdtx.printf("%c Layers (L)\n", '-' if core.debug.layers else '+')
+		if key_pressed(.L) do core.debug.layers = !core.debug.layers
+		if core.debug.layers {
+			sdtx.color3b(170, 170, 170)
+			__debug_print_layer :: proc(layer: ^Layer, depth: int = 0) {
+				sdtx.putc('H' if .Hovered in layer.state else '_')
+				sdtx.putc('F' if .Focused in layer.state else '_')
+				for i in 0..<depth {
+					sdtx.putc('\t')
+				}
+				sdtx.printf("\t{:i} - {:i}\n", layer.id, layer.z_index)
+				for &child in layer.children {
+					__debug_print_layer(child, depth + 1)
+				}
+			}
+			__debug_print_layer(core.root_layer)
+			sdtx.color3b(255, 255, 255)
+		}
+
+		sdtx.move_y(1)
+
+		sdtx.printf("%c Widgets (W)\n", '-' if core.debug.widgets else '+')
+		if key_pressed(.W) do core.debug.widgets = !core.debug.widgets
+		if core.debug.widgets {
+			sdtx.color3b(170, 170, 170)
+			for id, &widget in core.widget_map {
+				sdtx.putc('H' if .Hovered in widget.state else '_')
+				sdtx.putc('F' if .Focused in widget.state else '_')
+				sdtx.putc('P' if .Pressed in widget.state else '_')
+				sdtx.printf(" {:i}\n", widget.id)
+			}
+			sdtx.color3b(255, 255, 255)
+		}
+
+		sdtx.move_y(1)
+
+		sdtx.printf("%s bounding boxes (B)\n", "Hide" if core.debug.boxes else "Show")
+		if key_pressed(.B) do core.debug.boxes = !core.debug.boxes
+	}
 
 	sapp.set_mouse_cursor(core.cursor_type)
 	core.cursor_type = sapp.Mouse_Cursor.DEFAULT
@@ -281,10 +343,11 @@ end_frame :: proc() {
 
 			// Remove from parent's children
 			if layer.parent != nil {
-				for child, j in layer.parent.children {
-					if child == layer {
-						ordered_remove(&layer.parent.children, j)
-						break
+				for &child, c in layer.parent.children {
+					if child.id == layer.id {
+						ordered_remove(&layer.parent.children, c)
+					} else if child.z_index > layer.z_index {
+						child.z_index -= 1
 					}
 				}
 			}
@@ -295,6 +358,7 @@ end_frame :: proc() {
 
 			core.draw_next_frame = true
 		} else {
+			layer.last_state = layer.state
 			layer.state = {}
 			layer.dead = true
 		}
@@ -304,21 +368,6 @@ end_frame :: proc() {
 	if core.font_atlas.modified {
 		update_atlas(&core.font_atlas)
 		core.font_atlas.modified = false
-	}
-
-	// Display debug text
-	if core.show_debug_stats {
-		sdtx.canvas(core.view.x, core.view.y)
-		sdtx.color3b(255, 255, 255)
-		sdtx.printf("time: %f\n", sapp.frame_duration())
-		sdtx.printf("frame: %i\n", core.frame_count)
-		sdtx.printf("hovered widget: %i\n", core.hovered_widget)
-		sdtx.printf("focused widget: %i\n", core.focused_widget)
-		sdtx.pos_x(0); sdtx.move_y(1)
-		sdtx.puts("layers:\n")
-		for id, &layer in core.layer_map {
-			sdtx.printf("\t{:i}: {:i}\n", layer.id, layer.z_index)
-		}
 	}
 
 	for &call in core.draw_calls[:core.draw_call_count] {
@@ -410,7 +459,7 @@ end_frame :: proc() {
 		core.frame_count += 1
 		core.draw_this_frame = false
 
-		if core.show_debug_stats {
+		if core.debug.enabled {
 			sdtx.draw()
 		}
 		sg.end_pass()

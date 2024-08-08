@@ -27,6 +27,8 @@ Layer_Option :: enum {
 
 Layer_Options :: bit_set[Layer_Option]
 
+
+
 Layer :: struct {
 	id: Id,
 	last_state,
@@ -40,7 +42,6 @@ Layer :: struct {
 
 	// Sorted order
 	z_index: int,
-	is_top_child: bool,
 }
 
 Layer_Info :: struct {
@@ -109,7 +110,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 
 		// Add self to parent's children
 		if layer.parent != parent {
-			// Set `z-index` to one above that of the parent
+
 			layer.parent = parent
 			append(&parent.children, layer)
 			layer.z_index = parent.z_index + len(parent.children)
@@ -121,23 +122,13 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 		layer.state += {.Hovered}
 
 		// Re-order layers if clicked
-		if layer.parent != nil {
-			if mouse_pressed(.Left) && !layer.is_top_child {
-				for &child, c in layer.parent.children {
-					if child.id == layer.id do continue
-					child.z_index -= 1
-					child.is_top_child = false
-				}
-				layer.z_index += 1
-				layer.is_top_child = true
-			}
+		if mouse_pressed(.Left) {
+			bring_layer_to_front(layer)
 		}
-
-		if core.focused_layer == layer.id {
-			layer.state += {.Focused}
-
-
-		}
+	}
+	
+	if core.focused_layer == layer.id {
+		layer.state += {.Focused}
 	}
 
 	// Push stacks
@@ -156,11 +147,16 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 	scale_matrix(scale.x, scale.y, 1)
 	rotate_matrix(info.rotation, 0, 0, 1)
 	translate_matrix(-info.origin.x, -info.origin.y, 0)
+
+	// Draw debug bounding box
+	if core.debug.enabled && core.debug.boxes {
+		// draw_box_fill(layer.box, {255, 0, 0, 50})
+		draw_box_stroke(layer.box, 1, {255, 0, 0, 255})
+	}
 }
 
 end_layer :: proc() {
 	pop_matrix()
-
 	layer := current_layer()
 
 	// Get hover state
@@ -177,6 +173,19 @@ end_layer :: proc() {
 	core.vertex_state.z = (0.001 * f32(current_layer().z_index)) if core.layer_stack.height > 0 else 0
 }
 
-__bring_layer_to_front :: proc(layer: ^Layer) {
-	
+bring_layer_to_front :: proc(layer: ^Layer) {
+
+	if layer.parent == nil do return
+
+	top_z_index := layer.parent.z_index + len(layer.parent.children)
+
+	if layer.z_index == top_z_index do return
+
+	for &child, c in layer.parent.children {
+		if child.id == layer.id || child.z_index < layer.z_index {
+			continue
+		}
+		child.z_index -= 1
+	}
+	layer.z_index = top_z_index
 }
