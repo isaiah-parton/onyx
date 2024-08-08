@@ -68,7 +68,6 @@ Core :: struct {
 	pipeline: sg.Pipeline,				// Graphics pipeline
 	limits: sg.Limits,
 
-	layer_list: [dynamic]^Layer,					// Layers ordered by their z-index
 	layer_map: map[Id]^Layer,							// Map lookup by id
 	layers: [MAX_LAYERS]Maybe(Layer),			// Static allocated layer data
 	widgets: [MAX_WIDGETS]Maybe(Widget),	// Static allocated widget data
@@ -88,7 +87,10 @@ Core :: struct {
 	scrolling_layer,
 	last_hovered_layer,
 	hovered_layer,														// The current hovered layer
+	next_hovered_layer,
 	focused_layer: Id,												// The current focused layer
+
+	hovered_layer_z_index: int,
 
 	layout_stack: Stack(Layout, MAX_LAYOUTS),		// The layout context stack
 	layer_stack: Stack(^Layer, MAX_LAYERS),			// The layer context stack
@@ -204,12 +206,12 @@ init :: proc () {
 
 	max_atlas_size := int(core.limits.max_image_size_2d)
 	if max_atlas_size < MIN_ATLAS_SIZE {
-		fmt.printf("\nʕ+ᴥ+ʔ The maximum supported texture size is only %ix%i!\n\n", max_atlas_size)
+		fmt.printf("ʕ+ᴥ+ʔ The maximum supported texture size is only %ix%i!\n\n", max_atlas_size)
 	}
 	atlas_size: int = min(max_atlas_size, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, atlas_size, atlas_size)
 
-	fmt.println("\nʕ·ᴥ·ʔ Onyx is awake and feeling great!\n")
+	fmt.print("ʕ·ᴥ·ʔ Onyx is awake and feeling great!\n\n")
 }
 
 begin_frame :: proc () {
@@ -253,22 +255,70 @@ end_frame :: proc() {
 
 	sapp.set_mouse_cursor(core.cursor_type)
 	core.cursor_type = sapp.Mouse_Cursor.DEFAULT
-	// Process elements
-	process_layers()
+
+	// Update layer ids
+	core.last_hovered_layer = core.hovered_layer
+	core.hovered_layer = core.next_hovered_layer
+	core.next_hovered_layer = 0
+	core.hovered_layer_z_index = 0
+
+	if mouse_pressed(.Left) {
+		core.focused_layer = core.hovered_layer
+	}
+
+	// core.last_focused_layer = core.focused_layer
+
+	// Purge layers
+	for id, &layer in core.layer_map {
+		if layer.dead {
+
+			when ODIN_DEBUG {
+				fmt.printf("[ui] Deleted layer %x\n", layer.id)
+			}
+
+			// Remove from map
+			delete_key(&core.layer_map, id)
+
+			// Remove from parent's children
+			if layer.parent != nil {
+				for child, j in layer.parent.children {
+					if child == layer {
+						ordered_remove(&layer.parent.children, j)
+						break
+					}
+				}
+			}
+
+			// Deinitit init?
+			destroy_layer(layer)
+			(transmute(^Maybe(Layer))layer)^ = nil
+
+			core.draw_next_frame = true
+		} else {
+			layer.state = {}
+			layer.dead = true
+		}
+	}
+
 	// Update the atlas if needed
 	if core.font_atlas.modified {
 		update_atlas(&core.font_atlas)
 		core.font_atlas.modified = false
 	}
+
 	// Display debug text
 	if core.show_debug_stats {
 		sdtx.canvas(core.view.x, core.view.y)
-		sdtx.pos(1, 1)
 		sdtx.color3b(255, 255, 255)
 		sdtx.printf("time: %f\n", sapp.frame_duration())
 		sdtx.printf("frame: %i\n", core.frame_count)
 		sdtx.printf("hovered widget: %i\n", core.hovered_widget)
 		sdtx.printf("focused widget: %i\n", core.focused_widget)
+		sdtx.pos_x(0); sdtx.move_y(1)
+		sdtx.puts("layers:\n")
+		for id, &layer in core.layer_map {
+			sdtx.printf("\t{:i}: {:i}\n", layer.id, layer.z_index)
+		}
 	}
 
 	for &call in core.draw_calls[:core.draw_call_count] {
@@ -305,34 +355,24 @@ end_frame :: proc() {
 
 		sg.apply_pipeline(core.pipeline)
 
+		// Set view bounds
+		t := f32(0)
+		b := f32(core.view.y)
+		l := f32(0)
+		r := f32(core.view.x)
+		n := f32(1000)
+		f := f32(-1000)
+
+		projection_matrix := linalg.matrix_ortho3d(l, r, b, t, n, f)
+
 		// Render draw calls
 		for &call in core.draw_calls[:core.draw_call_count] {
 			sg.apply_bindings(call.bindings)
 
-			// Set view bounds
-			t := f32(0)
-			b := f32(core.view.y)
-			l := f32(0)
-			r := f32(core.view.x)
-			f := f32(0)
-			n := f32(1)
-			
-			// Calculate projection matrix
-			rl := r - l
-			tb := t - b
-			fn := f - n
-
-			projection_matrix: Matrix = {
-				2 / rl, 0, 			0, 				-(r + l) / rl,
-				0, 			2 / tb, 0, 				-(t + b) / tb,
-				0, 			0, 			-2 / fn,	-(f + n) / fn,
-				0, 			0, 			0, 				1,
-			}
-
 			// Apply projection matrix
 			sg.apply_uniforms(.VS, 0, { 
 				ptr = &projection_matrix,
-				size = size_of(Matrix),
+				size = size_of(projection_matrix),
 			})
 
 			u_gradient := U_Gradient{
@@ -422,7 +462,7 @@ quit :: proc () {
 	sg.destroy_pipeline(core.pipeline)
 	sg.shutdown()
 
-	fmt.println("ʕ-ᴥ-ʔ Onyx went to sleep peacefully.")
+	fmt.print("ʕ-ᴥ-ʔ Onyx went to sleep peacefully.\n\n")
 }
 
 handle_event :: proc (e: ^sapp.Event) {
@@ -488,10 +528,10 @@ mouse_down :: proc(button: Mouse_Button) -> bool {
 	return button in core.mouse_bits
 }
 mouse_pressed :: proc(button: Mouse_Button) -> bool {
-	return core.mouse_bits - core.last_mouse_bits >= {button}
+	return (core.mouse_bits - core.last_mouse_bits) >= {button}
 }
 mouse_released :: proc(button: Mouse_Button) -> bool {
-	return core.last_mouse_bits - core.mouse_bits >= {button}
+	return (core.last_mouse_bits - core.mouse_bits) >= {button}
 }
 
 set_clipboard_string :: proc(_: rawptr, str: string) -> bool {

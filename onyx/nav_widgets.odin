@@ -28,7 +28,7 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 	})
 	info.desired_size = text_size
 	if !info.is_tail {
-		info.desired_size.x += 20
+		info.desired_size.x += 16
 	}
 	if len(info.options) > 0 {
 		info.desired_size.x += 20
@@ -54,7 +54,7 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 			},
 		}, fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time))
 		if len(info.options) > 0 {
-			origin: [2]f32 = {math.floor(widget.box.hi.x - 30), box_center_y(widget.box)}
+			origin: [2]f32 = {math.floor(widget.box.hi.x - 24), box_center_y(widget.box)}
 			begin_path()
 				point(origin + {-4, -2})
 				point(origin + {0, 2})
@@ -65,7 +65,6 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 		if !info.is_tail {
 			origin: [2]f32 = {math.floor(widget.box.hi.x - 10), box_center_y(widget.box)}
 			begin_path()
-				// Slash
 				point(origin + {-2, 6})
 				point(origin + {2, -6})
 				stroke_path(2, fade(core.style.color.content, 0.5))
@@ -79,6 +78,10 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 		})
 			foreground()
 		end_layer()
+	}
+
+	if .Hovered in widget.state {
+		core.cursor_type = .POINTING_HAND
 	}
 
 	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))

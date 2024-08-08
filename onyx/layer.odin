@@ -29,15 +29,18 @@ Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
 	id: Id,
+	last_state,
 	state: Layer_State,
-	child_index: int,
-	index: int, 								// z-index
 	options: Layer_Options,			// Option bit flags
 	order: Layer_Order,					// Basically the type of layer, affects it's place in the list
 	box: Box,		
 	parent: ^Layer,							// The layer's parent
 	children: [dynamic]^Layer,	// The layer's children
 	dead: bool,									// Should be deleted?
+
+	// Sorted order
+	z_index: int,
+	is_top_child: bool,
 }
 
 Layer_Info :: struct {
@@ -45,6 +48,10 @@ Layer_Info :: struct {
 	options: Layer_Options,
 	order: Layer_Order,
 	box: Box,
+
+	origin: [2]f32,
+	scale: Maybe([2]f32),
+	rotation: f32,
 }
 
 init_layer :: proc(layer: ^Layer) {
@@ -59,6 +66,7 @@ current_layer :: proc(loc := #caller_location) -> ^Layer {
 	assert(core.layer_stack.height > 0, "No current layer", loc)
 	return core.layer_stack.items[core.layer_stack.height - 1]
 }
+
 __new_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
 	for i in 0..<MAX_LAYERS {
 		if core.layers[i] == nil {
@@ -75,142 +83,100 @@ __new_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
 	}
 	return
 }
+
 begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 	id := info.id if info.id != 0 else hash(loc)
 
+	// Get a layer with `id` or create one
 	layer := core.layer_map[id] or_else (__new_layer(id) or_else panic("Out of layers!"))
+
+	// Set parameters
 	layer.dead = false
 	layer.id = id
 	layer.box = info.box
 	layer.order = info.order
 	layer.options = info.options
 
+	// Check if there is a root layer
 	if core.root_layer == nil {
+
+		// Set root layer
 		core.root_layer = layer
 	} else {
+
+		// The parent will be the previous layer
 		parent := core.layer_stack.items[core.layer_stack.height - 1]
+
+		// Add self to parent's children
 		if layer.parent != parent {
+			// Set `z-index` to one above that of the parent
 			layer.parent = parent
 			append(&parent.children, layer)
+			layer.z_index = parent.z_index + len(parent.children)
 		}
 	}
 
+	// Set input state
+	if core.hovered_layer == layer.id {
+		layer.state += {.Hovered}
+
+		// Re-order layers if clicked
+		if layer.parent != nil {
+			if mouse_pressed(.Left) && !layer.is_top_child {
+				for &child, c in layer.parent.children {
+					if child.id == layer.id do continue
+					child.z_index -= 1
+					child.is_top_child = false
+				}
+				layer.z_index += 1
+				layer.is_top_child = true
+			}
+		}
+
+		if core.focused_layer == layer.id {
+			layer.state += {.Focused}
+
+
+		}
+	}
+
+	// Push stacks
 	push_stack(&core.layer_stack, layer)
 	begin_layout({
 		box = layer.box,
 	})
-	side(.Top)
 
 	// Set vertex z position
-	core.vertex_state.z = 0.01 * f32(layer.index)
+	core.vertex_state.z = 0.001 * f32(layer.z_index)
+
+	// Transform matrix
+	scale: [2]f32 = info.scale.? or_else 1
+	push_matrix()
+	translate_matrix(info.origin.x, info.origin.y, 0)
+	scale_matrix(scale.x, scale.y, 1)
+	rotate_matrix(info.rotation, 0, 0, 1)
+	translate_matrix(-info.origin.x, -info.origin.y, 0)
 }
+
 end_layer :: proc() {
+	pop_matrix()
+
+	layer := current_layer()
+
+	// Get hover state
+	if point_in_box(core.mouse_pos, layer.box) && layer.z_index >= core.hovered_layer_z_index {
+		core.hovered_layer_z_index = layer.z_index
+		core.next_hovered_layer = layer.id
+	}
+
+	// Pop the stacks
 	end_layout()
 	pop_stack(&core.layer_stack)
-	if core.layer_stack.height > 0 {
-		core.vertex_state.z = 0.01 * f32(current_layer().index)
-	}
-}
-process_layers :: proc() {
-	sorted_layer: ^Layer
-	core.last_hovered_layer = core.hovered_layer
-	core.hovered_layer = 0
-	if core.mouse_pos != core.last_mouse_pos {
-		core.scrolling_layer = 0
-	}
-	hovered_layer: ^Layer
-	for layer, i in core.layer_list {
-		if layer.dead {
-			when ODIN_DEBUG {
-				fmt.printf("[ui] Deleted layer %x\n", layer.id)
-			}
-			ordered_remove(&core.layer_list, i)
-			delete_key(&core.layer_map, layer.id)
-			if layer.parent != nil {
-				for child, j in layer.parent.children {
-					if child == layer {
-						ordered_remove(&layer.parent.children, j)
-						break
-					}
-				}
-			}
-			destroy_layer(layer)
-			(transmute(^Maybe(Layer))layer)^ = nil
-			core.sort_layers = true
-			core.draw_next_frame = true
-		} else {
-			layer.state = {}
-			layer.dead = true
-			if point_in_box(core.mouse_pos, layer.box) {
-				core.hovered_layer = layer.id
-				hovered_layer = layer
-				if core.mouse_pos != core.last_mouse_pos && layer.options & {.Scroll_X, .Scroll_Y} != {} {
-					core.scrolling_layer = layer.id
-				}
-				if mouse_pressed(.Left) {
-					core.focused_layer = layer.id
-					if .No_Sort not_in layer.options {
-						sorted_layer = layer
-					}
-				}
-			}
-		}
-	}
-	for hovered_layer != nil {
-		hovered_layer.state += {.Hovered}
-		if .Attached in hovered_layer.options {
-			hovered_layer = hovered_layer.parent
-		} else {
-			break
-		}
-	}
-	// If a sorted layer was selected, then find it's root attached parent
-	if sorted_layer != nil {
-		child := sorted_layer
-		for {
-			if child.parent != nil {
-				core.top_layer = child.id
-				sorted_layer = child
-				child = child.parent
-			} else {
-				break
-			}
-		}
-	}
-	// Then reorder it with it's siblings
-	if core.top_layer != core.last_top_layer {
-		if sorted_layer.parent != nil {
-			for child in sorted_layer.parent.children {
-				if child.order == sorted_layer.order {
-					if child.id == core.top_layer {
-						child.child_index = len(sorted_layer.parent.children)
-					} else {
-						child.child_index -= 1
-					}
-				}
-			}
-		}
-		core.sort_layers = true
-		core.last_top_layer = core.top_layer
-	}
-	// Sort the layers
-	if core.sort_layers {
-		core.sort_layers = false
 
-		clear(&core.layer_list)
-		sort_layer(&core.layer_list, core.root_layer)
-	}
+	// Reset z-level to that of the previous layer or to zero
+	core.vertex_state.z = (0.001 * f32(current_layer().z_index)) if core.layer_stack.height > 0 else 0
 }
-sort_layer :: proc(list: ^[dynamic]^Layer, layer: ^Layer) {
-	layer.index = len(list)
-	append(list, layer)
-	if len(layer.children) > 0 {
-		slice.sort_by(layer.children[:], proc(a, b: ^Layer) -> bool {
-			if a.order == b.order {
-				return a.child_index < b.child_index
-			}
-			return int(a.order) < int(b.order)
-		})
-		for child in layer.children do sort_layer(list, child)
-	}
+
+__bring_layer_to_front :: proc(layer: ^Layer) {
+	
 }

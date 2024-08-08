@@ -170,62 +170,27 @@ matrix_identity :: proc() -> Matrix {
 }
 
 translate_matrix :: proc(x, y, z: f32) {
-	translation_matrix: Matrix = {
-		1, 0, 0, x,
-    0, 1, 0, y,
-    0, 0, 1, z,
-    0, 0, 0, 1,
-	}
-
-	core.current_matrix^ *= translation_matrix
+	core.current_matrix^ *= linalg.matrix4_translate([3]f32{x, y, z})
 }
 
 rotate_matrix :: proc(angle, x, y, z: f32) {
-	rotation_matrix := matrix_identity()
-	
-	x, y, z := x, y, z
-	
-	len_squared := x * x + y * y + z * z
-	if len_squared != 1 && len_squared != 0 {
-		inverse_len := 1 / math.sqrt(len_squared)
-		x *= inverse_len
-		y *= inverse_len
-		z *= inverse_len
-	}
-	sinres := math.sin(angle)
+	core.current_matrix^ *= linalg.matrix4_rotate(angle, [3]f32{x, y, z})
+}
+
+rotate_matrix_z :: proc(angle: f32) {
 	cosres := math.cos(angle)
-	t := 1 - cosres
+	sinres := math.sin(angle)
 
-	rotation_matrix[0, 0] = x*x*y + cosres
-	rotation_matrix[1, 0] = y*x*t - z*sinres
-	rotation_matrix[2, 0] = z*x*y - y*sinres
-	rotation_matrix[3, 0] = 0
-
-	rotation_matrix[0, 1] = x*y*t - z*sinres
-	rotation_matrix[1, 1] = y*y*y + cosres
-	rotation_matrix[2, 1] = z*y*t + x*sinres
-	rotation_matrix[3, 1] = 0
-
-	rotation_matrix[0, 2] = x*z*t + y*sinres
-	rotation_matrix[1, 2] = y*z*t + x*sinres
-	rotation_matrix[2, 2] = z*z*y + cosres
-	rotation_matrix[3, 2] = 0
-
-	rotation_matrix[0, 3] = 0
-	rotation_matrix[1, 3] = 0
-	rotation_matrix[2, 3] = 0
-	rotation_matrix[3, 3] = 1
+	rotation_matrix: Matrix = {
+		cosres, 	-sinres, 	0, 0,
+		sinres, 	cosres, 	0, 0,
+		0, 				0, 				1, 0,
+		0, 				0, 				0, 1,
+	}
 
 	core.current_matrix^ *= rotation_matrix
 }
 
 scale_matrix :: proc(x, y, z: f32) {
-	scale_matrix: Matrix = {
-		x, 0, 0, 0,
-		0, y, 0, 0,
-		0, 0, z, 0,
-		0, 0, 0, 1,
-	}
-
-	core.current_matrix^ *= scale_matrix
+	core.current_matrix^ *= linalg.matrix4_scale([3]f32{x, y, z})
 }

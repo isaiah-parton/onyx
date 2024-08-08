@@ -2,6 +2,7 @@ package demo
 
 import "core:fmt"
 import "core:math"
+import "core:time"
 import "core:strings"
 import "base:runtime"
 import "core:reflect"
@@ -36,6 +37,8 @@ State :: struct {
 	slider_value: f32,
 
 	images: [4]ui.Image,
+
+	start_time: time.Time,
 }
 
 main :: proc() {
@@ -56,14 +59,17 @@ main :: proc() {
 			// for i in 0..<4 {
 			// 	state.images[i] = ui.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic("failed lol")
 			// }
+
+			state.start_time = time.now()
 		},
 		frame_userdata_cb = proc "c" (userdata: rawptr) {
 			context = runtime.default_context()
 			state := transmute(^State)userdata
 
 			ui.begin_frame()
+				layer_box := ui.shrink_box(ui.view_box(), 100)
 				ui.begin_layer({
-					box = ui.shrink_box(ui.view_box(), 100),
+					box = layer_box,
 				})
 					ui.foreground()
 					ui.begin_layout({
@@ -77,12 +83,12 @@ main :: proc() {
 						ui.side(.Right)
 						state.light_mode = ui.do_switch({on = state.light_mode}).on
 					ui.end_layout()
-
 					ui.shrink(30)
 					
 					#partial switch state.section.component {
 					
 						case .Button:
+						ui.side(.Top)
 						ui.do_label({
 							text = "Fit to label",
 							font_style = .Bold,
@@ -109,8 +115,22 @@ main :: proc() {
 						ui.end_layout()
 						
 					}
-					
+					ui.begin_layer({
+						box = {250, 500},
+						order = .Floating,
+					})
+						ui.foreground()
+					ui.end_layer()
+
+					ui.begin_layer({
+						box = {{300, 150}, {600, 450}},
+						order = .Floating,
+					})
+						ui.foreground()
+					ui.end_layer()
 				ui.end_layer()
+
+
 				// for i in 0..<4 {
 				// 	origin: [2]f32 = {
 				// 		0 + f32(i) * 200,
