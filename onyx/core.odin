@@ -45,15 +45,19 @@ pop_stack :: proc(stack: ^Stack($T, $N)) {
 }
 
 Keyboard_Key :: sapp.Keycode
+
 // Private global core instance
 @private core: Core
+
 // Input events should be localized to layers
 Mouse_Button :: enum {
 	Left,
 	Right,
 	Middle,
 }
+
 Mouse_Bits :: bit_set[Mouse_Button]
+
 // The global core data
 Core :: struct {
 	show_debug_stats: bool,
@@ -310,8 +314,8 @@ end_frame :: proc() {
 			b := f32(core.view.y)
 			l := f32(0)
 			r := f32(core.view.x)
-			f := f32(100)
-			n := f32(0)
+			f := f32(0)
+			n := f32(1)
 			
 			// Calculate projection matrix
 			rl := r - l
@@ -338,8 +342,6 @@ end_frame :: proc() {
 				ptr = &u_gradient,
 				size = size_of(u_gradient),
 			})
-
-			
 
 			// Apply scissor
 			if box, ok := call.scissor_box.?; ok {

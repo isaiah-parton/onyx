@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:os"
 import "base:runtime"
 
+import "core:image"
 import "core:image/png"
 
 import sg "extra:sokol-odin/sokol/gfx"
@@ -13,9 +14,10 @@ Pixel_Format :: sg.Pixel_Format
 Image :: struct {
 	using _image: sg.Image,
 
+	channels,
+	depth,
 	width,
 	height: int,
-	pixel_format: Pixel_Format,
 }
 
 destroy_image :: proc(image: ^Image) {
@@ -85,9 +87,35 @@ get_current_image :: proc() -> sg.Image {
 	return core.current_draw_call.bindings.fs.images[0]
 }
 
-load_image_from_file :: proc(file: string) -> (image: Image, err: png.Error) {
+get_pixel_format :: proc(channels, depth: int) -> sg.Pixel_Format {
+	switch channels {
+		case 1:
+		switch depth {
+			case 8: return .R8
+			case 16: return .R16
+			case 32: return .R32F
+		}
+		case 2:
+		switch depth {
+			case 8: return .RG8
+			case 16: return .RG16
+			case 32: return .RG32F
+		}
+		case 4:
+		switch depth {
+			case 8: return .RGBA8
+			case 16: return .RGBA16
+			case 32: return .RGBA32F
+		}
+	}
+	return .NONE
+}
+
+load_image_from_file :: proc(file: string) -> (result: Image, err: png.Error) {
 	_image := png.load_from_file(file) or_return
-	image = Image{
+	image.alpha_add_if_missing(_image)
+	pixel_format := get_pixel_format(_image.channels, _image.depth)
+	result = Image{
 		_image = sg.make_image(sg.Image_Desc{
 			data = {
 				subimage = {
@@ -101,11 +129,13 @@ load_image_from_file :: proc(file: string) -> (image: Image, err: png.Error) {
 			},
 			width = i32(_image.width),
 			height = i32(_image.height),
-			pixel_format = .RGBA8,
+			pixel_format = pixel_format,
 		}),
 		width = _image.width,
 		height = _image.height,
-		pixel_format = .RGBA8,
+		channels = _image.channels,
+		depth = _image.depth,
 	}
+	
 	return
 }

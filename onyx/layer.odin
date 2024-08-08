@@ -30,6 +30,7 @@ Layer_Options :: bit_set[Layer_Option]
 Layer :: struct {
 	id: Id,
 	state: Layer_State,
+	child_index: int,
 	index: int, 								// z-index
 	options: Layer_Options,			// Option bit flags
 	order: Layer_Order,					// Basically the type of layer, affects it's place in the list
@@ -99,10 +100,16 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 		box = layer.box,
 	})
 	side(.Top)
+
+	// Set vertex z position
+	core.vertex_state.z = 0.01 * f32(layer.index)
 }
 end_layer :: proc() {
 	end_layout()
 	pop_stack(&core.layer_stack)
+	if core.layer_stack.height > 0 {
+		core.vertex_state.z = 0.01 * f32(current_layer().index)
+	}
 }
 process_layers :: proc() {
 	sorted_layer: ^Layer
@@ -176,9 +183,9 @@ process_layers :: proc() {
 			for child in sorted_layer.parent.children {
 				if child.order == sorted_layer.order {
 					if child.id == core.top_layer {
-						child.index = len(sorted_layer.parent.children)
+						child.child_index = len(sorted_layer.parent.children)
 					} else {
-						child.index -= 1
+						child.child_index -= 1
 					}
 				}
 			}
@@ -195,11 +202,12 @@ process_layers :: proc() {
 	}
 }
 sort_layer :: proc(list: ^[dynamic]^Layer, layer: ^Layer) {
+	layer.index = len(list)
 	append(list, layer)
 	if len(layer.children) > 0 {
 		slice.sort_by(layer.children[:], proc(a, b: ^Layer) -> bool {
 			if a.order == b.order {
-				return a.index < b.index
+				return a.child_index < b.child_index
 			}
 			return int(a.order) < int(b.order)
 		})

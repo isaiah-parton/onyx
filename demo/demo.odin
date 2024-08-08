@@ -28,10 +28,7 @@ Component_Section :: struct {
 
 State :: struct {
 	light_mode: bool,
-	section: union {
-		Component_Section,
-	},
-
+	section: Component_Section,
 	checkboxes: [Option]bool,
 
 	text_builder: strings.Builder,
@@ -56,9 +53,9 @@ main :: proc() {
 			ui.set_color_scheme(ui.dark_color_scheme())
 			ui.set_style_rounding(0)
 
-			for i in 0..<4 {
-				state.images[i] = ui.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic("failed lol")
-			}
+			// for i in 0..<4 {
+			// 	state.images[i] = ui.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic("failed lol")
+			// }
 		},
 		frame_userdata_cb = proc "c" (userdata: rawptr) {
 			context = runtime.default_context()
@@ -82,48 +79,45 @@ main :: proc() {
 					ui.end_layout()
 
 					ui.shrink(30)
-					switch section in state.section {
 					
-						case Component_Section:
-						#partial switch section.component {
+					#partial switch state.section.component {
+					
+						case .Button:
+						ui.do_label({
+							text = "Fit to label",
+							font_style = .Bold,
+							font_size = 24,
+						})
+						ui.space(10)
+						ui.begin_layout({
+							size = 30,
+						})
+							ui.set_width_auto()
+							for member, m in ui.Button_Kind {
+								ui.push_id(m)
+									if m > 0 {
+										ui.space(10)
+									}
+									if ui.was_clicked(ui.do_button({
+										text = ui.tmp_print(member),
+										kind = member,
+									})) {
+
+									}
+								ui.pop_id()
+							}
+						ui.end_layout()
 						
-							case .Button:
-							ui.do_label({
-								text = "Fit to label",
-								font_style = .Bold,
-								font_size = 24,
-							})
-							ui.space(10)
-							ui.begin_layout({
-								size = 30,
-							})
-								ui.set_width_auto()
-								for member, m in ui.Button_Kind {
-									ui.push_id(m)
-										if m > 0 {
-											ui.space(10)
-										}
-										if ui.was_clicked(ui.do_button({
-											text = ui.tmp_print(member),
-											kind = member,
-										})) {
-
-										}
-									ui.pop_id()
-								}
-							ui.end_layout()
-							
-						}
 					}
-
+					
 				ui.end_layer()
-				for i in 0..<4 {
-					origin: [2]f32 = {
-						0 + f32(i) * 200,
-						sapp.heightf() - 200,
-					}
-					ui.draw_image(state.images[i], {origin, origin + 200}, {255, 255, 255, 255})
-				}
+				// for i in 0..<4 {
+				// 	origin: [2]f32 = {
+				// 		0 + f32(i) * 200,
+				// 		sapp.heightf() - 200,
+				// 	}
+				// 	ui.draw_image(state.images[i], {origin, origin + 200}, {255, 255, 255, 255})
+				// }
 			ui.end_frame()
 		},
 		cleanup_cb = proc "c" () {
@@ -143,5 +137,16 @@ main :: proc() {
 		width = 1000,
 		height = 800,
 		window_title = "o n y x",
+		// icon = sapp.Icon_Desc{
+		// 	images = {
+		// 		0 = {
+		// 			width = 2,
+		// 			height = 2,
+		// 			pixels = {
+						
+		// 			},
+		// 		},
+		// 	},
+		// },
 	})
 }
