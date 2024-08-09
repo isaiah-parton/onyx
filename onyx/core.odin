@@ -20,6 +20,7 @@ MAX_IDS :: 10
 MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
 MAX_LAYOUTS :: 100
+MAX_PANELS :: 100
 
 MAX_TEXTURES :: 200
 
@@ -79,6 +80,8 @@ Core :: struct {
 	layers: [MAX_LAYERS]Maybe(Layer),			// Static allocated layer data
 	widgets: [MAX_WIDGETS]Maybe(Widget),	// Static allocated widget data
 	widget_map: map[Id]^Widget,
+
+	panels: [MAX_PANELS]Maybe(Panel),
 
 	last_hovered_widget,
 	hovered_widget,
@@ -217,7 +220,7 @@ init :: proc () {
 	}
 	atlas_size: int = min(max_atlas_size, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, atlas_size, atlas_size)
-
+	
 	fmt.print("ʕ·ᴥ·ʔ Onyx is awake and feeling great!\n\n")
 }
 
@@ -262,7 +265,7 @@ end_frame :: proc() {
 
 	// Display debug text
 	if core.debug.enabled {
-		sdtx.canvas(core.view.x, core.view.y)
+		sdtx.canvas(core.view.x / 2, core.view.y / 2)
 
 		sdtx.color3b(255, 255, 255)
 

@@ -33,7 +33,7 @@ make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 		size = core.style.button_text_size,
 	}
 	info.__text_size = measure_text(info.__text_info)
-	info.desired_size = info.__text_size + {20, 16}
+	info.desired_size = info.__text_size + {20, 10}
 	return info
 }
 

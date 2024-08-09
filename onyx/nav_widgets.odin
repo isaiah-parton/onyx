@@ -6,13 +6,14 @@ import "core:math/linalg"
 
 Breadcrumb_Info :: struct {
 	using _: Generic_Widget_Info,
-	text: string,
-	is_tail: bool,
+	index: int,
 	options: []string,
+	is_tail: bool,
 }
 
 Breadcrumb_Result :: struct {
 	using _: Generic_Widget_Result,
+	index: Maybe(int),
 }
 
 make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Breadcrumb_Info {
@@ -23,7 +24,7 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 		size = core.style.button_text_size,
 	}
 	text_size := measure_text({
-		text = info.text,
+		text = info.options[info.index],
 		options = text_options,
 	})
 	info.desired_size = text_size
@@ -47,7 +48,7 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 
 	if widget.visible {
 		draw_text(widget.box.lo, {
-			text = info.text,
+			text = info.options[info.index],
 			options = Text_Options{
 				font = core.style.fonts[.Regular],
 				size = core.style.button_text_size,
@@ -72,11 +73,41 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 		}
 	}
 
+	widget.focus_time = animate(widget.focus_time, 0.2, .Focused in widget.state)
+	
 	if .Focused in widget.state {
+		layer_height: f32 = f32(len(info.options) - 1) * 30 + 10
+		box: Box = {
+			{
+				widget.box.lo.x,
+				widget.box.hi.y + 10,
+			},
+			{
+				widget.box.hi.x,
+				widget.box.hi.y + 10 + layer_height,
+			},
+		}
+
 		begin_layer({
-			box = attach_box_bottom(widget.box, 100),
+			box = box,
+			origin = {box_center_x(box), box.lo.y},
+			scale = ([2]f32)(ease.cubic_in_out(widget.focus_time)),
 		})
 			foreground()
+			shrink(5)
+			side(.Top); set_height(30)
+			set_width_fill()
+			for option, o in info.options {
+				if o == info.index do continue
+				push_id(o)
+					if was_clicked(do_button({
+						text = option,
+						kind = .Ghost,
+					})) {
+						result.index = o
+					}
+				pop_id()
+			}
 		end_layer()
 	}
 

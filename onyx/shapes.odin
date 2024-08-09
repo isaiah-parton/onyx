@@ -262,6 +262,7 @@ draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
 	nsteps := get_arc_steps(radius, da)
 
 	core.vertex_state.col = color
+	core.vertex_state.uv = {}
 	first_index := add_vertex(center.x, center.y)
 	for n in 0..=nsteps {
 		a := from + da * f32(n) / f32(nsteps)
