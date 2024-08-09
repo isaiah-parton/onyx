@@ -22,7 +22,7 @@ void main() {
 @end
 
 @fs fs
-uniform u_gradient {
+uniform frag_uniforms {
     int gradient_mode;
     vec4 gradient_colors[2];
     vec2 gradient_start;

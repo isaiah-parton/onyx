@@ -38,10 +38,9 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 	return info
 }
 
-display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
+add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 	widget := get_widget(info)
 	widget.box = next_widget_box(info)
-	context.allocator = widget.allocator
 	result.self = widget
 
 	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
@@ -76,37 +75,48 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 	widget.focus_time = animate(widget.focus_time, 0.2, .Focused in widget.state)
 	
 	if .Focused in widget.state {
-		layer_height: f32 = f32(len(info.options) - 1) * 30 + 10
+
+		menu_height: f32
+		buttons: [80]Button_Info
+		for option, o in info.options {
+			if o == info.index do continue
+			push_id(o)
+				buttons[o] = make_button({
+					text = option,
+					kind = .Ghost,
+					font_size = 16,
+				})
+				menu_height += buttons[o].desired_size.y
+			pop_id()
+		}
+		menu_height += 10
+
+		center := box_center_x(widget.box)
+
 		box: Box = {
-			{
-				widget.box.lo.x,
-				widget.box.hi.y + 10,
-			},
-			{
-				widget.box.hi.x,
-				widget.box.hi.y + 10 + layer_height,
-			},
+			{center - 80, widget.box.hi.y + 10},
+			{center + 80, widget.box.hi.y + 10 + menu_height},
 		}
 
 		begin_layer({
+			id = widget.id,
 			box = box,
 			origin = {box_center_x(box), box.lo.y},
 			scale = ([2]f32)(ease.cubic_in_out(widget.focus_time)),
+			parent = current_layer().id,
 		})
+			if .Focused in current_layer().state {
+				widget.next_state += {.Focused}
+			}
 			foreground()
 			shrink(5)
-			side(.Top); set_height(30)
+			side(.Top)
 			set_width_fill()
-			for option, o in info.options {
-				if o == info.index do continue
-				push_id(o)
-					if was_clicked(do_button({
-						text = option,
-						kind = .Ghost,
-					})) {
-						result.index = o
-					}
-				pop_id()
+			for &button, b in buttons[:len(info.options)] {
+				if b == info.index do continue
+				if was_clicked(add_button(button)) {
+					result.index = b
+				}
 			}
 		end_layer()
 	}
@@ -121,5 +131,5 @@ display_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result)
 }
 
 do_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Breadcrumb_Result {
-	return display_breadcrumb(make_breadcrumb(info, loc))
+	return add_breadcrumb(make_breadcrumb(info, loc))
 }

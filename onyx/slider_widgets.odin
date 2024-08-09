@@ -27,7 +27,7 @@ make_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_In
 	return info
 }
 
-display_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
+add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 	widget := get_widget(info)
 	widget.draggable = true
 	widget.box = next_widget_box(info)
@@ -60,5 +60,5 @@ display_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 }
 
 do_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Result(T) {
-	return display_slider(make_slider(info, loc))
+	return add_slider(make_slider(info, loc))
 }

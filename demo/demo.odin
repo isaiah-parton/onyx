@@ -2,6 +2,7 @@ package demo
 
 import "core:fmt"
 import "core:math"
+import "core:math/rand"
 import "core:time"
 import "core:strings"
 import "base:runtime"
@@ -29,7 +30,7 @@ Component_Section :: struct {
 	component: Component,
 }
 
-State :: struct {
+Component_Showcase :: struct {
 	light_mode: bool,
 	section: Component_Section,
 	checkboxes: [Option]bool,
@@ -41,6 +42,66 @@ State :: struct {
 	images: [4]onyx.Image,
 
 	start_time: time.Time,
+}
+
+State :: struct {
+	component_showcase: Component_Showcase,
+}
+
+do_component_showcase :: proc(state: ^Component_Showcase) {
+	using onyx
+
+	layer_box := shrink_box(view_box(), 100)
+	begin_layer({
+		box = layer_box,
+		kind = .Background,
+	})
+		foreground()
+		begin_layout({
+			size = 65,
+			side = .Top,
+			show_lines = true,
+		})
+			shrink(15)
+			do_breadcrumb({index = 0, options = {"Components"}})
+			if index, ok := do_breadcrumb({index = int(state.section.component), options = reflect.enum_field_names(Component)}).index.?; ok {
+				state.section.component = Component(index)
+			}
+			side(.Right)
+			state.light_mode = do_switch({on = state.light_mode}).on
+		end_layout()
+		shrink(30)
+		
+		#partial switch state.section.component {
+		
+			case .Button:
+			side(.Top)
+			do_label({
+				text = "Fit to label",
+				font_style = .Bold,
+				font_size = 24,
+			})
+			space(10)
+			begin_layout({
+				size = 30,
+			})
+				set_width_auto()
+				for member, m in Button_Kind {
+					push_id(m)
+						if m > 0 {
+							space(10)
+						}
+						if was_clicked(do_button({
+							text = tmp_print(member),
+							kind = member,
+						})) {
+
+						}
+					pop_id()
+				}
+			end_layout()
+		}
+	end_layer()
 }
 
 main :: proc() {
@@ -61,8 +122,6 @@ main :: proc() {
 			// for i in 0..<4 {
 			// 	state.images[i] = onyx.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic("failed lol")
 			// }
-
-			state.start_time = time.now()
 		},
 		frame_userdata_cb = proc "c" (userdata: rawptr) {
 			context = runtime.default_context()
@@ -70,70 +129,17 @@ main :: proc() {
 
 			using onyx
 			begin_frame()
-				layer_box := shrink_box(view_box(), 100)
-				begin_layer({
-					box = layer_box,
-				})
-					foreground()
-					begin_layout({
-						size = 65,
-						side = .Top,
-						show_lines = true,
-					})
-						shrink(15)
-						do_breadcrumb({index = 0, options = {"Components"}})
-						if index, ok := do_breadcrumb({index = int(state.section.component), options = reflect.enum_field_names(Component)}).index.?; ok {
-							state.section.component = Component(index)
-						}
-						side(.Right)
-						state.light_mode = do_switch({on = state.light_mode}).on
-					end_layout()
-					shrink(30)
-					
-					#partial switch state.section.component {
-					
-						case .Button:
-						side(.Top)
-						do_label({
-							text = "Fit to label",
-							font_style = .Bold,
-							font_size = 24,
+				do_component_showcase(&state.component_showcase)
+
+				for i in 0..<4 {
+					push_id(i)
+						begin_panel({
+							title = tmp_printf("Panel #{}", i + 1),
 						})
-						space(10)
-						begin_layout({
-							size = 30,
-						})
-							set_width_auto()
-							for member, m in Button_Kind {
-								push_id(m)
-									if m > 0 {
-										space(10)
-									}
-									if was_clicked(do_button({
-										text = tmp_print(member),
-										kind = member,
-									})) {
 
-									}
-								pop_id()
-							}
-						end_layout()
-					}
-					begin_layer({
-						box = {250, 500},
-						order = .Floating,
-					})
-						foreground()
-					end_layer()
-
-					begin_layer({
-						box = {{300, 150}, {600, 450}},
-						order = .Floating,
-					})
-						foreground()
-					end_layer()
-				end_layer()
-
+						end_panel()
+					pop_id()
+				}
 
 				// for i in 0..<4 {
 				// 	origin: [2]f32 = {
@@ -142,7 +148,7 @@ main :: proc() {
 				// 	}
 				// 	onyx.draw_image(state.images[i], {origin, origin + 200}, {255, 255, 255, 255})
 				// }
-			onyx.end_frame()
+			end_frame()
 		},
 		cleanup_cb = proc "c" () {
 			context = runtime.default_context()

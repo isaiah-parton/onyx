@@ -24,7 +24,7 @@ make_label :: proc(info: Label_Info, loc := #caller_location) -> Label_Info {
 	return info
 }
 
-display_label :: proc(info: Label_Info) {
+add_label :: proc(info: Label_Info) {
 	widget := get_widget(info)
 	widget.box = next_widget_box(info)
 
@@ -34,5 +34,5 @@ display_label :: proc(info: Label_Info) {
 }
 
 do_label :: proc(info: Label_Info) {
-	display_label(make_label(info))
+	add_label(make_label(info))
 }

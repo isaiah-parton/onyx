@@ -61,7 +61,7 @@ make_graph :: proc(info: Graph_Info($T), loc := #caller_location) -> Graph_Info(
 	return info
 }
 
-display_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
+add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 	widget := get_widget(info)
 	context.allocator = widget.allocator
 
@@ -250,5 +250,5 @@ display_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 }
 
 do_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
-	display_graph(make_graph(info, loc))
+	add_graph(make_graph(info, loc))
 }

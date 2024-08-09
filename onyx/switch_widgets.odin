@@ -28,10 +28,9 @@ make_switch :: proc(info: Switch_Info, loc := #caller_location) -> Switch_Info {
 	return info
 }
 
-display_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
+add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
 	widget := get_widget(info)
 	widget.box = next_widget_box(info)
-	context.allocator = widget.allocator
 	result.self = widget
 	result.on = info.on
 	variant := widget_variant(widget, Switch_Widget_Variant)
@@ -67,5 +66,5 @@ display_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
 }
 
 do_switch :: proc(info: Switch_Info, loc := #caller_location) -> Switch_Result {
-	return display_switch(make_switch(info, loc))
+	return add_switch(make_switch(info, loc))
 }

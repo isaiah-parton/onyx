@@ -67,12 +67,6 @@ Draw_Call :: struct {
 	ready: bool,
 }
 
-Draw_Surface :: struct {
-	vertices: [dynamic]Vertex,
-	indices: [dynamic]u16,
-	z: f32,
-}
-
 Path :: struct {
 	points: [MAX_PATH_POINTS][2]f32,
 	count: int,
@@ -155,6 +149,8 @@ push_draw_call :: proc() {
 			wrap_u = .MIRRORED_REPEAT,
 			wrap_v = .MIRRORED_REPEAT,
 		})
+		reserve(&core.current_draw_call.vertices, MAX_DRAW_CALL_VERTICES)
+		reserve(&core.current_draw_call.indices, MAX_DRAW_CALL_INDICES)
 		core.current_draw_call.ready = true
 	}
 	core.draw_call_count += 1

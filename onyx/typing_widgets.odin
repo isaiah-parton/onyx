@@ -31,7 +31,7 @@ make_text_input :: proc(info: Text_Input_Info, loc := #caller_location) -> Text_
 	return info
 }
 
-display_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
+add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	if info.builder == nil {
 		return
 	}
@@ -164,5 +164,5 @@ display_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result)
 }
 
 do_text_input :: proc(info: Text_Input_Info, loc := #caller_location) -> Text_Input_Result {
-	return display_text_input(make_text_input(info, loc))
+	return add_text_input(make_text_input(info, loc))
 }

@@ -25,7 +25,7 @@ make_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> Tabs_Info {
 	return info
 }
 
-display_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Result) {
+add_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Result) {
 	widget := get_widget(info)
 	context.allocator = widget.allocator
 	widget.box = next_widget_box(info)
@@ -67,5 +67,5 @@ display_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_
 }
 
 do_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> Tabs_Result {
-	return display_tabs(make_tabs(info, loc))
+	return add_tabs(make_tabs(info, loc))
 }

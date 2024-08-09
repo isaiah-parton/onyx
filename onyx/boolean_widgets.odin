@@ -36,7 +36,7 @@ make_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Checkbox_
 	return info
 }
 
-display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
+add_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 	self := get_widget(info)
 	self.box = info.box.? or_else next_widget_box(info)
 	self.hover_time = animate(self.hover_time, 0.1, .Hovered in self.state)
@@ -106,5 +106,5 @@ display_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 }
 
 do_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Generic_Widget_Result {
-	return display_checkbox(make_checkbox(info, loc))
+	return add_checkbox(make_checkbox(info, loc))
 }

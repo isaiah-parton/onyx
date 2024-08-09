@@ -63,6 +63,7 @@ Debug_State :: struct {
 	enabled,
 	widgets,
 	boxes,
+	panels,
 	layers: bool,
 }
 
@@ -76,12 +77,15 @@ Core :: struct {
 	pipeline: sg.Pipeline,				// Graphics pipeline
 	limits: sg.Limits,
 
+	layers: [MAX_LAYERS]Layer,						// Static allocated layer data
 	layer_map: map[Id]^Layer,							// Map lookup by id
-	layers: [MAX_LAYERS]Maybe(Layer),			// Static allocated layer data
+	highest_layer: int,
+
 	widgets: [MAX_WIDGETS]Maybe(Widget),	// Static allocated widget data
 	widget_map: map[Id]^Widget,
 
 	panels: [MAX_PANELS]Maybe(Panel),
+	panel_map: map[Id]^Panel,
 
 	last_hovered_widget,
 	hovered_widget,
@@ -90,11 +94,6 @@ Core :: struct {
 	focused_widget,
 	dragged_widget: Id,
 
-	root_layer: ^Layer,
-	sort_layers: bool,
-	last_top_layer,
-	top_layer,
-	scrolling_layer,
 	last_hovered_layer,
 	hovered_layer,														// The current hovered layer
 	next_hovered_layer,
@@ -151,12 +150,14 @@ get_mouse_pos :: proc() -> [2]f32 {
 }
 
 init :: proc () {
+
 	// Set view parameters
 	core.visible = true
 	core.focused = true
 	core.view = {sapp.widthf(), sapp.heightf()}
 	core.last_frame_time = time.now()
 	core.draw_next_frame = true
+
 	// Set up graphics environment
 	environment := sglue.environment()
 	sg.setup(sg.Desc{
@@ -174,6 +175,7 @@ init :: proc () {
       0 = sdtx.font_cpc(),
     },
 	})
+
 	// Prepare the graphics pipeline
 	core.pipeline = sg.make_pipeline(sg.Pipeline_Desc{
 		shader = sg.make_shader(ui_shader_desc(sg.query_backend())),
@@ -208,9 +210,9 @@ init :: proc () {
 		cull_mode = .BACK,
 	})
 
-	core.style.button_text_size = 18
+	core.style.button_text_size = 16
 	core.style.content_text_size = 16
-	core.style.header_text_size = 28
+	core.style.header_text_size = 24
 
 	core.style.text_input_height = 30
 
@@ -265,15 +267,14 @@ end_frame :: proc() {
 
 	// Display debug text
 	if core.debug.enabled {
-		sdtx.canvas(core.view.x / 2, core.view.y / 2)
+		sdtx.canvas(core.view.x, core.view.y)
 
 		sdtx.color3b(255, 255, 255)
 
 		sdtx.printf("frame %i\n", core.frame_count)
 		sdtx.color3b(170, 170, 170)
 		sdtx.printf("\ttime: %f\n", sapp.frame_duration())
-		// sdtx.printf("hovered widget: %i\n", core.hovered_widget)
-		// sdtx.printf("focused widget: %i\n", core.focused_widget)
+		sdtx.printf("\tdraw calls: %i\n", core.draw_call_count)
 		sdtx.color3b(255, 255, 255)
 
 		sdtx.move_y(1)
@@ -288,12 +289,16 @@ end_frame :: proc() {
 				for i in 0..<depth {
 					sdtx.putc('\t')
 				}
-				sdtx.printf("\t{:i} - {:i}\n", layer.id, layer.z_index)
-				for &child in layer.children {
+				sdtx.printf("\t{:i} ({}) ({})\n", layer.id, layer.kind, layer.z_index)
+				for child in layer.children {
 					__debug_print_layer(child, depth + 1)
 				}
 			}
-			__debug_print_layer(core.root_layer)
+			for _, layer in core.layer_map {
+				if layer.parent == nil {
+					__debug_print_layer(layer, 0)
+				}
+			}
 			sdtx.color3b(255, 255, 255)
 		}
 
@@ -308,6 +313,21 @@ end_frame :: proc() {
 				sdtx.putc('F' if .Focused in widget.state else '_')
 				sdtx.putc('P' if .Pressed in widget.state else '_')
 				sdtx.printf(" {:i}\n", widget.id)
+			}
+			sdtx.color3b(255, 255, 255)
+		}
+
+		sdtx.move_y(1)
+
+		sdtx.printf("%c Panels (P)\n", '-' if core.debug.panels else '+')
+		if key_pressed(.P) do core.debug.panels = !core.debug.panels
+		if core.debug.panels {
+			sdtx.color3b(170, 170, 170)
+			for id, &panel in core.panel_map {
+				// sdtx.putc('H' if .Hovered in panel.state else '_')
+				// sdtx.putc('F' if .Focused in panel.state else '_')
+				// sdtx.putc('P' if .Pressed in panel.state else '_')
+				sdtx.printf(" {}\n", panel.position)
 			}
 			sdtx.color3b(255, 255, 255)
 		}
@@ -341,23 +361,18 @@ end_frame :: proc() {
 				fmt.printf("[ui] Deleted layer %x\n", layer.id)
 			}
 
+			// Remove from parent's children
+			for &child, c in layer.children {
+				child.parent = nil
+			}
+			delete(layer.children)
+			remove_layer_parent(layer)
+			
 			// Remove from map
 			delete_key(&core.layer_map, id)
 
-			// Remove from parent's children
-			if layer.parent != nil {
-				for &child, c in layer.parent.children {
-					if child.id == layer.id {
-						ordered_remove(&layer.parent.children, c)
-					} else if child.z_index > layer.z_index {
-						child.z_index -= 1
-					}
-				}
-			}
-
-			// Deinitit init?
-			destroy_layer(layer)
-			(transmute(^Maybe(Layer))layer)^ = nil
+			// Free slot in array
+			layer.id = 0
 
 			core.draw_next_frame = true
 		} else {
@@ -427,7 +442,7 @@ end_frame :: proc() {
 				size = size_of(projection_matrix),
 			})
 
-			u_gradient := U_Gradient{
+			u_gradient := Frag_Uniforms{
 
 			}
 			sg.apply_uniforms(.FS, 0, {
@@ -454,7 +469,6 @@ end_frame :: proc() {
 				sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
 			}
 
-			// Clear draw call
 			clear(&call.vertices)
 			clear(&call.indices)
 		}
@@ -491,7 +505,6 @@ end_frame :: proc() {
 	core.vertex_state = {}
 	
 	// Reset root layer
-	core.root_layer = nil
 	core.last_mouse_pos = core.mouse_pos
 	core.last_mouse_bits = core.mouse_bits
 	clear(&core.runes)
@@ -501,9 +514,23 @@ end_frame :: proc() {
 quit :: proc () {
 	for &widget in core.widgets {
 		if widget, ok := widget.?; ok {
-			free_all(widget.allocator)
+			// free_all(widget.allocator)
 		}
 	}
+
+	for &font, f in core.fonts {
+		if font, ok := font.?; ok {
+			destroy_font(&font)
+		}
+	}
+	for &draw_call in core.draw_calls {
+		delete(draw_call.vertices)
+		delete(draw_call.indices)
+	}
+
+	delete(core.layer_map)
+	delete(core.widget_map)
+	delete(core.panel_map)
 
 	for &call in core.draw_calls {
 		if call.ready {
@@ -512,6 +539,8 @@ quit :: proc () {
 		}
 	}
 	sg.destroy_pipeline(core.pipeline)
+	
+	sdtx.shutdown()
 	sg.shutdown()
 
 	fmt.print("ʕ-ᴥ-ʔ Onyx went to sleep peacefully.\n\n")

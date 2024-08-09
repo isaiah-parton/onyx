@@ -45,8 +45,8 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) {
 	}
 
 	begin_layer({
-		box = box, 
-		order = .Floating,
+		box = box,
+		parent = current_layer().id,
 	}, loc)
 	draw_rounded_box_fill(box, core.style.rounding, core.style.color.background)
 }

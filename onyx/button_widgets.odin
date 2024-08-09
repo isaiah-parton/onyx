@@ -15,6 +15,7 @@ Button_Info :: struct {
 	using _: Generic_Widget_Info,
 	text: string,
 	kind: Button_Kind,
+	font_size: Maybe(f32),
 
 	__text_size: [2]f32,
 	__text_info: Text_Info,
@@ -30,14 +31,14 @@ make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 	info.__text_info = {
 		text = info.text,
 		font = core.style.fonts[.Bold],
-		size = core.style.button_text_size,
+		size = info.font_size.? or_else core.style.button_text_size,
 	}
 	info.__text_size = measure_text(info.__text_info)
 	info.desired_size = info.__text_size + {20, 10}
 	return info
 }
 
-display_button :: proc(info: Button_Info) -> (result: Button_Result) {
+add_button :: proc(info: Button_Info) -> (result: Button_Result) {
 	widget := get_widget(info)
 	result.self = widget
 	layout := current_layout()
@@ -77,5 +78,5 @@ display_button :: proc(info: Button_Info) -> (result: Button_Result) {
 }
 
 do_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Result {
-	return display_button(make_button(info, loc))
+	return add_button(make_button(info, loc))
 }
