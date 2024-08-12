@@ -361,6 +361,15 @@ end_frame :: proc() {
 				fmt.printf("[ui] Deleted layer %x\n", layer.id)
 			}
 
+			// Move other layers down by one z index
+			for i in 0..<len(core.layers) {
+				other_layer := &core.layers[i]
+				if other_layer.id == 0 do continue
+				if other_layer.z_index > layer.z_index {
+					other_layer.z_index -= 1
+				}
+			}
+
 			// Remove from parent's children
 			for &child, c in layer.children {
 				child.parent = nil
@@ -472,14 +481,10 @@ end_frame :: proc() {
 			clear(&call.vertices)
 			clear(&call.indices)
 		}
+		sg.end_pass()
 
 		core.frame_count += 1
 		core.draw_this_frame = false
-
-		if core.debug.enabled {
-			sdtx.draw()
-		}
-		sg.end_pass()
 	}
 	// Blank render pass to copy framebuffers
 	sg.begin_pass(sg.Pass{
@@ -497,7 +502,10 @@ end_frame :: proc() {
 		},
 		swapchain = sglue.swapchain(),
 	})
-	sg.apply_bindings({})
+	if core.debug.enabled {
+		sdtx.draw()
+		
+	}
 	sg.end_pass()
 	sg.commit()
 

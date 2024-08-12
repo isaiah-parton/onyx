@@ -64,13 +64,13 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) {
 	panel.layer = layer
 
 	// Background
-	draw_box_fill(box, core.style.color.foreground)
-	draw_box_stroke(box, 1, core.style.color.substance)
+	draw_rounded_box_fill(box, core.style.rounding, core.style.color.foreground)
+	draw_rounded_box_stroke(box, core.style.rounding, 1, core.style.color.substance)
 
 	// Title bar
 	if info.title != "" {
 		title_box := cut_box_top(&box, 25)
-		draw_box_fill({{title_box.lo.x, title_box.hi.y - 1}, title_box.hi}, core.style.color.substance)
+		draw_rounded_box_fill(title_box, core.style.rounding, core.style.color.substance)
 		draw_text({title_box.lo.x + 5, (title_box.hi.y + title_box.lo.y) / 2}, {
 			text = info.title,
 			font = core.style.fonts[.Regular],
