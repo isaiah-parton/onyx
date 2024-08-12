@@ -490,10 +490,10 @@ end_frame :: proc() {
 					store_action = .STORE,
 				},
 			},
-			depth = {
-				load_action = .LOAD,
-				store_action = .STORE,
-			},
+			// depth = {
+			// 	load_action = .LOAD,
+			// 	store_action = .STORE,
+			// },
 		},
 		swapchain = sglue.swapchain(),
 	})
