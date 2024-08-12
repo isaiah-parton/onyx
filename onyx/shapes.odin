@@ -386,9 +386,6 @@ draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) 
 }
 
 foreground :: proc() {
-	if core.debug.enabled && core.debug.boxes {
-		return
-	}
 	layout := current_layout()
 	draw_rounded_box_fill(layout.box, core.style.rounding, core.style.color.foreground)
 	draw_rounded_box_stroke(layout.box, core.style.rounding, 1, core.style.color.substance)

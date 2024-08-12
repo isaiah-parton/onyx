@@ -6,6 +6,7 @@ package onyx
 */
 
 import "core:fmt"
+import "core:math"
 import "core:slice"
 
 Layer_Kind :: enum int {
@@ -27,7 +28,6 @@ Layer_Option :: enum {
 	Scroll_X,
 	Scroll_Y,
 	Isolated,
-	No_Sort,
 	Attached,
 }
 
@@ -120,7 +120,6 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 	layer.options = info.options
 	layer.kind = kind
 
-	// Check if there is a root layer
 	if info.parent != 0 {
 		if parent, ok := get_layer_by_id(info.parent); ok {
 			set_layer_parent(layer, parent)
@@ -130,7 +129,6 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 	// Set input state
 	if core.hovered_layer == layer.id {
 		layer.state += {.Hovered}
-
 		// Re-order layers if clicked
 		if mouse_pressed(.Left) {
 			bring_layer_to_front(layer)
@@ -157,12 +155,6 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 	scale_matrix(scale.x, scale.y, 1)
 	rotate_matrix(info.rotation, 0, 0, 1)
 	translate_matrix(-info.origin.x, -info.origin.y, 0)
-
-	// Draw debug bounding box
-	if core.debug.enabled && core.debug.boxes {
-		// draw_box_fill(layer.box, {255, 0, 0, 50})
-		draw_box_stroke(layer.box, 1, {255, 0, 0, 255})
-	}
 }
 
 end_layer :: proc() {
@@ -170,12 +162,13 @@ end_layer :: proc() {
 	layer := current_layer()
 
 	// Get hover state
-	if point_in_box(core.mouse_pos, layer.box) && layer.z_index >= core.hovered_layer_z_index {
-		core.hovered_layer_z_index = layer.z_index
-		core.next_hovered_layer = layer.id
+	if point_in_box(core.mouse_pos, layer.box) {
+		if layer.z_index >= core.highest_layer_index {
+			// The layer has the highest z index yet
+			core.highest_layer_index = layer.z_index
+			core.next_hovered_layer = layer.id
+		}
 	}
-
-	core.highest_layer = max(core.highest_layer, layer.z_index)
 
 	// Pop the stacks
 	end_layout()

@@ -100,6 +100,28 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					pop_id()
 				}
 			end_layout()
+
+			case .Checkbox:
+			side(.Top)
+			do_label({
+				text = "checkboxes yo",
+				font_style = .Bold,
+				font_size = 24,
+			})
+			space(10)
+			for member, m in Option {
+				push_id(m)
+					if m > 0 {
+						space(10)
+					}
+					if was_clicked(do_checkbox({
+						text = tmp_print(member),
+						value = state.checkboxes[member],
+					})) {
+						state.checkboxes[member] = !state.checkboxes[member]
+					}
+				pop_id()
+			}
 		}
 	end_layer()
 }
@@ -116,8 +138,10 @@ main :: proc() {
 			onyx.init()
 			onyx.set_style_font(.Medium, "fonts/Geist-Medium.ttf")
 			onyx.set_style_font(.Bold, "fonts/Geist-Bold.ttf")
+			onyx.set_style_font(.Light, "fonts/Geist-Light.ttf")
+			onyx.set_style_font(.Regular, "fonts/Geist-Regular.ttf")
 			onyx.set_color_scheme(onyx.dark_color_scheme())
-			onyx.set_style_rounding(7)
+			// onyx.set_style_rounding(7)
 
 			// for i in 0..<4 {
 			// 	state.images[i] = onyx.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic("failed lol")
@@ -131,15 +155,15 @@ main :: proc() {
 			begin_frame()
 				do_component_showcase(&state.component_showcase)
 
-				for i in 0..<4 {
-					push_id(i)
-						begin_panel({
-							title = tmp_printf("Panel #{}", i + 1),
-						})
+				// for i in 0..<4 {
+				// 	push_id(i)
+				// 		begin_panel({
+				// 			title = tmp_printf("Panel #{}", i + 1),
+				// 		})
 
-						end_panel()
-					pop_id()
-				}
+				// 		end_panel()
+				// 	pop_id()
+				// }
 
 				// for i in 0..<4 {
 				// 	origin: [2]f32 = {

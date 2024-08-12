@@ -224,7 +224,7 @@ make_text_iterator :: proc(info: Text_Info) -> (it: Text_Iterator, ok: bool) {
 update_text_iterator_offset :: proc(it: ^Text_Iterator, info: Text_Info) {
 	it.offset.x = 0
 	#partial switch info.align_h {
-		case .Middle: it.offset.x -= math.floor(measure_next_line(info, it^) / 2)
+		case .Middle: it.offset.x -= measure_next_line(info, it^) / 2
 		case .Right: it.offset.x -= measure_next_line(info, it^)
 	}
 }

@@ -125,7 +125,7 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 		}
 	}
 
-	widget.visible = core.visible && core.draw_this_frame && !(core.debug.enabled && core.debug.boxes)
+	widget.visible = core.visible && core.draw_this_frame
 	widget.dead = false
 	widget.disabled = info.disabled
 	widget.layer = current_layer()
@@ -162,7 +162,7 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 			widget.state += {.Pressed}
 			if widget.draggable do core.dragged_widget = widget.id
 		}
-	} else {
+	} else if core.dragged_widget != widget.id {
 		widget.state -= {.Pressed, .Hovered}
 		widget.click_count = 0
 	}
@@ -252,14 +252,8 @@ process_widgets :: proc() {
 
 // Commit a widget to be processed
 commit_widget :: proc(widget: ^Widget, hovered: bool) {
-
-	if .Hovered in widget.layer.state && hovered {
+	if (.Hovered in widget.layer.state) && hovered {
 		core.next_hovered_widget = widget.id
-	}
-
-	if core.debug.enabled && core.debug.boxes {
-		draw_box_stroke(widget.box, 1, {0, 255, 0, 255})
-		draw_line(widget.box.lo + 1, widget.box.hi - 1, 0.5, {0, 255, 0, 255})
 	}
 }
 

@@ -30,8 +30,14 @@ make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 	info.id = hash(loc)
 	info.__text_info = {
 		text = info.text,
-		font = core.style.fonts[.Bold],
 		size = info.font_size.? or_else core.style.button_text_size,
+	}
+	#partial switch info.kind {
+		case .Ghost, .Outlined: 
+		info.__text_info.font = core.style.fonts[.Regular]
+		info.__text_info.spacing = 1
+		case: 
+		info.__text_info.font = core.style.fonts[.Bold]
 	}
 	info.__text_size = measure_text(info.__text_info)
 	info.desired_size = info.__text_size + {20, 10}

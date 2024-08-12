@@ -45,6 +45,20 @@ pop_stack :: proc(stack: ^Stack($T, $N)) {
 	stack.height -= 1
 }
 
+inject_stack :: proc(stack: ^Stack($T, $N), at: int, item: T) -> bool {
+	if at == stack.height {
+		return push_stack(stack, item)
+	}
+	copy(stack.items[at + 1:], stack.items[at:])
+	stack.items[at] = item
+	stack.height += 1
+	return true
+}
+
+clear_stack :: proc(stack: ^Stack($T, $N)) {
+	stack.height = 0
+}
+
 Keyboard_Key :: sapp.Keycode
 
 // Private global core instance
@@ -62,7 +76,6 @@ Mouse_Bits :: bit_set[Mouse_Button]
 Debug_State :: struct {
 	enabled,
 	widgets,
-	boxes,
 	panels,
 	layers: bool,
 }
@@ -74,7 +87,7 @@ Core :: struct {
 	arena: runtime.Arena,
 	view: [2]f32,
 
-	pipeline: sg.Pipeline,				// Graphics pipeline
+	pipeline: sg.Pipeline,								// Graphics pipeline
 	limits: sg.Limits,
 
 	layers: [MAX_LAYERS]Layer,						// Static allocated layer data
@@ -95,15 +108,14 @@ Core :: struct {
 	dragged_widget: Id,
 
 	last_hovered_layer,
-	hovered_layer,														// The current hovered layer
+	hovered_layer,																	// The current hovered layer
 	next_hovered_layer,
-	focused_layer: Id,												// The current focused layer
+	focused_layer: Id,															// The current focused layer
 
-	hovered_layer_z_index: int,
-
-	layout_stack: Stack(Layout, MAX_LAYOUTS),		// The layout context stack
-	layer_stack: Stack(^Layer, MAX_LAYERS),			// The layer context stack
-	id_stack: Stack(Id, MAX_IDS),								// The ID context stack for compound hashing
+	layout_stack: Stack(Layout, MAX_LAYOUTS),				// The layout context stack
+	layer_stack: Stack(^Layer, MAX_LAYERS),					// The layer context stack
+	highest_layer_index: int,
+	id_stack: Stack(Id, MAX_IDS),										// The ID context stack for compound hashing
 
 	cursor_type: sapp.Mouse_Cursor,
 	mouse_button: Mouse_Button,
@@ -324,28 +336,20 @@ end_frame :: proc() {
 		if core.debug.panels {
 			sdtx.color3b(170, 170, 170)
 			for id, &panel in core.panel_map {
-				// sdtx.putc('H' if .Hovered in panel.state else '_')
-				// sdtx.putc('F' if .Focused in panel.state else '_')
-				// sdtx.putc('P' if .Pressed in panel.state else '_')
-				sdtx.printf(" {}\n", panel.position)
+				sdtx.printf(" {}\n", panel.box)
 			}
 			sdtx.color3b(255, 255, 255)
 		}
-
-		sdtx.move_y(1)
-
-		sdtx.printf("%s bounding boxes (B)\n", "Hide" if core.debug.boxes else "Show")
-		if key_pressed(.B) do core.debug.boxes = !core.debug.boxes
 	}
 
 	sapp.set_mouse_cursor(core.cursor_type)
 	core.cursor_type = sapp.Mouse_Cursor.DEFAULT
 
 	// Update layer ids
+	core.highest_layer_index = 0
 	core.last_hovered_layer = core.hovered_layer
 	core.hovered_layer = core.next_hovered_layer
 	core.next_hovered_layer = 0
-	core.hovered_layer_z_index = 0
 
 	if mouse_pressed(.Left) {
 		core.focused_layer = core.hovered_layer
@@ -397,22 +401,21 @@ end_frame :: proc() {
 		core.font_atlas.modified = false
 	}
 
-	for &call in core.draw_calls[:core.draw_call_count] {
-		if len(call.indices) == 0 {
-			continue
-		}
-		sg.apply_bindings(call.bindings)
-		sg.update_buffer(call.bindings.index_buffer, { 
-			ptr = raw_data(call.indices), 
-			size = u64(len(call.indices) * size_of(u16)),
-		})
-		sg.update_buffer(call.bindings.vertex_buffers[0], { 
-			ptr = raw_data(call.vertices), 
-			size = u64(len(call.vertices) * size_of(Vertex)),
-		})
-	}
-
 	if core.draw_this_frame {
+		for &call in core.draw_calls[:core.draw_call_count] {
+			if len(call.indices) == 0 {
+				continue
+			}
+			sg.apply_bindings(call.bindings)
+			sg.update_buffer(call.bindings.index_buffer, { 
+				ptr = raw_data(call.indices), 
+				size = u64(len(call.indices) * size_of(u16)),
+			})
+			sg.update_buffer(call.bindings.vertex_buffers[0], { 
+				ptr = raw_data(call.vertices), 
+				size = u64(len(call.vertices) * size_of(Vertex)),
+			})
+		}
 		// Normal render pass
 		sg.begin_pass({
 			action = sg.Pass_Action{
@@ -481,33 +484,20 @@ end_frame :: proc() {
 			clear(&call.vertices)
 			clear(&call.indices)
 		}
+		if core.debug.enabled {
+			sdtx.draw()
+		}
 		sg.end_pass()
+		sg.commit()
 
 		core.frame_count += 1
 		core.draw_this_frame = false
+	} else {
+		for &call in core.draw_calls[:core.draw_call_count] {
+			clear(&call.vertices)
+			clear(&call.indices)
+		}
 	}
-	// Blank render pass to copy framebuffers
-	sg.begin_pass(sg.Pass{
-		action = sg.Pass_Action{
-			colors = {
-				0 = {
-					load_action = .LOAD,
-					store_action = .STORE,
-				},
-			},
-			// depth = {
-			// 	load_action = .LOAD,
-			// 	store_action = .STORE,
-			// },
-		},
-		swapchain = sglue.swapchain(),
-	})
-	if core.debug.enabled {
-		sdtx.draw()
-		
-	}
-	sg.end_pass()
-	sg.commit()
 
 	// Reset drawing system
 	core.vertex_state = {}
