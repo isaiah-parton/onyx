@@ -27,6 +27,7 @@ Layer_State :: bit_set[Layer_Status]
 Layer_Option :: enum {
 	Scroll_X,
 	Scroll_Y,
+	Ghost,
 	Isolated,
 	Attached,
 }
@@ -53,7 +54,7 @@ Layer :: struct {
 
 Layer_Info :: struct {
 	id: Id,
-	parent: Id,
+	parent: ^Layer,
 	options: Layer_Options,
 	box: Box,
 	kind: Maybe(Layer_Kind),
@@ -68,8 +69,21 @@ current_layer :: proc(loc := #caller_location) -> ^Layer {
 	return core.layer_stack.items[core.layer_stack.height - 1]
 }
 
-create_layer :: proc(id: Id, kind: Layer_Kind) -> (result: ^Layer, ok: bool) {
+set_layer_z_index :: proc(layer: ^Layer, z_index: int) {
+	assert(layer != nil)
 
+	for i in 0..<len(core.layers) {
+		other_layer := &core.layers[i]
+		if other_layer.id == 0 do continue
+
+		if other_layer.z_index >= z_index {
+			other_layer.z_index += 1
+		}
+	}
+	layer.z_index = z_index
+}
+
+get_highest_layer_of_kind :: proc(kind: Layer_Kind) -> int {
 	z_index: int
 	for i in 0..<len(core.layers) {
 		layer := &core.layers[i]
@@ -79,22 +93,14 @@ create_layer :: proc(id: Id, kind: Layer_Kind) -> (result: ^Layer, ok: bool) {
 			z_index = max(z_index, layer.z_index + 1)
 		}
 	}
+	return z_index
+}
 
-	for i in 0..<len(core.layers) {
-		layer := &core.layers[i]
-		if layer.id == 0 do continue
-
-		if layer.z_index >= z_index {
-			layer.z_index += 1
-		}
-	}
-
+create_layer :: proc(id: Id) -> (result: ^Layer, ok: bool) {
 	for i in 0..<MAX_LAYERS {
 		if core.layers[i].id == 0 {
 			core.layers[i] = Layer{
 				id = id,
-				kind = kind,
-				z_index = z_index,
 			}
 			result = &core.layers[i]
 			core.layer_map[id] = result
@@ -106,12 +112,21 @@ create_layer :: proc(id: Id, kind: Layer_Kind) -> (result: ^Layer, ok: bool) {
 	return
 }
 
-begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
+begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	id := info.id if info.id != 0 else hash(loc)
 	kind := info.kind.? or_else .Floating
 
 	// Get a layer with `id` or create one
-	layer := get_layer_by_id(id) or_else (create_layer(id, kind) or_else panic("Out of layers!"))
+	layer, ok := get_layer_by_id(id)
+	if !ok {
+		layer = create_layer(id) or_return
+
+		if info.parent != nil {
+			set_layer_parent(layer, info.parent)
+		}
+
+		set_layer_z_index(layer, layer.parent.z_index + 1 if layer.parent != nil else get_highest_layer_of_kind(kind))
+	}
 
 	// Set parameters
 	layer.dead = false
@@ -119,12 +134,6 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 	layer.box = info.box
 	layer.options = info.options
 	layer.kind = kind
-
-	if info.parent != 0 {
-		if parent, ok := get_layer_by_id(info.parent); ok {
-			set_layer_parent(layer, parent)
-		}
-	}
 
 	// Set input state
 	if core.hovered_layer == layer.id {
@@ -155,6 +164,8 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) {
 	scale_matrix(scale.x, scale.y, 1)
 	rotate_matrix(info.rotation, 0, 0, 1)
 	translate_matrix(-info.origin.x, -info.origin.y, 0)
+
+	return true
 }
 
 end_layer :: proc() {
@@ -162,7 +173,7 @@ end_layer :: proc() {
 	layer := current_layer()
 
 	// Get hover state
-	if point_in_box(core.mouse_pos, layer.box) {
+	if (.Ghost not_in layer.options) && point_in_box(core.mouse_pos, layer.box) {
 		if layer.z_index >= core.highest_layer_index {
 			// The layer has the highest z index yet
 			core.highest_layer_index = layer.z_index

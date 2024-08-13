@@ -144,8 +144,8 @@ push_draw_call :: proc() {
 			size = MAX_DRAW_CALL_VERTICES * size_of(Vertex),
 		})
 		core.current_draw_call.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
-			min_filter = .NONE,
-			mag_filter = .NONE,
+			min_filter = .LINEAR,
+			mag_filter = .LINEAR,
 			wrap_u = .MIRRORED_REPEAT,
 			wrap_v = .MIRRORED_REPEAT,
 		})

@@ -9,6 +9,7 @@ TOOLTIP_OFFSET :: 10
 Tooltip_Info :: struct {
 	bounds: Box,
 	size: [2]f32,
+	time: f32,
 }
 
 Widget_Variant_Tooltip :: struct {
@@ -46,7 +47,11 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) {
 
 	begin_layer({
 		box = box,
-		parent = current_layer().id,
+		// parent = current_layer(),
+		options = {.Ghost},
+		// origin = box_center(box),
+		// scale = [2]f32{1, info.time},
+		// rotation = diff.x * 0.001,
 	}, loc)
 	draw_rounded_box_fill(box, core.style.rounding, core.style.color.background)
 }

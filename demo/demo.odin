@@ -131,19 +131,46 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				hi = 10,
 				increment = 1,
 				spacing = 10,
-				kind = Graph_Kind_Bar{
+				kind = Bar_Graph{
 					show_labels = true,
 					show_tooltip = true,
 				},
 				fields = {
 					{"Ohio", {255, 100, 100, 255}},
 					{"Florida", {0, 100, 255, 255}},
+					{"Alabama", {0, 255, 120, 255}},
 				},
 				entries = {
-					{"Skibidy", {1, 5}},
-					{"Rizzler", {4, 2}},
-					{"Gooner", {6, 5}},
-					{"Sigma", {2, 8}},
+					{"Skibidy", {1, 5, 9}},
+					{"Rizzler", {4, 2, 2}},
+					{"Gooner", {6, 5, 10}},
+					{"Sigma", {2, 8, 1}},
+				},
+			})
+
+			case .Line_Graph:
+			set_width_fill()
+			set_height_fill()
+			do_graph(Graph_Info(int){
+				lo = 0,
+				hi = 50,
+				increment = 10,
+				spacing = 10,
+				kind = Line_Graph{
+					show_dots = true,
+				},
+				fields = {
+					{"Ohio", {255, 100, 100, 255}},
+					{"Florida", {0, 100, 255, 255}},
+					{"Alabama", {0, 255, 120, 255}},
+				},
+				entries = {
+					{values = {1, 5, 9}},
+					{values = {4, 2, 2}},
+					{values = {6, 5, 10}},
+					{values = {2, 8, 1}},
+					{values = {4, 7, 2}},
+					{values = {2, 4, 8}},
 				},
 			})
 		}
@@ -165,7 +192,7 @@ main :: proc() {
 			onyx.set_style_font(.Light, "fonts/Geist-Light.ttf")
 			onyx.set_style_font(.Regular, "fonts/Geist-Regular.ttf")
 			onyx.set_color_scheme(onyx.dark_color_scheme())
-			// onyx.set_style_rounding(7)
+			onyx.set_style_rounding(4)
 
 			// for i in 0..<4 {
 			// 	state.images[i] = onyx.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic("failed lol")

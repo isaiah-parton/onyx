@@ -187,9 +187,7 @@ __join_miter :: proc(p0, p1, p2: [2]f32) -> (dot: f32, miter: [2]f32) {
 	Basic shapes drawn in immediate mode
 */
 draw_triangle_fill :: proc(a, b, c: [2]f32, color: Color) {
-	core.vertex_state = {
-		col = color,
-	}
+	core.vertex_state.col = color
 	add_index(add_vertex(a.x, a.y))
 	add_index(add_vertex(b.x, b.y))
 	add_index(add_vertex(c.x, c.y))

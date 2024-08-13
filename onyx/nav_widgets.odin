@@ -114,7 +114,7 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 				box = box,
 				origin = {box_center_x(box), box.lo.y},
 				scale = ([2]f32)(ease.cubic_in_out(widget.focus_time)),
-				parent = current_layer().id,
+				parent = current_layer(),
 			})
 				layer := current_layer()
 				if .Focused in current_layer().state {
