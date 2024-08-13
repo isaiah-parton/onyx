@@ -37,7 +37,6 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	}
 
 	widget := get_widget(info)
-	context.allocator = widget.allocator
 	widget.box = next_widget_box(info)
 	widget.draggable = true
 
@@ -73,6 +72,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	}
 
 	if .Focused in (widget.state - widget.last_state) {
+		make_text_editor(e, widget.allocator, widget.allocator)
 		begin(e, 0, info.builder)
 		e.set_clipboard = set_clipboard_string
 		e.get_clipboard = get_clipboard_string
@@ -80,10 +80,6 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 
 	result.self = widget
 
-	begin_layer({
-		box = widget.box,
-		options = {.Attached},
-	})
 	if widget.visible || .Focused in widget.state {
 		draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.background)
 		draw_rounded_box_stroke(widget.box, core.style.rounding, 1, core.style.color.substance)
@@ -93,7 +89,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			draw_text(text_origin, text_info, fade(core.style.color.content, 0.5))
 		}
 		if .Focused in widget.state {
-			// draw_interactive_text(result, e, text_origin, text_info, core.style.color.content)
+			draw_interactive_text(widget, e, text_origin, text_info, core.style.color.content)
 		} else {
 			draw_text(text_origin, text_info, core.style.color.content)
 		}
@@ -101,28 +97,25 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			draw_rounded_box_stroke(expand_box(widget.box, 4), core.style.rounding + 2.5, 2, fade(core.style.color.accent, widget.focus_time))
 		}
 	}
-	end_layer()
 
 	if .Focused in widget.state {
 		cmd: Command
 		control_down := key_down(.LEFT_CONTROL) || key_down(.RIGHT_CONTROL)
 		shift_down := key_down(.LEFT_SHIFT) || key_down(.RIGHT_SHIFT)
 		if control_down {
-			if key_pressed(.C) do cmd = .Copy
 			if key_pressed(.A) do cmd = .Select_All
-			if !info.read_only {
-				if key_pressed(.V) do cmd = .Paste
-				if key_pressed(.X) do cmd = .Cut
-				if key_pressed(.Z) do cmd = .Undo
-				if key_pressed(.Y) do cmd = .Redo
-			}
+			if key_pressed(.C) do cmd = .Copy
+			if key_pressed(.V) do cmd = .Paste
+			if key_pressed(.X) do cmd = .Cut
+			if key_pressed(.Z) do cmd = .Undo
+			if key_pressed(.Y) do cmd = .Redo
 		}
 		if !info.read_only {
 			input_runes(e, core.runes[:])
-			if key_pressed(.BACKSPACE) do cmd = .Delete_Word_Left if control_down else .Backspace
-			if key_pressed(.DELETE) do cmd = .Delete
-			if key_pressed(.ENTER) do cmd = .New_Line
 		}
+		if key_pressed(.BACKSPACE) do cmd = .Delete_Word_Left if control_down else .Backspace
+		if key_pressed(.DELETE) do cmd = .Delete_Word_Right if control_down else .Delete
+		if key_pressed(.ENTER) do cmd = .New_Line
 		if key_pressed(.LEFT) {
 			if shift_down do cmd = .Select_Word_Left if control_down else .Select_Left
 			else do cmd = .Word_Left if control_down else .Left
@@ -148,8 +141,11 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		if !info.multiline && (cmd in MULTILINE_COMMANDS) {
 			cmd = .None
 		}
+		if info.read_only && (cmd in EDIT_COMMANDS) {
+			cmd = .None
+		}
 		if cmd != .None {
-			perform_command(e, cmd)
+			text_editor_execute(e, cmd)
 			core.draw_next_frame = true
 		}
 	}

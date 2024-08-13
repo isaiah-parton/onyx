@@ -116,7 +116,7 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 						box.hi.y + (f32(entry.values[f] - info.lo) / f32(info.hi - info.lo)) * (box.lo.y - box.hi.y),
 					}
 					dot_time := variant.dot_times[e]
-					dot_time = animate(dot_time, 0.1, hn == e && .Hovered in widget.state)
+					dot_time = animate(dot_time, 0.15, hn == e && .Hovered in widget.state)
 					if kind.show_dots {
 						draw_arc_fill(p, 4.5, 0, math.TAU, field.color)
 					}

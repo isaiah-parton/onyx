@@ -190,3 +190,20 @@ rotate_matrix_z :: proc(angle: f32) {
 scale_matrix :: proc(x, y, z: f32) {
 	core.current_matrix^ *= linalg.matrix4_scale([3]f32{x, y, z})
 }
+
+// clip_source :: proc(source, target, clip: Box) -> (new_source, new_target: Box) {
+// 	source, target := source, target
+
+// 	if target.lo.x < clip.lo.x {
+// 		a := clip.lo.x - target.lo.x
+// 		target.lo.x += a
+// 		source.lo.x += (a / box_width(target)) * box_width(source)
+// 	}
+// 	if target.lo.x < clip.lo.x {
+// 		a := clip.lo.x - target.lo.x
+// 		target.lo.x += a
+// 		source.lo.x += (a / box_width(target)) * box_width(source)
+// 	}
+
+// 	return source, target
+// }

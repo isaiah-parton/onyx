@@ -21,6 +21,7 @@ Option :: enum {
 
 Component :: enum {
 	Button,
+	Data_Input,
 	Checkbox,
 	Bar_Graph,
 	Line_Graph,
@@ -122,6 +123,14 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					}
 				pop_id()
 			}
+
+			case .Data_Input:
+			side(.Top)
+			set_width(200)
+			do_text_input({
+				builder = &state.text_builder,
+				placeholder = "Type something",
+			})
 
 			case .Bar_Graph:
 			set_width_fill()

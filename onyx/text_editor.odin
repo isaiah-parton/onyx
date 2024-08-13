@@ -10,15 +10,54 @@ import "core:unicode/utf8"
 
 MAX_UNDO :: 10
 
+Command_Set :: distinct bit_set[Command; u32]
+
+Command :: enum u32 {
+	None,
+	Undo,
+	Redo,
+	New_Line,    // multi-lines
+	Cut,
+	Copy,
+	Paste,
+	Select_All,
+	Backspace,
+	Delete,
+	Delete_Word_Left,
+	Delete_Word_Right,
+	Left,
+	Right,
+	Up,          // multi-lines
+	Down,        // multi-lines
+	Word_Left,
+	Word_Right,
+	Start,
+	End,
+	Line_Start,
+	Line_End,
+	Select_Left,
+	Select_Right,
+	Select_Up,   // multi-lines
+	Select_Down, // multi-lines
+	Select_Word_Left,
+	Select_Word_Right,
+	Select_Start,
+	Select_End,
+	Select_Line_Start,
+	Select_Line_End,
+}
+
+MULTILINE_COMMANDS :: Command_Set{.New_Line, .Up, .Down, .Select_Up, .Select_Down}
+EDIT_COMMANDS :: Command_Set{.New_Line, .Delete, .Delete_Word_Left, .Delete_Word_Right, .Backspace, .Cut, .Paste, .Undo, .Redo}
+
 Text_Editor :: struct {
 	selection: [2]int,
+	anchor: int,
 
 	line_start, 
 	line_end: int,
 
 	builder: ^strings.Builder,
-
-	x: f32,
 
 	up_index,
 	down_index: int,
@@ -164,7 +203,6 @@ sorted_selection :: proc(e: ^Text_Editor) -> (lo, hi: int) {
 	return
 }
 
-
 selection_delete :: proc(e: ^Text_Editor) {
 	lo, hi := sorted_selection(e)
 	remove(e, lo, hi)
@@ -245,9 +283,11 @@ move_to :: proc(e: ^Text_Editor, t: Translation) {
 		e.selection = {pos, pos}
 	}
 }
+
 select_to :: proc(e: ^Text_Editor, t: Translation) {
 	e.selection[0] = translate_position(e, e.selection[0], t)
 }
+
 delete_to :: proc(e: ^Text_Editor, t: Translation) {
 	if has_selection(e) {
 		selection_delete(e)
@@ -260,12 +300,10 @@ delete_to :: proc(e: ^Text_Editor, t: Translation) {
 	}
 }
 
-
 current_selected_text :: proc(e: ^Text_Editor) -> string {
 	lo, hi := sorted_selection(e)
 	return string(e.builder.buf[lo:hi])
 }
-
 
 text_editor_cut :: proc(e: ^Text_Editor) -> bool {
 	if text_editor_copy(e) {
@@ -290,46 +328,7 @@ text_editor_paste :: proc(e: ^Text_Editor) -> bool {
 	return e.get_clipboard != nil
 }
 
-Command_Set :: distinct bit_set[Command; u32]
-
-Command :: enum u32 {
-	None,
-	Undo,
-	Redo,
-	New_Line,    // multi-lines
-	Cut,
-	Copy,
-	Paste,
-	Select_All,
-	Backspace,
-	Delete,
-	Delete_Word_Left,
-	Delete_Word_Right,
-	Left,
-	Right,
-	Up,          // multi-lines
-	Down,        // multi-lines
-	Word_Left,
-	Word_Right,
-	Start,
-	End,
-	Line_Start,
-	Line_End,
-	Select_Left,
-	Select_Right,
-	Select_Up,   // multi-lines
-	Select_Down, // multi-lines
-	Select_Word_Left,
-	Select_Word_Right,
-	Select_Start,
-	Select_End,
-	Select_Line_Start,
-	Select_Line_End,
-}
-
-MULTILINE_COMMANDS :: Command_Set{.New_Line, .Up, .Down, .Select_Up, .Select_Down}
-
-perform_command :: proc(e: ^Text_Editor, cmd: Command) {
+text_editor_execute :: proc(e: ^Text_Editor, cmd: Command) {
 	if int(cmd) > 2 {
 		undo_clear(e, &e.redo)
 		append(&e.undo, Undo_Action{

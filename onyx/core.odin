@@ -141,8 +141,6 @@ Core :: struct {
 
 	font_atlas: Atlas,
 
-	text_job: Text_Job,
-
 	vertex_state: Vertex_State,
 
 	path_stack: Stack(Path, 10),
