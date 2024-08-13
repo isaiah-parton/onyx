@@ -35,7 +35,7 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 		info.desired_size.x += 20
 	}
 	if info.__has_menu {
-		info.desired_size.x += 20
+		info.desired_size.x += 15
 	}
 	info.fixed_size = true
 	return info
@@ -100,7 +100,7 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 			menu_size += 10
 
 			// Find horizontal center
-			center_x := box_center_x(widget.box)
+			center_x := box_center_x(widget.box) - 10
 
 			// Define the menu box
 			box: Box = {

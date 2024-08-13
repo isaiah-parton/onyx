@@ -122,6 +122,30 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					}
 				pop_id()
 			}
+
+			case .Bar_Graph:
+			set_width_fill()
+			set_height_fill()
+			do_graph(Graph_Info(int){
+				lo = 0,
+				hi = 10,
+				increment = 1,
+				spacing = 10,
+				kind = Graph_Kind_Bar{
+					show_labels = true,
+					show_tooltip = true,
+				},
+				fields = {
+					{"Ohio", {255, 100, 100, 255}},
+					{"Florida", {0, 100, 255, 255}},
+				},
+				entries = {
+					{"Skibidy", {1, 5}},
+					{"Rizzler", {4, 2}},
+					{"Gooner", {6, 5}},
+					{"Sigma", {2, 8}},
+				},
+			})
 		}
 	end_layer()
 }

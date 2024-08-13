@@ -84,12 +84,16 @@ end_layout :: proc() {
 		if side, ok := layout.side.?; ok {
 			box := layout.original_box
 			switch layout.side {
+				
 				case .Top:
 				draw_box_fill({{box.lo.x, box.hi.y - 1}, box.hi}, core.style.color.substance)
+
 				case .Bottom:
 				draw_box_fill({box.lo, {box.hi.x, box.lo.y + 1}}, core.style.color.substance)
+
 				case .Left:
 				draw_box_fill({{box.hi.x - 1, box.lo.y}, box.hi}, core.style.color.substance)
+
 				case .Right:
 				draw_box_fill({box.lo, {box.lo.x + 1, box.hi.y}}, core.style.color.substance)
 			}

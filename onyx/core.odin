@@ -395,6 +395,25 @@ end_frame :: proc() {
 		}
 	}
 
+	// Free unused widgets
+	for id, widget in core.widget_map {
+		if widget.dead {
+			when ODIN_DEBUG {
+				fmt.printf("[core] Deleted widget %x\n", id)
+			}
+
+			if err := free_all(widget.allocator); err != .None {
+				fmt.printf("[core] Error freeing widget data: %v\n", err)
+			}
+			
+			delete_key(&core.widget_map, id)
+			(transmute(^Maybe(Widget))widget)^ = nil
+			core.draw_this_frame = true
+		} else {
+			widget.dead = true
+		}
+	}
+
 	// Update the atlas if needed
 	if core.font_atlas.modified {
 		update_atlas(&core.font_atlas)
@@ -493,6 +512,19 @@ end_frame :: proc() {
 		core.frame_count += 1
 		core.draw_this_frame = false
 	} else {
+		// Normal render pass
+		sg.begin_pass({
+			action = sg.Pass_Action{
+				colors = {
+					0 = {
+						load_action = .LOAD,
+						store_action = .STORE,
+					},
+				},
+			},
+			swapchain = sglue.swapchain(),
+		})
+		sg.end_pass()
 		for &call in core.draw_calls[:core.draw_call_count] {
 			clear(&call.vertices)
 			clear(&call.indices)

@@ -229,25 +229,6 @@ process_widgets :: proc() {
 	if mouse_released(.Left) {
 		core.dragged_widget = 0
 	}
-
-	// Free unused widgets
-	for id, widget in core.widget_map {
-		if widget.dead {
-			when ODIN_DEBUG {
-				fmt.printf("[core] Deleted widget %x\n", id)
-			}
-
-			if err := free_all(widget.allocator); err != .None {
-				fmt.printf("[core] Error freeing widget data: %v\n", err)
-			}
-			
-			delete_key(&core.widget_map, id)
-			(transmute(^Maybe(Widget))widget)^ = nil
-			core.draw_this_frame = true
-		} else {
-			widget.dead = true
-		}
-	}
 }
 
 // Commit a widget to be processed
