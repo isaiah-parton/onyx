@@ -15,6 +15,7 @@ Text_Input_Info :: struct {
 
 Text_Input_Widget_Variant :: struct {
 	editor: Text_Editor,
+	anchor: int,
 }
 
 Text_Input_Result :: struct {
@@ -40,19 +41,16 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	widget.box = next_widget_box(info)
 	widget.draggable = true
 
-	v := widget.variant
+	result.self = widget
+
 	variant := widget_variant(widget, Text_Input_Widget_Variant)
 	e := &variant.editor
-	if v == nil {
-		// init_text_editor(e, widget.allocator, widget.allocator)
-	}
 
 	widget.focus_time = animate(widget.focus_time, 0.15, .Focused in widget.state)
 
 	text_info: Text_Info = {
-		font = core.style.fonts[.Regular],
+		font = core.style.fonts[.Medium],
 		text = strings.to_string(info.builder^),
-		spacing = 1,
 		size = core.style.content_text_size,
 	}
 
@@ -78,23 +76,75 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		e.get_clipboard = get_clipboard_string
 	}
 
-	result.self = widget
+	// Make text job
+	if text_job, ok := make_text_job(text_info, e, core.mouse_pos - text_origin); ok {
+		if widget.visible || .Focused in widget.state {
+			draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.background)
+			draw_rounded_box_stroke(widget.box, core.style.rounding, 1, core.style.color.substance)
+			if len(text_info.text) == 0 {
+				text_info := text_info
+				text_info.text = info.placeholder
+				draw_text(text_origin, text_info, fade(core.style.color.content, 0.5))
+			}
+			if .Focused in widget.state {
+				draw_text_highlight(text_job, text_origin, fade(core.style.color.accent, 0.5))
+			}
+			draw_text_glyphs(text_job, text_origin, core.style.color.content)
+			if .Focused in widget.state {
+				draw_text_cursor(text_job, text_origin, core.style.color.accent)
+			}
+			if widget.focus_time > 0 {
+				draw_rounded_box_stroke(expand_box(widget.box, 4), core.style.rounding + 2.5, 2, fade(core.style.color.accent, widget.focus_time))
+			}
+		}
 
-	if widget.visible || .Focused in widget.state {
-		draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.background)
-		draw_rounded_box_stroke(widget.box, core.style.rounding, 1, core.style.color.substance)
-		if len(text_info.text) == 0 {
-			text_info := text_info
-			text_info.text = info.placeholder
-			draw_text(text_origin, text_info, fade(core.style.color.content, 0.5))
+		// Mouse selection
+		last_selection := e.selection
+		if .Pressed in widget.state && text_job.hovered_rune != -1 {
+			if .Pressed not_in widget.last_state {
+				// Set click anchor
+				variant.anchor = text_job.hovered_rune
+				// Initial selection
+				if widget.click_count == 3 {
+					text_editor_execute(e, .Select_All)
+				} else {
+					e.selection = {text_job.hovered_rune, text_job.hovered_rune}
+				}
+			}
+			switch widget.click_count {
+
+				case 2:
+				if text_job.hovered_rune < variant.anchor {
+					if text_info.text[text_job.hovered_rune] == ' ' {
+						e.selection[0] = text_job.hovered_rune
+					} else {
+						e.selection[0] = max(0, strings.last_index_any(text_info.text[:text_job.hovered_rune], " \n") + 1)
+					}
+					e.selection[1] = strings.index_any(text_info.text[variant.anchor:], " \n")
+					if e.selection[1] == -1 {
+						e.selection[1] = len(text_info.text)
+					} else {
+						e.selection[1] += variant.anchor
+					}
+				} else {
+					e.selection[1] = max(0, strings.last_index_any(text_info.text[:variant.anchor], " \n") + 1)
+					if (text_job.hovered_rune > 0 && text_info.text[text_job.hovered_rune - 1] == ' ') {
+						e.selection[0] = 0
+					} else {
+						e.selection[0] = strings.index_any(text_info.text[text_job.hovered_rune:], " \n")
+					}
+					if e.selection[0] == -1 {
+						e.selection[0] = len(text_info.text) - text_job.hovered_rune
+					}
+					e.selection[0] += text_job.hovered_rune
+				}
+				
+				case 1:
+				e.selection[0] = text_job.hovered_rune
+			} 
 		}
-		if .Focused in widget.state {
-			draw_interactive_text(widget, e, text_origin, text_info, core.style.color.content)
-		} else {
-			draw_text(text_origin, text_info, core.style.color.content)
-		}
-		if widget.focus_time > 0 {
-			draw_rounded_box_stroke(expand_box(widget.box, 4), core.style.rounding + 2.5, 2, fade(core.style.color.accent, widget.focus_time))
+		if last_selection != e.selection {
+			core.draw_next_frame = true
 		}
 	}
 

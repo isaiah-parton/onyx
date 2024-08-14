@@ -136,6 +136,9 @@ Core :: struct {
 	draw_this_frame,
 	draw_next_frame: bool,
 
+	glyphs: [dynamic]Text_Job_Glyph,
+	lines: [dynamic]Text_Job_Line,
+
 	fonts: [MAX_FONTS]Maybe(Font),
 	current_font: int,
 
@@ -144,9 +147,11 @@ Core :: struct {
 	vertex_state: Vertex_State,
 
 	path_stack: Stack(Path, 10),
+
 	draw_calls: [MAX_DRAW_CALLS]Draw_Call,
 	draw_call_count: int,
 	current_draw_call: ^Draw_Call,
+
 	matrix_stack: Stack(Matrix, MAX_MATRICES),
 	current_matrix: ^Matrix,
 }
@@ -204,10 +209,10 @@ init :: proc () {
 			0 = {
 				pixel_format = sg.Pixel_Format.RGBA8,
 				write_mask = sg.Color_Mask.RGB,
-				blend = {
+				blend = sg.Blend_State{
 					enabled = true,
-					src_factor_rgb = sg.Blend_Factor.SRC_ALPHA,
-					dst_factor_rgb = sg.Blend_Factor.ONE_MINUS_SRC_ALPHA,
+					src_factor_rgb = .SRC_ALPHA,
+					dst_factor_rgb = .ONE_MINUS_SRC_ALPHA,
 				},
 			},
 		},
@@ -284,7 +289,7 @@ end_frame :: proc() {
 		sdtx.printf("frame %i\n", core.frame_count)
 		sdtx.color3b(170, 170, 170)
 		sdtx.printf("\ttime: %f\n", sapp.frame_duration())
-		sdtx.printf("\tdraw calls: %i\n", core.draw_call_count)
+		sdtx.printf("\tdraw calls: %i/%i\n", core.draw_call_count, MAX_DRAW_CALLS)
 		sdtx.color3b(255, 255, 255)
 
 		sdtx.move_y(1)
@@ -541,6 +546,10 @@ end_frame :: proc() {
 	core.last_mouse_bits = core.mouse_bits
 	clear(&core.runes)
 	core.last_keys = core.keys
+
+	// Clear text job arrays
+	clear(&core.glyphs)
+	clear(&core.lines)
 }
 
 quit :: proc () {

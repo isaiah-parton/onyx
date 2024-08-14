@@ -4,7 +4,7 @@ import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
-
+ANGLE_TOLERANCE :: 0.01
 
 clear_path :: proc(path: ^Path) {
 	path.count = 0

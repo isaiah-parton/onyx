@@ -109,6 +109,146 @@ Glyph :: struct {
 	advance: f32,
 }
 
+Text_Job_Glyph :: struct {
+	glyph: ^Glyph,
+	offset: [2]f32,
+}
+
+Text_Job_Line :: struct {
+	offset,
+	length: int,
+	highlight: [2]f32,
+}
+
+Text_Job :: struct {
+	glyphs: []Text_Job_Glyph,
+	lines: []Text_Job_Line,
+	line_height: f32,
+	size: [2]f32,
+	cursor_glyph,
+	hovered_line,
+	hovered_rune: int,
+}
+
+make_text_job :: proc(info: Text_Info, e: ^Text_Editor = nil, mouse_pos: [2]f32 = {}) -> (job: Text_Job, ok: bool) {
+	iter := make_text_iterator(info) or_return
+	
+	first_glyph := len(core.glyphs)
+	first_line := len(core.lines)
+
+	line: Text_Job_Line = {
+		offset = first_glyph,
+		highlight = {math.F32_MAX, 0},
+	}
+
+	job.cursor_glyph = -1
+	job.hovered_rune = -1
+	min_diff: f32 = math.F32_MAX
+
+	job.line_height = iter.size.ascent - iter.size.descent + iter.size.line_gap
+
+	at_end: bool
+
+	for {
+		if !iterate_text(&iter) {
+			at_end = true
+		}
+
+		// Figure out if line is hovered
+		if iter.offset.y <= mouse_pos.y && mouse_pos.y < iter.offset.y + job.line_height {
+			// Check for hovered index
+			diff := abs(iter.offset.x - mouse_pos.x)
+			if diff < min_diff {
+				min_diff = diff
+				job.hovered_rune = iter.index
+			}
+		}
+
+		// Add a glyph
+		append(&core.glyphs, Text_Job_Glyph{
+			glyph = iter.glyph,
+			offset = iter.offset,
+		})
+
+		// Figure out highlighting and cursor pos
+		if e != nil {
+			if e.selection[0] == iter.index {
+				job.cursor_glyph = (len(core.glyphs) - first_glyph) - 1
+			}
+			lo, hi := min(e.selection[0], e.selection[1]), max(e.selection[0], e.selection[1])
+			if lo <= iter.index && iter.index <= hi {
+				line.highlight[0] = min(line.highlight[0], iter.offset.x)
+				line.highlight[1] = max(line.highlight[1], iter.offset.x)
+			}
+		}
+
+		// Push a new line
+		if iter.codepoint == '\n' || at_end {
+			line.length = len(core.glyphs) - line.offset
+			append(&core.lines, line)
+			line = Text_Job_Line{
+				offset = len(core.glyphs) - first_glyph,
+				highlight = {math.F32_MAX, 0},
+			}
+
+			job.size.x = max(job.size.x, iter.line_size.x)
+			job.size.y += iter.line_size.y
+		}
+
+		if at_end {
+			break
+		}
+	}
+
+	// Take a slice of the global arrays
+	job.glyphs = core.glyphs[first_glyph:]
+	job.lines = core.lines[first_line:]
+
+	// Figure out which line is hovered
+	line_count := int(math.floor(job.size.y / job.line_height))
+	job.hovered_line = int(mouse_pos.y / job.line_height)
+	if job.hovered_line < 0 || job.hovered_line >= line_count {
+		job.hovered_line = -1
+	}
+
+	// We okay
+	ok = true
+
+	return
+}
+
+draw_text_highlight :: proc(job: Text_Job, origin: [2]f32, color: Color) {
+	for line, l in job.lines {
+		if line.highlight[0] < line.highlight[1] {
+			line_top: f32 = job.line_height * f32(l)
+			draw_box_fill({
+				origin + {line.highlight[0] - 1, line_top},
+				origin + {line.highlight[1] + 1, line_top + job.line_height},
+			}, color)
+		}
+	}
+}
+
+draw_text_glyphs :: proc(job: Text_Job, origin: [2]f32, color: Color) {
+	for glyph in job.glyphs {
+		if glyph.glyph == nil do continue
+		glyph_origin := origin + glyph.offset + glyph.glyph.offset
+		draw_image_portion(core.font_atlas.image, glyph.glyph.source, {glyph_origin, glyph_origin + (glyph.glyph.source.hi - glyph.glyph.source.lo)}, color)
+	}
+}
+
+draw_text_cursor :: proc(job: Text_Job, origin: [2]f32, color: Color) {
+	if job.cursor_glyph == -1 || job.cursor_glyph >= len(job.glyphs) {
+		return
+	}
+	glyph := job.glyphs[job.cursor_glyph]
+	glyph_origin := origin + glyph.offset
+	draw_box_fill({
+		glyph_origin + {-1, -2},
+		glyph_origin + {1, job.line_height + 2},
+	}, color)
+}
+
 destroy_font :: proc(using self: ^Font) {
 	for _, &size in sizes {
 		destroy_font_size(&size)
@@ -133,18 +273,6 @@ make_text_iterator :: proc(info: Text_Info) -> (it: Text_Iterator, ok: bool) {
 	return
 }
 
-update_text_iterator_offset :: proc(it: ^Text_Iterator) {
-	it.offset.x = 0
-	#partial switch it.info.align_h {
-
-		case .Middle: 
-		it.offset.x -= measure_next_line(it^) / 2
-
-		case .Right: 
-		it.offset.x -= measure_next_line(it^)
-	}
-}
-
 iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 	it.last_codepoint = it.codepoint
 	if it.next_index >= len(it.info.text) {
@@ -158,78 +286,89 @@ iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 	// Update next index
 	it.next_index += bytes
 	// Get current glyph data
-	if it.codepoint != '\n' {
-		if glyph, ok := __get_glyph(it.font, it.size, '•' if it.info.hidden else it.codepoint); ok {
-			it.glyph = glyph
-		}
-	} else {
+	if it.codepoint == '\n' || it.codepoint == '\r' {
 		it.glyph = nil
+	} else if glyph, ok := get_glyph(it.font, it.size, '•' if it.info.hidden else it.codepoint); ok {
+		it.glyph = glyph
 	}
 	return true
 }
 
-iterate_text :: proc(it: ^Text_Iterator) -> (ok: bool) {
+iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
+	
 	// Update horizontal offset with last glyph
-	if it.glyph != nil {
-		it.offset.x += it.glyph.advance + it.info.spacing
+	if iter.glyph != nil {
+		iter.offset.x += math.floor(iter.glyph.advance + iter.info.spacing)
 	}
-	/*
-		Pre-paint
-			Decode the next codepoint -> Update glyph data -> New line if needed
-	*/
-	ok = iterate_text_rune(it)
+
+	// Get the next glyph
+	ok = iterate_text_rune(iter)
+
 	// Space needed to fit this glyph/word
-	space: f32 = it.glyph.advance if it.glyph != nil else 0
+	space: f32 = iter.glyph.advance if iter.glyph != nil else 0
 	if !ok {
 		// We might need to use the end index
-		it.index = it.next_index
-		it.glyph = nil
-		it.codepoint = 0
+		iter.index = iter.next_index
+		iter.glyph = nil
+		iter.codepoint = 0
 	} else {
 		// Get the space for the next word if needed
-		if (it.info.wrap == .Word) && (it.next_index >= it.next_word) && (it.codepoint != ' ') {
-			for i := it.next_word; true; /**/ {
-				c, b := utf8.decode_rune(it.info.text[i:])
+		if (iter.info.wrap == .Word) && (iter.next_index >= iter.next_word) && (iter.codepoint != ' ') {
+			for i := iter.next_word; true; /**/ {
+				c, b := utf8.decode_rune(iter.info.text[i:])
 				if c != '\n' {
-					if g, ok := __get_glyph(it.font, it.size, it.codepoint); ok {
+					if g, ok := get_glyph(iter.font, iter.size, iter.codepoint); ok {
 						space += g.advance
 					}
 				}
-				if c == ' ' || i > len(it.info.text) - 1 {
-					it.next_word = i + b
+				if c == ' ' || i > len(iter.info.text) - 1 {
+					iter.next_word = i + b
 					break
 				}
 				i += b
 			}
 		}
 	}
+
 	// Reset new line state
-	it.new_line = false
-	if it.codepoint == '\t' {
-		it.line_size.x += it.glyph.advance
+	iter.new_line = false
+	if iter.codepoint == '\t' {
+		iter.line_size.x += iter.glyph.advance
 	}
+
 	// If the last rune was '\n' then this is a new line
-	if (it.last_codepoint == '\n') {
-		it.new_line = true
+	if (iter.last_codepoint == '\n') {
+		iter.new_line = true
 	} else {
 		// Or if this rune would exceede the limit
-		if ( it.line_limit != nil && it.line_size.x + space >= it.line_limit.? ) {
-			if it.info.wrap == .None {
-				it.index = it.next_index
-				it.offset.y += it.size.ascent - it.size.descent
+		if ( iter.line_limit != nil && iter.line_size.x + space >= iter.line_limit.? ) {
+			if iter.info.wrap == .None {
+				iter.index = iter.next_index
+				iter.offset.y += iter.size.ascent - iter.size.descent
 				ok = false
 			} else {
-				it.new_line = true
+				iter.new_line = true
 			}
 		}
 	}
+
 	// Update vertical offset if there'e.a new line or if reached end
-	if it.new_line {
-		it.line_size.x = 0
-		it.offset.y += it.size.ascent - it.size.descent + it.size.line_gap
-	} else if it.glyph != nil {
-		it.line_size.x += it.glyph.advance + it.info.spacing
+	if iter.new_line {
+		iter.line_size.x = 0
+		iter.offset.x = 0
+		#partial switch iter.info.align_h {
+
+			case .Middle: 
+			iter.offset.x -= measure_next_line(iter^) / 2
+
+			case .Right: 
+			iter.offset.x -= measure_next_line(iter^)
+		}
+		iter.offset.y += iter.size.ascent - iter.size.descent + iter.size.line_gap
+	} else if iter.glyph != nil {
+		iter.line_size.x += iter.glyph.advance + iter.info.spacing
 	}
+
 	return
 }
 
@@ -284,10 +423,10 @@ load_font :: proc(file_path: string) -> (handle: int, success: bool) {
 				}
 			}
 		} else {
-			fmt.printf("[ui] Failed to initialize font '%s'\n", file_path)
+			fmt.printf("[onyx] Failed to initialize font '%s'\n", file_path)
 		}
 	} else {
-		fmt.printf("[ui] Failed to load font '%s'\n", file_path)
+		fmt.printf("[onyx] Failed to load font '%s'\n", file_path)
 	}
 	return
 }
@@ -319,7 +458,7 @@ get_font_size :: proc(font: ^Font, size: f32) -> (data: ^Font_Size, ok: bool) {
 }
 
 // First creates the glyph if it doesn't exist, then returns its data
-__get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^Glyph, ok: bool) {
+get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^Glyph, ok: bool) {
 	// Try fetching from map
 	data, ok = &size.glyphs[codepoint]
 	// If the glyph doesn't exist, we create and render it
@@ -353,40 +492,9 @@ __get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (data: ^G
 }
 
 draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
-	size: [2]f32 
-	origin := origin
-	if info.align_v != .Top {
-		size = measure_text(info)
-		#partial switch info.align_v {
-			case .Middle: origin.y -= size.y / 2
-			case .Bottom: origin.y -= size.y
-		}
-	}
-	origin = linalg.floor(origin)
-	if it, ok := make_text_iterator(info); ok {
-		update_text_iterator_offset(&it)
-		for iterate_text(&it) {
-			// Reset offset if new line
-			if it.new_line {
-				update_text_iterator_offset(&it)
-			}
-			// Paint the glyph
-			if it.codepoint != '\n' && it.codepoint != ' ' && it.glyph != nil {
-				target: Box = {
-					lo = origin + it.offset + it.glyph.offset,
-				}
-				target.hi = target.lo + (it.glyph.source.hi - it.glyph.source.lo)
-				draw_image_portion(core.font_atlas, it.glyph.source, target, color)
-			}
-			// Update size
-			if it.new_line {
-				size.x = max(size.x, it.line_size.x)
-				size.y += it.line_size.y
-			}
-		}
-		size.y += it.line_size.y
-	}
-	return size 
+	job, _ := make_text_job(info)
+	draw_text_glyphs(job, origin, color)
+	return job.size
 }
 
 draw_aligned_rune :: proc(
@@ -400,7 +508,7 @@ draw_aligned_rune :: proc(
 ) -> (size: [2]f32, ok: bool) #optional_ok {
 
 	font := &core.fonts[font].?
-	glyph := __get_glyph(font, get_font_size(font, font_size) or_return, rune(icon)) or_return
+	glyph := get_glyph(font, get_font_size(font, font_size) or_return, rune(icon)) or_return
 	size = glyph.source.hi - glyph.source.lo
 
 	box: Box
@@ -439,7 +547,7 @@ draw_aligned_rune :: proc(
 draw_rune_aligned_clipped :: proc(font: int, size: f32, icon: rune, origin: [2]f32, color: Color, align: [2]Alignment, clip: Box) -> [2]f32 {
 	font := &core.fonts[font].?
 	font_size, _ := get_font_size(font, size)
-	glyph, _ := __get_glyph(font, font_size, rune(icon))
+	glyph, _ := get_glyph(font, font_size, rune(icon))
 	icon_size := glyph.source.hi - glyph.source.lo
 
 	box: Box
@@ -473,213 +581,4 @@ draw_rune_aligned_clipped :: proc(font: int, size: f32, icon: rune, origin: [2]f
 	}
 	draw_image_portion(core.font_atlas, glyph.source, box, color)
 	return icon_size
-}
-
-// Draw interactive text
-draw_interactive_text :: proc(widget: ^Widget, e: ^Text_Editor, origin: [2]f32, info: Text_Info, color: Color) -> (result: Interactive_Text_Result) {
-
-	assert(widget != nil)
-
-	// Initial measurement
-	size := measure_text(info)
-	origin := origin
-
-	// Apply baseline if needed
-	#partial switch info.align_v {
-		case .Middle: origin.y -= size.y / 2 
-		case .Bottom: origin.y -= size.y
-	}
-
-	// Hovered index
-	hover_index: int
-
-	// Paint the text
-	if it, ok := make_text_iterator(info); ok {
-
-		// If we've reached the end
-		at_end := false
-
-		// Determine hovered line
-		line_height := it.size.ascent - it.size.descent + it.size.line_gap
-		line_count := int(math.floor(size.y / line_height))
-		hovered_line := clamp(int((core.mouse_pos.y - origin.y) / line_height), 0, line_count)
-
-		// Current line and column
-		line, column: int
-
-		// Keep track of smallest distance to mouse
-		min_dist: f32 = math.F32_MAX
-
-		// Get line offset
-		update_text_iterator_offset(&it)
-
-		// Top left of this line
-		line_origin := origin + it.offset
-
-		// Horizontal bounds of the selection on the current line
-		line_box_bounds: [2]f32 = {math.F32_MAX, 0}
-
-		// Set bounds
-		result.bounds.lo = line_origin
-		result.bounds.hi = result.bounds.lo
-
-		e.line_start = -1
-
-		// Start iteration
-		for {
-
-			// Iterate the iterator
-			if !iterate_text(&it) {
-				at_end = true
-			}
-
-			// Get hovered state
-			if it.new_line {
-
-				// Allows for highlighting the last glyph in a line
-				if hovered_line == line {
-					dist1 := math.abs((origin.x + it.offset.x) - core.mouse_pos.x)
-					if dist1 < min_dist {
-						min_dist = dist1
-						hover_index = it.index
-					}
-				}
-
-				// Check if the last line was hovered
-				line_box: Box = {line_origin, line_origin + it.line_size}
-				if point_in_box(core.mouse_pos, line_box) {
-					result.hovered = true
-				}
-				update_text_iterator_offset(&it)
-				if line == hovered_line {
-					e.line_end = it.index
-				}
-				line += 1
-				column = 0
-				line_origin = origin + it.offset
-			}
-
-			// Update hovered index
-			if hovered_line == line {
-				if !unicode.is_white_space(it.codepoint) {
-					if e.line_start == -1 {
-						e.line_start = it.index
-					}
-				}
-
-				// Left side of glyph
-				dist1 := math.abs((origin.x + it.offset.x) - core.mouse_pos.x)
-				if dist1 < min_dist {
-					min_dist = dist1
-					hover_index = it.index
-				}
-				if it.glyph != nil && (it.new_line || it.next_index >= len(info.text)) {
-					// Right side of glyph
-					dist2 := math.abs((origin.x + it.offset.x + it.glyph.advance) - core.mouse_pos.x)
-					if dist2 < min_dist {
-						min_dist = dist2
-						hover_index = it.next_index
-					}
-				}
-			}
-
-			// Get the glyph point
-			point: [2]f32 = origin + it.offset
-			glyph_color := color
-
-			// Get selection info
-			if .Focused in (widget.last_state) {
-				lo, hi := min(e.selection[0], e.selection[1]), max(e.selection[0], e.selection[1])
-				if hi == lo {
-					if lo == it.index {
-						line_box_bounds = {
-							point.x,
-							point.x,
-						}
-						draw_box_fill({{point.x - 1, point.y - 2}, {point.x + 1, point.y + it.size.ascent - it.size.descent + 2}}, core.style.color.accent)
-					}
-				} else if it.index >= lo && hi > it.index {
-					glyph_color = core.style.color.background
-					line_box_bounds = {
-						min(line_box_bounds[0], point.x),
-						max(line_box_bounds[1], point.x),
-					}
-					if it.glyph != nil {
-						draw_box_fill({{point.x - 1, point.y - 2}, {point.x + it.glyph.advance + 1, point.y + it.size.ascent - it.size.descent + 2}}, core.style.color.accent)
-					}
-				}
-			}
-
-			// Paint the glyph
-			if it.glyph != nil {
-				// Paint the glyph
-				dst: Box = {lo = point + it.glyph.offset}
-				dst.hi = dst.lo + (it.glyph.source.hi - it.glyph.source.lo)
-				result.bounds.hi = linalg.max(result.bounds.hi, dst.hi)
-
-				draw_image_portion(core.font_atlas.image, it.glyph.source, dst, glyph_color)
-			}
-
-			// Paint this line'e.selection
-			if (.Focused in widget.last_state) && (it.index >= len(info.text) || info.text[it.index] == '\n') {
-				// Draw it if the selection is valid
-				if line_box_bounds[1] >= line_box_bounds[0] {
-					box: Box = {
-						{line_box_bounds[0] - 1, line_origin.y},
-						{line_box_bounds[1] + 1, line_origin.y + it.line_size.y},
-					}
-					
-					line_box_bounds = {math.F32_MAX, 0}
-				}
-			}
-
-			// Break if reached end
-			if at_end {
-				e.line_end = it.index
-				break
-			}
-
-			// Increment column
-			column += 1
-		}
-	}
-
-	e.line_start = max(e.line_start, 0)
-
-	last_selection := e.selection
-	if .Pressed in widget.state {
-		if .Pressed not_in widget.last_state {
-			if widget.click_count == 3 {
-				text_editor_execute(e, .Select_All)
-			} else {
-				e.selection = {hover_index, hover_index}
-			}
-		}
-		if widget.click_count == 2 {
-			next, last: int
-			if hover_index < e.selection[1] {
-				last = hover_index if info.text[hover_index] == ' ' else max(0, strings.last_index_any(info.text[:hover_index], " \n") + 1)
-				next = strings.index_any(info.text[e.selection[1]:], " \n")
-				if next == -1 {
-					next = len(info.text)
-				} else {
-					next += e.selection[1]
-				}
-			} else {
-				last = max(0, strings.last_index_any(info.text[:e.selection[1]], " \n") + 1)
-				next = 0 if (hover_index > 0 && info.text[hover_index - 1] == ' ') else strings.index_any(info.text[hover_index:], " \n")
-				if next == -1 {
-					next = len(info.text) - hover_index
-				}
-				next += hover_index
-			}
-			e.selection = {last, next}
-		} else {
-			e.selection[1] = hover_index
-		}
-	}
-	if last_selection != e.selection {
-		core.draw_next_frame = true
-	}
-	return result
 }

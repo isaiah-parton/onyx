@@ -322,10 +322,19 @@ text_editor_copy :: proc(e: ^Text_Editor) -> bool {
 }
 
 text_editor_paste :: proc(e: ^Text_Editor) -> bool {
-	if e.get_clipboard != nil {
-		input_text(e, e.get_clipboard(e.clipboard_user_data) or_return)
+	if e.get_clipboard == nil {
+		return false
 	}
-	return e.get_clipboard != nil
+	str := e.get_clipboard(e.clipboard_user_data) or_return
+	a: bool
+	str, a = strings.replace_all(str, "\t", " ") // this should never allocate
+	if e.get_clipboard != nil {
+		input_text(e, str)
+	}
+	if a {
+		delete(str)
+	}
+	return true
 }
 
 text_editor_execute :: proc(e: ^Text_Editor, cmd: Command) {

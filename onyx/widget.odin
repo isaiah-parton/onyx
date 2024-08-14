@@ -153,7 +153,7 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 				widget.click_button = core.mouse_button
 			}
 			if widget.click_button == core.mouse_button && time.since(widget.click_time) <= DOUBLE_CLICK_TIME {
-				widget.click_count = max((widget.click_count + 1) % 3, 1)
+				widget.click_count = max((widget.click_count + 1) % 4, 1)
 			} else {
 				widget.click_count = 1
 			}

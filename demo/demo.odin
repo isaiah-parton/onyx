@@ -127,9 +127,11 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			case .Data_Input:
 			side(.Top)
 			set_width(200)
+			set_height(120)
 			do_text_input({
 				builder = &state.text_builder,
 				placeholder = "Type something",
+				multiline = true,
 			})
 
 			case .Bar_Graph:

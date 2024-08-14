@@ -6,14 +6,15 @@ import "core:math/linalg"
 
 import sg "extra:sokol-odin/sokol/gfx"
 
-ANGLE_TOLERANCE :: 0.1
+// ANGLE_TOLERANCE :: 0.1
 MAX_PATH_POINTS :: 400
 MAX_MATRICES :: 100
-MAX_DRAW_CALLS :: 50
-MAX_DRAW_CALL_TEXTURES :: 8
+MAX_DRAW_CALLS :: 64
+
 MAX_FONTS :: 100
+// MAX_IMAGES :: 256
+
 MAX_ATLASES :: 8
-MAX_IMAGES :: 256
 MIN_ATLAS_SIZE :: 1024
 MAX_ATLAS_SIZE :: 4096
 

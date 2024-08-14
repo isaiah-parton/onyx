@@ -53,6 +53,9 @@ void main() {
         case 2:
         frag_color *= vec4(1.0, 0.0, 1.0, 1.0);
     }
+    if (frag_color.a < 0.1) {
+        discard;
+    }
 }
 @end
 
