@@ -1,23 +1,19 @@
 package onyx
 
-import "core:slice"
 import "core:fmt"
-import "core:mem"
 import "core:math"
 import "core:math/linalg"
+import "core:mem"
+import "core:slice"
 
 import sg "extra:sokol-odin/sokol/gfx"
 
 Atlas :: struct {
-	using image: Image,
-
-	data: []u8,
-
-	offset: [2]f32,
-	row_height: f32,
-
-	full,
-	modified: bool,
+	using image:    Image,
+	data:           []u8,
+	offset:         [2]f32,
+	row_height:     f32,
+	full, modified: bool,
 }
 
 init_atlas :: proc(atlas: ^Atlas, width, height: int) {
@@ -28,22 +24,17 @@ init_atlas :: proc(atlas: ^Atlas, width, height: int) {
 	atlas.data[2] = 255
 	atlas.data[3] = 255
 	atlas.offset = {1, 1}
-	atlas._image = sg.make_image(sg.Image_Desc{
-		width = i32(width),
-		height = i32(height),
-		usage = .DYNAMIC,
-		pixel_format = .RGBA8,
-		data = {
-			subimage = {
-				0 = {
-					0 = {
-						ptr = raw_data(atlas.data),
-						size = u64(len(atlas.data)),
-					},
-				},
+	atlas._image = sg.make_image(
+		sg.Image_Desc {
+			width = i32(width),
+			height = i32(height),
+			usage = .DYNAMIC,
+			pixel_format = .RGBA8,
+			data = {
+				subimage = {0 = {0 = {ptr = raw_data(atlas.data), size = u64(len(atlas.data))}}},
 			},
 		},
-	})
+	)
 }
 
 destroy_atlas :: proc(atlas: ^Atlas) {
@@ -52,16 +43,10 @@ destroy_atlas :: proc(atlas: ^Atlas) {
 }
 
 update_atlas :: proc(atlas: ^Atlas) {
-	sg.update_image(atlas.image, {
-		subimage = {
-			0 = {
-				0 = {
-					ptr = raw_data(atlas.data),
-					size = u64(len(atlas.data)),
-				},
-			},
-		},
-	})
+	sg.update_image(
+		atlas.image,
+		{subimage = {0 = {0 = {ptr = raw_data(atlas.data), size = u64(len(atlas.data))}}}},
+	)
 }
 
 add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas) -> Box {
@@ -69,10 +54,10 @@ add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas) -> Bo
 
 	pixel_size: int = 4
 
-	for y in 0..<height {
+	for y in 0 ..< height {
 		target_row_offset := (y + int(box.lo.y)) * atlas.width * pixel_size
 		source_row_offset := y * width
-		for x in 0..<width {
+		for x in 0 ..< width {
 			target_offset := target_row_offset + (x + int(box.lo.x)) * pixel_size
 			atlas.data[target_offset] = 255
 			atlas.data[target_offset + 1] = 255
