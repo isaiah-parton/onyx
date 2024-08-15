@@ -124,7 +124,7 @@ make_text_job :: proc(
 	first_line := len(core.lines)
 
 	line: Text_Job_Line = {
-		offset    = first_glyph,
+		offset    = 0,
 		highlight = {math.F32_MAX, 0},
 	}
 
@@ -171,7 +171,21 @@ make_text_job :: proc(
 
 		// Push a new line
 		if iter.codepoint == '\n' || at_end {
-			line.length = len(core.glyphs) - line.offset
+			line.length = len(core.glyphs) - (line.offset + first_glyph)
+
+			glyphs := core.glyphs[first_glyph + line.offset:][:line.length]
+
+			// Apply horizontal alignment
+			if iter.info.align_h == .Middle {
+				for &glyph in glyphs {
+					glyph.pos.x -= iter.line_size.x / 2
+				}
+			} else if iter.info.align_h == .Right {
+				for &glyph in glyphs {
+					glyph.pos.x -= iter.line_size.x
+				}
+			}
+
 			append(&core.lines, line)
 			line = Text_Job_Line {
 				offset    = len(core.glyphs) - first_glyph,
@@ -190,6 +204,17 @@ make_text_job :: proc(
 	// Take a slice of the global arrays
 	job.glyphs = core.glyphs[first_glyph:]
 	job.lines = core.lines[first_line:]
+
+	// Apply vertical alignment
+	if iter.info.align_v == .Middle {
+		for &glyph in job.glyphs {
+			glyph.pos.y -= job.size.y / 2
+		}
+	} else if iter.info.align_v == .Bottom {
+		for &glyph in job.glyphs {
+			glyph.pos.y -= job.size.y
+		}
+	}
 
 	// Figure out which line is hovered
 	line_count := int(math.floor(job.size.y / job.line_height))
@@ -302,6 +327,7 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 		// We might need to use the end index
 		iter.index = iter.next_index
 		iter.codepoint = 0
+		iter.glyph = {}
 	} else {
 		// Get the space for the next word if needed
 		if (iter.info.wrap == .Word) &&

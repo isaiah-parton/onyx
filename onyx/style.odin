@@ -1,11 +1,7 @@
 package onyx
 
 Color_Scheme :: struct {
-	background,
-	foreground,
-	substance,
-	accent,
-	content: Color,
+	background, foreground, substance, accent, content: Color,
 }
 
 Font_Style :: enum {
@@ -16,29 +12,33 @@ Font_Style :: enum {
 }
 
 Style :: struct {
-	fonts: [Font_Style]int,
-	color: Color_Scheme,
+	fonts:       [Font_Style]int,
+	color:       Color_Scheme,
+	using shape: Style_Shape,
+}
 
-	header_text_size,
-	button_text_size,
-	content_text_size: f32,
+Style_Shape :: struct {
+	header_text_size, button_text_size, tab_text_size, content_text_size: f32,
+	text_input_height, button_height:                                     f32,
+	tooltip_rounding, tooltip_padding, panel_padding, rounding:           f32,
+	stroke_width:                                                         f32,
+	title_margin:                                                         f32,
+	title_padding:                                                        f32,
+}
 
-	text_input_height,
-	button_height: f32,
-	
-	tooltip_rounding,
-	tooltip_padding,
-	panel_rounding,
-	rounding: f32,
-	
-	stroke_width: f32,
-	title_margin: f32,
-	title_padding: f32,
-	panel_background_opacity: f32,
+default_style_shape :: proc() -> Style_Shape {
+	return Style_Shape {
+		tooltip_padding = 3,
+		panel_padding = 10,
+		header_text_size = 32,
+		button_text_size = 22,
+		tab_text_size = 20,
+		content_text_size = 20,
+	}
 }
 
 light_color_scheme :: proc() -> Color_Scheme {
-	return Color_Scheme{
+	return Color_Scheme {
 		background = {0, 0, 0, 255},
 		foreground = {25, 25, 32, 255},
 		substance = {65, 65, 75, 255},
@@ -46,8 +46,9 @@ light_color_scheme :: proc() -> Color_Scheme {
 		content = {255, 255, 255, 255},
 	}
 }
+
 dark_color_scheme :: proc() -> Color_Scheme {
-	return Color_Scheme{
+	return Color_Scheme {
 		background = {0, 0, 0, 255},
 		foreground = {15, 15, 15, 255},
 		substance = {45, 45, 45, 255},

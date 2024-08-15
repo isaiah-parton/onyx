@@ -5,18 +5,17 @@ import "core:math/ease"
 import "core:math/linalg"
 
 Breadcrumb_Info :: struct {
-	using _: Generic_Widget_Info,
-	index: int,
-	options: []string,
-	is_tail: bool,
-
-	__has_menu: bool,
+	using _:     Generic_Widget_Info,
+	index:       int,
+	options:     []string,
+	is_tail:     bool,
+	__has_menu:  bool,
 	__text_info: Text_Info,
 }
 
 Breadcrumb_Result :: struct {
 	using _: Generic_Widget_Result,
-	index: Maybe(int),
+	index:   Maybe(int),
 }
 
 make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Breadcrumb_Info {
@@ -28,7 +27,7 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 		font = core.style.fonts[.Medium],
 		size = core.style.button_text_size,
 	}
-	info.__has_menu = len(info.options) > 1 
+	info.__has_menu = len(info.options) > 1
 
 	info.desired_size = measure_text(info.__text_info)
 	if !info.is_tail {
@@ -49,22 +48,26 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
 
 	if widget.visible {
-		draw_text(widget.box.lo, info.__text_info, fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time))
+		draw_text(
+			widget.box.lo,
+			info.__text_info,
+			fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time),
+		)
 		if info.__has_menu {
 			origin: [2]f32 = {math.floor(widget.box.hi.x - 24), box_center_y(widget.box)}
 			begin_path()
-				point(origin + {-4, -2})
-				point(origin + {0, 2})
-				point(origin + {4, -2})
-				stroke_path(2, fade(core.style.color.content, 0.5))
+			point(origin + {-4, -2})
+			point(origin + {0, 2})
+			point(origin + {4, -2})
+			stroke_path(2, fade(core.style.color.content, 0.5))
 			end_path()
 		}
 		if !info.is_tail {
 			origin: [2]f32 = {math.floor(widget.box.hi.x - 10), box_center_y(widget.box)}
 			begin_path()
-				point(origin + {-2, 6})
-				point(origin + {2, -6})
-				stroke_path(2, fade(core.style.color.content, 0.5))
+			point(origin + {-2, 6})
+			point(origin + {2, -6})
+			stroke_path(2, fade(core.style.color.content, 0.5))
 			end_path()
 		}
 	}
@@ -75,7 +78,7 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 		if .Pressed in widget.state {
 			widget.state += {.Open}
 		}
-		
+
 		if .Open in widget.state {
 
 			MAX_OPTIONS :: 30
@@ -86,13 +89,9 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 			for option, o in info.options[:min(len(info.options), MAX_OPTIONS)] {
 				if o == info.index do continue
 				push_id(o)
-					buttons[o] = make_button({
-						text = option,
-						kind = .Ghost,
-						font_size = 14,
-					})
-					menu_size.x = max(menu_size.x, buttons[o].desired_size.x)
-					menu_size.y += buttons[o].desired_size.y
+				buttons[o] = make_button({text = option, kind = .Ghost, font_size = 20})
+				menu_size.x = max(menu_size.x, buttons[o].desired_size.x)
+				menu_size.y += buttons[o].desired_size.y
 				pop_id()
 			}
 
@@ -109,28 +108,30 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 			}
 
 			// Begin the menu layer
-			begin_layer({
-				id = widget.id,
-				box = box,
-				origin = {box_center_x(box), box.lo.y},
-				scale = ([2]f32)(ease.cubic_in_out(widget.focus_time)),
-				parent = current_layer(),
-			})
-				layer := current_layer()
-				if .Focused in current_layer().state {
-					widget.next_state += {.Focused}
+			begin_layer(
+				{
+					id = widget.id,
+					box = box,
+					origin = {box_center_x(box), box.lo.y},
+					scale = ([2]f32)(ease.cubic_in_out(widget.focus_time)),
+					parent = current_layer(),
+				},
+			)
+			layer := current_layer()
+			if .Focused in current_layer().state {
+				widget.next_state += {.Focused}
+			}
+			foreground()
+			shrink(5)
+			side(.Top)
+			set_width_fill()
+			for &button, b in buttons[:len(info.options)] {
+				if b == info.index do continue
+				if was_clicked(add_button(button)) {
+					result.index = b
+					widget.state -= {.Open}
 				}
-				foreground()
-				shrink(5)
-				side(.Top)
-				set_width_fill()
-				for &button, b in buttons[:len(info.options)] {
-					if b == info.index do continue
-					if was_clicked(add_button(button)) {
-						result.index = b
-						widget.state -= {.Open}
-					}
-				}
+			}
 			end_layer()
 
 			if .Hovered not_in layer.state && .Focused not_in widget.state {

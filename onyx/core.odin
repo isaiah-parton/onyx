@@ -194,12 +194,7 @@ init :: proc() {
 		},
 	)
 
-	core.style.button_text_size = 16
-	core.style.content_text_size = 16
-	core.style.header_text_size = 24
-
-	core.style.text_input_height = 30
-
+	// Init font atlas
 	max_atlas_size := int(core.limits.max_image_size_2d)
 	if max_atlas_size < MIN_ATLAS_SIZE {
 		fmt.printf(
@@ -209,6 +204,10 @@ init :: proc() {
 	}
 	atlas_size: int = min(max_atlas_size, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, atlas_size, atlas_size)
+
+	// Default style
+	core.style.color = dark_color_scheme()
+	core.style.shape = default_style_shape()
 
 	fmt.print("ʕ·ᴥ·ʔ Onyx is awake and feeling great!\n\n")
 }
@@ -247,10 +246,12 @@ begin_frame :: proc() {
 	// Process widgets
 	process_widgets()
 
-	// Push initial draw call and matrix
+	// Reset draw calls
 	core.draw_call_count = 0
+
+	// Push initial draw call and matrix
 	push_draw_call()
-	core.current_draw_call.bindings.fs.images[0] = core.font_atlas.image
+	set_image(core.font_atlas.image)
 	push_matrix()
 }
 
