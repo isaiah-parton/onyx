@@ -13,6 +13,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
+import "core:slice"
 import "core:strings"
 import "core:time"
 
@@ -241,6 +242,35 @@ begin_frame :: proc() {
 		   core.last_hovered_widget != core.hovered_widget) {
 		core.draw_this_frame = true
 		core.draw_next_frame = true
+	}
+
+	// Tab/shift-tab selection
+	if key_pressed(.TAB) {
+		widget_list: [dynamic]^Widget
+		defer delete(widget_list)
+
+		for id, &widget in core.widget_map {
+			if widget.is_field {
+				append(&widget_list, widget)
+			}
+		}
+
+		sort_proc :: proc(i, j: ^Widget) -> bool {
+			return i.box.lo.y < j.box.lo.y || i.box.lo.x < j.box.lo.x
+		}
+
+		if key_down(.LEFT_SHIFT) {
+			slice.sort_by(widget_list[:], sort_proc)
+		} else {
+			slice.reverse_sort_by(widget_list[:], sort_proc)
+		}
+
+		for widget, w in widget_list {
+			if widget.id == core.focused_widget {
+				core.focused_widget = widget_list[(w + 1) % len(widget_list)].id
+				break
+			}
+		}
 	}
 
 	// Process widgets

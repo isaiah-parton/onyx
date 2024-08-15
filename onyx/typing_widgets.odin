@@ -1,16 +1,15 @@
 package onyx
 
 import "core:fmt"
-import "core:strings"
 import "core:slice"
+import "core:strings"
 import "core:time"
 
 Text_Input_Info :: struct {
-	using _: Generic_Widget_Info,
-	builder: ^strings.Builder,
-	placeholder: string,
-	multiline,
-	read_only: bool,
+	using _:              Generic_Widget_Info,
+	builder:              ^strings.Builder,
+	placeholder:          string,
+	multiline, read_only: bool,
 }
 
 Text_Input_Widget_Variant :: struct {
@@ -25,10 +24,7 @@ Text_Input_Result :: struct {
 make_text_input :: proc(info: Text_Input_Info, loc := #caller_location) -> Text_Input_Info {
 	info := info
 	info.id = hash(loc)
-	info.desired_size = {
-		200,
-		core.style.text_input_height,
-	}
+	info.desired_size = {200, core.style.text_input_height}
 	return info
 }
 
@@ -40,6 +36,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	widget := get_widget(info)
 	widget.box = next_widget_box(info)
 	widget.draggable = true
+	widget.is_field = true
 
 	result.self = widget
 
@@ -54,17 +51,16 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		size = core.style.content_text_size,
 	}
 
-	text_origin: [2]f32 = {
-		widget.box.lo.x + 5, 
-		0,
-	}
+	text_origin: [2]f32 = {widget.box.lo.x + 5, 0}
 
 	if font, ok := &core.fonts[text_info.font].?; ok {
 		if font_size, ok := get_font_size(font, text_info.size); ok {
 			if info.multiline {
 				text_origin.y = widget.box.lo.y + (font_size.ascent - font_size.descent) / 2
 			} else {
-				text_origin.y = (widget.box.hi.y + widget.box.lo.y) / 2 - (font_size.ascent - font_size.descent) / 2
+				text_origin.y =
+					(widget.box.hi.y + widget.box.lo.y) / 2 -
+					(font_size.ascent - font_size.descent) / 2
 			}
 		}
 	}
@@ -94,7 +90,12 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 				draw_text_cursor(text_job, text_origin, core.style.color.accent)
 			}
 			if widget.focus_time > 0 {
-				draw_rounded_box_stroke(expand_box(widget.box, 4), core.style.rounding + 2.5, 2, fade(core.style.color.accent, widget.focus_time))
+				draw_rounded_box_stroke(
+					expand_box(widget.box, 4),
+					core.style.rounding + 2.5,
+					2,
+					fade(core.style.color.accent, widget.focus_time),
+				)
 			}
 		}
 
@@ -113,12 +114,16 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			}
 			switch widget.click_count {
 
-				case 2:
+			case 2:
 				if text_job.hovered_rune < variant.anchor {
 					if text_info.text[text_job.hovered_rune] == ' ' {
 						e.selection[0] = text_job.hovered_rune
 					} else {
-						e.selection[0] = max(0, strings.last_index_any(text_info.text[:text_job.hovered_rune], " \n") + 1)
+						e.selection[0] = max(
+							0,
+							strings.last_index_any(text_info.text[:text_job.hovered_rune], " \n") +
+							1,
+						)
 					}
 					e.selection[1] = strings.index_any(text_info.text[variant.anchor:], " \n")
 					if e.selection[1] == -1 {
@@ -127,21 +132,28 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 						e.selection[1] += variant.anchor
 					}
 				} else {
-					e.selection[1] = max(0, strings.last_index_any(text_info.text[:variant.anchor], " \n") + 1)
-					if (text_job.hovered_rune > 0 && text_info.text[text_job.hovered_rune - 1] == ' ') {
+					e.selection[1] = max(
+						0,
+						strings.last_index_any(text_info.text[:variant.anchor], " \n") + 1,
+					)
+					if (text_job.hovered_rune > 0 &&
+						   text_info.text[text_job.hovered_rune - 1] == ' ') {
 						e.selection[0] = 0
 					} else {
-						e.selection[0] = strings.index_any(text_info.text[text_job.hovered_rune:], " \n")
+						e.selection[0] = strings.index_any(
+							text_info.text[text_job.hovered_rune:],
+							" \n",
+						)
 					}
 					if e.selection[0] == -1 {
 						e.selection[0] = len(text_info.text) - text_job.hovered_rune
 					}
 					e.selection[0] += text_job.hovered_rune
 				}
-				
-				case 1:
+
+			case 1:
 				e.selection[0] = text_job.hovered_rune
-			} 
+			}
 		}
 		if last_selection != e.selection {
 			core.draw_next_frame = true

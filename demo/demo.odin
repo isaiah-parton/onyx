@@ -107,6 +107,8 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		do_text_input(
 			{builder = &state.text_builder, placeholder = "Type something", multiline = true},
 		)
+		space(10)
+		do_text_input({builder = &state.text_builder})
 
 	case .Bar_Graph:
 		set_width_fill()

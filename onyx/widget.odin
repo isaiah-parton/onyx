@@ -13,28 +13,17 @@ import "base:runtime"
 DOUBLE_CLICK_TIME :: time.Millisecond * 450
 
 Widget :: struct {
-	id: Id,
-	box: Box,
-	layer: ^Layer,
-
-	visible,
-	disabled,
-	draggable,
-	dead: bool,
-
-	last_state,
-	next_state,
-	state: Widget_State,
-
-	focus_time,
-	hover_time: f32,
-
-	click_count: int,
-	click_time: time.Time,
-	click_button: Mouse_Button,
-
-	allocator: runtime.Allocator,
-	variant: Widget_Variant,
+	id:                                           Id,
+	box:                                          Box,
+	layer:                                        ^Layer,
+	visible, disabled, draggable, is_field, dead: bool,
+	last_state, next_state, state:                Widget_State,
+	focus_time, hover_time:                       f32,
+	click_count:                                  int,
+	click_time:                                   time.Time,
+	click_button:                                 Mouse_Button,
+	allocator:                                    runtime.Allocator,
+	variant:                                      Widget_Variant,
 }
 
 Widget_Variant :: union {
@@ -58,13 +47,11 @@ Widget_Status :: enum {
 Widget_State :: bit_set[Widget_Status;u8]
 
 Generic_Widget_Info :: struct {
-	id: Maybe(Id),
-	box: Maybe(Box),
-
-	fixed_size: bool,
+	id:           Maybe(Id),
+	box:          Maybe(Box),
+	fixed_size:   bool,
 	desired_size: [2]f32,
-	
-	disabled: bool,
+	disabled:     bool,
 }
 
 Generic_Widget_Result :: struct {
@@ -84,13 +71,17 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 		core.draw_next_frame = true
 		value = max(0, value - core.delta_time * (1 / duration))
 	}
-	
+
 	return value
 }
 
 // [SECTION] Results
 
-was_clicked :: proc(result: Generic_Widget_Result, button: Mouse_Button = .Left, times: int = 1) -> bool {
+was_clicked :: proc(
+	result: Generic_Widget_Result,
+	button: Mouse_Button = .Left,
+	times: int = 1,
+) -> bool {
 	widget := result.self.?
 	return .Clicked in widget.state && widget.click_button == button && widget.click_count >= times
 }
@@ -106,10 +97,10 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 	widget, ok := core.widget_map[id]
 
 	if !ok {
-		for i in 0..<MAX_WIDGETS {
+		for i in 0 ..< MAX_WIDGETS {
 			if core.widgets[i] == nil {
-				core.widgets[i] = Widget{
-					id = id,
+				core.widgets[i] = Widget {
+					id        = id,
 					allocator = runtime.arena_allocator(&core.arena),
 				}
 				widget = &core.widgets[i].?
@@ -152,7 +143,8 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 			if widget.click_count == 0 {
 				widget.click_button = core.mouse_button
 			}
-			if widget.click_button == core.mouse_button && time.since(widget.click_time) <= DOUBLE_CLICK_TIME {
+			if widget.click_button == core.mouse_button &&
+			   time.since(widget.click_time) <= DOUBLE_CLICK_TIME {
 				widget.click_count = max((widget.click_count + 1) % 4, 1)
 			} else {
 				widget.click_count = 1
@@ -238,7 +230,12 @@ commit_widget :: proc(widget: ^Widget, hovered: bool) {
 	}
 }
 
-compute_layout_size :: proc(padding, spacing: f32, widgets: ..Generic_Widget_Info) -> (size: [2]f32) {
+compute_layout_size :: proc(
+	padding, spacing: f32,
+	widgets: ..Generic_Widget_Info,
+) -> (
+	size: [2]f32,
+) {
 
 	for &widget, w in widgets {
 		size += widget.desired_size
