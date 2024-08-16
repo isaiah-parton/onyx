@@ -1,7 +1,9 @@
 package onyx
 
 import "core:fmt"
+import "core:time"
 import "core:math"
+import "core:math/ease"
 import "core:math/linalg"
 
 ANGLE_TOLERANCE :: 0.01
@@ -270,6 +272,49 @@ draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
 		}
 	}
 }
+
+draw_ellipse_fill :: proc(center, size: [2]f32, from, to: f32, color: Color) {
+	from, to := from, to
+	if from > to do from, to = to, from
+	da := to - from
+	nsteps := get_arc_steps(max(size.x, size.y), da)
+
+	core.vertex_state.col = color
+	core.vertex_state.uv = {}
+	first_index := add_vertex(center.x, center.y)
+	for n in 0..=nsteps {
+		a := from + da * f32(n) / f32(nsteps)
+		index := add_vertex(center + {math.cos(a), math.sin(a)} * size)
+		if n < nsteps {
+			add_indices(first_index, index, index + 1)
+		}
+	}
+}
+
+draw_ring_fill :: proc(center: [2]f32, inner, outer, from, to: f32, color: Color) {
+	from, to := from, to
+	if from > to do from, to = to, from
+	da := to - from
+	nsteps := get_arc_steps(outer, da)
+	step := da / f32(nsteps)
+
+	core.vertex_state.uv = {}
+	core.vertex_state.col = color
+
+	last_inner_index := add_vertex(center + {1, 0} * inner)
+	last_outer_index := add_vertex(center + {1, 0} * outer)
+	for n in 0..=nsteps {
+		angle := from + f32(n) * step
+		inner_index := add_vertex(center + {math.cos(angle), math.sin(angle)} * inner)
+		outer_index := add_vertex(center + {math.cos(angle), math.sin(angle)} * outer)
+		if n > 0 {
+			add_indices(last_inner_index, last_outer_index, outer_index, last_inner_index, outer_index, inner_index)
+		}
+		last_inner_index = inner_index
+		last_outer_index = outer_index
+	}
+}
+
 // Draw a stroke along an arc
 draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color: Color) {
 	from, to := from, to
@@ -387,4 +432,38 @@ foreground :: proc() {
 	layout := current_layout()
 	draw_rounded_box_fill(layout.box, core.style.rounding, core.style.color.foreground)
 	draw_rounded_box_stroke(layout.box, core.style.rounding, 1, core.style.color.substance)
+}
+
+draw_spinner :: proc(center: [2]f32, color: Color) {
+	from := f32(time.duration_seconds(time.since(core.start_time)) * 2) * math.PI
+	to := from + 2.5 + math.sin(f32(time.duration_seconds(time.since(core.start_time)) * 3)) * 1
+
+	inner := f32(6)
+	outer := f32(10)
+	half := (inner + outer) / 2
+
+	draw_ring_fill(center, inner, outer, from, to, color)
+	draw_arc_fill(center + {math.cos(from), math.sin(from)} * half, (outer - inner) / 2, 0, math.TAU, color)
+	draw_arc_fill(center + {math.cos(to), math.sin(to)} * half, (outer - inner) / 2, 0, math.TAU, color)
+
+	core.draw_next_frame = true
+}
+
+draw_loader :: proc(pos: [2]f32, scale: f32, color: Color) {
+	time := f32(time.duration_seconds(time.since(core.start_time))) * 4.5
+	radius := scale * 0.5
+	draw_ellipse_fill(
+		{
+			pos.x + math.cos(time) * scale,
+			pos.y,
+		}, 
+		{
+			radius * (1 + math.abs(math.cos(time + math.PI / 2)) * 0.75), 
+			radius,
+		}, 
+		0, 
+		math.TAU, 
+		color,
+	)
+	core.draw_next_frame = true
 }

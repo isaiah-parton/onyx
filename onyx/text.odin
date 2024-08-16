@@ -351,10 +351,6 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 
 	// Reset new line state
 	iter.new_line = false
-	if iter.codepoint == '\t' {
-		iter.line_size.x += iter.glyph.advance
-	}
-
 	// If the last rune was '\n' then this is a new line
 	if (iter.last_codepoint == '\n') {
 		iter.new_line = true
@@ -371,7 +367,7 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 		}
 	}
 
-	// Update vertical offset if there'e.a new line or if reached end
+	// Update vertical offset if there's a new line or if reached end
 	if iter.new_line {
 		iter.line_size.x = 0
 		iter.glyph_pos.x = 0
@@ -384,9 +380,8 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 			iter.glyph_pos.x -= measure_next_line(iter^)
 		}
 		iter.glyph_pos.y += iter.size.ascent - iter.size.descent + iter.size.line_gap
-	} else {
-		iter.line_size.x += math.floor(iter.glyph.advance + iter.info.spacing)
 	}
+	iter.line_size.x += math.floor(iter.glyph.advance + iter.info.spacing)
 
 	return
 }
@@ -414,17 +409,8 @@ measure_next_word :: proc(iter: Text_Iterator) -> (size: f32, end: int) {
 }
 
 measure_text :: proc(info: Text_Info) -> [2]f32 {
-	size: [2]f32
-	if it, ok := make_text_iterator(info); ok {
-		for iterate_text(&it) {
-			size.x = max(size.x, it.line_size.x)
-			if it.new_line {
-				size.y += it.size.ascent - it.size.descent + it.size.line_gap
-			}
-		}
-		size.y += it.size.ascent - it.size.descent
-	}
-	return size
+	job, _ := make_text_job(info)
+	return job.size
 }
 
 load_font :: proc(file_path: string) -> (handle: int, success: bool) {

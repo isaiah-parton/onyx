@@ -1,7 +1,7 @@
 package onyx
 
 Color_Scheme :: struct {
-	background, foreground, substance, accent, content: Color,
+	background, foreground, substance, accent, accent_content, content: Color,
 }
 
 Font_Style :: enum {
@@ -30,10 +30,11 @@ default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
 		tooltip_padding = 3,
 		panel_padding = 10,
-		header_text_size = 32,
-		button_text_size = 22,
-		tab_text_size = 20,
-		content_text_size = 20,
+		header_text_size = 30,
+		button_text_size = 20,
+		tab_text_size = 18,
+		content_text_size = 18,
+		rounding = 5,
 	}
 }
 
@@ -43,6 +44,7 @@ light_color_scheme :: proc() -> Color_Scheme {
 		foreground = {25, 25, 32, 255},
 		substance = {65, 65, 75, 255},
 		accent = {59, 130, 246, 255},
+		accent_content = {255, 255, 255, 255},
 		content = {255, 255, 255, 255},
 	}
 }
@@ -52,7 +54,8 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		background = {0, 0, 0, 255},
 		foreground = {15, 15, 15, 255},
 		substance = {45, 45, 45, 255},
-		accent = {59, 130, 246, 255},
+		accent = {234, 88, 12, 255},
+		accent_content = {255, 255, 255, 255},
 		content = {255, 255, 255, 255},
 	}
 }

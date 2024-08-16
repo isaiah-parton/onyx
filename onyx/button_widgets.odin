@@ -1,5 +1,6 @@
 package onyx
 
+import "core:time"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
@@ -14,11 +15,11 @@ Button_Kind :: enum {
 Button_Info :: struct {
 	using _: Generic_Widget_Info,
 	text: string,
+	is_loading: bool,
 	kind: Button_Kind,
 	font_size: Maybe(f32),
 
-	__text_size: [2]f32,
-	__text_info: Text_Info,
+	__text_job: Text_Job,
 }
 
 Button_Result :: struct {
@@ -28,19 +29,16 @@ Button_Result :: struct {
 make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 	info := info
 	info.id = hash(loc)
-	info.__text_info = {
+	text_info := Text_Info{
 		text = info.text,
 		size = info.font_size.? or_else core.style.button_text_size,
+		spacing = 1,
+		font = core.style.fonts[.Regular],
+		align_v = .Middle,
+		align_h = .Middle,
 	}
-	#partial switch info.kind {
-		case .Ghost, .Outlined: 
-		info.__text_info.font = core.style.fonts[.Regular]
-		info.__text_info.spacing = 1
-		case: 
-		info.__text_info.font = core.style.fonts[.Bold]
-	}
-	info.__text_size = measure_text(info.__text_info)
-	info.desired_size = info.__text_size + {20, 10}
+	info.__text_job, _ = make_text_job(text_info)
+	info.desired_size = info.__text_job.size + {20, 10}
 	return info
 }
 
@@ -52,26 +50,39 @@ add_button :: proc(info: Button_Info) -> (result: Button_Result) {
 	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
 
 	if widget.visible {
-		text_info := info.__text_info
+		text_color: Color
+
 		switch info.kind {
-			case .Outlined:
+		case .Outlined:
 			draw_rounded_box_fill(widget.box, core.style.rounding, fade(core.style.color.substance, widget.hover_time))
 			if widget.hover_time < 1 {
 				draw_rounded_box_stroke(widget.box, core.style.rounding, 1, core.style.color.substance)
 			}
-			draw_text(box_center(widget.box) - info.__text_size / 2, text_info, core.style.color.content)
+			text_color = core.style.color.content
 
-			case .Secondary:
+		case .Secondary:
 			draw_rounded_box_fill(widget.box, core.style.rounding, blend_colors(widget.hover_time * 0.25, core.style.color.substance, core.style.color.foreground))
-			draw_text(box_center(widget.box) - info.__text_size / 2, text_info, core.style.color.content)
+			text_color = core.style.color.content
 
-			case .Primary:
-			draw_rounded_box_fill(widget.box, core.style.rounding, blend_colors(widget.hover_time * 0.25, core.style.color.content, core.style.color.foreground))
-			draw_text(box_center(widget.box) - info.__text_size / 2, text_info, core.style.color.foreground)
+		case .Primary:
+			draw_rounded_box_fill(widget.box, core.style.rounding, blend_colors(widget.hover_time * 0.25, core.style.color.accent, core.style.color.foreground))
+			text_color = core.style.color.accent_content
 
-			case .Ghost:
+		case .Ghost:
 			draw_rounded_box_fill(widget.box, core.style.rounding, fade(core.style.color.substance, widget.hover_time))
-			draw_text(box_center(widget.box) - info.__text_size / 2, text_info, core.style.color.content)
+			text_color = core.style.color.content
+		}
+
+		if !info.is_loading {
+			draw_text_glyphs(info.__text_job, box_center(widget.box), text_color)
+		}
+
+		if widget.disable_time > 0 {
+			draw_rounded_box_fill(widget.box, core.style.rounding, fade(core.style.color.background, widget.disable_time * 0.5))
+		}
+
+		if info.is_loading {
+			draw_loader(box_center(widget.box), 10, text_color)
 		}
 	}
 

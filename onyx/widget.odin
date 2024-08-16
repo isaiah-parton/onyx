@@ -18,7 +18,7 @@ Widget :: struct {
 	layer:                                        ^Layer,
 	visible, disabled, draggable, is_field, dead: bool,
 	last_state, next_state, state:                Widget_State,
-	focus_time, hover_time:                       f32,
+	focus_time, hover_time, disable_time:                       f32,
 	click_count:                                  int,
 	click_time:                                   time.Time,
 	click_button:                                 Mouse_Button,
@@ -91,6 +91,10 @@ is_hovered :: proc(result: Generic_Widget_Result) -> bool {
 	return .Hovered in widget.state
 }
 
+was_changed :: proc(result: Generic_Widget_Result) -> bool {
+	return .Changed in result.self.?.state
+}
+
 get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 
 	id := info.id.?
@@ -118,13 +122,15 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 
 	widget.visible = core.visible && core.draw_this_frame
 	widget.dead = false
-	widget.disabled = info.disabled
 	widget.layer = current_layer()
 	if box, ok := info.box.?; ok {
 		widget.box = box
 	}
 	widget.last_state = widget.state
-	widget.state -= {.Clicked, .Focused}
+	widget.state -= {.Clicked, .Focused, .Changed}
+
+	widget.disabled = true if core.disable_widgets else info.disabled
+	widget.disable_time = animate(widget.disable_time, 0.25, widget.disabled)
 
 	// Mouse hover
 	if core.hovered_widget == widget.id {
@@ -225,26 +231,11 @@ process_widgets :: proc() {
 
 // Commit a widget to be processed
 commit_widget :: proc(widget: ^Widget, hovered: bool) {
-	if (.Hovered in widget.layer.state) && hovered {
+	if (.Hovered in widget.layer.state) && hovered && !widget.disabled {
 		core.next_hovered_widget = widget.id
 	}
 }
 
-compute_layout_size :: proc(
-	padding, spacing: f32,
-	widgets: ..Generic_Widget_Info,
-) -> (
-	size: [2]f32,
-) {
-
-	for &widget, w in widgets {
-		size += widget.desired_size
-		if w > 0 {
-			size += spacing
-		}
-	}
-
-	size += padding * 2
-
-	return
+enable_widgets :: proc(enabled: bool = true) {
+	core.disable_widgets = !enabled
 }

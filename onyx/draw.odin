@@ -146,7 +146,7 @@ push_draw_call :: proc() {
 		})
 		core.current_draw_call.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
 			min_filter = .LINEAR,
-			mag_filter = .LINEAR,
+			mag_filter = .NEAREST,
 			wrap_u = .MIRRORED_REPEAT,
 			wrap_v = .MIRRORED_REPEAT,
 		})

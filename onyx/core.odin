@@ -93,6 +93,7 @@ Core :: struct {
 		Widget,
 	),
 	widget_map:                                                           map[Id]^Widget,
+	disable_widgets: bool,
 	panels:                                                               [MAX_PANELS]Maybe(Panel),
 	panel_map:                                                            map[Id]^Panel,
 	last_hovered_widget, hovered_widget, next_hovered_widget:             Id,
@@ -119,7 +120,7 @@ Core :: struct {
 	visible, focused:                                                     bool,
 	frame_count:                                                          int,
 	delta_time:                                                           f32, // Delta time in seconds
-	last_frame_time:                                                      time.Time, // Time of last frame
+	last_frame_time, start_time:                                                      time.Time, // Time of last frame
 	draw_this_frame, draw_next_frame:                                     bool,
 	glyphs:                                                               [dynamic]Text_Job_Glyph,
 	lines:                                                                [dynamic]Text_Job_Line,
@@ -154,6 +155,7 @@ init :: proc() {
 	core.view = {sapp.widthf(), sapp.heightf()}
 	core.last_frame_time = time.now()
 	core.draw_next_frame = true
+	core.start_time = time.now()
 
 	// Set up graphics environment
 	environment := sglue.environment()
@@ -197,20 +199,12 @@ init :: proc() {
 
 	// Init font atlas
 	max_atlas_size := int(core.limits.max_image_size_2d)
-	if max_atlas_size < MIN_ATLAS_SIZE {
-		fmt.printf(
-			"ʕ+ᴥ+ʔ The maximum supported texture size is only %ix%i!\n\n",
-			max_atlas_size,
-		)
-	}
 	atlas_size: int = min(max_atlas_size, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, atlas_size, atlas_size)
 
 	// Default style
 	core.style.color = dark_color_scheme()
 	core.style.shape = default_style_shape()
-
-	fmt.print("ʕ·ᴥ·ʔ Onyx is awake and feeling great!\n\n")
 }
 
 begin_frame :: proc() {
@@ -260,9 +254,9 @@ begin_frame :: proc() {
 		}
 
 		if key_down(.LEFT_SHIFT) {
-			slice.sort_by(widget_list[:], sort_proc)
-		} else {
 			slice.reverse_sort_by(widget_list[:], sort_proc)
+		} else {
+			slice.sort_by(widget_list[:], sort_proc)
 		}
 
 		for widget, w in widget_list {
@@ -584,9 +578,6 @@ quit :: proc() {
 	// Shutdown subsystems
 	sdtx.shutdown()
 	sg.shutdown()
-
-	// idk????
-	fmt.print("ʕ-ᴥ-ʔ Onyx went to sleep peacefully.\n\n")
 }
 
 handle_event :: proc(e: ^sapp.Event) {
