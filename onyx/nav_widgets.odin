@@ -41,7 +41,8 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 }
 
 add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
-	widget := get_widget(info)
+	widget, ok := get_widget(info)
+	if !ok do return
 	widget.box = next_widget_box(info)
 	result.self = widget
 
@@ -114,11 +115,11 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 					box = box,
 					origin = {box_center_x(box), box.lo.y},
 					scale = ([2]f32)(ease.cubic_in_out(widget.focus_time)),
-					parent = current_layer(),
+					parent = current_layer().?,
 				},
 			)
-			layer := current_layer()
-			if .Focused in current_layer().state {
+			layer := current_layer().?
+			if .Focused in layer.state {
 				widget.next_state += {.Focused}
 			}
 			foreground()

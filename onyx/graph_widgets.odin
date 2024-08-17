@@ -8,15 +8,11 @@ import "core:math/linalg"
 import "base:intrinsics"
 
 Bar_Graph :: struct {
-	stacked,
-	show_labels,
-	show_tooltip,
-	horizontal: bool,
+	stacked, show_labels, show_tooltip, horizontal: bool,
 }
 
 Line_Graph :: struct {
-	show_dots,
-	filled: bool,
+	show_dots, filled: bool,
 }
 
 Graph_Kind :: union #no_nil {
@@ -25,45 +21,40 @@ Graph_Kind :: union #no_nil {
 }
 
 Graph_Entry :: struct($T: typeid) {
-	label: string,
+	label:  string,
 	values: []T,
 }
 
 Graph_Field_Info :: struct {
-	name: string,
+	name:  string,
 	color: Color,
 }
 
 Graph_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
-	using _: Generic_Widget_Info,
-
+	using _:           Generic_Widget_Info,
 	lo, hi, increment: T,
-	kind: Graph_Kind,
-
-	spacing: f32,
-
-	fields: []Graph_Field_Info,
-	entries: []Graph_Entry(T),
+	kind:              Graph_Kind,
+	spacing:           f32,
+	fields:            []Graph_Field_Info,
+	entries:           []Graph_Entry(T),
 }
 
-Widget_Variant_Graph :: struct{
+Widget_Variant_Graph :: struct {
 	dot_times: [dynamic]f32,
-	bar_time: f32,
+	bar_time:  f32,
 }
 
 make_graph :: proc(info: Graph_Info($T), loc := #caller_location) -> Graph_Info(T) {
 	info := info
 	info.id = hash(loc)
 	info.spacing = max(info.spacing, 10)
-	info.desired_size = {
-		info.spacing * f32(len(info.entries)),
-		f32(info.hi - info.lo) * 2,
-	}
+	info.desired_size = {info.spacing * f32(len(info.entries)), f32(info.hi - info.lo) * 2}
 	return info
 }
 
 add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
-	widget := get_widget(info)
+	widget, ok := get_widget(info)
+	if !ok do return
 
 	widget.box = next_widget_box(info)
 	variant := widget_variant(widget, Widget_Variant_Graph)
@@ -79,18 +70,33 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 
 	switch kind in info.kind {
 
-		case Line_Graph:
+	case Line_Graph:
 		if widget.visible {
 			for v := info.lo; v <= info.hi; v += info.increment {
-				p := math.floor(box.hi.y + (box.lo.y - box.hi.y) * (f32(v) / f32(info.hi - info.lo)))
-				draw_box_fill({{box.lo.x, p}, {box.hi.x, p + 1}}, fade(core.style.color.substance, 0.5))
+				p := math.floor(
+					box.hi.y + (box.lo.y - box.hi.y) * (f32(v) / f32(info.hi - info.lo)),
+				)
+				draw_box_fill(
+					{{box.lo.x, p}, {box.hi.x, p + 1}},
+					fade(core.style.color.substance, 0.5),
+				)
 			}
 			resize(&variant.dot_times, len(info.entries))
 
-			hn := int(math.round((core.mouse_pos.x - box.lo.x) / ((box.hi.x -  box.lo.x) / f32(len(info.entries) - 1))))
+			hn := int(
+				math.round(
+					(core.mouse_pos.x - box.lo.x) /
+					((box.hi.x - box.lo.x) / f32(len(info.entries) - 1)),
+				),
+			)
 			if hn >= 0 && hn < len(info.entries) {
 				p := box.lo.x + (f32(hn) / f32(len(info.entries) - 1)) * (box.hi.x - box.lo.x)
-				draw_line({p, box.lo.y}, {p, box.hi.y}, 2, fade(core.style.color.content, widget.hover_time * 0.5))
+				draw_line(
+					{p, box.lo.y},
+					{p, box.hi.y},
+					2,
+					fade(core.style.color.content, widget.hover_time * 0.5),
+				)
 			}
 
 			for &field, f in info.fields {
@@ -98,8 +104,10 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 				begin_path()
 				for &entry, e in info.entries {
 					p: [2]f32 = {
-						box.lo.x + (f32(e) / f32(len(info.entries) - 1)) * (box.hi.x - box.lo.x), 
-						box.hi.y + (f32(entry.values[f] - info.lo) / f32(info.hi - info.lo)) * (box.lo.y - box.hi.y),
+						box.lo.x + (f32(e) / f32(len(info.entries) - 1)) * (box.hi.x - box.lo.x),
+						box.hi.y +
+						(f32(entry.values[f] - info.lo) / f32(info.hi - info.lo)) *
+							(box.lo.y - box.hi.y),
 					}
 					point(p)
 				}
@@ -112,8 +120,10 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 				for &entry, e in info.entries {
 					point_time: f32 = f32(e) / f32(len(info.entries) - 1)
 					p: [2]f32 = {
-						box.lo.x + point_time * (box.hi.x - box.lo.x), 
-						box.hi.y + (f32(entry.values[f] - info.lo) / f32(info.hi - info.lo)) * (box.lo.y - box.hi.y),
+						box.lo.x + point_time * (box.hi.x - box.lo.x),
+						box.hi.y +
+						(f32(entry.values[f] - info.lo) / f32(info.hi - info.lo)) *
+							(box.lo.y - box.hi.y),
 					}
 					dot_time := variant.dot_times[e]
 					dot_time = animate(dot_time, 0.15, hn == e && .Hovered in widget.state)
@@ -130,21 +140,35 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 			}
 		}
 
-		case Bar_Graph:
-
+	case Bar_Graph:
 		PADDING :: 5
 		block_size: f32 = (box.hi.x - box.lo.x) / f32(len(info.entries))
-		hovered_entry := clamp(int((core.mouse_pos.x - widget.box.lo.x) / block_size), 0, len(info.entries) - 1)
+		hovered_entry := clamp(
+			int((core.mouse_pos.x - widget.box.lo.x) / block_size),
+			0,
+			len(info.entries) - 1,
+		)
 
 		if .Hovered in widget.state {
-			draw_box_fill({{box.lo.x + f32(hovered_entry) * block_size, box.lo.y}, {box.lo.x + f32(hovered_entry) * block_size + block_size, box.hi.y}}, fade(core.style.color.substance, 0.5))
+			draw_box_fill(
+				{
+					{box.lo.x + f32(hovered_entry) * block_size, box.lo.y},
+					{box.lo.x + f32(hovered_entry) * block_size + block_size, box.hi.y},
+				},
+				fade(core.style.color.substance, 0.5),
+			)
 		}
 
 		if kind.stacked {
 
 			for v := info.lo; v <= info.hi; v += info.increment / T(len(info.fields)) {
-				p := math.floor(box.hi.y + (box.lo.y - box.hi.y) * (f32(v) / f32(info.hi - info.lo)))
-				draw_box_fill({{box.lo.x, p}, {box.hi.x, p + 1}}, fade(core.style.color.substance, 0.5))
+				p := math.floor(
+					box.hi.y + (box.lo.y - box.hi.y) * (f32(v) / f32(info.hi - info.lo)),
+				)
+				draw_box_fill(
+					{{box.lo.x, p}, {box.hi.x, p + 1}},
+					fade(core.style.color.substance, 0.5),
+				)
 			}
 
 			for &entry, e in info.entries {
@@ -156,13 +180,17 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 				}
 
 				if len(entry.label) > 0 {
-					draw_text({(block.lo.x + block.hi.x) / 2, block.hi.y + 2}, {
-						text = entry.label, 
-						font = core.style.fonts[.Light],
-						size = 16,
-						align_h = .Middle,
-						align_v = .Top,
-					}, core.style.color.content)
+					draw_text(
+						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
+						{
+							text = entry.label,
+							font = core.style.fonts[.Light],
+							size = 16,
+							align_h = .Middle,
+							align_v = .Top,
+						},
+						core.style.color.content,
+					)
 				}
 
 				height: f32 = 0
@@ -171,7 +199,9 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					if entry.values[f] == 0 {
 						continue
 					}
-					field_height := (f32(entry.values[f]) / f32(info.hi * len(info.fields))) * (box.hi.y - box.lo.y)
+					field_height :=
+						(f32(entry.values[f]) / f32(info.hi * len(info.fields))) *
+						(box.hi.y - box.lo.y)
 					corners: Corners
 					if f == 0 {
 						corners += {.Top_Left, .Top_Right}
@@ -179,15 +209,28 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					if f == len(info.fields) - 1 {
 						corners += {.Bottom_Left, .Bottom_Right}
 					}
-					draw_rounded_box_corners_fill({{block.lo.x, block.hi.y - (height + field_height)}, {block.hi.x, block.hi.y - height}}, core.style.rounding, corners, field.color)
+					draw_rounded_box_corners_fill(
+						{
+							{block.lo.x, block.hi.y - (height + field_height)},
+							{block.hi.x, block.hi.y - height},
+						},
+						core.style.rounding,
+						corners,
+						field.color,
+					)
 					height += field_height
 				}
 			}
 		} else {
 			// Draw incremental lines
 			for v := info.lo; v <= info.hi; v += info.increment {
-				p := math.floor(box.hi.y + (box.lo.y - box.hi.y) * (f32(v) / f32(info.hi - info.lo)))
-				draw_box_fill({{box.lo.x, p}, {box.hi.x, p + 1}}, fade(core.style.color.substance, 0.5))
+				p := math.floor(
+					box.hi.y + (box.lo.y - box.hi.y) * (f32(v) / f32(info.hi - info.lo)),
+				)
+				draw_box_fill(
+					{{box.lo.x, p}, {box.hi.x, p + 1}},
+					fade(core.style.color.substance, 0.5),
+				)
 			}
 			for &entry, e in info.entries {
 				block := cut_box_left(&box, block_size)
@@ -197,57 +240,76 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 				}
 				bar_size := (block.hi.x - block.lo.x) / f32(len(info.fields))
 				if len(entry.label) > 0 {
-					draw_text({(block.lo.x + block.hi.x) / 2, block.hi.y + 2}, {
-						text = entry.label, 
-						font = core.style.fonts[.Light],
-						size = 16,
-						align_h = .Middle,
-						align_v = .Top,
-					}, core.style.color.content)
+					draw_text(
+						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
+						{
+							text = entry.label,
+							font = core.style.fonts[.Light],
+							size = 16,
+							align_h = .Middle,
+							align_v = .Top,
+						},
+						core.style.color.content,
+					)
 				}
 				for &field, f in info.fields {
 					bar := cut_box_left(&block, bar_size)
 					bar.lo.x += 1
 					bar.hi.x -= 1
-					bar.lo.y = bar.hi.y - (f32(entry.values[f]) / f32(info.hi)) * (bar.hi.y - bar.lo.y)
+					bar.lo.y =
+						bar.hi.y - (f32(entry.values[f]) / f32(info.hi)) * (bar.hi.y - bar.lo.y)
 					draw_rounded_box_fill(bar, core.style.rounding, field.color)
 					if kind.show_labels {
-						draw_text({(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2}, {
-							text = tmp_print(entry.values[f]), 
-							font = core.style.fonts[.Light],
-							size = 16,
-							align_h = .Middle,
-							align_v = .Bottom,
-						}, fade(core.style.color.content, 0.5 if entry.values[f] == 0 else 1.0))
+						draw_text(
+							{(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},
+							{
+								text = tmp_print(entry.values[f]),
+								font = core.style.fonts[.Light],
+								size = 16,
+								align_h = .Middle,
+								align_v = .Bottom,
+							},
+							fade(core.style.color.content, 0.5 if entry.values[f] == 0 else 1.0),
+						)
 					}
 				}
 			}
 		}
 		if .Hovered in widget.state {
 			// Tooltip
-			begin_tooltip({
-				bounds = widget.box,
-				size = {150, f32(len(info.fields)) * 26 + 6},
-				time = ease.cubic_in_out(widget.hover_time),
-			})
-				shrink(3)
-				for &field, f in info.fields {
-					tip_box := shrink_box(cut_box(&current_layout().box, .Top, 26), 3)
-					draw_rounded_box_fill(cut_box_left(&tip_box, 6), core.style.rounding, field.color)
-					draw_text({tip_box.lo.x + 8, (tip_box.lo.y + tip_box.hi.y) / 2}, {
-						text = field.name, 
-						font = core.style.fonts[.Regular], 
+			begin_tooltip(
+				{
+					bounds = widget.box,
+					size = {150, f32(len(info.fields)) * 26 + 6},
+					time = ease.cubic_in_out(widget.hover_time),
+				},
+			)
+			shrink(3)
+			for &field, f in info.fields {
+				tip_box := shrink_box(cut_box(&current_layout().?.box, .Top, 26), 3)
+				draw_rounded_box_fill(cut_box_left(&tip_box, 6), core.style.rounding, field.color)
+				draw_text(
+					{tip_box.lo.x + 8, (tip_box.lo.y + tip_box.hi.y) / 2},
+					{
+						text = field.name,
+						font = core.style.fonts[.Regular],
 						size = 18,
 						align_v = .Middle,
-					}, color = core.style.color.content)
-					draw_text({tip_box.hi.x - 4, (tip_box.lo.y + tip_box.hi.y) / 2}, {
-						text = tmp_printf("%v", info.entries[hovered_entry].values[f]), 
-						font = core.style.fonts[.Regular], 
+					},
+					color = core.style.color.content,
+				)
+				draw_text(
+					{tip_box.hi.x - 4, (tip_box.lo.y + tip_box.hi.y) / 2},
+					{
+						text = tmp_printf("%v", info.entries[hovered_entry].values[f]),
+						font = core.style.fonts[.Regular],
 						size = 18,
 						align_h = .Right,
 						align_v = .Middle,
-					}, color = core.style.color.content)
-				}
+					},
+					color = core.style.color.content,
+				)
+			}
 			end_tooltip()
 		}
 	}

@@ -37,12 +37,12 @@ Component_Showcase :: struct {
 	checkboxes:   [Option]bool,
 	text_builder: strings.Builder,
 	slider_value: f32,
-	images:       [4]onyx.Image,
 	start_time:   time.Time,
 }
 
 State :: struct {
 	component_showcase: Component_Showcase,
+	images:             [4]onyx.Image,
 }
 
 do_component_showcase :: proc(state: ^Component_Showcase) {
@@ -69,21 +69,21 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		side(.Top)
 		do_label({text = "Fit to label", font_style = .Bold, font_size = 24})
 		space(10)
-		begin_layout({size = 30})
-		set_width_auto()
-		for member, m in Button_Kind {
-			push_id(m)
-			if m > 0 {
-				space(10)
-			}
-			if was_clicked(
-				do_button({text = tmp_print(member), kind = member, is_loading = true}),
-			) {
+		if do_layout({size = 30}) {
+			set_width_auto()
+			for member, m in Button_Kind {
+				push_id(m)
+				if m > 0 {
+					space(10)
+				}
+				if was_clicked(
+					do_button({text = tmp_print(member), kind = member, is_loading = true}),
+				) {
 
+				}
+				pop_id()
 			}
-			pop_id()
 		}
-		end_layout()
 
 	case .Checkbox:
 		side(.Top)
@@ -181,8 +181,11 @@ main :: proc() {
 				onyx.set_style_font(.Light, "fonts/Geist-Light.ttf")
 				onyx.set_style_font(.Regular, "fonts/Geist-Regular.ttf")
 
-				// for i in 0..<4 {
-				// 	state.images[i] = onyx.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic("failed lol")
+				// for i in 0 ..< 4 {
+				// 	state.images[i] =
+				// 		onyx.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic(
+				// 			"failed lol",
+				// 		)
 				// }
 			},
 			frame_userdata_cb = proc "c" (userdata: rawptr) {
@@ -193,23 +196,22 @@ main :: proc() {
 				begin_frame()
 				do_component_showcase(&state.component_showcase)
 
-				// for i in 0..<4 {
-				// 	push_id(i)
-				// 		begin_panel({
-				// 			title = tmp_printf("Panel #{}", i + 1),
-				// 		})
-
-				// 		end_panel()
-				// 	pop_id()
-				// }
-
-				// for i in 0..<4 {
-				// 	origin: [2]f32 = {
-				// 		0 + f32(i) * 200,
-				// 		sapp.heightf() - 200,
-				// 	}
-				// 	onyx.draw_image(state.images[i], {origin, origin + 200}, {255, 255, 255, 255})
-				// }
+				if do_panel({title = "Widgets"}) {
+					shrink(30)
+					side(.Top)
+					for i in 0 ..< 6 {
+						if i > 0 do space(10)
+						if do_layout({size = 30, side = .Top}) {
+							for j in 0 ..< 4 {
+								if j > 0 do space(10)
+								button_text := tmp_printf("Button %c%i", 'A' + i, j + 1)
+								push_id(button_text)
+								do_button({text = button_text})
+								pop_id()
+							}
+						}
+					}
+				}
 				end_frame()
 			},
 			cleanup_cb = proc "c" () {

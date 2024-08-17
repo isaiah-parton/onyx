@@ -1,7 +1,7 @@
 package onyx
 
 /*
-	Layers are surfaces with a unique z-index on which widgets are drawn. 
+	Layers are surfaces with a unique z-index on which widgets are drawn.
 	They can be reordered by the mouse
 */
 
@@ -35,44 +35,39 @@ Layer_Option :: enum {
 Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
-	id: Id,
-
-	last_state,
-	state: Layer_State,
-	options: Layer_Options,			// Option bit flags
-	kind: Layer_Kind,
-
-	box: Box,		
-
-	parent: ^Layer,							// The layer's parent
-	children: [dynamic]^Layer,	// The layer's children
-
-	dead: bool,									// Should be deleted?
-
-	z_index: int,
+	id:                Id,
+	last_state, state: Layer_State,
+	options:           Layer_Options, // Option bit flags
+	kind:              Layer_Kind,
+	box:               Box,
+	parent:            ^Layer, // The layer's parent
+	children:          [dynamic]^Layer, // The layer's children
+	dead:              bool, // Should be deleted?
+	z_index:           int,
 }
 
 Layer_Info :: struct {
-	id: Id,
-	parent: ^Layer,
-	options: Layer_Options,
-	box: Box,
-	kind: Maybe(Layer_Kind),
-
-	origin: [2]f32,
-	scale: Maybe([2]f32),
+	id:       Id,
+	parent:   ^Layer,
+	options:  Layer_Options,
+	box:      Box,
+	kind:     Maybe(Layer_Kind),
+	origin:   [2]f32,
+	scale:    Maybe([2]f32),
 	rotation: f32,
 }
 
-current_layer :: proc(loc := #caller_location) -> ^Layer {
-	assert(core.layer_stack.height > 0, "No current layer", loc)
-	return core.layer_stack.items[core.layer_stack.height - 1]
+current_layer :: proc(loc := #caller_location) -> Maybe(^Layer) {
+	if core.layer_stack.height > 0 {
+		return core.layer_stack.items[core.layer_stack.height - 1]
+	}
+	return nil
 }
 
 set_layer_z_index :: proc(layer: ^Layer, z_index: int) {
 	assert(layer != nil)
 
-	for i in 0..<len(core.layers) {
+	for i in 0 ..< len(core.layers) {
 		other_layer := &core.layers[i]
 		if other_layer.id == 0 do continue
 
@@ -85,7 +80,7 @@ set_layer_z_index :: proc(layer: ^Layer, z_index: int) {
 
 get_highest_layer_of_kind :: proc(kind: Layer_Kind) -> int {
 	z_index: int
-	for i in 0..<len(core.layers) {
+	for i in 0 ..< len(core.layers) {
 		layer := &core.layers[i]
 		if layer.id == 0 do continue
 
@@ -97,9 +92,9 @@ get_highest_layer_of_kind :: proc(kind: Layer_Kind) -> int {
 }
 
 create_layer :: proc(id: Id) -> (result: ^Layer, ok: bool) {
-	for i in 0..<MAX_LAYERS {
+	for i in 0 ..< MAX_LAYERS {
 		if core.layers[i].id == 0 {
-			core.layers[i] = Layer{
+			core.layers[i] = Layer {
 				id = id,
 			}
 			result = &core.layers[i]
@@ -125,7 +120,10 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 			set_layer_parent(layer, info.parent)
 		}
 
-		set_layer_z_index(layer, layer.parent.z_index + 1 if layer.parent != nil else get_highest_layer_of_kind(kind))
+		set_layer_z_index(
+			layer,
+			layer.parent.z_index + 1 if layer.parent != nil else get_highest_layer_of_kind(kind),
+		)
 	}
 
 	// Set parameters
@@ -143,16 +141,14 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 			bring_layer_to_front(layer)
 		}
 	}
-	
+
 	if core.focused_layer == layer.id {
 		layer.state += {.Focused}
 	}
 
 	// Push stacks
 	push_stack(&core.layer_stack, layer)
-	begin_layout({
-		box = layer.box,
-	})
+	begin_layout({box = layer.box})
 
 	// Set vertex z position
 	core.vertex_state.z = 0.001 * f32(layer.z_index)
@@ -170,7 +166,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 
 end_layer :: proc() {
 	pop_matrix()
-	layer := current_layer()
+	layer := current_layer().?
 
 	// Get hover state
 	if (.Ghost not_in layer.options) && point_in_box(core.mouse_pos, layer.box) {
@@ -186,7 +182,9 @@ end_layer :: proc() {
 	pop_stack(&core.layer_stack)
 
 	// Reset z-level to that of the previous layer or to zero
-	core.vertex_state.z = (0.001 * f32(current_layer().z_index)) if core.layer_stack.height > 0 else 0
+	if layer, ok := current_layer().?; ok {
+		core.vertex_state.z = 0.001 * f32(layer.z_index)
+	}
 }
 
 bring_layer_to_front :: proc(layer: ^Layer) {
@@ -200,7 +198,7 @@ bring_layer_to_front :: proc(layer: ^Layer) {
 	}
 
 	// Second pass lowers other layers
-	for i in 0..<len(core.layers) {
+	for i in 0 ..< len(core.layers) {
 		other_layer := &core.layers[i]
 		if other_layer.id == 0 do continue
 		if other_layer.z_index > layer.z_index && other_layer.z_index <= highest_of_kind {
@@ -229,7 +227,7 @@ bring_layer_to_front_of_children :: proc(layer: ^Layer) {
 	}
 
 	// Second pass lowers other layers
-	for i in 0..<len(core.layers) {
+	for i in 0 ..< len(core.layers) {
 		other_layer := &core.layers[i]
 		if other_layer.id == 0 do continue
 		if other_layer.z_index > layer.z_index && other_layer.z_index <= highest_of_kind {
@@ -242,7 +240,7 @@ bring_layer_to_front_of_children :: proc(layer: ^Layer) {
 
 get_highest_layer_kind_index :: proc(kind: Layer_Kind) -> int {
 	index: int
-	for i in 0..<len(core.layers) {
+	for i in 0 ..< len(core.layers) {
 		other_layer := &core.layers[i]
 		if other_layer.id == 0 do continue
 		if int(other_layer.kind) <= int(kind) {

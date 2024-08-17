@@ -18,12 +18,13 @@ Widget :: struct {
 	layer:                                        ^Layer,
 	visible, disabled, draggable, is_field, dead: bool,
 	last_state, next_state, state:                Widget_State,
-	focus_time, hover_time, disable_time:                       f32,
+	focus_time, hover_time, disable_time:         f32,
 	click_count:                                  int,
 	click_time:                                   time.Time,
 	click_button:                                 Mouse_Button,
 	allocator:                                    runtime.Allocator,
 	variant:                                      Widget_Variant,
+	desired_size:                                 [2]f32,
 }
 
 Widget_Variant :: union {
@@ -82,24 +83,23 @@ was_clicked :: proc(
 	button: Mouse_Button = .Left,
 	times: int = 1,
 ) -> bool {
-	widget := result.self.?
+	widget := result.self.? or_return
 	return .Clicked in widget.state && widget.click_button == button && widget.click_count >= times
 }
 
 is_hovered :: proc(result: Generic_Widget_Result) -> bool {
-	widget := result.self.?
+	widget := result.self.? or_return
 	return .Hovered in widget.state
 }
 
 was_changed :: proc(result: Generic_Widget_Result) -> bool {
-	return .Changed in result.self.?.state
+	widget := result.self.? or_return
+	return .Changed in widget.state
 }
 
-get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
-
-	id := info.id.?
-	widget, ok := core.widget_map[id]
-
+get_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
+	id := info.id.? or_return
+	widget, ok = core.widget_map[id]
 	if !ok {
 		for i in 0 ..< MAX_WIDGETS {
 			if core.widgets[i] == nil {
@@ -114,20 +114,26 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 					fmt.printf("[core] Created widget %x\n", id)
 				}
 
+				ok = true
+
 				core.draw_next_frame = true
 				break
 			}
 		}
 	}
 
+	// Widget must have a valid layer
+	widget.layer = current_layer().? or_return
+
 	widget.visible = core.visible && core.draw_this_frame
 	widget.dead = false
-	widget.layer = current_layer()
 	if box, ok := info.box.?; ok {
 		widget.box = box
 	}
 	widget.last_state = widget.state
 	widget.state -= {.Clicked, .Focused, .Changed}
+
+	widget.desired_size = info.desired_size
 
 	widget.disabled = true if core.disable_widgets else info.disabled
 	widget.disable_time = animate(widget.disable_time, 0.25, widget.disabled)
@@ -187,17 +193,14 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 	widget.state += widget.next_state
 	widget.next_state = {}
 
-	return widget
+	return
 }
 
 widget_variant :: proc(widget: ^Widget, $T: typeid) -> ^T {
-
 	if variant, ok := &widget.variant.(T); ok {
 		return variant
 	}
-
 	widget.variant = T{}
-
 	return &widget.variant.(T)
 }
 
@@ -234,6 +237,8 @@ commit_widget :: proc(widget: ^Widget, hovered: bool) {
 	if (.Hovered in widget.layer.state) && hovered && !widget.disabled {
 		core.next_hovered_widget = widget.id
 	}
+	layout := current_layout().?
+	add_layout_content_size(layout, widget.desired_size)
 }
 
 enable_widgets :: proc(enabled: bool = true) {

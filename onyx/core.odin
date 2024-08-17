@@ -93,7 +93,7 @@ Core :: struct {
 		Widget,
 	),
 	widget_map:                                                           map[Id]^Widget,
-	disable_widgets: bool,
+	disable_widgets:                                                      bool,
 	panels:                                                               [MAX_PANELS]Maybe(Panel),
 	panel_map:                                                            map[Id]^Panel,
 	last_hovered_widget, hovered_widget, next_hovered_widget:             Id,
@@ -106,6 +106,10 @@ Core :: struct {
 	layer_stack:                                                          Stack(
 		^Layer,
 		MAX_LAYERS,
+	),
+	panel_stack:                                                          Stack(
+		^Panel,
+		MAX_PANELS,
 	),
 	highest_layer_index:                                                  int,
 	id_stack:                                                             Stack(Id, MAX_IDS),
@@ -120,7 +124,7 @@ Core :: struct {
 	visible, focused:                                                     bool,
 	frame_count:                                                          int,
 	delta_time:                                                           f32, // Delta time in seconds
-	last_frame_time, start_time:                                                      time.Time, // Time of last frame
+	last_frame_time, start_time:                                          time.Time, // Time of last frame
 	draw_this_frame, draw_next_frame:                                     bool,
 	glyphs:                                                               [dynamic]Text_Job_Glyph,
 	lines:                                                                [dynamic]Text_Job_Line,

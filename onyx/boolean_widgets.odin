@@ -54,38 +54,40 @@ make_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Checkbox_
 }
 
 add_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
-	self := get_widget(info)
-	self.box = info.box.? or_else next_widget_box(info)
-	self.hover_time = animate(self.hover_time, 0.1, .Hovered in self.state)
+	widget, ok := get_widget(info)
+	if !ok do return {}
 
-	if self.visible {
+	widget.box = info.box.? or_else next_widget_box(info)
+	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
+
+	if widget.visible {
 		icon_box: Box
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				icon_box = {self.box.lo, SIZE}
+				icon_box = {widget.box.lo, SIZE}
 			case .Right:
-				icon_box = {{self.box.hi.x - SIZE, self.box.lo.y}, SIZE}
+				icon_box = {{widget.box.hi.x - SIZE, widget.box.lo.y}, SIZE}
 			case .Top:
-				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.hi.y - SIZE}, SIZE}
+				icon_box = {{box_center_x(widget.box) - SIZE / 2, widget.box.hi.y - SIZE}, SIZE}
 			case .Bottom:
-				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.lo.y}, SIZE}
+				icon_box = {{box_center_x(widget.box) - SIZE / 2, widget.box.lo.y}, SIZE}
 			}
 			icon_box.lo = linalg.floor(icon_box.lo)
 			icon_box.hi += icon_box.lo
 		} else {
-			icon_box = self.box
+			icon_box = widget.box
 		}
 		// Hover
-		if self.hover_time > 0 {
+		if widget.hover_time > 0 {
 			draw_rounded_box_fill(
-				self.box,
+				widget.box,
 				core.style.rounding,
-				fade(core.style.color.substance, 0.5 * self.hover_time),
+				fade(core.style.color.substance, 0.5 * widget.hover_time),
 			)
 		}
 		// Paint box
-		opacity: f32 = 0.5 if self.disabled else 1
+		opacity: f32 = 0.5 if widget.disabled else 1
 		if info.value {
 			draw_rounded_box_fill(
 				icon_box,
@@ -133,13 +135,13 @@ add_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 				)
 			case .Top:
 				draw_text(
-					self.box.lo,
+					widget.box.lo,
 					{text = info.text, font = core.style.fonts[.Regular], size = 18},
 					fade(core.style.color.content, opacity),
 				)
 			case .Bottom:
 				draw_text(
-					{self.box.lo.x, self.box.hi.y - info.__text_size.y},
+					{widget.box.lo.x, widget.box.hi.y - info.__text_size.y},
 					{text = info.text, font = core.style.fonts[.Regular], size = 18},
 					fade(core.style.color.content, opacity),
 				)
@@ -147,13 +149,13 @@ add_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 		}
 	}
 
-	if .Hovered in self.state {
+	if .Hovered in widget.state {
 		core.cursor_type = .POINTING_HAND
 	}
 
-	commit_widget(self, point_in_box(core.mouse_pos, self.box))
+	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
 
-	return Generic_Widget_Result{self = self}
+	return Generic_Widget_Result{self = widget}
 }
 
 do_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Generic_Widget_Result {
@@ -169,7 +171,9 @@ make_switch :: proc(info: Switch_Info, loc := #caller_location) -> Switch_Info {
 }
 
 add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
-	widget := get_widget(info)
+	widget, ok := get_widget(info)
+	if !ok do return
+
 	widget.box = next_widget_box(info)
 	result.self = widget
 	result.on = info.on
