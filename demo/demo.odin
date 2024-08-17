@@ -76,7 +76,9 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			if m > 0 {
 				space(10)
 			}
-			if was_clicked(do_button({text = tmp_print(member), kind = member})) {
+			if was_clicked(
+				do_button({text = tmp_print(member), kind = member, is_loading = true}),
+			) {
 
 			}
 			pop_id()

@@ -130,25 +130,18 @@ make_text_job :: proc(
 
 	job.cursor_glyph = -1
 	job.hovered_rune = -1
-	min_diff: f32 = math.F32_MAX
+
+	hovered_rune: int = -1
+	closest: f32 = math.F32_MAX
 
 	job.line_height = iter.size.ascent - iter.size.descent + iter.size.line_gap
+	job.hovered_line = max(0, int(mouse_pos.y / job.line_height))
 
 	at_end: bool
 
 	for {
 		if !iterate_text(&iter) {
 			at_end = true
-		}
-
-		// Figure out if line is hovered
-		if iter.glyph_pos.y <= mouse_pos.y && mouse_pos.y < iter.glyph_pos.y + job.line_height {
-			// Check for hovered index
-			diff := abs(iter.glyph_pos.x - mouse_pos.x)
-			if diff < min_diff {
-				min_diff = diff
-				job.hovered_rune = iter.index
-			}
 		}
 
 		// Add a glyph
@@ -169,10 +162,35 @@ make_text_job :: proc(
 			}
 		}
 
+		// Check for hovered index
+		diff := abs(iter.glyph_pos.x - mouse_pos.x)
+		if diff < closest {
+			closest = diff
+			hovered_rune = iter.index
+		}
+
 		// Push a new line
 		if iter.codepoint == '\n' || at_end {
+			current_line := len(core.lines) - first_line
+
+			// Clamp hovered line index if this is the last one
+			if at_end {
+				job.hovered_line = min(job.hovered_line, current_line)
+			}
+
+			// Determine hovered rune
+			if current_line == job.hovered_line {
+				job.hovered_rune = hovered_rune
+			}
+
+			// Reset glyph search
+			hovered_rune = -1
+			closest = math.F32_MAX
+
+			// Determine line length in runes
 			line.length = len(core.glyphs) - (line.offset + first_glyph)
 
+			// Take slice of global glyphs
 			glyphs := core.glyphs[first_glyph + line.offset:][:line.length]
 
 			// Apply horizontal alignment
@@ -186,12 +204,16 @@ make_text_job :: proc(
 				}
 			}
 
+			// Append a new line
 			append(&core.lines, line)
+
+			// Reset the current line
 			line = Text_Job_Line {
 				offset    = len(core.glyphs) - first_glyph,
 				highlight = {math.F32_MAX, 0},
 			}
 
+			// Update text size
 			job.size.x = max(job.size.x, iter.line_size.x)
 			job.size.y += iter.line_size.y
 		}
