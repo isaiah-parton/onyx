@@ -27,6 +27,7 @@ Text_Input_Widget_Variant :: struct {
 
 Text_Input_Result :: struct {
 	using _: Generic_Widget_Result,
+	changed, submitted: bool,
 }
 
 make_text_input :: proc(info: Text_Input_Info, loc := #caller_location) -> Text_Input_Info {
@@ -96,13 +97,22 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		}
 		if !info.read_only {
 			if len(core.runes) > 0 {
-				widget.state += {.Changed}
+				result.changed = true
 			}
 			input_runes(e, core.runes[:])
 		}
 		if key_pressed(.BACKSPACE) do cmd = .Delete_Word_Left if control_down else .Backspace
 		if key_pressed(.DELETE) do cmd = .Delete_Word_Right if control_down else .Delete
-		if key_pressed(.ENTER) do cmd = .New_Line
+		if key_pressed(.ENTER) {
+			cmd = .New_Line
+			if info.multiline {
+				if control_down {
+					result.submitted = true
+				}
+			} else {
+				result.submitted = true
+			}
+		}
 		if key_pressed(.LEFT) {
 			if shift_down do cmd = .Select_Word_Left if control_down else .Select_Left
 			else do cmd = .Word_Left if control_down else .Left
@@ -133,7 +143,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		}
 		if cmd != .None {
 			text_editor_execute(e, cmd)
-			widget.state += {.Changed}
+			result.changed = true
 			core.draw_next_frame = true
 		}
 	}

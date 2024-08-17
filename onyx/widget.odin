@@ -39,7 +39,6 @@ Widget_Status :: enum {
 	Hovered,
 	Focused,
 	Pressed,
-	Changed,
 	Clicked,
 	Open,
 }
@@ -91,10 +90,6 @@ is_hovered :: proc(result: Generic_Widget_Result) -> bool {
 	return .Hovered in widget.state
 }
 
-was_changed :: proc(result: Generic_Widget_Result) -> bool {
-	return .Changed in result.self.?.state
-}
-
 get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 
 	id := info.id.?
@@ -120,17 +115,33 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 		}
 	}
 
+	// Determine visible state
 	widget.visible = core.visible && core.draw_this_frame
+	
+	// Reset dead flag
 	widget.dead = false
+
+	// Assign layer
 	widget.layer = current_layer()
+
+	// Assign box
 	if box, ok := info.box.?; ok {
 		widget.box = box
 	}
-	widget.last_state = widget.state
-	widget.state -= {.Clicked, .Focused, .Changed}
 
+	// Update state
+	widget.last_state = widget.state
+	widget.state -= {.Clicked, .Focused}
+
+	// Determine disabled state
 	widget.disabled = true if core.disable_widgets else info.disabled
 	widget.disable_time = animate(widget.disable_time, 0.25, widget.disabled)
+
+	// Disable if disabled
+	if widget.disabled {
+		if core.hovered_widget == widget.id do core.hovered_widget = 0
+		if core.focused_widget == widget.id do core.focused_widget = 0
+	}
 
 	// Mouse hover
 	if core.hovered_widget == widget.id {

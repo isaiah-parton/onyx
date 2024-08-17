@@ -458,7 +458,7 @@ draw_loader :: proc(pos: [2]f32, scale: f32, color: Color) {
 			pos.y,
 		}, 
 		{
-			radius * (1 + math.abs(math.cos(time + math.PI / 2)) * 0.75), 
+			radius * (1 + math.abs(math.cos(time + math.PI / 2)) * 0.5), 
 			radius,
 		}, 
 		0, 
