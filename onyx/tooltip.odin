@@ -8,6 +8,7 @@ TOOLTIP_OFFSET :: 10
 
 Tooltip_Info :: struct {
 	bounds: Box,
+	pos:    Maybe([2]f32),
 	size:   [2]f32,
 	time:   f32,
 }
@@ -24,7 +25,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 	variant := widget_variant(widget, Widget_Variant_Tooltip)
 
 	bounds := info.bounds if info.bounds != {} else view_box()
-	origin: [2]f32 = core.mouse_pos + TOOLTIP_OFFSET
+	origin: [2]f32 = (info.pos.? or_else core.mouse_pos) + TOOLTIP_OFFSET
 	if origin.x + info.size.x > bounds.hi.x {
 		origin.x -= info.size.x + TOOLTIP_OFFSET * 2
 	}

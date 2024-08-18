@@ -53,7 +53,6 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	foreground()
 	begin_layout({size = 65, side = .Top, show_lines = true})
 	shrink(15)
-	do_breadcrumb({index = 0, options = {"Components"}})
 	if index, ok := do_breadcrumb({index = int(state.section.component), options = reflect.enum_field_names(Component)}).index.?;
 	   ok {
 		state.section.component = Component(index)
@@ -76,9 +75,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				if m > 0 {
 					space(10)
 				}
-				if was_clicked(
-					do_button({text = tmp_print(member), kind = member, is_loading = true}),
-				) {
+				if was_clicked(do_button({text = tmp_print(member), kind = member})) {
 
 				}
 				pop_id()
@@ -142,22 +139,23 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		do_graph(
 			Graph_Info(int) {
 				lo = 0,
-				hi = 50,
+				hi = 20,
 				increment = 10,
 				spacing = 10,
-				kind = Line_Graph{show_dots = true},
-				fields = {
-					{"Ohio", {255, 100, 100, 255}},
-					{"Florida", {0, 100, 255, 255}},
-					{"Alabama", {0, 255, 120, 255}},
-				},
+				kind = Line_Graph{show_dots = false},
+				fields = {{"Minecraft", {255, 25, 96, 255}}, {"Terraria", {0, 58, 255, 255}}},
 				entries = {
 					{values = {1, 5, 9}},
 					{values = {4, 2, 2}},
 					{values = {6, 5, 10}},
-					{values = {2, 8, 1}},
+					{values = {2, 6, 1}},
 					{values = {4, 7, 2}},
 					{values = {2, 4, 8}},
+					{values = {8, 5, 8}},
+					{values = {18, 6, 8}},
+					{values = {15, 7, 8}},
+					{values = {14, 8, 8}},
+					{values = {11, 6, 8}},
 				},
 			},
 		)
@@ -196,22 +194,30 @@ main :: proc() {
 				begin_frame()
 				do_component_showcase(&state.component_showcase)
 
-				if do_panel({title = "Widgets"}) {
-					shrink(30)
-					side(.Top)
-					for i in 0 ..< 6 {
-						if i > 0 do space(10)
-						if do_layout({size = 30, side = .Top}) {
-							for j in 0 ..< 4 {
-								if j > 0 do space(10)
-								button_text := tmp_printf("Button %c%i", 'A' + i, j + 1)
-								push_id(button_text)
-								do_button({text = button_text})
-								pop_id()
-							}
-						}
-					}
-				}
+				// if do_panel({title = "Widgets"}) {
+				// 	shrink(30)
+				// 	side(.Top)
+				// 	colors := [6]Color {
+				// 		{255, 60, 60, 255},
+				// 		{0, 255, 120, 255},
+				// 		{255, 10, 220, 255},
+				// 		{240, 195, 0, 255},
+				// 		{30, 120, 255, 255},
+				// 		{0, 255, 0, 255},
+				// 	}
+				// 	for color, c in colors {
+				// 		if c > 0 do space(10)
+				// 		if do_layout({size = 30, side = .Top}) {
+				// 			for kind, k in Button_Kind {
+				// 				if k > 0 do space(10)
+				// 				button_text := tmp_printf("Button %c%i", 'A' + c, k + 1)
+				// 				push_id(button_text)
+				// 				do_button({text = button_text, color = color, kind = kind})
+				// 				pop_id()
+				// 			}
+				// 		}
+				// 	}
+				// }
 				end_frame()
 			},
 			cleanup_cb = proc "c" () {
@@ -227,8 +233,9 @@ main :: proc() {
 			enable_clipboard = true,
 			enable_dragndrop = true,
 			sample_count = 4,
-			width = 1000,
-			height = 800,
+			width = 1800,
+			height = 960,
+			// fullscreen = true,
 			window_title = "o n y x",
 			// icon = sapp.Icon_Desc{
 			// 	images = {

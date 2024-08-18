@@ -1,8 +1,10 @@
 package onyx
 
+import "base:intrinsics"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
+import "core:reflect"
 
 Breadcrumb_Info :: struct {
 	using _:     Generic_Widget_Info,

@@ -18,6 +18,7 @@ Button_Info :: struct {
 	is_loading: bool,
 	kind:       Button_Kind,
 	font_size:  Maybe(f32),
+	color:      Maybe(Color),
 	__text_job: Text_Job,
 }
 
@@ -58,14 +59,14 @@ add_button :: proc(info: Button_Info) -> (result: Button_Result) {
 			draw_rounded_box_fill(
 				widget.box,
 				core.style.rounding,
-				fade(core.style.color.substance, widget.hover_time),
+				fade(info.color.? or_else core.style.color.substance, widget.hover_time),
 			)
 			if widget.hover_time < 1 {
 				draw_rounded_box_stroke(
 					widget.box,
 					core.style.rounding,
 					1,
-					core.style.color.substance,
+					info.color.? or_else core.style.color.substance,
 				)
 			}
 			text_color = core.style.color.content
@@ -76,7 +77,7 @@ add_button :: proc(info: Button_Info) -> (result: Button_Result) {
 				core.style.rounding,
 				blend_colors(
 					widget.hover_time * 0.25,
-					core.style.color.substance,
+					info.color.? or_else core.style.color.substance,
 					core.style.color.foreground,
 				),
 			)
@@ -88,7 +89,7 @@ add_button :: proc(info: Button_Info) -> (result: Button_Result) {
 				core.style.rounding,
 				blend_colors(
 					widget.hover_time * 0.25,
-					core.style.color.accent,
+					info.color.? or_else core.style.color.accent,
 					core.style.color.foreground,
 				),
 			)
@@ -98,7 +99,7 @@ add_button :: proc(info: Button_Info) -> (result: Button_Result) {
 			draw_rounded_box_fill(
 				widget.box,
 				core.style.rounding,
-				fade(core.style.color.substance, widget.hover_time),
+				fade(info.color.? or_else core.style.color.substance, widget.hover_time),
 			)
 			text_color = core.style.color.content
 		}

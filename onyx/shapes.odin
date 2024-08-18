@@ -12,7 +12,7 @@ clear_path :: proc(path: ^Path) {
 	path.count = 0
 }
 
-__get_path :: proc() -> ^Path {
+get_path :: proc() -> ^Path {
 	return &core.path_stack.items[core.path_stack.height - 1]
 }
 
@@ -25,11 +25,11 @@ end_path :: proc() {
 }
 
 close_path :: proc() {
-	__get_path().closed = true
+	get_path().closed = true
 }
 
 point :: proc(point: [2]f32) {
-	path := __get_path()
+	path := get_path()
 	if path.count >= MAX_PATH_POINTS {
 		return
 	}
@@ -61,7 +61,7 @@ arc :: proc(center: [2]f32, radius, from, to: f32) {
 }
 
 fill_path :: proc(color: Color) {
-	path := __get_path()
+	path := get_path()
 	if path.count < 3 {
 		return
 	}
@@ -75,7 +75,7 @@ fill_path :: proc(color: Color) {
 }
 
 stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Center) {
-	path := __get_path()
+	path := get_path()
 
 	if path.count < 2 {
 		return
@@ -230,15 +230,24 @@ draw_line :: proc(a, b: [2]f32, thickness: f32, color: Color) {
 draw_bezier_stroke :: proc(p0, p1, p2, p3: [2]f32, segments: int, thickness: f32, color: Color) {
 	step: f32 = 1.0 / f32(segments)
 	lp: [2]f32 = p0
-	for t: f32 = step; t <= 1; t += step {
+	weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
+	for t: f32 = step; t <= 1.0 + step; t += step {
 		times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
-		weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
 		p: [2]f32 = {
 			(times * weights * (matrix[4, 1]f32){p0.x, p1.x, p2.x, p3.x})[0][0],
 			(times * weights * (matrix[4, 1]f32){p0.y, p1.y, p2.y, p3.y})[0][0],
 		}
 		draw_line(lp, p, thickness, color)
 		lp = p
+	}
+}
+
+get_bezier_point :: proc(p0, p1, p2, p3: [2]f32, t: f32) -> [2]f32 {
+	weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
+	times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
+	return [2]f32 {
+		(times * weights * (matrix[4, 1]f32){p0.x, p1.x, p2.x, p3.x})[0][0],
+		(times * weights * (matrix[4, 1]f32){p0.y, p1.y, p2.y, p3.y})[0][0],
 	}
 }
 

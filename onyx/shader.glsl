@@ -39,7 +39,7 @@ out vec4 frag_color;
 
 void main() {
     frag_color = diffuse_color * texture(sampler2D(u_texture, u_sampler), tex_coord);
-    switch(gradient_mode) {
+    switch (gradient_mode) {
 
         // None
         case 0:
@@ -47,14 +47,14 @@ void main() {
 
         // Linear gradient
         case 1:
-        frag_color *= vec4(1.0, 0.0, 1.0, 1.0);//diffuse_color * gradient_color0 + (gradient_color1 - gradient_color0) 
+        frag_color *= vec4(1.0, 0.0, 1.0, 1.0); //diffuse_color * gradient_color0 + (gradient_color1 - gradient_color0)
 
         // Radial gradient
         case 2:
         frag_color *= vec4(1.0, 0.0, 1.0, 1.0);
     }
-    if (frag_color.a < 0.1) {
-        discard;
+    if (frag_color.a < 0.001) {
+        // discard;
     }
 }
 @end
