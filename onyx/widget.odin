@@ -17,17 +17,20 @@ Widget :: struct {
 	box:                                          Box,
 	layer:                                        ^Layer,
 	visible, disabled, draggable, is_field, dead: bool,
+	try_hover:                                    bool,
 	last_state, next_state, state:                Widget_State,
-	focus_time, hover_time, disable_time:                       f32,
+	focus_time, hover_time, disable_time:         f32,
 	click_count:                                  int,
 	click_time:                                   time.Time,
 	click_button:                                 Mouse_Button,
 	allocator:                                    runtime.Allocator,
 	variant:                                      Widget_Variant,
+	desired_size:                                 [2]f32,
 }
 
 Widget_Variant :: union {
-	Widget_Variant_Graph,
+	Graph_Widget_Variant,
+	Selector_Widget_Variant,
 	Widget_Variant_Tooltip,
 	Widget_Variant_Tabs,
 	Text_Input_Widget_Variant,
@@ -39,6 +42,7 @@ Widget_Status :: enum {
 	Hovered,
 	Focused,
 	Pressed,
+	Changed,
 	Clicked,
 	Open,
 }
@@ -81,20 +85,70 @@ was_clicked :: proc(
 	button: Mouse_Button = .Left,
 	times: int = 1,
 ) -> bool {
-	widget := result.self.?
+	widget := result.self.? or_return
 	return .Clicked in widget.state && widget.click_button == button && widget.click_count >= times
 }
 
 is_hovered :: proc(result: Generic_Widget_Result) -> bool {
-	widget := result.self.?
+	widget := result.self.? or_return
 	return .Hovered in widget.state
 }
 
-get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
+was_changed :: proc(result: Generic_Widget_Result) -> bool {
+	widget := result.self.? or_return
+	return .Changed in widget.state
+}
 
-	id := info.id.?
-	widget, ok := core.widget_map[id]
+widget_variant :: proc(widget: ^Widget, $T: typeid) -> ^T {
+	if variant, ok := &widget.variant.(T); ok {
+		return variant
+	}
+	widget.variant = T{}
+	return &widget.variant.(T)
+}
 
+// Process all widgets
+process_widgets :: proc() {
+
+	core.last_focused_widget = core.focused_widget
+	core.last_hovered_widget = core.hovered_widget
+
+	// Make sure dragged widgets are hovered
+	if core.dragged_widget != 0 {
+		core.hovered_widget = core.dragged_widget
+	} else {
+		core.hovered_widget = core.next_hovered_widget
+	}
+
+	// Reset next hover id so if nothing is hovered nothing will be hovered
+	core.next_hovered_widget = 0
+
+	// Press whatever is hovered and focus what is pressed
+	if mouse_pressed(.Left) {
+		core.focused_widget = core.hovered_widget
+		core.draw_this_frame = true
+	}
+
+	// Reset drag state
+	if mouse_released(.Left) {
+		core.dragged_widget = 0
+	}
+}
+
+enable_widgets :: proc(enabled: bool = true) {
+	core.disable_widgets = !enabled
+}
+
+current_widget :: proc() -> Maybe(^Widget) {
+	if core.widget_stack.height > 0 {
+		return core.widget_stack.items[core.widget_stack.height - 1]
+	}
+	return nil
+}
+
+begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
+	id := info.id.? or_return
+	widget, ok = core.widget_map[id]
 	if !ok {
 		for i in 0 ..< MAX_WIDGETS {
 			if core.widgets[i] == nil {
@@ -109,39 +163,30 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 					fmt.printf("[core] Created widget %x\n", id)
 				}
 
+				ok = true
+
 				core.draw_next_frame = true
 				break
 			}
 		}
 	}
+	if !ok do return
 
-	// Determine visible state
-	widget.visible = core.visible && core.draw_this_frame
-	
-	// Reset dead flag
+	// Widget must have a valid layer
+	widget.layer = current_layer().? or_return
+
+	// Place widget
+	widget.box = info.box.? or_else next_widget_box(info)
+
+	// Reset widget state
 	widget.dead = false
-
-	// Assign layer
-	widget.layer = current_layer()
-
-	// Assign box
-	if box, ok := info.box.?; ok {
-		widget.box = box
-	}
-
-	// Update state
+	widget.try_hover = false
+	widget.visible = core.visible && core.draw_this_frame
 	widget.last_state = widget.state
-	widget.state -= {.Clicked, .Focused}
-
-	// Determine disabled state
+	widget.state -= {.Clicked, .Focused, .Changed}
+	widget.desired_size = info.desired_size
 	widget.disabled = true if core.disable_widgets else info.disabled
 	widget.disable_time = animate(widget.disable_time, 0.25, widget.disabled)
-
-	// Disable if disabled
-	if widget.disabled {
-		if core.hovered_widget == widget.id do core.hovered_widget = 0
-		if core.focused_widget == widget.id do core.focused_widget = 0
-	}
 
 	// Mouse hover
 	if core.hovered_widget == widget.id {
@@ -198,55 +243,16 @@ get_widget :: proc(info: Generic_Widget_Info) -> ^Widget {
 	widget.state += widget.next_state
 	widget.next_state = {}
 
-	return widget
+	ok = push_stack(&core.widget_stack, widget)
+	return
 }
 
-widget_variant :: proc(widget: ^Widget, $T: typeid) -> ^T {
-
-	if variant, ok := &widget.variant.(T); ok {
-		return variant
-	}
-
-	widget.variant = T{}
-
-	return &widget.variant.(T)
-}
-
-// Process all widgets
-process_widgets :: proc() {
-
-	core.last_focused_widget = core.focused_widget
-	core.last_hovered_widget = core.hovered_widget
-
-	// Make sure dragged widgets are hovered
-	if core.dragged_widget != 0 {
-		core.hovered_widget = core.dragged_widget
-	} else {
-		core.hovered_widget = core.next_hovered_widget
-	}
-
-	// Reset next hover id so if nothing is hovered nothing will be hovered
-	core.next_hovered_widget = 0
-
-	// Press whatever is hovered and focus what is pressed
-	if mouse_pressed(.Left) {
-		core.focused_widget = core.hovered_widget
-		core.draw_this_frame = true
-	}
-
-	// Reset drag state
-	if mouse_released(.Left) {
-		core.dragged_widget = 0
-	}
-}
-
-// Commit a widget to be processed
-commit_widget :: proc(widget: ^Widget, hovered: bool) {
-	if (.Hovered in widget.layer.state) && hovered && !widget.disabled {
+end_widget :: proc() {
+	widget := current_widget().?
+	if widget.try_hover && (.Hovered in widget.layer.state) && !widget.disabled {
 		core.next_hovered_widget = widget.id
 	}
-}
-
-enable_widgets :: proc(enabled: bool = true) {
-	core.disable_widgets = !enabled
+	layout := current_layout().?
+	add_layout_content_size(layout, widget.desired_size)
+	pop_stack(&core.widget_stack)
 }

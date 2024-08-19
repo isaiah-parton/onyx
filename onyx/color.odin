@@ -17,12 +17,15 @@ blend_colors :: proc(time: f32, colors: ..Color) -> Color {
 		} else {
 			i := int(math.floor(time))
 			t := time - f32(i)
-			return colors[i] + {
-				u8((f32(colors[i + 1].r) - f32(colors[i].r)) * t),
-				u8((f32(colors[i + 1].g) - f32(colors[i].g)) * t),
-				u8((f32(colors[i + 1].b) - f32(colors[i].b)) * t),
-				u8((f32(colors[i + 1].a) - f32(colors[i].a)) * t),
-			}
+			return(
+				colors[i] +
+				{
+						u8((f32(colors[i + 1].r) - f32(colors[i].r)) * t),
+						u8((f32(colors[i + 1].g) - f32(colors[i].g)) * t),
+						u8((f32(colors[i + 1].b) - f32(colors[i].b)) * t),
+						u8((f32(colors[i + 1].a) - f32(colors[i].a)) * t),
+					} \
+			)
 		}
 	}
 	return {}
@@ -39,8 +42,19 @@ set_color_brightness :: proc(color: Color, value: f32) -> Color {
 	}
 }
 
+get_color_brightness :: proc(color: Color) -> f32 {
+	return f32(color.r / 255) * 0.3 + f32(color.g / 255) * 0.59 + f32(color.b / 255) * 0.11
+}
+
 color_to_hsv :: proc(color: Color) -> [4]f32 {
-	hsva := linalg.vector4_rgb_to_hsl(linalg.Vector4f32{f32(color.r) / 255.0, f32(color.g) / 255.0, f32(color.b) / 255.0, f32(color.a) / 255.0})
+	hsva := linalg.vector4_rgb_to_hsl(
+		linalg.Vector4f32 {
+			f32(color.r) / 255.0,
+			f32(color.g) / 255.0,
+			f32(color.b) / 255.0,
+			f32(color.a) / 255.0,
+		},
+	)
 	return hsva.xyzw
 }
 
@@ -71,9 +85,21 @@ alpha_blend_colors_tint :: proc(dst, src, tint: Color) -> (out: Color) {
 		out.a = u8((u32(alpha) * 256 + u32(dst.a) * (256 - alpha)) >> 8)
 
 		if out.a > 0 {
-			out.r = u8(((u32(src.r) * alpha * 256 + u32(dst.r) * u32(dst.a) * (256 - alpha)) / u32(out.a)) >> 8)
-			out.g = u8(((u32(src.g) * alpha * 256 + u32(dst.g) * u32(dst.a) * (256 - alpha)) / u32(out.a)) >> 8)
-			out.b = u8(((u32(src.b) * alpha * 256 + u32(dst.b) * u32(dst.a) * (256 - alpha)) / u32(out.a)) >> 8)
+			out.r = u8(
+				((u32(src.r) * alpha * 256 + u32(dst.r) * u32(dst.a) * (256 - alpha)) /
+					u32(out.a)) >>
+				8,
+			)
+			out.g = u8(
+				((u32(src.g) * alpha * 256 + u32(dst.g) * u32(dst.a) * (256 - alpha)) /
+					u32(out.a)) >>
+				8,
+			)
+			out.b = u8(
+				((u32(src.b) * alpha * 256 + u32(dst.b) * u32(dst.a) * (256 - alpha)) /
+					u32(out.a)) >>
+				8,
+			)
 		}
 	}
 	return

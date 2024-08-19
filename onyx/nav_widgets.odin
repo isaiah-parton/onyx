@@ -1,8 +1,10 @@
 package onyx
 
+import "base:intrinsics"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
+import "core:reflect"
 
 Breadcrumb_Info :: struct {
 	using _:     Generic_Widget_Info,
@@ -41,26 +43,16 @@ make_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Bread
 }
 
 add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
-	widget := get_widget(info)
-	widget.box = next_widget_box(info)
+	widget, ok := begin_widget(info)
+	if !ok do return
+
 	result.self = widget
 
-	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
-
 	if widget.visible {
-		draw_text(
-			widget.box.lo,
-			info.__text_info,
-			fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time),
-		)
+		color := fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time)
+		draw_text(widget.box.lo, info.__text_info, color)
 		if info.__has_menu {
-			origin: [2]f32 = {math.floor(widget.box.hi.x - 24), box_center_y(widget.box)}
-			begin_path()
-			point(origin + {-4, -2})
-			point(origin + {0, 2})
-			point(origin + {4, -2})
-			stroke_path(2, fade(core.style.color.content, 0.5))
-			end_path()
+			draw_arrow({math.floor(widget.box.hi.x - 24), box_center_y(widget.box)}, 5, color)
 		}
 		if !info.is_tail {
 			origin: [2]f32 = {math.floor(widget.box.hi.x - 10), box_center_y(widget.box)}
@@ -103,8 +95,11 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 
 			// Define the menu box
 			box: Box = {
-				{center_x - menu_size.x / 2, widget.box.hi.y + 10},
-				{center_x + menu_size.x / 2, widget.box.hi.y + 10 + menu_size.y},
+				{center_x - menu_size.x / 2, widget.box.hi.y + core.style.shape.menu_padding},
+				{
+					center_x + menu_size.x / 2,
+					widget.box.hi.y + core.style.shape.menu_padding + menu_size.y,
+				},
 			}
 
 			// Begin the menu layer
@@ -114,11 +109,11 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 					box = box,
 					origin = {box_center_x(box), box.lo.y},
 					scale = ([2]f32)(ease.cubic_in_out(widget.focus_time)),
-					parent = current_layer(),
+					parent = current_layer().?,
 				},
 			)
-			layer := current_layer()
-			if .Focused in current_layer().state {
+			layer := current_layer().?
+			if .Focused in layer.state {
 				widget.next_state += {.Focused}
 			}
 			foreground()
@@ -140,12 +135,9 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 		}
 	}
 
-	if .Hovered in widget.state {
-		core.cursor_type = .POINTING_HAND
-	}
+	button_behavior(widget)
 
-	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
-
+	end_widget()
 	return
 }
 

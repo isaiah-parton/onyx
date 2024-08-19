@@ -24,6 +24,7 @@ Style_Shape :: struct {
 	stroke_width:                                                         f32,
 	title_margin:                                                         f32,
 	title_padding:                                                        f32,
+	menu_padding:                                                         f32,
 }
 
 default_style_shape :: proc() -> Style_Shape {
@@ -34,7 +35,8 @@ default_style_shape :: proc() -> Style_Shape {
 		button_text_size = 20,
 		tab_text_size = 18,
 		content_text_size = 18,
-		rounding = 5,
+		rounding = 7,
+		menu_padding = 5,
 	}
 }
 
@@ -53,7 +55,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
 		background = {0, 0, 0, 255},
 		foreground = {15, 15, 15, 255},
-		substance = {45, 45, 45, 255},
+		substance = {40, 42, 45, 255},
 		accent = {234, 88, 12, 255},
 		accent_content = {255, 255, 255, 255},
 		content = {255, 255, 255, 255},

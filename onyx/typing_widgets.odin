@@ -12,16 +12,16 @@ Text_Input_Decal :: enum {
 }
 
 Text_Input_Info :: struct {
-	using _:              Generic_Widget_Info,
-	builder:              ^strings.Builder,
-	placeholder:          string,
+	using _:                      Generic_Widget_Info,
+	builder:                      ^strings.Builder,
+	placeholder:                  string,
 	multiline, read_only, hidden: bool,
-	decal: Text_Input_Decal,
+	decal:                        Text_Input_Decal,
 }
 
 Text_Input_Widget_Variant :: struct {
-	editor: Text_Editor,
-	anchor: int,
+	editor:    Text_Editor,
+	anchor:    int,
 	icon_time: f32,
 }
 
@@ -42,8 +42,9 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		return
 	}
 
-	widget := get_widget(info)
-	widget.box = next_widget_box(info)
+	widget, ok := begin_widget(info)
+	if !ok do return
+
 	widget.draggable = true
 	widget.is_field = true
 
@@ -56,9 +57,9 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	variant.icon_time = animate(variant.icon_time, 0.2, info.decal != .None)
 
 	text_info: Text_Info = {
-		font = core.style.fonts[.Medium],
-		text = strings.to_string(info.builder^),
-		size = core.style.content_text_size,
+		font   = core.style.fonts[.Medium],
+		text   = strings.to_string(info.builder^),
+		size   = core.style.content_text_size,
 		hidden = info.hidden,
 	}
 
@@ -192,7 +193,11 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 				}
 			}
 			if widget.disable_time > 0 {
-				draw_rounded_box_fill(widget.box, core.style.rounding, fade(core.style.color.background, widget.disable_time * 0.5))
+				draw_rounded_box_fill(
+					widget.box,
+					core.style.rounding,
+					fade(core.style.color.background, widget.disable_time * 0.5),
+				)
 			}
 		}
 
@@ -261,8 +266,11 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		core.cursor_type = .IBEAM
 	}
 
-	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
+	if point_in_box(core.mouse_pos, widget.box) {
+		widget.try_hover = true
+	}
 
+	end_widget()
 	return
 }
 

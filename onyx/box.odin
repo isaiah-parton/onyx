@@ -6,8 +6,7 @@ import "core:math/linalg"
 import "base:intrinsics"
 
 Box :: struct {
-	lo,
-	hi: [2]f32,
+	lo, hi: [2]f32,
 }
 
 Alignment :: enum {
@@ -24,10 +23,10 @@ Corner :: enum {
 }
 
 Side :: enum {
-	Top,
-	Bottom,
 	Left,
 	Right,
+	Top,
+	Bottom,
 }
 
 Corners :: bit_set[Corner;u8]
@@ -35,9 +34,9 @@ Corners :: bit_set[Corner;u8]
 ALL_CORNERS :: Corners{.Top_Left, .Top_Right, .Bottom_Left, .Bottom_Right}
 
 Clip :: enum {
-	None,				// completely visible
-	Partial,		// partially visible
-	Full,				// hidden
+	None, // completely visible
+	Partial, // partially visible
+	Full, // hidden
 }
 
 box_width :: proc(box: Box) -> f32 {
@@ -70,12 +69,10 @@ box_contains_box :: proc(a, b: Box) -> bool {
 
 // Get the clip status of `b` inside `a`
 get_clip :: proc(a, b: Box) -> Clip {
-	if a.lo.x > b.hi.x || a.hi.x < b.lo.x ||
-	   a.lo.y > b.hi.y || a.hi.y < b.lo.y { 
-		return .Full 
+	if a.lo.x > b.hi.x || a.hi.x < b.lo.x || a.lo.y > b.hi.y || a.hi.y < b.lo.y {
+		return .Full
 	}
-	if a.lo.x >= b.lo.x && a.hi.x <= b.hi.x &&
-	   a.lo.y >= b.lo.y && a.hi.y <= b.hi.y { 
+	if a.lo.x >= b.lo.x && a.hi.x <= b.hi.x && a.lo.y >= b.lo.y && a.hi.y <= b.hi.y {
 		return .None
 	}
 	return .Partial
@@ -91,10 +88,7 @@ update_bounding :: proc(a, b: Box) -> Box {
 
 // Clamps `a` inside `b`
 clamp_box :: proc(a, b: Box) -> Box {
-	return {
-		linalg.clamp(a.lo, b.lo, b.hi),
-		linalg.clamp(a.hi, b.lo, b.hi),
-	}
+	return {linalg.clamp(a.lo, b.lo, b.hi), linalg.clamp(a.hi, b.lo, b.hi)}
 }
 
 box_center :: proc(a: Box) -> [2]f32 {
@@ -103,31 +97,35 @@ box_center :: proc(a: Box) -> [2]f32 {
 
 // Shrink a box by pushing one of its sides
 squish_box_left :: proc(box: Box, amount: f32) -> Box {
-	box := box 
+	box := box
 	box.lo.x += amount
 	return box
 }
 squish_box_right :: proc(box: Box, amount: f32) -> Box {
-	box := box 
+	box := box
 	box.hi.x -= amount
 	return box
 }
 squish_box_top :: proc(box: Box, amount: f32) -> Box {
-	box := box 
+	box := box
 	box.lo.y += amount
 	return box
 }
 squish_box_bottom :: proc(box: Box, amount: f32) -> Box {
-	box := box 
+	box := box
 	box.hi.y -= amount
 	return box
 }
 squish_box :: proc(box: Box, side: Side, amount: f32) -> (result: Box) {
 	switch side {
-		case .Bottom: result = squish_box_bottom(box, amount)
-		case .Top: 		result = squish_box_top(box, amount)
-		case .Left: 	result = squish_box_left(box, amount)
-		case .Right: 	result = squish_box_right(box, amount)
+	case .Bottom:
+		result = squish_box_bottom(box, amount)
+	case .Top:
+		result = squish_box_top(box, amount)
+	case .Left:
+		result = squish_box_left(box, amount)
+	case .Right:
+		result = squish_box_right(box, amount)
 	}
 	return
 }
@@ -135,28 +133,28 @@ squish_box :: proc(box: Box, side: Side, amount: f32) -> (result: Box) {
 align_inner :: proc(b: Box, size: [2]f32, align: [2]Alignment) -> Box {
 	a: Box
 	switch align.x {
-		case .Far:
+	case .Far:
 		a.hi.x = b.hi.x
-		a.lo.x = b.hi.x - size.x 
-		case .Middle: 
+		a.lo.x = b.hi.x - size.x
+	case .Middle:
 		c := (b.lo.x + b.hi.x) / 2
 		d := size.x / 2
 		a.lo.x = c - d
 		a.hi.x = c + d
-		case .Near: 
+	case .Near:
 		a.lo.x = b.lo.x
 		a.hi.x = b.lo.x + size.x
 	}
 	switch align.y {
-		case .Far:
+	case .Far:
 		a.hi.y = b.hi.y
-		a.lo.y = b.hi.y - size.y 
-		case .Middle: 
+		a.lo.y = b.hi.y - size.y
+	case .Middle:
 		c := (b.lo.y + b.hi.y) / 2
 		d := size.y / 2
 		a.lo.y = c - d
 		a.hi.y = c + d
-		case .Near: 
+	case .Near:
 		a.lo.y = b.lo.y
 		a.hi.y = b.lo.y + size.y
 	}
@@ -207,10 +205,14 @@ cut_box_bottom :: proc(box: ^Box, a: f32) -> (res: Box) {
 }
 cut_box :: proc(box: ^Box, side: Side, amount: f32) -> Box {
 	switch side {
-		case .Bottom: 	return cut_box_bottom(box, amount)
-		case .Top: 			return cut_box_top(box, amount)
-		case .Left: 		return cut_box_left(box, amount)
-		case .Right: 		return cut_box_right(box, amount)
+	case .Bottom:
+		return cut_box_bottom(box, amount)
+	case .Top:
+		return cut_box_top(box, amount)
+	case .Left:
+		return cut_box_left(box, amount)
+	case .Right:
+		return cut_box_right(box, amount)
 	}
 	return {}
 }
@@ -229,10 +231,14 @@ grow_box_bottom :: proc(box: ^Box, a: f32) {
 }
 grow_box :: proc(box: ^Box, side: Side, amount: f32) {
 	switch side {
-		case .Bottom: 	grow_box_top(box, amount)
-		case .Top: 			grow_box_bottom(box, amount)
-		case .Right: 		grow_box_left(box, amount)
-		case .Left: 		grow_box_right(box, amount)
+	case .Bottom:
+		grow_box_top(box, amount)
+	case .Top:
+		grow_box_bottom(box, amount)
+	case .Right:
+		grow_box_left(box, amount)
+	case .Left:
+		grow_box_right(box, amount)
 	}
 }
 
@@ -251,10 +257,14 @@ get_box_cut_bottom :: proc(b: Box, a: f32) -> Box {
 }
 get_box_cut :: proc(box: Box, side: Side, amount: f32) -> Box {
 	switch side {
-		case .Bottom: return get_box_cut_bottom(box, amount)
-		case .Top: 		return get_box_cut_top(box, amount)
-		case .Left: 	return get_box_cut_left(box, amount)
-		case .Right: 	return get_box_cut_right(box, amount)
+	case .Bottom:
+		return get_box_cut_bottom(box, amount)
+	case .Top:
+		return get_box_cut_top(box, amount)
+	case .Left:
+		return get_box_cut_left(box, amount)
+	case .Right:
+		return get_box_cut_right(box, amount)
 	}
 	return {}
 }
@@ -274,10 +284,14 @@ attach_box_bottom :: proc(box: Box, size: f32) -> Box {
 }
 attach_box :: proc(box: Box, side: Side, size: f32) -> Box {
 	switch side {
-		case .Bottom: 	return attach_box_bottom(box, size)
-		case .Top: 			return attach_box_top(box, size)
-		case .Left: 		return attach_box_left(box, size)
-		case .Right: 		return attach_box_right(box, size)
+	case .Bottom:
+		return attach_box_bottom(box, size)
+	case .Top:
+		return attach_box_top(box, size)
+	case .Left:
+		return attach_box_left(box, size)
+	case .Right:
+		return attach_box_right(box, size)
 	}
 	return {}
 }
@@ -285,10 +299,14 @@ attach_box :: proc(box: Box, side: Side, size: f32) -> Box {
 // Get the valid corners for the given sides or whatever
 side_corners :: proc(side: Side) -> Corners {
 	switch side {
-		case .Bottom:  	return {.Top_Left, .Top_Right}
-		case .Top:  		return {.Bottom_Left, .Bottom_Right}
-		case .Left:  		return {.Top_Right, .Bottom_Right}
-		case .Right:  	return {.Top_Left, .Bottom_Left}
+	case .Bottom:
+		return {.Top_Left, .Top_Right}
+	case .Top:
+		return {.Bottom_Left, .Bottom_Right}
+	case .Left:
+		return {.Top_Right, .Bottom_Right}
+	case .Right:
+		return {.Top_Left, .Bottom_Left}
 	}
 	return ALL_CORNERS
 }
@@ -296,52 +314,63 @@ side_corners :: proc(side: Side) -> Corners {
 // attach a box
 get_attached_box :: proc(box: Box, side: Side, size: [2]f32, offset: f32) -> Box {
 	switch side {
-		
-		case .Bottom: 
+
+	case .Bottom:
 		middle := (box.lo.x + box.hi.x) / 2
-		return {{middle - size.x / 2, box.hi.y + offset}, {middle + size.x / 2, box.hi.y + offset + size.y}}
-		
-		case .Left: 
-		middle := (box.lo.y + box.hi.y) / 2 
-		return {{box.lo.x - (offset + size.x), middle - size.y / 2}, {box.lo.x - offset, middle + size.y / 2}}
-		
-		case .Right: 
-		middle := (box.lo.y + box.hi.y) / 2 
-		return {{box.hi.x + offset, middle - size.y / 2}, {box.lo.x + offset + size.x, middle + size.y / 2}}
-		
-		case .Top: 
+		return {
+			{middle - size.x / 2, box.hi.y + offset},
+			{middle + size.x / 2, box.hi.y + offset + size.y},
+		}
+
+	case .Left:
+		middle := (box.lo.y + box.hi.y) / 2
+		return {
+			{box.lo.x - (offset + size.x), middle - size.y / 2},
+			{box.lo.x - offset, middle + size.y / 2},
+		}
+
+	case .Right:
+		middle := (box.lo.y + box.hi.y) / 2
+		return {
+			{box.hi.x + offset, middle - size.y / 2},
+			{box.lo.x + offset + size.x, middle + size.y / 2},
+		}
+
+	case .Top:
 		middle := (box.lo.x + box.hi.x) / 2
-		return {{middle - size.x / 2, box.lo.y - offset - size.y}, {middle + size.x / 2, box.lo.y - offset}}
+		return {
+			{middle - size.x / 2, box.lo.y - offset - size.y},
+			{middle + size.x / 2, box.lo.y - offset},
+		}
 	}
 	return {}
 }
 
 Ray_Box_Info :: struct {
-	point,
-	normal: [2]f32,
-	time: f32,
+	point, normal: [2]f32,
+	time:          f32,
 }
 box_touches_line :: proc(box: Box, a, b: [2]f32) -> (info: Ray_Box_Info, ok: bool) {
 	start := a
 	direction := b - a
-	
+
 	normal: [2]f32
 
 	inv_direction := 1.0 / direction
 	t_near := (box.lo - start) * inv_direction
 	t_far := (box.hi - start) * inv_direction
 
-	if math.is_nan(t_far.y) || math.is_nan(t_far.x) { 
-		return 
+	if math.is_nan(t_far.y) || math.is_nan(t_far.x) {
+		return
 	}
-	if math.is_nan(t_near.y) || math.is_nan(t_near.x) { 
-		return 
+	if math.is_nan(t_near.y) || math.is_nan(t_near.x) {
+		return
 	}
 
-	if t_near[0] > t_far[0] { t_near[0], t_far[0] = t_far[0], t_near[0] }
-	if t_near[1] > t_far[1] { t_near[1], t_far[1] = t_far[1], t_near[1] }
+	if t_near[0] > t_far[0] {t_near[0], t_far[0] = t_far[0], t_near[0]}
+	if t_near[1] > t_far[1] {t_near[1], t_far[1] = t_far[1], t_near[1]}
 
-	if t_near[0] > t_far[1] || t_near[1] > t_far[0] { 
+	if t_near[0] > t_far[1] || t_near[1] > t_far[0] {
 		return
 	}
 
@@ -349,11 +378,11 @@ box_touches_line :: proc(box: Box, a, b: [2]f32) -> (info: Ray_Box_Info, ok: boo
 
 	t_hit_far := min(t_far[0], t_far[1])
 
-	if t_hit_far < 0 { 
-		return 
+	if t_hit_far < 0 {
+		return
 	}
 
-	info.point = start + info.time * direction;
+	info.point = start + info.time * direction
 
 	if t_near[0] > t_near[1] {
 		if inv_direction[0] < 0 {
