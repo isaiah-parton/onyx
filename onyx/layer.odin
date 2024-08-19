@@ -44,6 +44,7 @@ Layer :: struct {
 	children:          [dynamic]^Layer, // The layer's children
 	dead:              bool, // Should be deleted?
 	z_index:           int,
+	// indices:           [dynamic]u16,
 }
 
 Layer_Info :: struct {
@@ -100,7 +101,6 @@ create_layer :: proc(id: Id) -> (result: ^Layer, ok: bool) {
 			result = &core.layers[i]
 			core.layer_map[id] = result
 			ok = true
-
 			return
 		}
 	}
@@ -148,7 +148,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 
 	// Push stacks
 	push_stack(&core.layer_stack, layer)
-	begin_layout({box = layer.box})
+	push_layout(Layout{box = layer.box, original_box = layer.box, next_side = .Top})
 
 	// Set vertex z position
 	core.vertex_state.z = 0.001 * f32(layer.z_index)
@@ -178,7 +178,7 @@ end_layer :: proc() {
 	}
 
 	// Pop the stacks
-	end_layout()
+	pop_layout()
 	pop_stack(&core.layer_stack)
 
 	// Reset z-level to that of the previous layer or to zero

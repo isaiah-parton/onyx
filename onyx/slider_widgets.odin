@@ -23,10 +23,10 @@ make_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_In
 }
 
 add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
-	widget, ok := get_widget(info)
+	widget, ok := begin_widget(info)
 	if !ok do return
 	widget.draggable = true
-	widget.box = next_widget_box(info)
+	result.self = widget
 
 	h := box_height(widget.box)
 
@@ -67,8 +67,11 @@ add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 		core.draw_next_frame = true
 	}
 
-	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
+	if point_in_box(core.mouse_pos, widget.box) {
+		widget.try_hover = true
+	}
 
+	end_widget()
 	return
 }
 

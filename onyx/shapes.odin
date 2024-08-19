@@ -397,7 +397,7 @@ draw_rounded_box_corners_fill :: proc(box: Box, radius: f32, corners: Corners, c
 		return
 	}
 	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
-	if radius <= 0 || corners == {} {
+	if radius <= 0 {
 		draw_box_fill(box, color)
 		return
 	}
@@ -447,6 +447,7 @@ draw_rounded_box_corners_fill :: proc(box: Box, radius: f32, corners: Corners, c
 		)
 	}
 }
+
 
 draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
@@ -498,10 +499,13 @@ draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) 
 }
 
 foreground :: proc() {
-	layout := current_layout().?
+	layout, ok := current_layout().?
+	if !ok do return
 	draw_rounded_box_fill(layout.box, core.style.rounding, core.style.color.foreground)
 	draw_rounded_box_stroke(layout.box, core.style.rounding, 1, core.style.color.substance)
 }
+
+// Advanced shapes
 
 draw_spinner :: proc(center: [2]f32, color: Color) {
 	from := f32(time.duration_seconds(time.since(core.start_time)) * 2) * math.PI
@@ -537,4 +541,22 @@ draw_loader :: proc(pos: [2]f32, scale: f32, color: Color) {
 	size := [2]f32{radius * (1 + math.abs(math.cos(time + math.PI / 2)) * 0.75), radius}
 	draw_rounded_box_fill({center - size, center + size}, scale, color)
 	core.draw_next_frame = true
+}
+
+draw_arrow :: proc(pos: [2]f32, scale: f32, color: Color) {
+	begin_path()
+	point(pos + {-1, -0.5} * scale)
+	point(pos + {0, 0.5} * scale)
+	point(pos + {1, -0.5} * scale)
+	stroke_path(2, color)
+	end_path()
+}
+
+draw_check :: proc(pos: [2]f32, scale: f32, color: Color) {
+	begin_path()
+	point(pos + {-1, -0.047} * scale)
+	point(pos + {-0.333, 0.619} * scale)
+	point(pos + {1, -0.713} * scale)
+	stroke_path(2, color)
+	end_path()
 }

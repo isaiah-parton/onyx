@@ -23,8 +23,7 @@ Component :: enum {
 	Button,
 	Data_Input,
 	Checkbox,
-	Bar_Graph,
-	Line_Graph,
+	Graph,
 }
 
 Component_Section :: struct {
@@ -38,6 +37,7 @@ Component_Showcase :: struct {
 	text_builder: strings.Builder,
 	slider_value: f32,
 	start_time:   time.Time,
+	option:       Option,
 }
 
 State :: struct {
@@ -63,17 +63,16 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	shrink(30)
 
 	#partial switch state.section.component {
-
 	case .Button:
 		side(.Top)
 		do_label({text = "Fit to label", font_style = .Bold, font_size = 24})
-		space(10)
+		add_space(10)
 		if do_layout({size = 30}) {
 			set_width_auto()
 			for member, m in Button_Kind {
 				push_id(m)
 				if m > 0 {
-					space(10)
+					add_space(10)
 				}
 				if was_clicked(do_button({text = tmp_print(member), kind = member})) {
 
@@ -81,15 +80,30 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				pop_id()
 			}
 		}
+		add_space(10)
+		if do_selector({text = "Combo"}) {
+			shrink(3)
+			side(.Top)
+			set_width_fill()
+			for option, o in Option {
+				push_id(o)
+				if was_clicked(
+					do_selector_option({text = tmp_print(option), state = state.option == option}),
+				) {
+					state.option = option
+				}
+				pop_id()
+			}
+		}
 
 	case .Checkbox:
 		side(.Top)
-		do_label({text = "checkboxes yo", font_style = .Bold, font_size = 24})
-		space(10)
+		do_label({text = "Checkboxes", font_style = .Bold, font_size = 24})
+		add_space(10)
 		for member, m in Option {
 			push_id(m)
 			if m > 0 {
-				space(10)
+				add_space(10)
 			}
 			if was_clicked(
 				do_checkbox({text = tmp_print(member), value = state.checkboxes[member]}),
@@ -106,59 +120,73 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		do_text_input(
 			{builder = &state.text_builder, placeholder = "Type something", multiline = true},
 		)
-		space(10)
+		add_space(10)
 		do_text_input({builder = &state.text_builder})
 
-	case .Bar_Graph:
-		set_width_fill()
-		set_height_fill()
-		do_graph(
-			Graph_Info(int) {
-				lo = 0,
-				hi = 10,
-				increment = 1,
-				spacing = 10,
-				kind = Bar_Graph{show_labels = true, show_tooltip = true},
-				fields = {
-					{"Ohio", {255, 100, 100, 255}},
-					{"Florida", {0, 100, 255, 255}},
-					{"Alabama", {0, 255, 120, 255}},
+	case .Graph:
+		side(.Left)
+		set_width_percent(50)
+		set_height(100)
+		if do_layout({}) {
+			shrink(30)
+			set_width_fill()
+			set_height_fill()
+			do_graph(
+				Graph_Info(int) {
+					lo = 0,
+					hi = 30,
+					increment = 5,
+					spacing = 10,
+					kind = Bar_Graph{value_labels = true, show_tooltip = true},
+					label_tooltip = true,
+					fields = {{"Minecraft", {255, 25, 96, 255}}, {"Terraria", {0, 58, 255, 255}}},
+					entries = {
+						{"Feb 2nd", {1, 5}},
+						{"Feb 3rd", {4, 2}},
+						{"Feb 4th", {6, 5}},
+						{"Feb 5th", {2, 8}},
+						{"Feb 6th", {3, 12}},
+						{"Feb 7th", {4, 13}},
+						{"Feb 8th", {4, 10}},
+						{"Feb 9th", {5, 10}},
+						{"Feb 10th", {7, 7}},
+						{"Feb 11th", {8, 6}},
+						{"Feb 12th", {11, 6}},
+						{"Feb 13th", {12, 7}},
+						{"Feb 14th", {9, 4}},
+					},
 				},
-				entries = {
-					{"Skibidy", {1, 5, 9}},
-					{"Rizzler", {4, 2, 2}},
-					{"Gooner", {6, 5, 10}},
-					{"Sigma", {2, 8, 1}},
+			)
+		}
+		if do_layout({}) {
+			shrink(30)
+			set_width_fill()
+			set_height_fill()
+			do_graph(
+				Graph_Info(int) {
+					lo = 0,
+					hi = 30,
+					increment = 5,
+					spacing = 10,
+					kind = Line_Graph{show_dots = false},
+					label_tooltip = true,
+					fields = {{"Minecraft", {255, 25, 96, 255}}, {"Terraria", {0, 58, 255, 255}}},
+					entries = {
+						{label = "Jan 5th", values = {1, 5, 9}},
+						{label = "Jan 6th", values = {4, 2, 2}},
+						{label = "Jan 7th", values = {6, 5, 10}},
+						{label = "Jan 8th", values = {2, 6, 1}},
+						{label = "Jan 9th", values = {4, 7, 2}},
+						{label = "Jan 10th", values = {2, 4, 8}},
+						{label = "Jan 11th", values = {8, 5, 8}},
+						{label = "Jan 12th", values = {18, 6, 8}},
+						{label = "Jan 13th", values = {15, 7, 8}},
+						{label = "Jan 14th", values = {14, 8, 8}},
+						{label = "Jan 15th", values = {11, 6, 8}},
+					},
 				},
-			},
-		)
-
-	case .Line_Graph:
-		set_width_fill()
-		set_height_fill()
-		do_graph(
-			Graph_Info(int) {
-				lo = 0,
-				hi = 20,
-				increment = 10,
-				spacing = 10,
-				kind = Line_Graph{show_dots = false},
-				fields = {{"Minecraft", {255, 25, 96, 255}}, {"Terraria", {0, 58, 255, 255}}},
-				entries = {
-					{values = {1, 5, 9}},
-					{values = {4, 2, 2}},
-					{values = {6, 5, 10}},
-					{values = {2, 6, 1}},
-					{values = {4, 7, 2}},
-					{values = {2, 4, 8}},
-					{values = {8, 5, 8}},
-					{values = {18, 6, 8}},
-					{values = {15, 7, 8}},
-					{values = {14, 8, 8}},
-					{values = {11, 6, 8}},
-				},
-			},
-		)
+			)
+		}
 	}
 	end_layer()
 }
@@ -206,10 +234,10 @@ main :: proc() {
 				// 		{0, 255, 0, 255},
 				// 	}
 				// 	for color, c in colors {
-				// 		if c > 0 do space(10)
+				// 		if c > 0 do add_space(10)
 				// 		if do_layout({size = 30, side = .Top}) {
 				// 			for kind, k in Button_Kind {
-				// 				if k > 0 do space(10)
+				// 				if k > 0 do add_space(10)
 				// 				button_text := tmp_printf("Button %c%i", 'A' + c, k + 1)
 				// 				push_id(button_text)
 				// 				do_button({text = button_text, color = color, kind = kind})

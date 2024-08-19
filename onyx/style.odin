@@ -24,6 +24,7 @@ Style_Shape :: struct {
 	stroke_width:                                                         f32,
 	title_margin:                                                         f32,
 	title_padding:                                                        f32,
+	menu_padding:                                                         f32,
 }
 
 default_style_shape :: proc() -> Style_Shape {
@@ -35,6 +36,7 @@ default_style_shape :: proc() -> Style_Shape {
 		tab_text_size = 18,
 		content_text_size = 18,
 		rounding = 7,
+		menu_padding = 5,
 	}
 }
 

@@ -99,6 +99,7 @@ Core :: struct {
 	last_hovered_widget, hovered_widget, next_hovered_widget:             Id,
 	last_focused_widget, focused_widget, dragged_widget:                  Id,
 	last_hovered_layer, hovered_layer, next_hovered_layer, focused_layer: Id,
+	widget_stack:                                                         Stack(^Widget, 10),
 	layout_stack:                                                         Stack(
 		Layout,
 		MAX_LAYOUTS,

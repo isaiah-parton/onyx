@@ -22,8 +22,14 @@ Button_Info :: struct {
 	__text_job: Text_Job,
 }
 
-Button_Result :: struct {
-	using _: Generic_Widget_Result,
+button_behavior :: proc(widget: ^Widget) {
+	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
+	if .Hovered in widget.state {
+		core.cursor_type = .POINTING_HAND
+	}
+	if point_in_box(core.mouse_pos, widget.box) {
+		widget.try_hover = true
+	}
 }
 
 make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
@@ -42,14 +48,11 @@ make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 	return info
 }
 
-add_button :: proc(info: Button_Info) -> (result: Button_Result) {
-	widget, ok := get_widget(info)
+add_button :: proc(info: Button_Info) -> (result: Generic_Widget_Result) {
+	widget, ok := begin_widget(info)
 	if !ok do return
 
 	result.self = widget
-	layout := current_layout()
-	widget.box = next_widget_box(info)
-	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
 
 	if widget.visible {
 		text_color: Color
@@ -121,14 +124,12 @@ add_button :: proc(info: Button_Info) -> (result: Button_Result) {
 		}
 	}
 
-	if .Hovered in widget.state {
-		core.cursor_type = .POINTING_HAND
-	}
+	button_behavior(widget)
 
-	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
-	return
+	end_widget()
+	return result
 }
 
-do_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Result {
+do_button :: proc(info: Button_Info, loc := #caller_location) -> Generic_Widget_Result {
 	return add_button(make_button(info, loc))
 }

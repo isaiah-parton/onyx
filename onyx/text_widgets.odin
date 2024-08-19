@@ -24,13 +24,16 @@ make_label :: proc(info: Label_Info, loc := #caller_location) -> Label_Info {
 }
 
 add_label :: proc(info: Label_Info) {
-	widget, ok := get_widget(info)
+	widget, ok := begin_widget(info)
 	if !ok do return
+
 	widget.box = next_widget_box(info)
 
 	if widget.visible {
 		draw_text(widget.box.lo, info.__text_info, core.style.color.content)
 	}
+
+	end_widget()
 }
 
 do_label :: proc(info: Label_Info) {

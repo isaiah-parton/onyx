@@ -53,12 +53,11 @@ make_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Checkbox_
 	return info
 }
 
-add_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
-	widget, ok := get_widget(info)
-	if !ok do return {}
+add_checkbox :: proc(info: Checkbox_Info) -> (result: Generic_Widget_Result) {
+	widget, ok := begin_widget(info)
+	if !ok do return
 
-	widget.box = info.box.? or_else next_widget_box(info)
-	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
+	result.self = widget
 
 	if widget.visible {
 		icon_box: Box
@@ -105,13 +104,7 @@ add_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 		center := box_center(icon_box)
 		// Paint icon
 		if info.value {
-			scale: f32 = SIZE / 4
-			begin_path()
-			point(center + {-1, -0.047} * scale)
-			point(center + {-0.333, 0.619} * scale)
-			point(center + {1, -0.713} * scale)
-			stroke_path(2, core.style.color.background)
-			end_path()
+			draw_check(center, SIZE / 4, core.style.color.background)
 		}
 		// Paint text
 		if len(info.text) > 0 {
@@ -148,14 +141,9 @@ add_checkbox :: proc(info: Checkbox_Info) -> Generic_Widget_Result {
 			}
 		}
 	}
-
-	if .Hovered in widget.state {
-		core.cursor_type = .POINTING_HAND
-	}
-
-	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
-
-	return Generic_Widget_Result{self = widget}
+	button_behavior(widget)
+	end_widget()
+	return
 }
 
 do_checkbox :: proc(info: Checkbox_Info, loc := #caller_location) -> Generic_Widget_Result {
@@ -171,10 +159,9 @@ make_switch :: proc(info: Switch_Info, loc := #caller_location) -> Switch_Info {
 }
 
 add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
-	widget, ok := get_widget(info)
+	widget, ok := begin_widget(info)
 	if !ok do return
 
-	widget.box = next_widget_box(info)
 	result.self = widget
 	result.on = info.on
 	variant := widget_variant(widget, Switch_Widget_Variant)
@@ -210,8 +197,11 @@ add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
 
 	variant.how_on = animate(variant.how_on, 0.2, info.on)
 
-	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
+	if point_in_box(core.mouse_pos, widget.box) {
+		widget.try_hover = true
+	}
 
+	end_widget()
 	return
 }
 

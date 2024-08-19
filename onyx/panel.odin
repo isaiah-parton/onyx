@@ -184,7 +184,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		}
 		push_id(panel.layer.id)
 		for side, s in Side {
-			widget, ok := get_widget({id = hash(s)})
+			widget, ok := begin_widget({id = hash(s)})
 			if !ok do continue
 
 			widget.draggable = true
@@ -201,7 +201,11 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 				core.cursor_type = .RESIZE_EW if int(side) > 1 else .RESIZE_NS
 			}
 
-			commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
+			if point_in_box(core.mouse_pos, widget.box) {
+				widget.try_hover = true
+			}
+
+			end_widget()
 		}
 		pop_id()
 	}

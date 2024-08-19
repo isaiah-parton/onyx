@@ -41,9 +41,9 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		return
 	}
 
-	widget, ok := get_widget(info)
+	widget, ok := begin_widget(info)
 	if !ok do return
-	widget.box = next_widget_box(info)
+
 	widget.draggable = true
 	widget.is_field = true
 
@@ -256,8 +256,11 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		core.cursor_type = .IBEAM
 	}
 
-	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
+	if point_in_box(core.mouse_pos, widget.box) {
+		widget.try_hover = true
+	}
 
+	end_widget()
 	return
 }
 

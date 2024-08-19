@@ -19,7 +19,7 @@ Widget_Variant_Tooltip :: struct {
 }
 
 begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
-	widget, ok := get_widget({id = hash(loc)})
+	widget, ok := begin_widget({id = hash(loc)})
 	if !ok do return false
 
 	variant := widget_variant(widget, Widget_Variant_Tooltip)
@@ -58,6 +58,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 	)
 	draw_rounded_box_fill(box, core.style.rounding, core.style.color.background)
 
+	end_widget()
 	return true
 }
 

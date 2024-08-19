@@ -8,7 +8,7 @@ import "core:math/linalg"
 import "base:intrinsics"
 
 Bar_Graph :: struct {
-	stacked, show_labels, show_tooltip, horizontal: bool,
+	stacked, value_labels, entry_labels, show_tooltip, horizontal: bool,
 }
 
 Line_Graph :: struct {
@@ -37,6 +37,7 @@ Graph_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	spacing:           f32,
 	fields:            []Graph_Field_Info,
 	entries:           []Graph_Entry(T),
+	label_tooltip:     bool,
 }
 
 Graph_Widget_Variant :: struct {
@@ -54,11 +55,12 @@ make_graph :: proc(info: Graph_Info($T), loc := #caller_location) -> Graph_Info(
 }
 
 add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
-	widget, ok := get_widget(info)
+	widget, ok := begin_widget(info)
 	if !ok do return
 
-	// Colocate
-	widget.box = next_widget_box(info)
+	if len(info.entries) == 0 {
+		return
+	}
 
 	// Set up variant and allocators
 	variant := widget_variant(widget, Graph_Widget_Variant)
@@ -69,9 +71,6 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 
 	widget.hover_time = animate(widget.hover_time, 0.2, .Hovered in widget.state)
 
-	if len(info.entries) == 0 {
-		return
-	}
 
 	tooltip_idx: int
 	tooltip_pos: Maybe([2]f32)
@@ -126,38 +125,35 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					c2 := p2 - (p3 - p1) / 6
 
 					// Do curve
-					segments := int((p2.x - p1.x) / 10)
+					segments := int((p2.x - p1.x) / 5)
 					step: f32 = 1.0 / f32(segments)
-					lp: [2]f32 = p1
-					for n in 1 ..= segments {
+					lp: [2]f32
+					ti, bi: u16
+					for n in 0 ..= segments {
 						t: f32 = f32(n) * step
 						times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
 						p: [2]f32 = {
 							(times * weights * (matrix[4, 1]f32){p1.x, c1.x, c2.x, p2.x})[0][0],
 							(times * weights * (matrix[4, 1]f32){p1.y, c1.y, c2.y, p2.y})[0][0],
 						}
-						// draw_triangle_strip_fill(
-						// 	{lp, p, {lp.x, box.hi.y}, {p.x, box.hi.y}},
-						// 	fade(field.color, 0.25),
-						// )
 						vertex_uv({})
-						vertex_col(fade(field.color, (box.hi.y - lp.y) / box_height(box)))
-						tl := add_vertex(lp)
 						vertex_col(fade(field.color, (box.hi.y - p.y) / box_height(box)))
-						tr := add_vertex(p)
+						nti := add_vertex(p)
 						vertex_col({})
-						bl := add_vertex({lp.x, box.hi.y})
-						br := add_vertex({p.x, box.hi.y})
-						add_indices(tl, tr, bl, tr, br, bl)
-
-						draw_line(lp, p, 2, field.color)
+						nbi := add_vertex({p.x, box.hi.y})
+						if n > 0 {
+							add_indices(ti, nti, bi, nti, nbi, bi)
+							draw_line(lp, p, 2, field.color)
+						}
+						ti = nti
+						bi = nbi
 						lp = p
 					}
 				}
 				end_path()
 			}
 
-			if hn >= 0 && hn < len(info.entries) {
+			if .Hovered in widget.state && hn >= 0 && hn < len(info.entries) {
 				p := box.lo.x + (f32(hn) / f32(len(info.entries) - 1)) * (box.hi.x - box.lo.x)
 				draw_box_fill({{p, box.lo.y}, {p + 1, box.hi.y}}, core.style.color.content)
 			}
@@ -226,7 +222,7 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					{offset + block_size - PADDING, box.hi.y},
 				}
 
-				if len(entry.label) > 0 {
+				if kind.entry_labels && len(entry.label) > 0 {
 					draw_text(
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
 						{
@@ -279,40 +275,50 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					fade(core.style.color.substance, 0.5),
 				)
 			}
+
+			// For each entry
 			for &entry, e in info.entries {
+				// Cut a box for this block
 				block := cut_box_left(&box, block_size)
 				if len(info.fields) > 1 {
 					block.lo.x += PADDING
 					block.hi.x -= PADDING
 				}
 				bar_size := (block.hi.x - block.lo.x) / f32(len(info.fields))
-				if len(entry.label) > 0 {
+
+				// Draw entry label if enabled
+				if kind.entry_labels && len(entry.label) > 0 {
 					draw_text(
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
 						{
 							text = entry.label,
-							font = core.style.fonts[.Light],
-							size = 16,
+							font = core.style.fonts[.Regular],
+							size = 18,
 							align_h = .Middle,
 							align_v = .Top,
 						},
 						core.style.color.content,
 					)
 				}
+
+				// Draw a bar for each field
 				for &field, f in info.fields {
 					bar := cut_box_left(&block, bar_size)
-					bar.lo.x += 1
-					bar.hi.x -= 1
+					// bar.lo.x += 1
+					// bar.hi.x -= 1
 					bar.lo.y =
 						bar.hi.y - (f32(entry.values[f]) / f32(info.hi)) * (bar.hi.y - bar.lo.y)
-					draw_rounded_box_fill(bar, core.style.rounding, field.color)
-					if kind.show_labels {
+					corners: Corners = {}
+					if f == 0 do corners += {.Top_Left, .Bottom_Left}
+					if f == len(info.fields) - 1 do corners += {.Top_Right, .Bottom_Right}
+					draw_rounded_box_corners_fill(bar, core.style.rounding, corners, field.color)
+					if kind.value_labels {
 						draw_text(
 							{(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},
 							{
 								text = tmp_print(entry.values[f]),
-								font = core.style.fonts[.Light],
-								size = 16,
+								font = core.style.fonts[.Regular],
+								size = 18,
 								align_h = .Middle,
 								align_v = .Bottom,
 							},
@@ -325,16 +331,33 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 	}
 
 	if .Hovered in widget.state {
+		tooltip_size: [2]f32 = {150, f32(len(info.fields)) * 26 + 6}
+		if info.label_tooltip {
+			tooltip_size += 26
+		}
 		// Tooltip
 		begin_tooltip(
 			{
 				pos = tooltip_pos,
 				bounds = widget.box,
-				size = {150, f32(len(info.fields)) * 26 + 6},
+				size = tooltip_size,
 				time = ease.cubic_in_out(widget.hover_time),
 			},
 		)
 		shrink(3)
+		if info.label_tooltip {
+			box := cut_current_layout(.Top, [2]f32{0, 26})
+			draw_text(
+				box.lo + [2]f32{5, 13},
+				{
+					text = info.entries[tooltip_idx].label,
+					font = core.style.fonts[.Medium],
+					size = 18,
+					align_v = .Middle,
+				},
+				core.style.color.content,
+			)
+		}
 		for &field, f in info.fields {
 			tip_box := shrink_box(cut_box(&current_layout().?.box, .Top, 26), 3)
 			draw_rounded_box_fill(cut_box_left(&tip_box, 6), core.style.rounding, field.color)
@@ -342,11 +365,11 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 				{tip_box.lo.x + 8, (tip_box.lo.y + tip_box.hi.y) / 2},
 				{
 					text = field.name,
-					font = core.style.fonts[.Regular],
+					font = core.style.fonts[.Medium],
 					size = 18,
 					align_v = .Middle,
 				},
-				color = core.style.color.content,
+				color = fade(core.style.color.content, 0.5),
 			)
 			draw_text(
 				{tip_box.hi.x - 4, (tip_box.lo.y + tip_box.hi.y) / 2},
@@ -363,7 +386,12 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 		end_tooltip()
 	}
 
-	commit_widget(widget, point_in_box(core.mouse_pos, widget.box))
+	if point_in_box(core.mouse_pos, widget.box) {
+		widget.try_hover = true
+	}
+
+	end_widget()
+	return
 }
 
 do_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
