@@ -22,7 +22,7 @@ Switch_Info :: struct {
 	on:      bool,
 }
 
-Switch_Widget_Variant :: struct {
+Switch_Widget_Kind :: struct {
 	how_on: f32,
 }
 
@@ -164,7 +164,7 @@ add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
 
 	result.self = widget
 	result.on = info.on
-	variant := widget_variant(widget, Switch_Widget_Variant)
+	variant := widget_kind(widget, Switch_Widget_Kind)
 
 	how_on := ease.cubic_in_out(variant.how_on)
 

@@ -17,19 +17,10 @@ Button_Info :: struct {
 	text:       string,
 	is_loading: bool,
 	kind:       Button_Kind,
+	font_style: Maybe(Font_Style),
 	font_size:  Maybe(f32),
 	color:      Maybe(Color),
 	__text_job: Text_Job,
-}
-
-button_behavior :: proc(widget: ^Widget) {
-	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
-	if .Hovered in widget.state {
-		core.cursor_type = .POINTING_HAND
-	}
-	if point_in_box(core.mouse_pos, widget.box) {
-		widget.try_hover = true
-	}
 }
 
 make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
@@ -39,7 +30,7 @@ make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 		text    = info.text,
 		size    = info.font_size.? or_else core.style.button_text_size,
 		spacing = 1,
-		font    = core.style.fonts[.Medium],
+		font    = core.style.fonts[info.font_style.? or_else .Medium],
 		align_v = .Middle,
 		align_h = .Middle,
 	}

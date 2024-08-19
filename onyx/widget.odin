@@ -24,17 +24,18 @@ Widget :: struct {
 	click_time:                                   time.Time,
 	click_button:                                 Mouse_Button,
 	allocator:                                    runtime.Allocator,
-	variant:                                      Widget_Variant,
+	variant:                                      Widget_Kind,
 	desired_size:                                 [2]f32,
 }
 
-Widget_Variant :: union {
-	Graph_Widget_Variant,
-	Selector_Widget_Variant,
-	Widget_Variant_Tooltip,
-	Widget_Variant_Tabs,
-	Text_Input_Widget_Variant,
-	Switch_Widget_Variant,
+Widget_Kind :: union {
+	Graph_Widget_Kind,
+	Menu_Widget_Kind,
+	Tooltip_Widget_Kind,
+	Tabs_Widget_Kind,
+	Text_Input_Widget_Kind,
+	Switch_Widget_Kind,
+	Date_Picker_Widget_Kind,
 }
 
 // Interaction state
@@ -99,7 +100,7 @@ was_changed :: proc(result: Generic_Widget_Result) -> bool {
 	return .Changed in widget.state
 }
 
-widget_variant :: proc(widget: ^Widget, $T: typeid) -> ^T {
+widget_kind :: proc(widget: ^Widget, $T: typeid) -> ^T {
 	if variant, ok := &widget.variant.(T); ok {
 		return variant
 	}

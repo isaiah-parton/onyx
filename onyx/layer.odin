@@ -13,7 +13,7 @@ Layer_Kind :: enum int {
 	Background,
 	Floating,
 	Topmost,
-	__Debug,
+	Debug,
 }
 
 Layer_Status :: enum {
@@ -35,16 +35,17 @@ Layer_Option :: enum {
 Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
-	id:                Id,
-	last_state, state: Layer_State,
-	options:           Layer_Options, // Option bit flags
-	kind:              Layer_Kind,
-	box:               Box,
-	parent:            ^Layer, // The layer's parent
-	children:          [dynamic]^Layer, // The layer's children
-	dead:              bool, // Should be deleted?
-	z_index:           int,
-	// indices:           [dynamic]u16,
+	id:                	Id,
+	last_state, state: 	Layer_State,
+	options:           	Layer_Options, // Option bit flags
+	kind:              	Layer_Kind,
+	box:               	Box,
+	parent:            	^Layer, // The layer's parent
+	children:          	[dynamic]^Layer, // The layer's children
+	dead:              	bool, // Should be deleted?
+	z_index:           	int,
+	opacity: 						f32,
+	draw_call: int,
 }
 
 Layer_Info :: struct {
@@ -56,6 +57,7 @@ Layer_Info :: struct {
 	origin:   [2]f32,
 	scale:    Maybe([2]f32),
 	rotation: f32,
+	opacity: 	Maybe(f32),
 }
 
 current_layer :: proc(loc := #caller_location) -> Maybe(^Layer) {
@@ -132,6 +134,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	layer.box = info.box
 	layer.options = info.options
 	layer.kind = kind
+	layer.opacity = info.opacity.? or_else 1
 
 	// Set input state
 	if core.hovered_layer == layer.id {
@@ -152,6 +155,12 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 
 	// Set vertex z position
 	core.vertex_state.z = 0.001 * f32(layer.z_index)
+	core.vertex_state.alpha = layer.opacity
+
+	layer.draw_call = core.draw_call_count
+	push_draw_call()
+	set_image(core.font_atlas.image)
+	core.current_draw_call.index = layer.z_index
 
 	// Transform matrix
 	scale: [2]f32 = info.scale.? or_else 1
@@ -184,6 +193,10 @@ end_layer :: proc() {
 	// Reset z-level to that of the previous layer or to zero
 	if layer, ok := current_layer().?; ok {
 		core.vertex_state.z = 0.001 * f32(layer.z_index)
+		core.vertex_state.alpha = layer.opacity
+		push_draw_call()
+	set_image(core.font_atlas.image)
+	core.current_draw_call.index = layer.z_index
 	}
 }
 

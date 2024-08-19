@@ -38,6 +38,8 @@ Component_Showcase :: struct {
 	slider_value: f32,
 	start_time:   time.Time,
 	option:       Option,
+	date_range: 	[2]onyx.Date,
+	month_offset: int,
 }
 
 State :: struct {
@@ -57,14 +59,14 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	   ok {
 		state.section.component = Component(index)
 	}
-	side(.Right)
+	set_side(.Right)
 	state.light_mode = do_switch({on = state.light_mode}).on
 	end_layout()
 	shrink(30)
 
 	#partial switch state.section.component {
 	case .Button:
-		side(.Top)
+		set_side(.Top)
 		do_label({text = "Fit to label", font_style = .Bold, font_size = 24})
 		add_space(10)
 		if do_layout({size = 30}) {
@@ -83,7 +85,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		add_space(10)
 		if do_selector({text = "Combo"}) {
 			shrink(3)
-			side(.Top)
+			set_side(.Top)
 			set_width_fill()
 			for option, o in Option {
 				push_id(o)
@@ -95,9 +97,16 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				pop_id()
 			}
 		}
+		calendar := make_calendar({
+			range = state.date_range, 
+			month_offset = state.month_offset,
+		})
+		if do_layout({box = align_inner(layout_box(), calendar.desired_size, {.Middle, .Middle})}) {
+			state.month_offset = add_calendar(calendar).month_offset
+		}
 
 	case .Checkbox:
-		side(.Top)
+		set_side(.Top)
 		do_label({text = "Checkboxes", font_style = .Bold, font_size = 24})
 		add_space(10)
 		for member, m in Option {
@@ -114,7 +123,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		}
 
 	case .Data_Input:
-		side(.Top)
+		set_side(.Top)
 		set_width(200)
 		set_height(120)
 		do_text_input(
@@ -124,7 +133,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		do_text_input({builder = &state.text_builder})
 
 	case .Graph:
-		side(.Left)
+		set_side(.Left)
 		set_width_percent(50)
 		set_height(100)
 		if do_layout({}) {
@@ -194,6 +203,8 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 main :: proc() {
 	state: State
 
+	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
+
 	sapp.run(
 		sapp.Desc {
 			user_data = &state,
@@ -206,6 +217,7 @@ main :: proc() {
 				onyx.set_style_font(.Bold, "fonts/Geist-Bold.ttf")
 				onyx.set_style_font(.Light, "fonts/Geist-Light.ttf")
 				onyx.set_style_font(.Regular, "fonts/Geist-Regular.ttf")
+				onyx.set_style_font(.Icon, "fonts/remixicon.ttf")
 
 				// for i in 0 ..< 4 {
 				// 	state.images[i] =
@@ -224,7 +236,7 @@ main :: proc() {
 
 				// if do_panel({title = "Widgets"}) {
 				// 	shrink(30)
-				// 	side(.Top)
+				// 	set_side(.Top)
 				// 	colors := [6]Color {
 				// 		{255, 60, 60, 255},
 				// 		{0, 255, 120, 255},

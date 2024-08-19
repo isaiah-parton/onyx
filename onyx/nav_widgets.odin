@@ -47,6 +47,7 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 	if !ok do return
 
 	result.self = widget
+	kind := widget_kind(widget, Menu_Widget_Kind)
 
 	if widget.visible {
 		color := fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time)
@@ -65,8 +66,6 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 	}
 
 	if info.__has_menu {
-		widget.focus_time = animate(widget.focus_time, 0.2, .Open in widget.state)
-
 		if .Pressed in widget.state {
 			widget.state += {.Open}
 		}
@@ -102,14 +101,17 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 				},
 			}
 
+			open_time := ease.quadratic_out(kind.open_time)
+			layer_scale: f32 = 0.7 + 0.3 * open_time
 			// Begin the menu layer
 			begin_layer(
 				{
 					id = widget.id,
 					box = box,
 					origin = {box_center_x(box), box.lo.y},
-					scale = ([2]f32)(ease.cubic_in_out(widget.focus_time)),
+					scale = ([2]f32)(layer_scale),
 					parent = current_layer().?,
+					opacity = open_time,
 				},
 			)
 			layer := current_layer().?
@@ -118,7 +120,7 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 			}
 			foreground()
 			shrink(5)
-			side(.Top)
+			set_side(.Top)
 			set_width_fill()
 			for &button, b in buttons[:len(info.options)] {
 				if b == info.index do continue
@@ -135,7 +137,7 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 		}
 	}
 
-	button_behavior(widget)
+	menu_behavior(widget)
 
 	end_widget()
 	return

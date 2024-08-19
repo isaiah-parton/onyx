@@ -40,7 +40,7 @@ Graph_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	label_tooltip:     bool,
 }
 
-Graph_Widget_Variant :: struct {
+Graph_Widget_Kind :: struct {
 	dot_times: [dynamic]f32,
 	bar_time:  f32,
 	vertices:  [dynamic]Vertex,
@@ -63,7 +63,7 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 	}
 
 	// Set up variant and allocators
-	variant := widget_variant(widget, Graph_Widget_Variant)
+	variant := widget_kind(widget, Graph_Widget_Kind)
 	variant.dot_times.allocator = widget.allocator
 	variant.vertices.allocator = widget.allocator
 
@@ -136,10 +136,10 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 							(times * weights * (matrix[4, 1]f32){p1.x, c1.x, c2.x, p2.x})[0][0],
 							(times * weights * (matrix[4, 1]f32){p1.y, c1.y, c2.y, p2.y})[0][0],
 						}
-						vertex_uv({})
-						vertex_col(fade(field.color, (box.hi.y - p.y) / box_height(box)))
+						set_vertex_uv({})
+						set_vertex_color(fade(field.color, (box.hi.y - p.y) / box_height(box)))
 						nti := add_vertex(p)
-						vertex_col({})
+						set_vertex_color({})
 						nbi := add_vertex({p.x, box.hi.y})
 						if n > 0 {
 							add_indices(ti, nti, bi, nti, nbi, bi)

@@ -19,7 +19,7 @@ Text_Input_Info :: struct {
 	decal:                        Text_Input_Decal,
 }
 
-Text_Input_Widget_Variant :: struct {
+Text_Input_Widget_Kind :: struct {
 	editor:    Text_Editor,
 	anchor:    int,
 	icon_time: f32,
@@ -50,7 +50,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 
 	result.self = widget
 
-	variant := widget_variant(widget, Text_Input_Widget_Variant)
+	variant := widget_kind(widget, Text_Input_Widget_Kind)
 	e := &variant.editor
 
 	widget.focus_time = animate(widget.focus_time, 0.15, .Focused in widget.state)

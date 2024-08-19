@@ -5,21 +5,21 @@ Label_Info :: struct {
 	font_style:  Font_Style,
 	font_size:   f32,
 	text:        string,
-	__text_info: Text_Info,
+	__text_job: Text_Job,
 }
 
 make_label :: proc(info: Label_Info, loc := #caller_location) -> Label_Info {
 	info := info
 	info.id = hash(loc)
-	info.__text_info = Text_Info {
+	info.__text_job, _ = make_text_job({
 		text    = info.text,
 		size    = info.font_size,
 		font    = core.style.fonts[info.font_style],
 		align_h = .Left,
 		align_v = .Top,
-	}
+	})
 	info.fixed_size = true
-	info.desired_size = measure_text(info.__text_info)
+	info.desired_size = info.__text_job.size
 	return info
 }
 
@@ -27,10 +27,8 @@ add_label :: proc(info: Label_Info) {
 	widget, ok := begin_widget(info)
 	if !ok do return
 
-	widget.box = next_widget_box(info)
-
 	if widget.visible {
-		draw_text(widget.box.lo, info.__text_info, core.style.color.content)
+		draw_text_glyphs(info.__text_job, widget.box.lo, core.style.color.content)
 	}
 
 	end_widget()

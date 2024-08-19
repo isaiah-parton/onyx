@@ -6,7 +6,7 @@ Tabs_Info :: struct {
 	options: []string,
 }
 
-Widget_Variant_Tabs :: struct {
+Tabs_Widget_Kind :: struct {
 	timers: [dynamic]f32,
 }
 
@@ -28,7 +28,7 @@ add_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Resu
 
 	result.self = widget
 
-	variant := widget_variant(widget, Widget_Variant_Tabs)
+	variant := widget_kind(widget, Tabs_Widget_Kind)
 	variant.timers.allocator = widget.allocator
 
 	if widget.visible {

@@ -15,6 +15,7 @@ Layout :: struct {
 	original_box, box: Box, // Original box// Current box to cut from
 	next_side:         Side, // Next side to cut from
 	next_size:         [2]f32, // Next cut size
+	next_padding: [2]f32,
 	content_size:      [2]f32,
 	spacing_size:      [2]f32,
 	show_lines:        bool,
@@ -40,6 +41,8 @@ begin_layout :: proc(info: Layout_Info) -> bool {
 		side         = info.side,
 		show_lines   = info.show_lines,
 		next_side    = .Left if int(side) > 1 else .Top,
+		next_size = last_layout.next_size,
+		next_padding = last_layout.next_padding,
 	}
 	return push_layout(layout)
 }
@@ -126,10 +129,12 @@ next_widget_box :: proc(info: Generic_Widget_Info) -> Box {
 			box.hi.y = box.lo.y + size.y
 		}
 	}
+	box.lo += layout.next_padding
+	box.hi -= layout.next_padding
 	return {linalg.floor(box.lo), linalg.floor(box.hi)}
 }
 
-side :: proc(side: Side) {
+set_side :: proc(side: Side) {
 	layout := current_layout().?
 	layout.next_side = side
 }
@@ -187,6 +192,18 @@ shrink_y :: proc(amount: f32) {
 	layout := current_layout().?
 	layout.box.lo.y += amount
 	layout.box.hi.y -= amount
+}
+
+set_padding_x :: proc(amount: f32) {
+	current_layout().?.next_padding.x = amount
+}
+
+set_padding_y :: proc(amount: f32) {
+	current_layout().?.next_padding.y = amount
+}
+
+set_padding :: proc(amount: f32) {
+	current_layout().?.next_padding = amount
 }
 
 add_space :: proc(amount: f32) {

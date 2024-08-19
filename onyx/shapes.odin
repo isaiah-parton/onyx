@@ -81,7 +81,7 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 		return
 	}
 
-	first_index := u16(len(core.current_draw_call.vertices))
+	first_index := next_vertex_index()
 
 	left, right: f32
 	switch justify {
@@ -97,8 +97,8 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 		right = thickness
 	}
 
-	core.vertex_state.col = color
-	core.vertex_state.uv = {}
+	set_vertex_color(color)
+	set_vertex_uv({})
 
 	for i in 0 ..< path.count {
 		a := i - 1
@@ -261,8 +261,8 @@ draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
 	da := to - from
 	nsteps := get_arc_steps(radius, da)
 
-	core.vertex_state.col = color
-	core.vertex_state.uv = {}
+	set_vertex_color(color)
+	set_vertex_uv({})
 	first_index := add_vertex(center.x, center.y)
 	for n in 0 ..= nsteps {
 		a := from + da * f32(n) / f32(nsteps)
@@ -279,8 +279,8 @@ draw_ellipse_fill :: proc(center, size: [2]f32, from, to: f32, color: Color) {
 	da := to - from
 	nsteps := get_arc_steps(max(size.x, size.y), da)
 
-	core.vertex_state.col = color
-	core.vertex_state.uv = {}
+	set_vertex_color(color)
+	set_vertex_uv({})
 	first_index := add_vertex(center.x, center.y)
 	for n in 0 ..= nsteps {
 		a := from + da * f32(n) / f32(nsteps)
@@ -338,7 +338,7 @@ draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color:
 	end_path()
 }
 draw_box_fill :: proc(box: Box, color: Color) {
-	core.vertex_state.col = color
+	set_vertex_color(color)
 	core.vertex_state.uv = {}
 	tl := add_vertex(box.lo)
 	bl := add_vertex({box.lo.x, box.hi.y})

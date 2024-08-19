@@ -267,6 +267,7 @@ draw_text_highlight :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 }
 
 draw_text_glyphs :: proc(job: Text_Job, pos: [2]f32, color: Color) {
+	pos := linalg.floor(pos)
 	for glyph in job.glyphs {
 		if glyph.codepoint == 0 || glyph.source == {} do continue
 		glyph_pos := pos + glyph.pos + glyph.offset

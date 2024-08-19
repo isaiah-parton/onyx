@@ -13,7 +13,7 @@ Tooltip_Info :: struct {
 	time:   f32,
 }
 
-Widget_Variant_Tooltip :: struct {
+Tooltip_Widget_Kind :: struct {
 	origin: [2]f32,
 	exists: bool,
 }
@@ -22,7 +22,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 	widget, ok := begin_widget({id = hash(loc)})
 	if !ok do return false
 
-	variant := widget_variant(widget, Widget_Variant_Tooltip)
+	variant := widget_kind(widget, Tooltip_Widget_Kind)
 
 	bounds := info.bounds if info.bounds != {} else view_box()
 	origin: [2]f32 = (info.pos.? or_else core.mouse_pos) + TOOLTIP_OFFSET
@@ -56,7 +56,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		},
 		loc,
 	)
-	draw_rounded_box_fill(box, core.style.rounding, core.style.color.background)
+	draw_rounded_box_fill(box, core.style.rounding, fade(core.style.color.background, 0.85))
 
 	end_widget()
 	return true

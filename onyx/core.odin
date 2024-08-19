@@ -25,8 +25,8 @@ MAX_PANELS :: 100
 
 MAX_TEXTURES :: 200
 
-MAX_DRAW_CALL_VERTICES :: 65536
-MAX_DRAW_CALL_INDICES :: 65536
+MAX_VERTICES :: 65536
+MAX_INDICES :: 65536
 
 Stack :: struct($T: typeid, $N: int) {
 	items:  [N]T,
@@ -134,6 +134,7 @@ Core :: struct {
 	font_atlas:                                                           Atlas,
 	vertex_state:                                                         Vertex_State,
 	path_stack:                                                           Stack(Path, 10),
+	draw_list: Draw_List,
 	draw_calls:                                                           [MAX_DRAW_CALLS]Draw_Call,
 	draw_call_count:                                                      int,
 	current_draw_call:                                                    ^Draw_Call,
@@ -207,6 +208,8 @@ init :: proc() {
 	atlas_size: int = min(max_atlas_size, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, atlas_size, atlas_size)
 
+	init_draw_list(&core.draw_list)
+
 	// Default style
 	core.style.color = dark_color_scheme()
 	core.style.shape = default_style_shape()
@@ -279,8 +282,6 @@ begin_frame :: proc() {
 	core.draw_call_count = 0
 
 	// Push initial draw call and matrix
-	push_draw_call()
-	set_image(core.font_atlas.image)
 	push_matrix()
 }
 
@@ -432,20 +433,16 @@ end_frame :: proc() {
 
 	if core.draw_this_frame {
 		// First things first ima upload all my data
-		for &call in core.draw_calls[:core.draw_call_count] {
-			// Don't bother if there are no indices
-			if len(call.indices) == 0 do continue
+		sg.apply_bindings(core.draw_list.bindings)
+		sg.update_buffer(
+			core.draw_list.bindings.index_buffer,
+			{ptr = raw_data(core.draw_list.indices), size = u64(len(core.draw_list.indices) * size_of(u16))},
+		)
+		sg.update_buffer(
+			core.draw_list.bindings.vertex_buffers[0],
+			{ptr = raw_data(core.draw_list.vertices), size = u64(len(core.draw_list.vertices) * size_of(Vertex))},
+		)
 
-			sg.apply_bindings(call.bindings)
-			sg.update_buffer(
-				call.bindings.index_buffer,
-				{ptr = raw_data(call.indices), size = u64(len(call.indices) * size_of(u16))},
-			)
-			sg.update_buffer(
-				call.bindings.vertex_buffers[0],
-				{ptr = raw_data(call.vertices), size = u64(len(call.vertices) * size_of(Vertex))},
-			)
-		}
 		// Normal render pass
 		sg.begin_pass(
 			{
@@ -457,6 +454,7 @@ end_frame :: proc() {
 			},
 		)
 		sg.apply_pipeline(core.pipeline)
+		sg.apply_bindings(core.draw_list.bindings)
 
 		// Set view bounds
 		t := f32(0)
@@ -469,41 +467,39 @@ end_frame :: proc() {
 		// Thank you linalg!
 		projection_matrix := linalg.matrix_ortho3d(l, r, b, t, n, f)
 
+		// Apply projection matrix
+		sg.apply_uniforms(
+			.VS,
+			0,
+			{ptr = &projection_matrix, size = size_of(projection_matrix)},
+		)
+
 		// Render draw calls
+		slice.sort_by(core.draw_calls[:core.draw_call_count], proc(i, j: Draw_Call) -> bool {
+			return i.index < j.index
+		})
 		for &call in core.draw_calls[:core.draw_call_count] {
-			sg.apply_bindings(call.bindings)
+			bindings := core.draw_list.bindings
+			bindings.fs.images[0] = call.image
+			sg.apply_bindings(bindings)
 
-			// Apply projection matrix
-			sg.apply_uniforms(
-				.VS,
-				0,
-				{ptr = &projection_matrix, size = size_of(projection_matrix)},
-			)
-
-			frag_uniforms := Frag_Uniforms{}
-			sg.apply_uniforms(.FS, 0, {ptr = &frag_uniforms, size = size_of(Frag_Uniforms)})
+			// frag_uniforms := Frag_Uniforms{}
+			// sg.apply_uniforms(.FS, 0, {ptr = &frag_uniforms, size = size_of(Frag_Uniforms)})
 
 			// Apply scissor
-			if box, ok := call.scissor_box.?; ok {
-				sg.apply_scissor_rectf(
-					box.lo.x,
-					box.lo.y,
-					(box.hi.x - box.lo.x),
-					(box.hi.y - box.lo.y),
-					true,
-				)
-			}
+			// sg.apply_scissor_rectf(
+			// 	call.clip_box.lo.x,
+			// 	call.clip_box.lo.y,
+			// 	(call.clip_box.hi.x - call.clip_box.lo.x),
+			// 	(call.clip_box.hi.y - call.clip_box.lo.y),
+			// 	true,
+			// )
 
 			// Draw elements
-			sg.draw(0, len(call.indices), 1)
+			sg.draw(call.idx_offset, call.elem_count, 1)
 
 			// Reset scissor
-			if call.scissor_box != nil {
-				sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
-			}
-
-			clear(&call.vertices)
-			clear(&call.indices)
+			sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
 		}
 		if core.debug.enabled {
 			sdtx.draw()
@@ -525,11 +521,10 @@ end_frame :: proc() {
 			},
 		)
 		sg.end_pass()
-		for &call in core.draw_calls[:core.draw_call_count] {
-			clear(&call.vertices)
-			clear(&call.indices)
-		}
 	}
+
+	clear_draw_list(&core.draw_list)
+	core.draw_call_count = 0
 
 	// Reset drawing system
 	core.vertex_state = {}
@@ -539,6 +534,7 @@ end_frame :: proc() {
 	core.last_mouse_bits = core.mouse_bits
 	clear(&core.runes)
 	core.last_keys = core.keys
+	core.mouse_scroll = {}
 
 	// Clear text job arrays
 	clear(&core.glyphs)
@@ -561,10 +557,7 @@ quit :: proc() {
 	}
 
 	// Free draw call data
-	for &draw_call in core.draw_calls {
-		delete(draw_call.vertices)
-		delete(draw_call.indices)
-	}
+	destroy_draw_list(&core.draw_list)
 
 	// Delete maps
 	delete(core.layer_map)
@@ -572,12 +565,6 @@ quit :: proc() {
 	delete(core.panel_map)
 
 	// Now uninit gpu stuff
-	for &call in core.draw_calls {
-		if call.ready {
-			sg.destroy_buffer(call.bindings.index_buffer)
-			sg.destroy_buffer(call.bindings.vertex_buffers[0])
-		}
-	}
 	sg.destroy_pipeline(core.pipeline)
 
 	// Shutdown subsystems

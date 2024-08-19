@@ -50,22 +50,27 @@ Vertex_State :: struct {
 	uv: [2]f32,
 	col: [4]u8,
 	z: f32,
+	alpha: f32,
 }
 
 // Matrix used for vertex transforms
 Matrix :: matrix[4, 4]f32
 
+Draw_List :: struct {
+	bindings: sg.Bindings,
+	vertices: [dynamic]Vertex,
+	indices: [dynamic]u16,
+}
+
 // A draw call to the GPU these are managed internally
 Draw_Call :: struct {
 	gradient: Gradient,
-	scissor_box: Maybe(Box),
-
-	bindings: sg.Bindings,
-
-	vertices: [dynamic]Vertex,
-	indices: [dynamic]u16,
-
-	ready: bool,
+	clip_box: Box,
+	image: sg.Image,
+	vtx_offset,
+	idx_offset,
+	elem_count: int,
+	index: int,
 }
 
 Path :: struct {
@@ -74,12 +79,48 @@ Path :: struct {
 	closed: bool,
 }
 
-vertex_uv :: proc(uv: [2]f32) {
+init_draw_list :: proc(draw_list: ^Draw_List) {
+	draw_list.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
+		type = .INDEXBUFFER,
+		usage = .STREAM,
+		size = MAX_INDICES * size_of(u16),
+	})
+	draw_list.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
+		type = .VERTEXBUFFER,
+		usage = .STREAM,
+		size = MAX_VERTICES * size_of(Vertex),
+	})
+	draw_list.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
+		min_filter = .LINEAR,
+		mag_filter = .LINEAR,
+		wrap_u = .MIRRORED_REPEAT,
+		wrap_v = .MIRRORED_REPEAT,
+	})
+}
+
+destroy_draw_list :: proc(draw_list: ^Draw_List) {
+	sg.destroy_buffer(draw_list.bindings.index_buffer)
+	sg.destroy_buffer(draw_list.bindings.vertex_buffers[0])
+	sg.destroy_sampler(draw_list.bindings.fs.samplers[0])
+	delete(draw_list.vertices)
+	delete(draw_list.indices)
+}
+
+clear_draw_list :: proc(draw_list: ^Draw_List) {
+	clear(&draw_list.vertices)
+	clear(&draw_list.indices)
+}
+
+set_vertex_uv :: proc(uv: [2]f32) {
 	core.vertex_state.uv = uv
 }
 
-vertex_col :: proc(color: Color) {
-	core.vertex_state.col = color
+set_vertex_color :: proc(color: Color) {
+	if core.vertex_state.alpha == 1 {
+		core.vertex_state.col = color
+		return
+	}
+	core.vertex_state.col = {color.r, color.g, color.b, u8((f32(color.a) / 255) * core.vertex_state.alpha * 255)}
 }
 
 // Append a vertex and return it's index
@@ -89,8 +130,8 @@ add_vertex_3f32 :: proc(x, y, z: f32) -> (i: u16) {
 		core.current_matrix[1, 0] * x + core.current_matrix[1, 1] * y + core.current_matrix[1, 2] * z + core.current_matrix[1, 3],
 		core.current_matrix[2, 0] * x + core.current_matrix[2, 1] * y + core.current_matrix[2, 2] * z + core.current_matrix[2, 3],
 	}
-	i = u16(len(core.current_draw_call.vertices))
-	append(&core.current_draw_call.vertices, Vertex{
+	i = next_vertex_index()
+	append(&core.draw_list.vertices, Vertex{
 		pos = pos,
 		uv = core.vertex_state.uv,
 		col = core.vertex_state.col,
@@ -113,11 +154,17 @@ add_vertex :: proc {
 }
 
 add_index :: proc(i: u16) {
-	append(&core.current_draw_call.indices, i)
+	append(&core.draw_list.indices, i)
+	core.current_draw_call.elem_count += 1
 }
 
 add_indices :: proc(i: ..u16) {
-	append(&core.current_draw_call.indices, ..i)
+	append(&core.draw_list.indices, ..i)
+	core.current_draw_call.elem_count += len(i)
+}
+
+next_vertex_index :: proc() -> u16 {
+	return u16(len(core.draw_list.vertices))
 }
 
 push_matrix :: proc() {
@@ -133,26 +180,8 @@ pop_matrix :: proc() {
 
 push_draw_call :: proc() {
 	core.current_draw_call = &core.draw_calls[core.draw_call_count]
-	if !core.current_draw_call.ready {
-		core.current_draw_call.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
-			type = .INDEXBUFFER,
-			usage = .STREAM,
-			size = MAX_DRAW_CALL_INDICES * size_of(u16),
-		})
-		core.current_draw_call.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
-			type = .VERTEXBUFFER,
-			usage = .STREAM,
-			size = MAX_DRAW_CALL_VERTICES * size_of(Vertex),
-		})
-		core.current_draw_call.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
-			min_filter = .LINEAR,
-			mag_filter = .NEAREST,
-			wrap_u = .MIRRORED_REPEAT,
-			wrap_v = .MIRRORED_REPEAT,
-		})
-		reserve(&core.current_draw_call.vertices, MAX_DRAW_CALL_VERTICES)
-		reserve(&core.current_draw_call.indices, MAX_DRAW_CALL_INDICES)
-		core.current_draw_call.ready = true
+	core.current_draw_call^ = Draw_Call{
+		idx_offset = len(core.draw_list.indices),
 	}
 	core.draw_call_count += 1
 }
@@ -191,20 +220,3 @@ rotate_matrix_z :: proc(angle: f32) {
 scale_matrix :: proc(x, y, z: f32) {
 	core.current_matrix^ *= linalg.matrix4_scale([3]f32{x, y, z})
 }
-
-// clip_source :: proc(source, target, clip: Box) -> (new_source, new_target: Box) {
-// 	source, target := source, target
-
-// 	if target.lo.x < clip.lo.x {
-// 		a := clip.lo.x - target.lo.x
-// 		target.lo.x += a
-// 		source.lo.x += (a / box_width(target)) * box_width(source)
-// 	}
-// 	if target.lo.x < clip.lo.x {
-// 		a := clip.lo.x - target.lo.x
-// 		target.lo.x += a
-// 		source.lo.x += (a / box_width(target)) * box_width(source)
-// 	}
-
-// 	return source, target
-// }

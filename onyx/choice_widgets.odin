@@ -1,6 +1,7 @@
 package onyx
 
 import "core:math"
+import "core:math/ease"
 import "core:math/linalg"
 
 Selector_Info :: struct {
@@ -10,7 +11,7 @@ Selector_Info :: struct {
 	__text_job: Text_Job,
 }
 
-Selector_Widget_Variant :: struct {
+Menu_Widget_Kind :: struct {
 	size:      [2]f32,
 	open_time: f32,
 }
@@ -33,8 +34,7 @@ make_selector :: proc(info: Selector_Info, loc := #caller_location) -> Selector_
 
 begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 	widget := begin_widget(info) or_return
-	variant := widget_variant(widget, Selector_Widget_Variant)
-	variant.open_time = animate(variant.open_time, 0.1, .Open in widget.state)
+	kind := widget_kind(widget, Menu_Widget_Kind)
 	if widget.visible {
 		draw_rounded_box_fill(
 			widget.box,
@@ -52,13 +52,12 @@ begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 			core.style.color.content,
 		)
 	}
-	button_behavior(widget)
-	if .Pressed in (widget.state - widget.last_state) {
-		widget.state += {.Open}
-	}
+
+	menu_behavior(widget)
+	
 	if .Open in widget.state {
 		layer_pos := [2]f32{widget.box.lo.x, widget.box.hi.y + core.style.shape.menu_padding}
-		layer_size := variant.size
+		layer_size := kind.size
 		layer_origin := [2]f32{layer_pos.x, layer_pos.y}
 
 		switch info.menu_align {
@@ -72,23 +71,22 @@ begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 			layer_pos.x = widget.box.lo.x
 		}
 
+		open_time := ease.quadratic_out(kind.open_time)
+		scale: f32 = 0.7 + 0.3 * open_time
+
 		begin_layer(
 			{
 				id = widget.id,
 				box = {layer_pos, layer_pos + layer_size},
 				origin = layer_origin,
-				scale = [2]f32{variant.open_time, variant.open_time},
+				scale = [2]f32{scale, scale},
+				opacity = open_time,
 			},
 		)
 		foreground()
-
-		layer := current_layer().?
-		if .Hovered not_in layer.state && .Focused not_in widget.state {
-			widget.state -= {.Open}
-		}
-	} else {
-		end_widget()
 	}
+
+
 	return .Open in widget.state
 }
 
@@ -96,11 +94,15 @@ end_selector :: proc() {
 	widget := current_widget().?
 	if .Open in widget.state {
 		layout := current_layout().?
-		variant := widget_variant(widget, Selector_Widget_Variant)
-		variant.size = layout.content_size + layout.spacing_size
+		kind := widget_kind(widget, Menu_Widget_Kind)
+		kind.size = layout.content_size + layout.spacing_size
+		layer := current_layer().?
+		if .Hovered not_in layer.state && .Focused not_in widget.state {
+			widget.state -= {.Open}
+		}
 		end_layer()
-		end_widget()
 	}
+	end_widget()
 }
 
 @(deferred_out = __do_selector)
@@ -110,9 +112,7 @@ do_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 
 @(private)
 __do_selector :: proc(ok: bool) {
-	if ok {
-		end_selector()
-	}
+	end_selector()
 }
 
 Selector_Option_Kind :: enum {

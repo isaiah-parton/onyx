@@ -9,6 +9,8 @@ Font_Style :: enum {
 	Regular,
 	Medium,
 	Bold,
+	Icon,
+	Monospace,
 }
 
 Style :: struct {
