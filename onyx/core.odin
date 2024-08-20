@@ -132,9 +132,10 @@ Core :: struct {
 	fonts:                                                                [MAX_FONTS]Maybe(Font),
 	current_font:                                                         int,
 	font_atlas:                                                           Atlas,
+	user_images:                                                          [300]Maybe(Image),
 	vertex_state:                                                         Vertex_State,
 	path_stack:                                                           Stack(Path, 10),
-	draw_list: Draw_List,
+	draw_list:                                                            Draw_List,
 	draw_calls:                                                           [MAX_DRAW_CALLS]Draw_Call,
 	draw_call_count:                                                      int,
 	current_draw_call:                                                    ^Draw_Call,
@@ -405,7 +406,6 @@ end_frame :: proc() {
 			layer.dead = true
 		}
 	}
-
 	// Free unused widgets
 	for id, widget in core.widget_map {
 		if widget.dead {
@@ -436,11 +436,17 @@ end_frame :: proc() {
 		sg.apply_bindings(core.draw_list.bindings)
 		sg.update_buffer(
 			core.draw_list.bindings.index_buffer,
-			{ptr = raw_data(core.draw_list.indices), size = u64(len(core.draw_list.indices) * size_of(u16))},
+			{
+				ptr = raw_data(core.draw_list.indices),
+				size = u64(len(core.draw_list.indices) * size_of(u16)),
+			},
 		)
 		sg.update_buffer(
 			core.draw_list.bindings.vertex_buffers[0],
-			{ptr = raw_data(core.draw_list.vertices), size = u64(len(core.draw_list.vertices) * size_of(Vertex))},
+			{
+				ptr = raw_data(core.draw_list.vertices),
+				size = u64(len(core.draw_list.vertices) * size_of(Vertex)),
+			},
 		)
 
 		// Normal render pass
@@ -454,7 +460,6 @@ end_frame :: proc() {
 			},
 		)
 		sg.apply_pipeline(core.pipeline)
-		sg.apply_bindings(core.draw_list.bindings)
 
 		// Set view bounds
 		t := f32(0)
@@ -468,11 +473,7 @@ end_frame :: proc() {
 		projection_matrix := linalg.matrix_ortho3d(l, r, b, t, n, f)
 
 		// Apply projection matrix
-		sg.apply_uniforms(
-			.VS,
-			0,
-			{ptr = &projection_matrix, size = size_of(projection_matrix)},
-		)
+		sg.apply_uniforms(.VS, 0, {ptr = &projection_matrix, size = size_of(projection_matrix)})
 
 		// Render draw calls
 		slice.sort_by(core.draw_calls[:core.draw_call_count], proc(i, j: Draw_Call) -> bool {
@@ -480,23 +481,23 @@ end_frame :: proc() {
 		})
 		for &call in core.draw_calls[:core.draw_call_count] {
 			bindings := core.draw_list.bindings
-			bindings.fs.images[0] = call.image
+			bindings.fs.images[0] = call.texture
 			sg.apply_bindings(bindings)
 
 			// frag_uniforms := Frag_Uniforms{}
 			// sg.apply_uniforms(.FS, 0, {ptr = &frag_uniforms, size = size_of(Frag_Uniforms)})
 
 			// Apply scissor
-			// sg.apply_scissor_rectf(
-			// 	call.clip_box.lo.x,
-			// 	call.clip_box.lo.y,
-			// 	(call.clip_box.hi.x - call.clip_box.lo.x),
-			// 	(call.clip_box.hi.y - call.clip_box.lo.y),
-			// 	true,
-			// )
+			sg.apply_scissor_rectf(
+				call.clip_box.lo.x,
+				call.clip_box.lo.y,
+				(call.clip_box.hi.x - call.clip_box.lo.x),
+				(call.clip_box.hi.y - call.clip_box.lo.y),
+				true,
+			)
 
 			// Draw elements
-			sg.draw(call.idx_offset, call.elem_count, 1)
+			sg.draw(call.elem_offset, call.elem_count, 1)
 
 			// Reset scissor
 			sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)

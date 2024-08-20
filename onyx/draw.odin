@@ -16,7 +16,7 @@ MAX_FONTS :: 100
 
 MAX_ATLASES :: 8
 MIN_ATLAS_SIZE :: 1024
-MAX_ATLAS_SIZE :: 4096
+MAX_ATLAS_SIZE :: 8192
 
 Gradient :: union {
 	Linear_Gradient,
@@ -42,14 +42,14 @@ Stroke_Justify :: enum {
 
 Vertex :: struct {
 	pos: [3]f32,
-	uv: [2]f32,
+	uv:  [2]f32,
 	col: [4]u8,
 }
 
 Vertex_State :: struct {
-	uv: [2]f32,
-	col: [4]u8,
-	z: f32,
+	uv:    [2]f32,
+	col:   [4]u8,
+	z:     f32,
 	alpha: f32,
 }
 
@@ -59,43 +59,43 @@ Matrix :: matrix[4, 4]f32
 Draw_List :: struct {
 	bindings: sg.Bindings,
 	vertices: [dynamic]Vertex,
-	indices: [dynamic]u16,
+	indices:  [dynamic]u16,
 }
 
 // A draw call to the GPU these are managed internally
 Draw_Call :: struct {
-	gradient: Gradient,
-	clip_box: Box,
-	image: sg.Image,
-	vtx_offset,
-	idx_offset,
-	elem_count: int,
-	index: int,
+	gradient:                Gradient,
+	clip_box:                Box,
+	texture:                 sg.Image,
+	elem_offset, elem_count: int,
+	index:                   int,
 }
 
 Path :: struct {
 	points: [MAX_PATH_POINTS][2]f32,
-	count: int,
+	count:  int,
 	closed: bool,
 }
 
 init_draw_list :: proc(draw_list: ^Draw_List) {
-	draw_list.bindings.index_buffer = sg.make_buffer(sg.Buffer_Desc{
-		type = .INDEXBUFFER,
-		usage = .STREAM,
-		size = MAX_INDICES * size_of(u16),
-	})
-	draw_list.bindings.vertex_buffers[0] = sg.make_buffer(sg.Buffer_Desc{
-		type = .VERTEXBUFFER,
-		usage = .STREAM,
-		size = MAX_VERTICES * size_of(Vertex),
-	})
-	draw_list.bindings.fs.samplers[0] = sg.make_sampler(sg.Sampler_Desc{
-		min_filter = .LINEAR,
-		mag_filter = .LINEAR,
-		wrap_u = .MIRRORED_REPEAT,
-		wrap_v = .MIRRORED_REPEAT,
-	})
+	draw_list.bindings.index_buffer = sg.make_buffer(
+		sg.Buffer_Desc{type = .INDEXBUFFER, usage = .STREAM, size = MAX_INDICES * size_of(u16)},
+	)
+	draw_list.bindings.vertex_buffers[0] = sg.make_buffer(
+		sg.Buffer_Desc {
+			type = .VERTEXBUFFER,
+			usage = .STREAM,
+			size = MAX_VERTICES * size_of(Vertex),
+		},
+	)
+	draw_list.bindings.fs.samplers[0] = sg.make_sampler(
+		sg.Sampler_Desc {
+			min_filter = .LINEAR,
+			mag_filter = .LINEAR,
+			wrap_u = .MIRRORED_REPEAT,
+			wrap_v = .MIRRORED_REPEAT,
+		},
+	)
 }
 
 destroy_draw_list :: proc(draw_list: ^Draw_List) {
@@ -120,22 +120,35 @@ set_vertex_color :: proc(color: Color) {
 		core.vertex_state.col = color
 		return
 	}
-	core.vertex_state.col = {color.r, color.g, color.b, u8((f32(color.a) / 255) * core.vertex_state.alpha * 255)}
+	core.vertex_state.col = {
+		color.r,
+		color.g,
+		color.b,
+		u8((f32(color.a) / 255) * core.vertex_state.alpha * 255),
+	}
 }
 
 // Append a vertex and return it's index
 add_vertex_3f32 :: proc(x, y, z: f32) -> (i: u16) {
 	pos: [3]f32 = {
-		core.current_matrix[0, 0] * x + core.current_matrix[0, 1] * y + core.current_matrix[0, 2] * z + core.current_matrix[0, 3],
-		core.current_matrix[1, 0] * x + core.current_matrix[1, 1] * y + core.current_matrix[1, 2] * z + core.current_matrix[1, 3],
-		core.current_matrix[2, 0] * x + core.current_matrix[2, 1] * y + core.current_matrix[2, 2] * z + core.current_matrix[2, 3],
+		core.current_matrix[0, 0] * x +
+		core.current_matrix[0, 1] * y +
+		core.current_matrix[0, 2] * z +
+		core.current_matrix[0, 3],
+		core.current_matrix[1, 0] * x +
+		core.current_matrix[1, 1] * y +
+		core.current_matrix[1, 2] * z +
+		core.current_matrix[1, 3],
+		core.current_matrix[2, 0] * x +
+		core.current_matrix[2, 1] * y +
+		core.current_matrix[2, 2] * z +
+		core.current_matrix[2, 3],
 	}
 	i = next_vertex_index()
-	append(&core.draw_list.vertices, Vertex{
-		pos = pos,
-		uv = core.vertex_state.uv,
-		col = core.vertex_state.col,
-	})
+	append(
+		&core.draw_list.vertices,
+		Vertex{pos = pos, uv = core.vertex_state.uv, col = core.vertex_state.col},
+	)
 	return
 }
 
@@ -180,19 +193,14 @@ pop_matrix :: proc() {
 
 push_draw_call :: proc() {
 	core.current_draw_call = &core.draw_calls[core.draw_call_count]
-	core.current_draw_call^ = Draw_Call{
-		idx_offset = len(core.draw_list.indices),
+	core.current_draw_call^ = Draw_Call {
+		elem_offset = len(core.draw_list.indices),
 	}
 	core.draw_call_count += 1
 }
 
 matrix_identity :: proc() -> Matrix {
-	return {
-		1, 0, 0, 0,
-		0, 1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1,
-	}
+	return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
 }
 
 translate_matrix :: proc(x, y, z: f32) {
@@ -207,12 +215,7 @@ rotate_matrix_z :: proc(angle: f32) {
 	cosres := math.cos(angle)
 	sinres := math.sin(angle)
 
-	rotation_matrix: Matrix = {
-		cosres, 	-sinres, 	0, 0,
-		sinres, 	cosres, 	0, 0,
-		0, 				0, 				1, 0,
-		0, 				0, 				0, 1,
-	}
+	rotation_matrix: Matrix = {cosres, -sinres, 0, 0, sinres, cosres, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
 
 	core.current_matrix^ *= rotation_matrix
 }

@@ -4,25 +4,47 @@ import "base:runtime"
 import "core:fmt"
 import "core:os"
 
-import "core:image"
-import "core:image/png"
+import img "core:image"
+import png "core:image/png"
 
 import sg "extra:sokol-odin/sokol/gfx"
 
 Pixel_Format :: sg.Pixel_Format
 
 Image :: struct {
-	using _image:                   sg.Image,
-	channels, depth, width, height: int,
+	using image: img.Image,
+	atlas_src:   Maybe(Box),
+}
+
+Texture :: struct {
+	using image: sg.Image,
+	width:       int,
+	height:      int,
+}
+
+upload_image :: proc(image: img.Image) -> (index: int, ok: bool) {
+	for i in 0 ..< len(core.user_images) {
+		if core.user_images[i] == nil {
+			index = i
+			ok = true
+			core.user_images[i] = Image{}
+			break
+		}
+	}
+	return
+}
+
+drop_image :: proc(index: int) {
+	core.user_images[index] = nil
 }
 
 destroy_image :: proc(image: ^Image) {
-	sg.destroy_image(image)
+	img.destroy(image)
 }
 
-draw_image :: proc(image: Image, box: Box, tint: Color) {
-	prev_image := get_current_image()
-	set_image(image)
+draw_texture :: proc(texture: Texture, box: Box, tint: Color) {
+	prev_image := get_current_texture()
+	set_texture(texture)
 
 	set_vertex_color(tint)
 
@@ -37,16 +59,17 @@ draw_image :: proc(image: Image, box: Box, tint: Color) {
 
 	add_indices(tl, br, bl, tl, tr, br)
 
-	set_image(prev_image)
+	set_texture(prev_image)
+
 }
 
-draw_image_portion :: proc(image: Image, source, target: Box, tint: Color) {
-	prev_image := get_current_image()
-	set_image(image)
+draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color) {
+	prev_image := get_current_texture()
+	set_texture(texture)
 
 	set_vertex_color(tint)
 
-	size: [2]f32 = {f32(image.width), f32(image.height)}
+	size: [2]f32 = {f32(texture.width), f32(texture.height)}
 
 	set_vertex_uv(source.lo / size)
 	tl := add_vertex(target.lo)
@@ -59,29 +82,29 @@ draw_image_portion :: proc(image: Image, source, target: Box, tint: Color) {
 
 	add_indices(tl, br, bl, tl, tr, br)
 
-	set_image(prev_image)
+	set_texture(prev_image)
 }
 
-set_image :: proc(image: sg.Image) {
-	if core.current_draw_call.image == image {
+set_texture :: proc(texture: sg.Image) {
+	if core.current_draw_call.texture == texture {
 		return
 	}
-	if core.current_draw_call.image == {} {
-		core.current_draw_call.image = image
+	if core.current_draw_call.texture == {} {
+		core.current_draw_call.texture = texture
 		return
 	}
 	for i in 0 ..< core.draw_call_count {
-		if core.draw_calls[i].image == image {
+		if core.draw_calls[i].texture == texture {
 			core.current_draw_call = &core.draw_calls[i]
 			return
 		}
 	}
 	push_draw_call()
-	core.current_draw_call.image = image
+	core.current_draw_call.texture = texture
 }
 
-get_current_image :: proc() -> sg.Image {
-	return core.current_draw_call.image
+get_current_texture :: proc() -> sg.Image {
+	return core.current_draw_call.texture
 }
 
 get_pixel_format :: proc(channels, depth: int) -> sg.Pixel_Format {
@@ -117,12 +140,12 @@ get_pixel_format :: proc(channels, depth: int) -> sg.Pixel_Format {
 	return .NONE
 }
 
-load_image_from_file :: proc(file: string) -> (result: Image, err: png.Error) {
+load_texture_from_file :: proc(file: string) -> (result: Texture, err: png.Error) {
 	_image := png.load_from_file(file) or_return
-	image.alpha_add_if_missing(_image)
+	img.alpha_add_if_missing(_image)
 	pixel_format := get_pixel_format(_image.channels, _image.depth)
-	result = Image {
-		_image   = sg.make_image(
+	result = Texture {
+		image  = sg.make_image(
 			sg.Image_Desc {
 				data = {
 					subimage = {
@@ -139,10 +162,8 @@ load_image_from_file :: proc(file: string) -> (result: Image, err: png.Error) {
 				pixel_format = pixel_format,
 			},
 		),
-		width    = _image.width,
-		height   = _image.height,
-		channels = _image.channels,
-		depth    = _image.depth,
+		width  = _image.width,
+		height = _image.height,
 	}
 
 	return

@@ -271,8 +271,8 @@ draw_text_glyphs :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 	for glyph in job.glyphs {
 		if glyph.codepoint == 0 || glyph.source == {} do continue
 		glyph_pos := pos + glyph.pos + glyph.offset
-		draw_image_portion(
-			core.font_atlas.image,
+		draw_texture_portion(
+			core.font_atlas.texture,
 			glyph.source,
 			{glyph_pos, glyph_pos + (glyph.source.hi - glyph.source.lo)},
 			color,
@@ -575,7 +575,7 @@ draw_aligned_rune :: proc(
 		box.lo.y = origin.y
 		box.hi.y = origin.y + size.y
 	}
-	draw_image_portion(core.font_atlas, glyph.source, box, color)
+	draw_texture_portion(core.font_atlas.texture, glyph.source, box, color)
 	return
 }
 
@@ -622,6 +622,6 @@ draw_rune_aligned_clipped :: proc(
 		box.lo.y = origin.y
 		box.hi.y = origin.y + icon_size.y
 	}
-	draw_image_portion(core.font_atlas, glyph.source, box, color)
+	draw_texture_portion(core.font_atlas.texture, glyph.source, box, color)
 	return icon_size
 }

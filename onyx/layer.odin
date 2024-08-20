@@ -35,17 +35,16 @@ Layer_Option :: enum {
 Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
-	id:                	Id,
-	last_state, state: 	Layer_State,
-	options:           	Layer_Options, // Option bit flags
-	kind:              	Layer_Kind,
-	box:               	Box,
-	parent:            	^Layer, // The layer's parent
-	children:          	[dynamic]^Layer, // The layer's children
-	dead:              	bool, // Should be deleted?
-	z_index:           	int,
-	opacity: 						f32,
-	draw_call: int,
+	id:                Id,
+	last_state, state: Layer_State,
+	options:           Layer_Options, // Option bit flags
+	kind:              Layer_Kind,
+	box:               Box,
+	parent:            ^Layer, // The layer's parent
+	children:          [dynamic]^Layer, // The layer's children
+	dead:              bool, // Should be deleted?
+	z_index:           int,
+	opacity:           f32,
 }
 
 Layer_Info :: struct {
@@ -57,7 +56,7 @@ Layer_Info :: struct {
 	origin:   [2]f32,
 	scale:    Maybe([2]f32),
 	rotation: f32,
-	opacity: 	Maybe(f32),
+	opacity:  Maybe(f32),
 }
 
 current_layer :: proc(loc := #caller_location) -> Maybe(^Layer) {
@@ -157,10 +156,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	core.vertex_state.z = 0.001 * f32(layer.z_index)
 	core.vertex_state.alpha = layer.opacity
 
-	layer.draw_call = core.draw_call_count
-	push_draw_call()
-	set_image(core.font_atlas.image)
-	core.current_draw_call.index = layer.z_index
+	add_layer_draw_call(layer)
 
 	// Transform matrix
 	scale: [2]f32 = info.scale.? or_else 1
@@ -194,10 +190,15 @@ end_layer :: proc() {
 	if layer, ok := current_layer().?; ok {
 		core.vertex_state.z = 0.001 * f32(layer.z_index)
 		core.vertex_state.alpha = layer.opacity
-		push_draw_call()
-	set_image(core.font_atlas.image)
-	core.current_draw_call.index = layer.z_index
+		add_layer_draw_call(layer)
 	}
+}
+
+add_layer_draw_call :: proc(layer: ^Layer) {
+	push_draw_call()
+	core.current_draw_call.texture = core.font_atlas.texture
+	core.current_draw_call.index = layer.z_index
+	core.current_draw_call.clip_box = layer.box
 }
 
 bring_layer_to_front :: proc(layer: ^Layer) {

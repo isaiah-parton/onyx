@@ -38,7 +38,7 @@ Component_Showcase :: struct {
 	slider_value: f32,
 	start_time:   time.Time,
 	option:       Option,
-	date_range: 	[2]onyx.Date,
+	date_range:   [2]onyx.Date,
 	month_offset: int,
 }
 
@@ -97,11 +97,10 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				pop_id()
 			}
 		}
-		calendar := make_calendar({
-			range = state.date_range, 
-			month_offset = state.month_offset,
-		})
-		if do_layout({box = align_inner(layout_box(), calendar.desired_size, {.Middle, .Middle})}) {
+		calendar := make_calendar({range = state.date_range, month_offset = state.month_offset})
+		if do_layout(
+			{box = align_inner(layout_box(), calendar.desired_size, {.Middle, .Middle})},
+		) {
 			state.month_offset = add_calendar(calendar).month_offset
 		}
 
