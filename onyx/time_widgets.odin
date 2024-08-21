@@ -8,21 +8,31 @@ import dt "core:time/datetime"
 Date :: dt.Date
 
 Calendar_Info :: struct {
-	id:               Id,
-	month_offset:     int,
-	range:            [2]Date,
-	desired_size:     [2]f32,
-	__calendar_start: t.Time,
-	__month_start:    t.Time,
-	__size:           f32,
-	__days:           int,
-	__year, __month:  int,
+	id:                Id,
+	selection:         [2]Maybe(Date),
+	desired_size:      [2]f32,
+	month_offset:      int,
+	__calendar_start:  t.Time,
+	__month_start:     t.Time,
+	__size:            f32,
+	__days:            int,
+	__year, __month:   int,
+	__selection_times: [2]t.Time,
 }
 
 Calendar_Result :: struct {
 	using _:      Generic_Widget_Result,
-	range:        [2]Date,
+	selection:    [2]Maybe(Date),
 	month_offset: int,
+}
+
+todays_date :: proc() -> Date {
+	year, month, day := t.date(t.now())
+	return Date{i64(year), i8(month), i8(day)}
+}
+
+dates_are_equal :: proc(a, b: Date) -> bool {
+	return a.year == b.year && a.month == b.month && a.day == b.day
 }
 
 make_calendar :: proc(info: Calendar_Info, loc := #caller_location) -> Calendar_Info {
@@ -33,8 +43,10 @@ make_calendar :: proc(info: Calendar_Info, loc := #caller_location) -> Calendar_
 	info.__size = info.desired_size.x / 7
 	info.desired_size.y = info.__size * 2
 
-	info.__month = int(info.range[0].month) + info.month_offset
-	info.__year = int(info.range[0].year)
+	date := info.selection[0].? or_else todays_date()
+
+	info.__month = int(date.month) + info.month_offset
+	info.__year = int(date.year)
 	for info.__month < 1 {
 		info.__year -= 1
 		info.__month += 12
@@ -42,6 +54,11 @@ make_calendar :: proc(info: Calendar_Info, loc := #caller_location) -> Calendar_
 	for info.__month > 12 {
 		info.__year += 1
 		info.__month -= 12
+	}
+
+	info.__selection_times = {
+		t.datetime_to_time(dt.DateTime{info.selection[0].? or_else Date{}, {}}) or_else t.Time{},
+		t.datetime_to_time(dt.DateTime{info.selection[1].? or_else Date{}, {}}) or_else t.Time{},
 	}
 
 	// Get the start of the month
@@ -72,7 +89,7 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 	begin_layout({box = next_widget_box({desired_size = info.desired_size})})
 
 	size := info.__size
-	result.range = info.range
+	result.selection = info.selection
 	result.month_offset = info.month_offset
 
 	set_width(size)
@@ -141,6 +158,7 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 			set_side(.Left)
 		}
 		year, month, day := t.date(time)
+		date := Date{i64(year), i8(month), i8(day)}
 		time._nsec += i64(t.Hour * 24)
 
 		today_year, today_month, today_day := t.date(t.now())
@@ -149,6 +167,29 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 		if !ok do continue
 
 		if widget.visible {
+			if time._nsec > info.__selection_times[0]._nsec &&
+			   time._nsec <= info.__selection_times[1]._nsec + i64(t.Hour * 24) {
+				corners: Corners = {}
+				if time._nsec == info.__selection_times[0]._nsec {
+					corners += {.Top_Left, .Bottom_Left}
+				}
+				if time._nsec == info.__selection_times[1]._nsec + i64(t.Hour * 24) {
+					corners += {.Top_Right, .Bottom_Right}
+				}
+				draw_rounded_box_corners_fill(
+					widget.box,
+					core.style.shape.rounding,
+					corners,
+					core.style.color.substance,
+				)
+			} else if date == todays_date() {
+				draw_rounded_box_stroke(
+					widget.box,
+					core.style.shape.rounding,
+					1,
+					core.style.color.substance,
+				)
+			}
 			draw_rounded_box_fill(
 				widget.box,
 				core.style.shape.rounding,
@@ -179,12 +220,29 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 		widget.focus_time = animate(
 			widget.focus_time,
 			0.2,
-			i64(year) == i64(info.range[0].year) &&
-			i8(month) == i8(info.range[0].month) &&
-			i8(day) == info.range[0].day,
+			date == info.selection[0] || date == info.selection[1],
 		)
 
 		button_behavior(widget)
+
+		if .Clicked in widget.state {
+			if result.selection[0] == nil {
+				result.selection[0] = date
+				result.month_offset = 0
+			} else {
+				if date == result.selection[0] {
+					result.selection = {nil, nil}
+				} else {
+					if time._nsec <=
+					   (t.datetime_to_time(dt.DateTime{result.selection[0].?, {}}) or_else t.Time{})._nsec {
+						result.selection[0] = date
+						result.month_offset = 0
+					} else {
+						result.selection[1] = date
+					}
+				}
+			}
+		}
 		end_widget()
 	}
 	end_layout()

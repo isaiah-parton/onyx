@@ -38,7 +38,7 @@ Component_Showcase :: struct {
 	slider_value: f32,
 	start_time:   time.Time,
 	option:       Option,
-	date_range:   [2]onyx.Date,
+	date_range:   [2]Maybe(onyx.Date),
 	month_offset: int,
 }
 
@@ -97,11 +97,15 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				pop_id()
 			}
 		}
-		calendar := make_calendar({range = state.date_range, month_offset = state.month_offset})
+		calendar := make_calendar(
+			{selection = state.date_range, month_offset = state.month_offset},
+		)
 		if do_layout(
 			{box = align_inner(layout_box(), calendar.desired_size, {.Middle, .Middle})},
 		) {
-			state.month_offset = add_calendar(calendar).month_offset
+			result := add_calendar(calendar)
+			state.month_offset = result.month_offset
+			state.date_range = result.selection
 		}
 
 	case .Checkbox:
@@ -233,30 +237,30 @@ main :: proc() {
 				begin_frame()
 				do_component_showcase(&state.component_showcase)
 
-				// if do_panel({title = "Widgets"}) {
-				// 	shrink(30)
-				// 	set_side(.Top)
-				// 	colors := [6]Color {
-				// 		{255, 60, 60, 255},
-				// 		{0, 255, 120, 255},
-				// 		{255, 10, 220, 255},
-				// 		{240, 195, 0, 255},
-				// 		{30, 120, 255, 255},
-				// 		{0, 255, 0, 255},
-				// 	}
-				// 	for color, c in colors {
-				// 		if c > 0 do add_space(10)
-				// 		if do_layout({size = 30, side = .Top}) {
-				// 			for kind, k in Button_Kind {
-				// 				if k > 0 do add_space(10)
-				// 				button_text := tmp_printf("Button %c%i", 'A' + c, k + 1)
-				// 				push_id(button_text)
-				// 				do_button({text = button_text, color = color, kind = kind})
-				// 				pop_id()
-				// 			}
-				// 		}
-				// 	}
-				// }
+				if do_panel({title = "Widgets"}) {
+					shrink(30)
+					set_side(.Top)
+					colors := [6]Color {
+						{255, 60, 60, 255},
+						{0, 255, 120, 255},
+						{255, 10, 220, 255},
+						{240, 195, 0, 255},
+						{30, 120, 255, 255},
+						{0, 255, 0, 255},
+					}
+					for color, c in colors {
+						if c > 0 do add_space(10)
+						if do_layout({size = 30, side = .Top}) {
+							for kind, k in Button_Kind {
+								if k > 0 do add_space(10)
+								button_text := tmp_printf("Button %c%i", 'A' + c, k + 1)
+								push_id(button_text)
+								do_button({text = button_text, color = color, kind = kind})
+								pop_id()
+							}
+						}
+					}
+				}
 				end_frame()
 			},
 			cleanup_cb = proc "c" () {

@@ -198,7 +198,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 			}
 
 			if .Hovered in widget.state {
-				core.cursor_type = .RESIZE_EW if int(side) > 1 else .RESIZE_NS
+				core.cursor_type = .RESIZE_NS if int(side) > 1 else .RESIZE_EW
 			}
 
 			if point_in_box(core.mouse_pos, widget.box) {
