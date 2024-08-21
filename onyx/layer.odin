@@ -3,6 +3,8 @@ package onyx
 /*
 	Layers are surfaces with a unique z-index on which widgets are drawn.
 	They can be reordered by the mouse
+
+	FIXME: Opened layers on menus cause frame drop the first time opened (only on D3D11)
 */
 
 import "core:fmt"
@@ -36,15 +38,16 @@ Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
 	id:                Id,
+	parent:            ^Layer, // The layer's parent
+	children:          [dynamic]^Layer, // The layer's children
+
 	last_state, state: Layer_State,
 	options:           Layer_Options, // Option bit flags
 	kind:              Layer_Kind,
 	box:               Box,
-	parent:            ^Layer, // The layer's parent
-	children:          [dynamic]^Layer, // The layer's children
 	dead:              bool, // Should be deleted?
-	z_index:           int,
 	opacity:           f32,
+	z_index:           int,
 }
 
 Layer_Info :: struct {
@@ -57,6 +60,10 @@ Layer_Info :: struct {
 	scale:    Maybe([2]f32),
 	rotation: f32,
 	opacity:  Maybe(f32),
+}
+
+destroy_layer :: proc(layer: ^Layer) {
+	delete(layer.children)
 }
 
 current_layer :: proc(loc := #caller_location) -> Maybe(^Layer) {
@@ -153,9 +160,6 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	push_layout(Layout{box = layer.box, original_box = layer.box, next_side = .Top})
 
 	// Set vertex z position
-	core.vertex_state.z = 0.001 * f32(layer.z_index)
-	core.vertex_state.alpha = layer.opacity
-
 	add_layer_draw_call(layer)
 
 	// Transform matrix
@@ -188,8 +192,6 @@ end_layer :: proc() {
 
 	// Reset z-level to that of the previous layer or to zero
 	if layer, ok := current_layer().?; ok {
-		core.vertex_state.z = 0.001 * f32(layer.z_index)
-		core.vertex_state.alpha = layer.opacity
 		add_layer_draw_call(layer)
 	}
 }
@@ -199,6 +201,8 @@ add_layer_draw_call :: proc(layer: ^Layer) {
 	core.current_draw_call.texture = core.font_atlas.texture
 	core.current_draw_call.index = layer.z_index
 	core.current_draw_call.clip_box = layer.box
+
+	core.vertex_state.alpha = layer.opacity
 }
 
 bring_layer_to_front :: proc(layer: ^Layer) {

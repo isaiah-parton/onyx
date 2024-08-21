@@ -13,7 +13,7 @@ button_behavior :: proc(widget: ^Widget) {
 menu_behavior :: proc(widget: ^Widget) {
 	kind := widget_kind(widget, Menu_Widget_Kind)
 	if .Open in widget.state {
-		kind.open_time = animate(kind.open_time, 0.2, .Open in widget.state)
+		kind.open_time = animate(kind.open_time, 0.2, true)
 	} else {
 		kind.open_time = 0
 	}

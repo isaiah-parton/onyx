@@ -27,17 +27,19 @@ Style_Shape :: struct {
 	title_margin:                                                         f32,
 	title_padding:                                                        f32,
 	menu_padding:                                                         f32,
+	scrollbar_thickness: f32,
+	rounded_scrollbars: bool,
 }
 
 default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
 		tooltip_padding = 3,
 		panel_padding = 10,
-		header_text_size = 30,
-		button_text_size = 20,
+		header_text_size = 26,
+		button_text_size = 18,
 		tab_text_size = 18,
 		content_text_size = 18,
-		rounding = 7,
+		rounding = 6,
 		menu_padding = 5,
 	}
 }

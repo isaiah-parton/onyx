@@ -20,21 +20,25 @@ Atlas :: struct {
 
 init_atlas :: proc(atlas: ^Atlas, width, height: int) {
 	pixels := make([]u8, width * height * 4)
+	defer delete(pixels)
+
 	pixels[0] = 255
 	pixels[1] = 255
 	pixels[2] = 255
 	pixels[3] = 255
 	atlas.offset = {1, 1}
+
+	image_desc := sg.Image_Desc {
+		width = i32(width),
+		height = i32(height),
+		usage = .DYNAMIC,
+		pixel_format = .RGBA8,
+	}
+
+		image_desc.data = {subimage = {0 = {0 = {ptr = raw_data(pixels), size = u64(len(pixels))}}}}
+
 	atlas.texture = {
-		image  = sg.make_image(
-			sg.Image_Desc {
-				width = i32(width),
-				height = i32(height),
-				usage = .DYNAMIC,
-				pixel_format = .RGBA8,
-				data = {subimage = {0 = {0 = {ptr = raw_data(pixels), size = u64(len(pixels))}}}},
-			},
-		),
+		image  = sg.make_image(image_desc),
 		width  = width,
 		height = height,
 	}
@@ -42,7 +46,7 @@ init_atlas :: proc(atlas: ^Atlas, width, height: int) {
 }
 
 destroy_atlas :: proc(atlas: ^Atlas) {
-	img.destroy(&atlas.image)
+	bytes.buffer_destroy(&atlas.image.pixels)
 	sg.destroy_image(atlas.texture)
 }
 

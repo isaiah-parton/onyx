@@ -290,6 +290,7 @@ draw_text_cursor :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 }
 
 destroy_font :: proc(font: ^Font) {
+	free(font.data.data)
 	for _, &size in font.sizes {
 		destroy_font_size(&size)
 	}
@@ -438,21 +439,20 @@ measure_text :: proc(info: Text_Info) -> [2]f32 {
 
 load_font :: proc(file_path: string) -> (handle: int, success: bool) {
 	font: Font
-	if file_data, ok := os.read_entire_file(file_path); ok {
-		if ttf.InitFont(&font.data, raw_data(file_data), 0) {
-			for i in 0 ..< MAX_FONTS {
-				if core.fonts[i] == nil {
-					core.fonts[i] = font
-					handle = int(i)
-					success = true
-					break
-				}
+
+	file_data := os.read_entire_file(file_path) or_return
+
+	if ttf.InitFont(&font.data, raw_data(file_data), 0) {
+		for i in 0 ..< MAX_FONTS {
+			if core.fonts[i] == nil {
+				core.fonts[i] = font
+				handle = int(i)
+				success = true
+				break
 			}
-		} else {
-			fmt.printf("[onyx] Failed to initialize font '%s'\n", file_path)
 		}
 	} else {
-		fmt.printf("[onyx] Failed to load font '%s'\n", file_path)
+		fmt.printf("[onyx] Failed to initialize font '%s'\n", file_path)
 	}
 	return
 }

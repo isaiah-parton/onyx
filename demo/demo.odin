@@ -7,6 +7,7 @@ import "core:math/rand"
 import "core:reflect"
 import "core:strings"
 import "core:time"
+import "core:mem"
 
 import "extra:onyx/onyx"
 import sapp "extra:sokol-odin/sokol/app"
@@ -203,7 +204,33 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	end_layer()
 }
 
+allocator: runtime.Allocator
+
 main :: proc() {
+	when ODIN_DEBUG {
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		allocator = mem.tracking_allocator(&track)
+
+		defer {
+			if len(track.allocation_map) > 0 {
+				fmt.eprintf("=== %v allocations not freed: ===\n", len(track.allocation_map))
+				for _, entry in track.allocation_map {
+					fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
+				}
+			}
+			if len(track.bad_free_array) > 0 {
+				fmt.eprintf("=== %v incorrect frees: ===\n", len(track.bad_free_array))
+				for entry in track.bad_free_array {
+					fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
+				}
+			}
+			mem.tracking_allocator_destroy(&track)
+		}
+	} else {
+		allocator = runtime.default_allocator()
+	}
+
 	state: State
 
 	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
@@ -213,6 +240,7 @@ main :: proc() {
 			user_data = &state,
 			init_userdata_cb = proc "c" (userdata: rawptr) {
 				context = runtime.default_context()
+				context.allocator = allocator
 				state := transmute(^State)userdata
 
 				onyx.init()
@@ -231,45 +259,50 @@ main :: proc() {
 			},
 			frame_userdata_cb = proc "c" (userdata: rawptr) {
 				context = runtime.default_context()
+				context.allocator = allocator
 				state := transmute(^State)userdata
 
 				using onyx
 				begin_frame()
 				do_component_showcase(&state.component_showcase)
 
-				if do_panel({title = "Widgets"}) {
-					shrink(30)
-					set_side(.Top)
-					colors := [6]Color {
-						{255, 60, 60, 255},
-						{0, 255, 120, 255},
-						{255, 10, 220, 255},
-						{240, 195, 0, 255},
-						{30, 120, 255, 255},
-						{0, 255, 0, 255},
-					}
-					for color, c in colors {
-						if c > 0 do add_space(10)
-						if do_layout({size = 30, side = .Top}) {
-							for kind, k in Button_Kind {
-								if k > 0 do add_space(10)
-								button_text := tmp_printf("Button %c%i", 'A' + c, k + 1)
-								push_id(button_text)
-								do_button({text = button_text, color = color, kind = kind})
-								pop_id()
-							}
-						}
-					}
-				}
+				// if do_panel({title = "Widgets"}) {
+				// 	shrink(30)
+				// 	set_side(.Top)
+				// 	colors := [6]Color {
+				// 		{255, 60, 60, 255},
+				// 		{0, 255, 120, 255},
+				// 		{255, 10, 220, 255},
+				// 		{240, 195, 0, 255},
+				// 		{30, 120, 255, 255},
+				// 		{0, 255, 0, 255},
+				// 	}
+				// 	for color, c in colors {
+				// 		if c > 0 do add_space(10)
+				// 		if do_layout({size = 30, side = .Top}) {
+				// 			for kind, k in Button_Kind {
+				// 				if k > 0 do add_space(10)
+				// 				button_text := tmp_printf("Button %c%i", 'A' + c, k + 1)
+				// 				push_id(button_text)
+				// 				do_button({text = button_text, color = color, kind = kind})
+				// 				pop_id()
+				// 			}
+				// 		}
+				// 	}
+				// }
+
+
 				end_frame()
 			},
 			cleanup_cb = proc "c" () {
 				context = runtime.default_context()
+				context.allocator = allocator
 
-				onyx.quit()
+				onyx.uninit()
 			},
 			event_cb = proc "c" (e: ^sapp.Event) {
 				context = runtime.default_context()
+				context.allocator = allocator
 
 				onyx.handle_event(e)
 			},

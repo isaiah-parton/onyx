@@ -35,7 +35,7 @@ make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 		align_h = .Middle,
 	}
 	info.__text_job, _ = make_text_job(text_info)
-	info.desired_size = info.__text_job.size + {20, 10}
+	info.desired_size = info.__text_job.size + {18, 6}
 	return info
 }
 

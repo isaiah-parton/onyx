@@ -10,6 +10,7 @@ import slog "extra:sokol-odin/sokol/log"
 import "vendor:fontstash"
 
 import "base:runtime"
+import "core:mem"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -82,7 +83,6 @@ Debug_State :: struct {
 // The global core data
 Core :: struct {
 	debug:                                                                Debug_State,
-	arena:                                                                runtime.Arena,
 	view:                                                                 [2]f32,
 	pipeline:                                                             sg.Pipeline,
 	limits:                                                               sg.Limits,
@@ -126,6 +126,7 @@ Core :: struct {
 	frame_count:                                                          int,
 	delta_time:                                                           f32, // Delta time in seconds
 	last_frame_time, start_time:                                          time.Time, // Time of last frame
+	render_duration: time.Duration,
 	draw_this_frame, draw_next_frame:                                     bool,
 	glyphs:                                                               [dynamic]Text_Job_Glyph,
 	lines:                                                                [dynamic]Text_Job_Line,
@@ -144,6 +145,8 @@ Core :: struct {
 		MAX_MATRICES,
 	),
 	current_matrix:                                                       ^Matrix,
+	profiler: Profiler,
+	scratch_allocator: mem.Scratch_Allocator,
 }
 
 view_box :: proc() -> Box {
@@ -181,7 +184,7 @@ init :: proc() {
 			index_type = .UINT16,
 			layout = {
 				attrs = {
-					0 = {offset = i32(offset_of(Vertex, pos)), format = .FLOAT3},
+					0 = {offset = i32(offset_of(Vertex, pos)), format = .FLOAT2},
 					1 = {offset = i32(offset_of(Vertex, uv)), format = .FLOAT2},
 					2 = {offset = i32(offset_of(Vertex, col)), format = .UBYTE4N},
 				},
@@ -198,7 +201,6 @@ init :: proc() {
 					},
 				},
 			},
-			depth = {pixel_format = .DEPTH, compare = .GREATER_EQUAL, write_enabled = true},
 			label = "pipeline",
 			cull_mode = .BACK,
 		},
@@ -279,81 +281,16 @@ begin_frame :: proc() {
 	// Process widgets
 	process_widgets()
 
-	// Reset draw calls
-	core.draw_call_count = 0
-
-	// Push initial draw call and matrix
+	// Push initial matrix
 	push_matrix()
 }
 
 end_frame :: proc() {
+
+	// Pop the last vertex matrix
 	pop_matrix()
 
-	// Display debug text
-	if core.debug.enabled {
-		sdtx.canvas(core.view.x, core.view.y)
-
-		sdtx.color3b(255, 255, 255)
-
-		sdtx.printf("frame %i\n", core.frame_count)
-		sdtx.color3b(170, 170, 170)
-		sdtx.printf("\ttime: %f\n", sapp.frame_duration())
-		sdtx.printf("\tdraw calls: %i/%i\n", core.draw_call_count, MAX_DRAW_CALLS)
-		sdtx.color3b(255, 255, 255)
-
-		sdtx.move_y(1)
-
-		sdtx.printf("%c Layers (L)\n", '-' if core.debug.layers else '+')
-		if key_pressed(.L) do core.debug.layers = !core.debug.layers
-		if core.debug.layers {
-			sdtx.color3b(170, 170, 170)
-			__debug_print_layer :: proc(layer: ^Layer, depth: int = 0) {
-				sdtx.putc('H' if .Hovered in layer.state else '_')
-				sdtx.putc('F' if .Focused in layer.state else '_')
-				for i in 0 ..< depth {
-					sdtx.putc('\t')
-				}
-				sdtx.printf("\t{:i} ({}) ({})\n", layer.id, layer.kind, layer.z_index)
-				for child in layer.children {
-					__debug_print_layer(child, depth + 1)
-				}
-			}
-			for _, layer in core.layer_map {
-				if layer.parent == nil {
-					__debug_print_layer(layer, 0)
-				}
-			}
-			sdtx.color3b(255, 255, 255)
-		}
-
-		sdtx.move_y(1)
-
-		sdtx.printf("%c Widgets (W)\n", '-' if core.debug.widgets else '+')
-		if key_pressed(.W) do core.debug.widgets = !core.debug.widgets
-		if core.debug.widgets {
-			sdtx.color3b(170, 170, 170)
-			for id, &widget in core.widget_map {
-				sdtx.putc('H' if .Hovered in widget.state else '_')
-				sdtx.putc('F' if .Focused in widget.state else '_')
-				sdtx.putc('P' if .Pressed in widget.state else '_')
-				sdtx.printf(" {:i}\n", widget.id)
-			}
-			sdtx.color3b(255, 255, 255)
-		}
-
-		sdtx.move_y(1)
-
-		sdtx.printf("%c Panels (P)\n", '-' if core.debug.panels else '+')
-		if key_pressed(.P) do core.debug.panels = !core.debug.panels
-		if core.debug.panels {
-			sdtx.color3b(170, 170, 170)
-			for id, &panel in core.panel_map {
-				sdtx.printf(" {}\n", panel.box)
-			}
-			sdtx.color3b(255, 255, 255)
-		}
-	}
-
+	// Set and reset cursor
 	sapp.set_mouse_cursor(core.cursor_type)
 	core.cursor_type = sapp.Mouse_Cursor.DEFAULT
 
@@ -367,15 +304,9 @@ end_frame :: proc() {
 		core.focused_layer = core.hovered_layer
 	}
 
-	// core.last_focused_layer = core.focused_layer
-
 	// Purge layers
 	for id, &layer in core.layer_map {
 		if layer.dead {
-
-			when ODIN_DEBUG {
-				fmt.printf("[ui] Deleted layer %x\n", layer.id)
-			}
 
 			// Move other layers down by one z index
 			for i in 0 ..< len(core.layers) {
@@ -390,8 +321,8 @@ end_frame :: proc() {
 			for &child, c in layer.children {
 				child.parent = nil
 			}
-			delete(layer.children)
 			remove_layer_parent(layer)
+			destroy_layer(layer)
 
 			// Remove from map
 			delete_key(&core.layer_map, id)
@@ -406,12 +337,10 @@ end_frame :: proc() {
 			layer.dead = true
 		}
 	}
+
 	// Free unused widgets
 	for id, widget in core.widget_map {
 		if widget.dead {
-			when ODIN_DEBUG {
-				fmt.printf("[core] Deleted widget %x\n", id)
-			}
 
 			if err := free_all(widget.allocator); err != .None {
 				fmt.printf("[core] Error freeing widget data: %v\n", err)
@@ -432,6 +361,8 @@ end_frame :: proc() {
 	}
 
 	if core.draw_this_frame {
+		start_time := time.now()
+
 		// First things first ima upload all my data
 		sg.apply_bindings(core.draw_list.bindings)
 		sg.update_buffer(
@@ -475,10 +406,12 @@ end_frame :: proc() {
 		// Apply projection matrix
 		sg.apply_uniforms(.VS, 0, {ptr = &projection_matrix, size = size_of(projection_matrix)})
 
-		// Render draw calls
+		// Sort draw calls by index
 		slice.sort_by(core.draw_calls[:core.draw_call_count], proc(i, j: Draw_Call) -> bool {
 			return i.index < j.index
 		})
+
+		// Render them
 		for &call in core.draw_calls[:core.draw_call_count] {
 			bindings := core.draw_list.bindings
 			bindings.fs.images[0] = call.texture
@@ -502,14 +435,22 @@ end_frame :: proc() {
 			// Reset scissor
 			sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
 		}
+
+		// Display debug text
 		if core.debug.enabled {
+			if core.debug.enabled {
+				print_debug_text()
+			}
 			sdtx.draw()
 		}
+
+		// Done rendering
 		sg.end_pass()
 		sg.commit()
 
 		core.frame_count += 1
 		core.draw_this_frame = false
+		core.render_duration = time.since(start_time)
 	} else {
 		// Normal render pass
 		sg.begin_pass(
@@ -524,30 +465,38 @@ end_frame :: proc() {
 		sg.end_pass()
 	}
 
-	clear_draw_list(&core.draw_list)
+	// Reset draw calls and draw list
 	core.draw_call_count = 0
+	clear_draw_list(&core.draw_list)
 
-	// Reset drawing system
+	// Reset vertex state
 	core.vertex_state = {}
 
-	// Reset root layer
+	// Reset input values
 	core.last_mouse_pos = core.mouse_pos
 	core.last_mouse_bits = core.mouse_bits
-	clear(&core.runes)
 	core.last_keys = core.keys
 	core.mouse_scroll = {}
+	clear(&core.runes)
 
 	// Clear text job arrays
 	clear(&core.glyphs)
 	clear(&core.lines)
+
+	// Clear temp allocator
+	free_all(context.temp_allocator)
 }
 
-quit :: proc() {
+uninit :: proc() {
 	// Free all dynamically allocated widget memory
 	for &widget in core.widgets {
 		if widget, ok := widget.?; ok {
 			free_all(widget.allocator)
 		}
+	}
+
+	for _, &layer in core.layer_map {
+		destroy_layer(layer)
 	}
 
 	// Free all font data
@@ -557,6 +506,11 @@ quit :: proc() {
 		}
 	}
 
+	mem.scratch_allocator_destroy(&core.scratch_allocator)
+
+	// Destroy atlas
+	destroy_atlas(&core.font_atlas)
+
 	// Free draw call data
 	destroy_draw_list(&core.draw_list)
 
@@ -564,6 +518,11 @@ quit :: proc() {
 	delete(core.layer_map)
 	delete(core.widget_map)
 	delete(core.panel_map)
+
+	// Delete stuff
+	delete(core.glyphs)
+	delete(core.lines)
+	delete(core.runes)
 
 	// Now uninit gpu stuff
 	sg.destroy_pipeline(core.pipeline)

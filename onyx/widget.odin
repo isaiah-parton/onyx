@@ -3,6 +3,7 @@ package onyx
 import "core:fmt"
 import "core:time"
 
+import "core:mem"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
@@ -155,14 +156,10 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 			if core.widgets[i] == nil {
 				core.widgets[i] = Widget {
 					id        = id,
-					allocator = runtime.arena_allocator(&core.arena),
+					allocator = mem.scratch_allocator(&core.scratch_allocator),
 				}
 				widget = &core.widgets[i].?
 				core.widget_map[id] = widget
-
-				when ODIN_DEBUG {
-					fmt.printf("[core] Created widget %x\n", id)
-				}
 
 				ok = true
 

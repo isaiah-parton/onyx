@@ -7,7 +7,7 @@ uniform Uniform {
     mat4 mat;
 };
 
-in vec3 pos;
+in vec2 pos;
 in vec2 uv;
 in vec4 col;
 
@@ -15,7 +15,7 @@ out vec2 tex_coord;
 out vec4 diffuse_color;
 
 void main() {
-    gl_Position = mat * vec4(pos, 1.0);
+    gl_Position = mat * vec4(pos, 0.0, 1.0);
     tex_coord = uv;
     diffuse_color = col;
 }

@@ -167,10 +167,12 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 		if !ok do continue
 
 		if widget.visible {
+			is_month := i8(month) == i8(info.__month)
+			// Range highlight
 			if time._nsec > info.__selection_times[0]._nsec &&
 			   time._nsec <= info.__selection_times[1]._nsec + i64(t.Hour * 24) {
 				corners: Corners = {}
-				if time._nsec == info.__selection_times[0]._nsec {
+				if time._nsec == info.__selection_times[0]._nsec + i64(t.Hour * 24) {
 					corners += {.Top_Left, .Bottom_Left}
 				}
 				if time._nsec == info.__selection_times[1]._nsec + i64(t.Hour * 24) {
@@ -180,26 +182,35 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 					widget.box,
 					core.style.shape.rounding,
 					corners,
-					core.style.color.substance,
+					fade(core.style.color.substance, 1 if is_month else 0.5),
 				)
-			} else if date == todays_date() {
-				draw_rounded_box_stroke(
+			} else {
+				// Hover box
+				if widget.hover_time > 0 {
+					draw_rounded_box_fill(
+						widget.box,
+						core.style.shape.rounding,
+						fade(core.style.color.substance, widget.hover_time),
+					)
+				}
+			 	if date == todays_date() {
+					draw_rounded_box_stroke(
+						widget.box,
+						core.style.shape.rounding,
+						1,
+						core.style.color.substance,
+					)
+				}
+			}
+			// Focus box
+			if widget.focus_time > 0 {
+				draw_rounded_box_fill(
 					widget.box,
 					core.style.shape.rounding,
-					1,
-					core.style.color.substance,
+					fade(core.style.color.content, widget.focus_time),
 				)
 			}
-			draw_rounded_box_fill(
-				widget.box,
-				core.style.shape.rounding,
-				blend_colors(
-					widget.focus_time,
-					fade(core.style.color.substance, widget.hover_time),
-					core.style.color.content,
-				),
-			)
-			is_month := i8(month) == i8(info.__month)
+			// Day number
 			draw_text(
 				box_center(widget.box),
 				{
@@ -230,7 +241,7 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 				result.selection[0] = date
 				result.month_offset = 0
 			} else {
-				if date == result.selection[0] {
+				if date == result.selection[0] || date == result.selection[1] {
 					result.selection = {nil, nil}
 				} else {
 					if time._nsec <=

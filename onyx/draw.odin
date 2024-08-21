@@ -41,7 +41,7 @@ Stroke_Justify :: enum {
 }
 
 Vertex :: struct {
-	pos: [3]f32,
+	pos: [2]f32,
 	uv:  [2]f32,
 	col: [4]u8,
 }
@@ -49,7 +49,6 @@ Vertex :: struct {
 Vertex_State :: struct {
 	uv:    [2]f32,
 	col:   [4]u8,
-	z:     f32,
 	alpha: f32,
 }
 
@@ -96,6 +95,8 @@ init_draw_list :: proc(draw_list: ^Draw_List) {
 			wrap_v = .MIRRORED_REPEAT,
 		},
 	)
+	reserve(&draw_list.vertices, MAX_VERTICES)
+	reserve(&draw_list.indices, MAX_INDICES)
 }
 
 destroy_draw_list :: proc(draw_list: ^Draw_List) {
@@ -129,20 +130,16 @@ set_vertex_color :: proc(color: Color) {
 }
 
 // Append a vertex and return it's index
-add_vertex_3f32 :: proc(x, y, z: f32) -> (i: u16) {
-	pos: [3]f32 = {
+add_vertex_2f32 :: proc(x, y: f32) -> (i: u16) {
+	pos: [2]f32 = {
 		core.current_matrix[0, 0] * x +
 		core.current_matrix[0, 1] * y +
-		core.current_matrix[0, 2] * z +
+		core.current_matrix[0, 2] + 
 		core.current_matrix[0, 3],
 		core.current_matrix[1, 0] * x +
 		core.current_matrix[1, 1] * y +
-		core.current_matrix[1, 2] * z +
+		core.current_matrix[1, 2] + 
 		core.current_matrix[1, 3],
-		core.current_matrix[2, 0] * x +
-		core.current_matrix[2, 1] * y +
-		core.current_matrix[2, 2] * z +
-		core.current_matrix[2, 3],
 	}
 	i = next_vertex_index()
 	append(
@@ -152,16 +149,11 @@ add_vertex_3f32 :: proc(x, y, z: f32) -> (i: u16) {
 	return
 }
 
-add_vertex_2f32 :: proc(x, y: f32) -> u16 {
-	return add_vertex_3f32(x, y, core.vertex_state.z)
-}
-
 add_vertex_point :: proc(point: [2]f32) -> u16 {
 	return add_vertex_2f32(point.x, point.y)
 }
 
 add_vertex :: proc {
-	add_vertex_3f32,
 	add_vertex_2f32,
 	add_vertex_point,
 }
@@ -180,8 +172,15 @@ next_vertex_index :: proc() -> u16 {
 	return u16(len(core.draw_list.vertices))
 }
 
+current_matrix :: proc() -> Maybe(Matrix) {
+	if core.matrix_stack.height > 0 {
+		return core.matrix_stack.items[core.matrix_stack.height - 1]
+	}
+	return nil
+}
+
 push_matrix :: proc() {
-	push_stack(&core.matrix_stack, matrix_identity())
+	push_stack(&core.matrix_stack, current_matrix().? or_else matrix_identity())
 	core.current_matrix = &core.matrix_stack.items[core.matrix_stack.height - 1]
 }
 

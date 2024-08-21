@@ -60,6 +60,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		font   = core.style.fonts[.Medium],
 		text   = strings.to_string(info.builder^),
 		size   = core.style.content_text_size,
+		spacing = 1 if info.hidden else 0,
 		hidden = info.hidden,
 	}
 
