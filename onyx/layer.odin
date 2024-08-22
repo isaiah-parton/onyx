@@ -200,7 +200,7 @@ end_layer :: proc() {
 
 	// Reset z-level to that of the previous layer or to zero
 	if layer, ok := current_layer().?; ok {
-		pop_clip(layer.box)
+		pop_clip()
 		core.current_draw_call.texture = core.font_atlas.texture
 
 		set_global_alpha(layer.opacity)

@@ -73,7 +73,15 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_width(300)
 		set_height_fill()
 		if do_container({size = 1000}) {
-
+			set_height_auto()
+			for i in 0..<40 {
+				if i > 0 {
+					add_space(4)
+				}
+				push_id(i)
+					do_button({text = fmt.tprintf("Button #%i", i + 1), kind = .Ghost})
+				pop_id()
+			}
 		}
 
 	case .Slider:

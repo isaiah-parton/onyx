@@ -59,6 +59,8 @@ add_checkbox :: proc(info: Checkbox_Info) -> (result: Generic_Widget_Result) {
 
 	result.self = widget
 
+	button_behavior(widget)
+
 	if widget.visible {
 		icon_box: Box
 		if len(info.text) > 0 {
@@ -141,7 +143,6 @@ add_checkbox :: proc(info: Checkbox_Info) -> (result: Generic_Widget_Result) {
 			}
 		}
 	}
-	button_behavior(widget)
 	end_widget()
 	return
 }
@@ -166,6 +167,9 @@ add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
 	result.on = info.on
 	variant := widget_kind(widget, Switch_Widget_Kind)
 
+	button_behavior(widget)
+
+	variant.how_on = animate(variant.how_on, 0.2, info.on)
 	how_on := ease.cubic_in_out(variant.how_on)
 
 	if widget.visible {
@@ -189,16 +193,6 @@ add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
 
 	if .Clicked in widget.state {
 		result.on = !result.on
-	}
-
-	if .Hovered in widget.state {
-		core.cursor_type = .POINTING_HAND
-	}
-
-	variant.how_on = animate(variant.how_on, 0.2, info.on)
-
-	if point_in_box(core.mouse_pos, widget.box) {
-		widget.try_hover = true
 	}
 
 	end_widget()

@@ -254,3 +254,15 @@ end_widget :: proc() {
 	add_layout_content_size(layout, widget.desired_size)
 	pop_stack(&core.widget_stack)
 }
+
+hover_widget :: proc(widget: ^Widget) {
+	if core.hovered_layer != widget.layer.id {
+		return
+	}
+	if clip, ok := current_clip().?; ok {
+		if !point_in_box(core.mouse_pos, clip) {
+			return
+		}
+	}
+	core.next_hovered_widget = widget.id
+}

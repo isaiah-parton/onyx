@@ -304,6 +304,8 @@ end_frame :: proc() {
 	core.hovered_layer = core.next_hovered_layer
 	core.next_hovered_layer = 0
 
+	core.active_container = core.next_active_container
+
 	if mouse_pressed(.Left) {
 		core.focused_layer = core.hovered_layer
 	}

@@ -45,6 +45,8 @@ add_button :: proc(info: Button_Info) -> (result: Generic_Widget_Result) {
 
 	result.self = widget
 
+	button_behavior(widget)
+	
 	if widget.visible {
 		text_color: Color
 
@@ -115,7 +117,6 @@ add_button :: proc(info: Button_Info) -> (result: Generic_Widget_Result) {
 		}
 	}
 
-	button_behavior(widget)
 
 	end_widget()
 	return result

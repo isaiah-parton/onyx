@@ -111,11 +111,14 @@ Container_Info :: struct {
 }
 
 Container :: struct {
-	id:     Id,
-	active: bool,
-	scroll: [2]f32,
-	size:   [2]f32,
-	box:    Box,
+	id:                       Id,
+	active:                   bool,
+	no_scroll_x, no_scroll_y: bool,
+	desired_scroll: [2]f32,
+	scroll:                   [2]f32,
+	size:                     [2]f32,
+	box:                      Box,
+	dead:                     bool,
 }
 
 begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
@@ -131,20 +134,59 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 	cnt.box = info.box.? or_else next_widget_box({})
 
 	cnt.active = core.active_container == cnt.id
-	if point_in_box(core.mouse_pos, cnt.box) {
+	if point_in_box(core.mouse_pos, cnt.box) && core.hovered_layer == current_layer().?.id {
 		core.next_active_container = id
+	}
+
+	if cnt.active {
+		cnt.desired_scroll -= core.mouse_scroll * 8.5
+	}
+	cnt.desired_scroll = linalg.clamp(cnt.desired_scroll, 0, cnt.size - (cnt.box.hi - cnt.box.lo))
+	delta_scroll := (cnt.desired_scroll - cnt.scroll) * core.delta_time * 15
+	cnt.scroll += delta_scroll
+	if abs(delta_scroll.x) >= 1 || abs(delta_scroll.y) >= 1 {
+		core.draw_next_frame = true
 	}
 
 	push_clip(cnt.box)
 	push_stack(&core.container_stack, cnt)
+
+	draw_rounded_box_stroke(cnt.box, core.style.shape.rounding, 1, core.style.color.substance)
+
+	layout_pos := cnt.box.lo - linalg.floor(cnt.scroll)
+	layout_size := linalg.max(cnt.size, info.size)
+	cnt.size = 0
+	begin_layout({box = Box{layout_pos, layout_pos + layout_size}})
 
 	return true
 }
 
 end_container :: proc() {
 
+	cnt := current_container().?
+	layout := current_layout().?
+	cnt.size = layout.content_size + layout.spacing_size
 
+	end_layout()
+
+	begin_layout({box = shrink_box(cnt.box, 1)})
+	if !cnt.no_scroll_y {
+
+	}
+	if !cnt.no_scroll_x {
+
+	}
+	end_layout()
+
+	pop_clip()
 	pop_stack(&core.container_stack)
+}
+
+current_container :: proc() -> Maybe(^Container) {
+	if core.container_stack.height > 0 {
+		return core.container_stack.items[core.container_stack.height - 1]
+	}
+	return nil
 }
 
 push_clip :: proc(box: Box) {
@@ -155,13 +197,15 @@ push_clip :: proc(box: Box) {
 		return
 	}
 	append_draw_call(current_layer().?.index)
+	core.current_draw_call.texture = core.font_atlas.texture
 	core.current_draw_call.clip_box = box
 }
 
-pop_clip :: proc(box: Box) {
+pop_clip :: proc() {
 	pop_stack(&core.clip_stack)
 
 	append_draw_call(current_layer().?.index)
+	core.current_draw_call.texture = core.font_atlas.texture
 	core.current_draw_call.clip_box = current_clip().? or_else view_box()
 }
 

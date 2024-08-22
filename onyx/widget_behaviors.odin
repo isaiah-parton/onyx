@@ -6,7 +6,7 @@ button_behavior :: proc(widget: ^Widget) {
 		core.cursor_type = .POINTING_HAND
 	}
 	if point_in_box(core.mouse_pos, widget.box) {
-		widget.try_hover = true
+		hover_widget(widget)
 	}
 }
 
