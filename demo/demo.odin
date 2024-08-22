@@ -72,7 +72,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if do_scroll_zone({}) {
+		if do_container({size = 1000}) {
 
 		}
 

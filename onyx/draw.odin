@@ -129,16 +129,20 @@ set_vertex_color :: proc(color: Color) {
 	}
 }
 
+set_global_alpha :: proc(alpha: f32) {
+	core.vertex_state.alpha = alpha
+}
+
 // Append a vertex and return it's index
 add_vertex_2f32 :: proc(x, y: f32) -> (i: u16) {
 	pos: [2]f32 = {
 		core.current_matrix[0, 0] * x +
 		core.current_matrix[0, 1] * y +
-		core.current_matrix[0, 2] + 
+		core.current_matrix[0, 2] +
 		core.current_matrix[0, 3],
 		core.current_matrix[1, 0] * x +
 		core.current_matrix[1, 1] * y +
-		core.current_matrix[1, 2] + 
+		core.current_matrix[1, 2] +
 		core.current_matrix[1, 3],
 	}
 	i = next_vertex_index()
@@ -190,10 +194,11 @@ pop_matrix :: proc() {
 	core.current_matrix = &core.matrix_stack.items[max(0, core.matrix_stack.height - 1)]
 }
 
-push_draw_call :: proc() {
+append_draw_call :: proc(index: int) {
 	core.current_draw_call = &core.draw_calls[core.draw_call_count]
 	core.current_draw_call^ = Draw_Call {
 		elem_offset = len(core.draw_list.indices),
+		index       = index,
 	}
 	core.draw_call_count += 1
 }

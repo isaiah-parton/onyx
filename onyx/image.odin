@@ -99,7 +99,7 @@ set_texture :: proc(texture: sg.Image) {
 			return
 		}
 	}
-	push_draw_call()
+	append_draw_call(current_layer().?.index)
 	core.current_draw_call.texture = texture
 }
 

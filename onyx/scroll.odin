@@ -1,6 +1,7 @@
 package onyx
 
 import "core:fmt"
+import "core:math/linalg"
 
 Scrollbar_Info :: struct {
 	using _:     Generic_Widget_Info,
@@ -102,4 +103,83 @@ do_scroll_zone :: proc(info: Scroll_Zone_Info, loc := #caller_location) -> (ok: 
 @(private)
 __do_scroll_zone :: proc(ok: bool) {
 	end_scroll_zone()
+}
+
+Container_Info :: struct {
+	size: [2]f32,
+	box:  Maybe(Box),
+}
+
+Container :: struct {
+	id:     Id,
+	active: bool,
+	scroll: [2]f32,
+	size:   [2]f32,
+	box:    Box,
+}
+
+begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
+	id := hash(loc)
+	cnt, ok := core.container_map[id]
+	if !ok {
+		cnt = new(Container)
+		core.container_map[id] = cnt
+	}
+
+	cnt.id = id
+	cnt.size = linalg.max(cnt.size, info.size)
+	cnt.box = info.box.? or_else next_widget_box({})
+
+	cnt.active = core.active_container == cnt.id
+	if point_in_box(core.mouse_pos, cnt.box) {
+		core.next_active_container = id
+	}
+
+	push_clip(cnt.box)
+	push_stack(&core.container_stack, cnt)
+
+	return true
+}
+
+end_container :: proc() {
+
+
+	pop_stack(&core.container_stack)
+}
+
+push_clip :: proc(box: Box) {
+	push_stack(&core.clip_stack, box)
+
+	if core.current_draw_call != nil && core.current_draw_call.clip_box == view_box() {
+		core.current_draw_call.clip_box = box
+		return
+	}
+	append_draw_call(current_layer().?.index)
+	core.current_draw_call.clip_box = box
+}
+
+pop_clip :: proc(box: Box) {
+	pop_stack(&core.clip_stack)
+
+	append_draw_call(current_layer().?.index)
+	core.current_draw_call.clip_box = current_clip().? or_else view_box()
+}
+
+current_clip :: proc() -> Maybe(Box) {
+	if core.clip_stack.height > 0 {
+		return core.clip_stack.items[core.clip_stack.height - 1]
+	}
+	return nil
+}
+
+@(deferred_out = __do_container)
+do_container :: proc(info: Container_Info, loc := #caller_location) -> (ok: bool) {
+	return begin_container(info, loc)
+}
+
+@(private)
+__do_container :: proc(ok: bool) {
+	if ok {
+		end_container()
+	}
 }

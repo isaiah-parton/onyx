@@ -42,7 +42,7 @@ print_debug_text :: proc() {
 			for i in 0 ..< depth {
 				sdtx.putc('\t')
 			}
-			sdtx.printf("\t{:i} ({}) ({})\n", layer.id, layer.kind, layer.z_index)
+			sdtx.printf("\t{:i} ({}) ({})\n", layer.id, layer.kind, layer.index)
 			for child in layer.children {
 				__debug_print_layer(child, depth + 1)
 			}

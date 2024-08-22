@@ -10,10 +10,10 @@ import slog "extra:sokol-odin/sokol/log"
 import "vendor:fontstash"
 
 import "base:runtime"
-import "core:mem"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
+import "core:mem"
 import "core:slice"
 import "core:strings"
 import "core:time"
@@ -112,6 +112,10 @@ Core :: struct {
 		^Panel,
 		MAX_PANELS,
 	),
+	clip_stack:                                                           Stack(Box, 100),
+	container_map:                                                        map[Id]^Container,
+	container_stack:                                                      Stack(^Container, 200),
+	active_container, next_active_container:                              Id,
 	highest_layer_index:                                                  int,
 	id_stack:                                                             Stack(Id, MAX_IDS),
 	cursor_type:                                                          sapp.Mouse_Cursor,
@@ -126,7 +130,7 @@ Core :: struct {
 	frame_count:                                                          int,
 	delta_time:                                                           f32, // Delta time in seconds
 	last_frame_time, start_time:                                          time.Time, // Time of last frame
-	render_duration: time.Duration,
+	render_duration:                                                      time.Duration,
 	draw_this_frame, draw_next_frame:                                     bool,
 	glyphs:                                                               [dynamic]Text_Job_Glyph,
 	lines:                                                                [dynamic]Text_Job_Line,
@@ -145,8 +149,8 @@ Core :: struct {
 		MAX_MATRICES,
 	),
 	current_matrix:                                                       ^Matrix,
-	profiler: Profiler,
-	scratch_allocator: mem.Scratch_Allocator,
+	profiler:                                                             Profiler,
+	scratch_allocator:                                                    mem.Scratch_Allocator,
 }
 
 view_box :: proc() -> Box {
@@ -312,8 +316,8 @@ end_frame :: proc() {
 			for i in 0 ..< len(core.layers) {
 				other_layer := &core.layers[i]
 				if other_layer.id == 0 do continue
-				if other_layer.z_index > layer.z_index {
-					other_layer.z_index -= 1
+				if other_layer.index > layer.index {
+					other_layer.index -= 1
 				}
 			}
 
