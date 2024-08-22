@@ -17,7 +17,7 @@ Slider_Result :: struct($T: typeid) {
 make_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T) {
 	info := info
 	info.id = hash(loc)
-	info.desired_size = {100, 18}
+	info.desired_size = {100, 20}
 	info.hi = max(info.hi, info.lo + 1)
 	return info
 }
@@ -30,44 +30,35 @@ add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 
 	h := box_height(widget.box)
 
-	widget.box.low.y += h / 4
-	widget.box.high.y -= h / 4
+	widget.box.lo.y += h / 4
+	widget.box.hi.y -= h / 4
 
 	radius := box_height(widget.box) / 2
 	time := f32(info.value - info.lo) / f32(info.hi - info.lo)
 	range_width := box_width(widget.box) - radius * 2
 
+	knob_center := widget.box.lo + radius + {time * range_width, 0}
+	knob_radius := h / 2
+
 	if widget.visible {
 		draw_rounded_box_fill(widget.box, radius, core.style.color.substance)
 		draw_rounded_box_fill(
-			{widget.box.low, {widget.box.low.x + box_width(widget.box) * time, widget.box.high.y}},
+			{widget.box.lo, {widget.box.lo.x + box_width(widget.box) * time, widget.box.hi.y}},
 			radius,
 			core.style.color.accent,
 		)
-		draw_arc_fill(
-			widget.box.low + radius + {time * range_width, 0},
-			h / 2,
-			0,
-			math.TAU,
-			core.style.color.background,
-		)
-		draw_arc_stroke(
-			widget.box.low + radius + {time * range_width, 0},
-			h / 2,
-			0,
-			math.TAU,
-			1.5,
-			core.style.color.accent,
-		)
+		draw_arc_fill(knob_center, knob_radius, 0, math.TAU, core.style.color.background)
+		draw_arc_stroke(knob_center, knob_radius, 0, math.TAU, 1.5, core.style.color.accent)
 	}
 
 	if .Pressed in widget.state {
-		new_time := clamp((core.mouse_pos.x - widget.box.low.x - radius) / range_width, 0, 1)
+		new_time := clamp((core.mouse_pos.x - widget.box.lo.x - radius) / range_width, 0, 1)
 		result.value = info.lo + T(new_time * f32(info.hi - info.lo))
 		core.draw_next_frame = true
 	}
 
-	if point_in_box(core.mouse_pos, widget.box) {
+	if point_in_box(core.mouse_pos, widget.box) ||
+	   linalg.distance(knob_center, core.mouse_pos) <= knob_radius {
 		widget.try_hover = true
 	}
 

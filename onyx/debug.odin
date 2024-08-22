@@ -1,7 +1,7 @@
 package onyx
 
-import sdtx "extra:sokol-odin/sokol/debugtext"
 import "core:time"
+import sdtx "extra:sokol-odin/sokol/debugtext"
 
 Profiler :: struct {
 	frame_times: [dynamic]f64,
@@ -23,9 +23,11 @@ print_debug_text :: proc() {
 
 	sdtx.printf("frame %i\n", core.frame_count)
 	sdtx.color3b(170, 170, 170)
-	sdtx.printf("\ttime: %f\n", time.duration_milliseconds(time.since(core.last_frame_time)))
-	sdtx.printf("\trender: %f\n", time.duration_milliseconds(core.render_duration))
+	sdtx.printf("\tui: %fms\n", time.duration_milliseconds(time.since(core.last_frame_time)))
+	sdtx.printf("\trender: %fms\n", time.duration_milliseconds(core.render_duration))
 	sdtx.printf("\tdraw calls: %i/%i\n", core.draw_call_count, MAX_DRAW_CALLS)
+	sdtx.printf("\tvertices: %i/%i\n", len(core.draw_list.vertices), MAX_VERTICES)
+	sdtx.printf("\ttris: %i\n", len(core.draw_list.indices) / 3)
 	sdtx.color3b(255, 255, 255)
 
 	sdtx.move_y(1)

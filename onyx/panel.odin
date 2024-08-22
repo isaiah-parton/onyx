@@ -32,7 +32,7 @@ create_panel :: proc(id: Id) -> Maybe(^Panel) {
 
 begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
-	MIN_SIZE :: [2]f32{240, 180}
+	MIN_SIZE :: [2]f32{100, 100}
 
 	id := hash(loc)
 	panel, ok := core.panel_map[id]
@@ -66,7 +66,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		if mouse_released(.Left) {
 			panel.resize = nil
 		}
-		min_size := panel.min_size //linalg.max(MIN_SIZE, panel.min_size)
+		min_size := linalg.max(MIN_SIZE, panel.min_size)
 		#partial switch resize {
 		case .Left:
 			panel.box.lo.x = min(core.mouse_pos.x, panel.box.hi.x - min_size.x)

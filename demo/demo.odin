@@ -4,10 +4,10 @@ import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:math/rand"
+import "core:mem"
 import "core:reflect"
 import "core:strings"
 import "core:time"
-import "core:mem"
 
 import "extra:onyx/onyx"
 import sapp "extra:sokol-odin/sokol/app"
@@ -25,6 +25,8 @@ Component :: enum {
 	Data_Input,
 	Checkbox,
 	Graph,
+	Slider,
+	Scroll_Zone,
 }
 
 Component_Section :: struct {
@@ -66,6 +68,19 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	shrink(30)
 
 	#partial switch state.section.component {
+	case .Scroll_Zone:
+		set_side(.Left)
+		set_width(300)
+		set_height_fill()
+		if do_scroll_zone({}) {
+
+		}
+
+	case .Slider:
+		set_side(.Top)
+		state.slider_value =
+			do_slider(Slider_Info(f32){value = state.slider_value}).value.? or_else state.slider_value
+
 	case .Button:
 		set_side(.Top)
 		do_label({text = "Fit to label", font_style = .Bold, font_size = 24})
@@ -263,34 +278,9 @@ main :: proc() {
 				state := transmute(^State)userdata
 
 				using onyx
+
 				begin_frame()
 				do_component_showcase(&state.component_showcase)
-
-				// if do_panel({title = "Widgets"}) {
-				// 	shrink(30)
-				// 	set_side(.Top)
-				// 	colors := [6]Color {
-				// 		{255, 60, 60, 255},
-				// 		{0, 255, 120, 255},
-				// 		{255, 10, 220, 255},
-				// 		{240, 195, 0, 255},
-				// 		{30, 120, 255, 255},
-				// 		{0, 255, 0, 255},
-				// 	}
-				// 	for color, c in colors {
-				// 		if c > 0 do add_space(10)
-				// 		if do_layout({size = 30, side = .Top}) {
-				// 			for kind, k in Button_Kind {
-				// 				if k > 0 do add_space(10)
-				// 				button_text := tmp_printf("Button %c%i", 'A' + c, k + 1)
-				// 				push_id(button_text)
-				// 				do_button({text = button_text, color = color, kind = kind})
-				// 				pop_id()
-				// 			}
-				// 		}
-				// 	}
-				// }
-
 
 				end_frame()
 			},

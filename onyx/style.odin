@@ -27,8 +27,8 @@ Style_Shape :: struct {
 	title_margin:                                                         f32,
 	title_padding:                                                        f32,
 	menu_padding:                                                         f32,
-	scrollbar_thickness: f32,
-	rounded_scrollbars: bool,
+	scrollbar_thickness:                                                  f32,
+	rounded_scrollbars:                                                   bool,
 }
 
 default_style_shape :: proc() -> Style_Shape {
@@ -41,6 +41,7 @@ default_style_shape :: proc() -> Style_Shape {
 		content_text_size = 18,
 		rounding = 6,
 		menu_padding = 5,
+		scrollbar_thickness = 10,
 	}
 }
 
