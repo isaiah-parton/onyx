@@ -190,6 +190,10 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 			widget.draggable = true
 			widget.box = hover_boxes[side]
 
+			if point_in_box(core.mouse_pos, widget.box) {
+				hover_widget(widget)
+			}
+
 			widget.hover_time = animate(widget.hover_time, 0.2, .Hovered in widget.state)
 			draw_box_fill(draw_boxes[side], fade(core.style.color.content, widget.hover_time))
 
@@ -199,10 +203,6 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 			if .Hovered in widget.state {
 				core.cursor_type = .RESIZE_NS if int(side) > 1 else .RESIZE_EW
-			}
-
-			if point_in_box(core.mouse_pos, widget.box) {
-				widget.try_hover = true
 			}
 
 			end_widget()

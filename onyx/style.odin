@@ -39,7 +39,7 @@ default_style_shape :: proc() -> Style_Shape {
 		button_text_size = 18,
 		tab_text_size = 18,
 		content_text_size = 18,
-		rounding = 0,
+		rounding = 5,
 		menu_padding = 5,
 		scrollbar_thickness = 10,
 	}

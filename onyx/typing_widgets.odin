@@ -26,7 +26,7 @@ Text_Input_Widget_Kind :: struct {
 }
 
 Text_Input_Result :: struct {
-	using _: Generic_Widget_Result,
+	using _:            Generic_Widget_Result,
 	changed, submitted: bool,
 }
 
@@ -56,33 +56,12 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	widget.focus_time = animate(widget.focus_time, 0.15, .Focused in widget.state)
 	variant.icon_time = animate(variant.icon_time, 0.2, info.decal != .None)
 
-	text_info: Text_Info = {
-		font   = core.style.fonts[.Medium],
-		text   = strings.to_string(info.builder^),
-		size   = core.style.content_text_size,
-		spacing = 1 if info.hidden else 0,
-		hidden = info.hidden,
+	if .Hovered in widget.state {
+		core.cursor_type = .IBEAM
 	}
 
-	text_origin: [2]f32 = {widget.box.lo.x + 5, 0}
-
-	if font, ok := &core.fonts[text_info.font].?; ok {
-		if font_size, ok := get_font_size(font, text_info.size); ok {
-			if info.multiline {
-				text_origin.y = widget.box.lo.y + (font_size.ascent - font_size.descent) / 2
-			} else {
-				text_origin.y =
-					(widget.box.hi.y + widget.box.lo.y) / 2 -
-					(font_size.ascent - font_size.descent) / 2
-			}
-		}
-	}
-
-	if .Focused in (widget.state - widget.last_state) {
-		make_text_editor(e, widget.allocator, widget.allocator)
-		begin(e, 0, info.builder)
-		e.set_clipboard = set_clipboard_string
-		e.get_clipboard = get_clipboard_string
+	if point_in_box(core.mouse_pos, widget.box) {
+		hover_widget(widget)
 	}
 
 	if .Focused in widget.state {
@@ -100,6 +79,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		if !info.read_only {
 			if len(core.runes) > 0 {
 				result.changed = true
+				core.draw_this_frame = true
 			}
 			input_runes(e, core.runes[:])
 		}
@@ -146,8 +126,37 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		if cmd != .None {
 			text_editor_execute(e, cmd)
 			result.changed = true
-			core.draw_next_frame = true
+			core.draw_this_frame = true
 		}
+	}
+
+	text_info: Text_Info = {
+		font    = core.style.fonts[.Medium],
+		text    = strings.to_string(info.builder^),
+		size    = core.style.content_text_size,
+		spacing = 1 if info.hidden else 0,
+		hidden  = info.hidden,
+	}
+
+	text_origin: [2]f32 = {widget.box.lo.x + 5, 0}
+
+	if font, ok := &core.fonts[text_info.font].?; ok {
+		if font_size, ok := get_font_size(font, text_info.size); ok {
+			if info.multiline {
+				text_origin.y = widget.box.lo.y + (font_size.ascent - font_size.descent) / 2
+			} else {
+				text_origin.y =
+					(widget.box.hi.y + widget.box.lo.y) / 2 -
+					(font_size.ascent - font_size.descent) / 2
+			}
+		}
+	}
+
+	if .Focused in (widget.state - widget.last_state) {
+		make_text_editor(e, widget.allocator, widget.allocator)
+		begin(e, 0, info.builder)
+		e.set_clipboard = set_clipboard_string
+		e.get_clipboard = get_clipboard_string
 	}
 
 	// Make text job
@@ -263,13 +272,6 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		}
 	}
 
-	if .Hovered in widget.state {
-		core.cursor_type = .IBEAM
-	}
-
-	if point_in_box(core.mouse_pos, widget.box) {
-		widget.try_hover = true
-	}
 
 	end_widget()
 	return

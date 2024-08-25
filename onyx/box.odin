@@ -52,6 +52,10 @@ box_center_y :: proc(box: Box) -> f32 {
 	return (box.lo.y + box.hi.y) * 0.5
 }
 
+box_size :: proc(box: Box) -> [2]f32 {
+	return box.hi - box.lo
+}
+
 // If `a` is inside of `b`
 point_in_box :: proc(a: [2]f32, b: Box) -> bool {
 	return (a.x >= b.lo.x) && (a.x < b.hi.x) && (a.y >= b.lo.y) && (a.y < b.hi.y)

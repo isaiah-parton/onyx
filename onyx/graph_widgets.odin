@@ -128,7 +128,7 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					segments := int((p2.x - p1.x) / 5)
 					step: f32 = 1.0 / f32(segments)
 					lp: [2]f32
-					ti, bi: u16
+					ti, bi: u32
 					for n in 0 ..= segments {
 						t: f32 = f32(n) * step
 						times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
@@ -387,7 +387,7 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 	}
 
 	if point_in_box(core.mouse_pos, widget.box) {
-		widget.try_hover = true
+		hover_widget(widget)
 	}
 
 	end_widget()

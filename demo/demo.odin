@@ -72,14 +72,29 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if do_container({size = 1000}) {
+		if do_container({}) {
+			set_width_fill()
 			set_height_auto()
-			for i in 0..<40 {
+			for i in 0 ..< 40 {
 				if i > 0 {
 					add_space(4)
 				}
 				push_id(i)
-					do_button({text = fmt.tprintf("Button #%i", i + 1), kind = .Ghost})
+				do_button({text = fmt.tprintf("Button #%i", i + 1), kind = .Ghost})
+				pop_id()
+			}
+		}
+		add_space(50)
+		set_width(500)
+		set_height(300)
+		if do_container({}) {
+			set_side(.Left)
+			set_height_fill()
+			set_width(200)
+			set_padding(10)
+			for i in 0 ..< 5 {
+				push_id(i)
+				do_button({text = fmt.tprint(i + 1), kind = .Outlined})
 				pop_id()
 			}
 		}
@@ -289,7 +304,6 @@ main :: proc() {
 
 				begin_frame()
 				do_component_showcase(&state.component_showcase)
-
 				end_frame()
 			},
 			cleanup_cb = proc "c" () {

@@ -24,10 +24,6 @@ MAX_WIDGETS :: 4000
 MAX_LAYOUTS :: 100
 MAX_PANELS :: 100
 
-MAX_TEXTURES :: 200
-
-MAX_VERTICES :: 65536
-MAX_INDICES :: 65536
 
 Stack :: struct($T: typeid, $N: int) {
 	items:  [N]T,
@@ -82,75 +78,79 @@ Debug_State :: struct {
 
 // The global core data
 Core :: struct {
-	debug:                                                                Debug_State,
-	view:                                                                 [2]f32,
-	pipeline:                                                             sg.Pipeline,
-	limits:                                                               sg.Limits,
-	layers:                                                               [MAX_LAYERS]Layer,
-	layer_map:                                                            map[Id]^Layer,
-	highest_layer:                                                        int,
-	widgets:                                                              [MAX_WIDGETS]Maybe(
-		Widget,
-	),
-	widget_map:                                                           map[Id]^Widget,
-	disable_widgets:                                                      bool,
-	panels:                                                               [MAX_PANELS]Maybe(Panel),
-	panel_map:                                                            map[Id]^Panel,
-	last_hovered_widget, hovered_widget, next_hovered_widget:             Id,
-	last_focused_widget, focused_widget, dragged_widget:                  Id,
-	last_hovered_layer, hovered_layer, next_hovered_layer, focused_layer: Id,
-	widget_stack:                                                         Stack(^Widget, 10),
-	layout_stack:                                                         Stack(
-		Layout,
-		MAX_LAYOUTS,
-	),
-	layer_stack:                                                          Stack(
-		^Layer,
-		MAX_LAYERS,
-	),
-	panel_stack:                                                          Stack(
-		^Panel,
-		MAX_PANELS,
-	),
-	clip_stack:                                                           Stack(Box, 100),
-	container_map:                                                        map[Id]^Container,
-	container_stack:                                                      Stack(^Container, 200),
-	active_container, next_active_container:                              Id,
-	highest_layer_index:                                                  int,
-	id_stack:                                                             Stack(Id, MAX_IDS),
-	cursor_type:                                                          sapp.Mouse_Cursor,
-	mouse_button:                                                         Mouse_Button,
-	last_mouse_pos, mouse_pos:                                            [2]f32,
-	mouse_scroll:                                                         [2]f32,
-	mouse_bits, last_mouse_bits:                                          Mouse_Bits,
-	keys, last_keys:                                                      [max(sapp.Keycode)]bool,
-	runes:                                                                [dynamic]rune,
-	style:                                                                Style,
-	visible, focused:                                                     bool,
-	frame_count:                                                          int,
-	delta_time:                                                           f32, // Delta time in seconds
-	last_frame_time, start_time:                                          time.Time, // Time of last frame
-	render_duration:                                                      time.Duration,
-	draw_this_frame, draw_next_frame:                                     bool,
-	glyphs:                                                               [dynamic]Text_Job_Glyph,
-	lines:                                                                [dynamic]Text_Job_Line,
-	fonts:                                                                [MAX_FONTS]Maybe(Font),
-	current_font:                                                         int,
-	font_atlas:                                                           Atlas,
-	user_images:                                                          [300]Maybe(Image),
-	vertex_state:                                                         Vertex_State,
-	path_stack:                                                           Stack(Path, 10),
-	draw_list:                                                            Draw_List,
-	draw_calls:                                                           [MAX_DRAW_CALLS]Draw_Call,
-	draw_call_count:                                                      int,
-	current_draw_call:                                                    ^Draw_Call,
-	matrix_stack:                                                         Stack(
-		Matrix,
-		MAX_MATRICES,
-	),
-	current_matrix:                                                       ^Matrix,
-	profiler:                                                             Profiler,
-	scratch_allocator:                                                    mem.Scratch_Allocator,
+	debug:                                                    Debug_State,
+	view:                                                     [2]f32,
+	layers:                                                   [MAX_LAYERS]Layer,
+	layer_map:                                                map[Id]^Layer,
+	highest_layer:                                            int,
+
+	// Widgets
+	drag_offset:                                              [2]f32,
+	last_hovered_widget, hovered_widget, next_hovered_widget: Id,
+	last_focused_widget, focused_widget, dragged_widget:      Id,
+	widgets:                                                  [MAX_WIDGETS]Maybe(Widget),
+	widget_map:                                               map[Id]^Widget,
+	disable_widgets:                                          bool,
+	panels:                                                   [MAX_PANELS]Maybe(Panel),
+	panel_map:                                                map[Id]^Panel,
+	last_hovered_layer, hovered_layer, next_hovered_layer:    Id,
+	focused_layer:                                            Id,
+	widget_stack:                                             Stack(^Widget, 10),
+	layout_stack:                                             Stack(Layout, MAX_LAYOUTS),
+	layer_stack:                                              Stack(^Layer, MAX_LAYERS),
+	panel_stack:                                              Stack(^Panel, MAX_PANELS),
+	clip_stack:                                               Stack(Box, 100),
+	container_map:                                            map[Id]^Container,
+	container_stack:                                          Stack(^Container, 200),
+	active_container, next_active_container:                  Id,
+	highest_layer_index:                                      int,
+	id_stack:                                                 Stack(Id, MAX_IDS),
+
+	// IO
+	cursor_type:                                              sapp.Mouse_Cursor,
+	mouse_button:                                             Mouse_Button,
+	last_mouse_pos, mouse_pos:                                [2]f32,
+	mouse_scroll:                                             [2]f32,
+	mouse_bits, last_mouse_bits:                              Mouse_Bits,
+	keys, last_keys:                                          [max(sapp.Keycode)]bool,
+	runes:                                                    [dynamic]rune,
+	visible, focused:                                         bool,
+
+	// Style
+	style:                                                    Style,
+
+	// Timings
+	frame_count:                                              int,
+	delta_time:                                               f32, // Delta time in seconds
+	last_frame_time, start_time:                              time.Time, // Time of last frame
+	render_duration:                                          time.Duration,
+
+	// Text
+	glyphs:                                                   [dynamic]Text_Job_Glyph,
+	lines:                                                    [dynamic]Text_Job_Line,
+	fonts:                                                    [MAX_FONTS]Maybe(Font),
+	current_font:                                             int,
+	font_atlas:                                               Atlas,
+	user_images:                                              [300]Maybe(Image),
+
+	// Drawing
+	draw_this_frame, draw_next_frame:                         bool,
+	path_stack:                                               Stack(Path, 10),
+	vertex_state:                                             Vertex_State,
+	current_matrix:                                           ^Matrix,
+	matrix_stack:                                             Stack(Matrix, MAX_MATRICES),
+	current_texture:                                          sg.Image,
+
+	// Rendering
+	draw_list:                                                Draw_List,
+	draw_calls:                                               [MAX_DRAW_CALLS]Draw_Call,
+	draw_call_count:                                          int,
+	current_draw_call:                                        ^Draw_Call,
+	pipeline:                                                 sg.Pipeline,
+	limits:                                                   sg.Limits,
+
+	// Allocators
+	scratch_allocator:                                        mem.Scratch_Allocator,
 }
 
 view_box :: proc() -> Box {
@@ -185,7 +185,7 @@ init :: proc() {
 	core.pipeline = sg.make_pipeline(
 		sg.Pipeline_Desc {
 			shader = sg.make_shader(ui_shader_desc(sg.query_backend())),
-			index_type = .UINT16,
+			index_type = .UINT32,
 			layout = {
 				attrs = {
 					0 = {offset = i32(offset_of(Vertex, pos)), format = .FLOAT2},
@@ -287,9 +287,12 @@ begin_frame :: proc() {
 
 	// Push initial matrix
 	push_matrix()
+	set_texture(core.font_atlas.texture)
 }
 
 end_frame :: proc() {
+
+	assert(core.clip_stack.height == 0)
 
 	// Pop the last vertex matrix
 	pop_matrix()
@@ -305,6 +308,7 @@ end_frame :: proc() {
 	core.next_hovered_layer = 0
 
 	core.active_container = core.next_active_container
+	core.next_active_container = 0
 
 	if mouse_pressed(.Left) {
 		core.focused_layer = core.hovered_layer
@@ -347,16 +351,22 @@ end_frame :: proc() {
 	// Free unused widgets
 	for id, widget in core.widget_map {
 		if widget.dead {
-
 			if err := free_all(widget.allocator); err != .None {
 				fmt.printf("[core] Error freeing widget data: %v\n", err)
 			}
-
 			delete_key(&core.widget_map, id)
 			(transmute(^Maybe(Widget))widget)^ = nil
 			core.draw_this_frame = true
 		} else {
 			widget.dead = true
+		}
+	}
+	for id, cnt in core.container_map {
+		if cnt.dead {
+			delete_key(&core.container_map, id)
+			free(cnt)
+		} else {
+			cnt.dead = true
 		}
 	}
 
@@ -375,7 +385,7 @@ end_frame :: proc() {
 			core.draw_list.bindings.index_buffer,
 			{
 				ptr = raw_data(core.draw_list.indices),
-				size = u64(len(core.draw_list.indices) * size_of(u16)),
+				size = u64(len(core.draw_list.indices) * size_of(u32)),
 			},
 		)
 		sg.update_buffer(
@@ -419,12 +429,13 @@ end_frame :: proc() {
 
 		// Render them
 		for &call in core.draw_calls[:core.draw_call_count] {
+			if call.elem_count == 0 {
+				continue
+			}
+
 			bindings := core.draw_list.bindings
 			bindings.fs.images[0] = call.texture
 			sg.apply_bindings(bindings)
-
-			// frag_uniforms := Frag_Uniforms{}
-			// sg.apply_uniforms(.FS, 0, {ptr = &frag_uniforms, size = size_of(Frag_Uniforms)})
 
 			// Apply scissor
 			sg.apply_scissor_rectf(
@@ -437,10 +448,9 @@ end_frame :: proc() {
 
 			// Draw elements
 			sg.draw(call.elem_offset, call.elem_count, 1)
-
-			// Reset scissor
-			sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
 		}
+
+		sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
 
 		// Display debug text
 		if core.debug.enabled {
@@ -473,7 +483,9 @@ end_frame :: proc() {
 
 	// Reset draw calls and draw list
 	core.draw_call_count = 0
+	core.current_draw_call = nil
 	clear_draw_list(&core.draw_list)
+	core.current_texture = {}
 
 	// Reset vertex state
 	core.vertex_state = {}

@@ -25,6 +25,7 @@ make_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_In
 add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 	widget, ok := begin_widget(info)
 	if !ok do return
+
 	widget.draggable = true
 	result.self = widget
 
@@ -39,6 +40,11 @@ add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 
 	knob_center := widget.box.lo + radius + {time * range_width, 0}
 	knob_radius := h / 2
+
+	if point_in_box(core.mouse_pos, widget.box) ||
+	   linalg.distance(knob_center, core.mouse_pos) <= knob_radius {
+		hover_widget(widget)
+	}
 
 	if widget.visible {
 		draw_rounded_box_fill(widget.box, radius, core.style.color.substance)
@@ -55,11 +61,6 @@ add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 		new_time := clamp((core.mouse_pos.x - widget.box.lo.x - radius) / range_width, 0, 1)
 		result.value = info.lo + T(new_time * f32(info.hi - info.lo))
 		core.draw_next_frame = true
-	}
-
-	if point_in_box(core.mouse_pos, widget.box) ||
-	   linalg.distance(knob_center, core.mouse_pos) <= knob_radius {
-		widget.try_hover = true
 	}
 
 	end_widget()

@@ -158,9 +158,8 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	}
 
 	// Set vertex z position
+	append_draw_call(current_layer().?.index)
 	push_clip(layer.box)
-	core.current_draw_call.texture = core.font_atlas.texture
-
 	set_global_alpha(layer.opacity)
 
 	// Transform matrix
@@ -192,31 +191,25 @@ end_layer :: proc() {
 		}
 	}
 
-	// Pop the current layout
 	pop_layout()
-
-	// Pop the layer stack
 	pop_stack(&core.layer_stack)
+
+	// AFTER LAYER!
+	pop_clip()
 
 	// Reset z-level to that of the previous layer or to zero
 	if layer, ok := current_layer().?; ok {
-		pop_clip()
-		core.current_draw_call.texture = core.font_atlas.texture
-
 		set_global_alpha(layer.opacity)
 	}
 }
 
 bring_layer_to_front :: proc(layer: ^Layer) {
 	assert(layer != nil)
-
 	// First pass determines the new z-index
 	highest_of_kind := get_highest_layer_kind_index(layer.kind)
-
 	if layer.index >= highest_of_kind {
 		return
 	}
-
 	// Second pass lowers other layers
 	for i in 0 ..< len(core.layers) {
 		other_layer := &core.layers[i]
@@ -225,7 +218,6 @@ bring_layer_to_front :: proc(layer: ^Layer) {
 			other_layer.index -= 1
 		}
 	}
-
 	layer.index = highest_of_kind
 }
 

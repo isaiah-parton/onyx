@@ -86,25 +86,16 @@ draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color)
 }
 
 set_texture :: proc(texture: sg.Image) {
-	if core.current_draw_call.texture == texture {
-		return
+	core.current_texture = texture
+	if core.current_draw_call == nil do return
+	if core.current_draw_call.texture == core.current_texture do return
+	if core.current_draw_call.texture != {} {
+		append_draw_call(current_layer().?.index)
 	}
-	if core.current_draw_call.texture == {} {
-		core.current_draw_call.texture = texture
-		return
-	}
-	for i in 0 ..< core.draw_call_count {
-		if core.draw_calls[i].texture == texture {
-			core.current_draw_call = &core.draw_calls[i]
-			return
-		}
-	}
-	append_draw_call(current_layer().?.index)
-	core.current_draw_call.texture = texture
 }
 
 get_current_texture :: proc() -> sg.Image {
-	return core.current_draw_call.texture
+	return core.current_texture
 }
 
 get_pixel_format :: proc(channels, depth: int) -> sg.Pixel_Format {

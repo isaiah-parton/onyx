@@ -3,10 +3,10 @@ package onyx
 import "core:fmt"
 import "core:time"
 
-import "core:mem"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
+import "core:mem"
 
 import "base:intrinsics"
 import "base:runtime"
@@ -18,7 +18,6 @@ Widget :: struct {
 	box:                                          Box,
 	layer:                                        ^Layer,
 	visible, disabled, draggable, is_field, dead: bool,
-	try_hover:                                    bool,
 	last_state, next_state, state:                Widget_State,
 	focus_time, hover_time, disable_time:         f32,
 	click_count:                                  int,
@@ -69,11 +68,11 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 
 	if condition {
 		if value < 1 {
-			core.draw_next_frame = true
+			core.draw_this_frame = true
 			value = min(1, value + core.delta_time * (1 / duration))
 		}
 	} else if value > 0 {
-		core.draw_next_frame = true
+		core.draw_this_frame = true
 		value = max(0, value - core.delta_time * (1 / duration))
 	}
 
@@ -163,7 +162,7 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 
 				ok = true
 
-				core.draw_next_frame = true
+				core.draw_this_frame = true
 				break
 			}
 		}
@@ -176,27 +175,34 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 	// Place widget
 	widget.box = info.box.? or_else next_widget_box(info)
 
-	// Reset widget state
+	// Keep alive
 	widget.dead = false
-	widget.try_hover = false
-	widget.visible = core.visible && core.draw_this_frame
+
+	// Set visible flag
+	widget.visible = core.visible && get_clip(current_clip().?, widget.box) != .Full
+
+	// Reset state
 	widget.last_state = widget.state
 	widget.state -= {.Clicked, .Focused, .Changed}
-	widget.desired_size = info.desired_size
+
+	// Disabled?
 	widget.disabled = true if core.disable_widgets else info.disabled
 	widget.disable_time = animate(widget.disable_time, 0.25, widget.disabled)
 
+	// If the user set an explicit size with either `set_width()` or `set_height()` the widget's desired size should reflect that
+	// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
+	layout := current_layout().?
+	if layout.next_size.x != box_width(layout.box) {
+		widget.desired_size.x = max(info.desired_size.x, layout.next_size.x)
+	}
+	if layout.next_size.y != box_height(layout.box) {
+		widget.desired_size.y = max(info.desired_size.y, layout.next_size.y)
+	}
+
 	// Mouse hover
 	if core.hovered_widget == widget.id {
-
 		// Add hovered state
 		widget.state += {.Hovered}
-
-		// Set time of hover
-		if core.last_hovered_widget != widget.id {
-			// widget.hover_time = time.now()
-		}
-
 		// Clicking
 		pressed_buttons := core.mouse_bits - core.last_mouse_bits
 		if pressed_buttons != {} {
@@ -247,22 +253,18 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 
 end_widget :: proc() {
 	widget := current_widget().?
-	if widget.try_hover && (.Hovered in widget.layer.state) && !widget.disabled {
-		core.next_hovered_widget = widget.id
-	}
 	layout := current_layout().?
 	add_layout_content_size(layout, widget.desired_size)
 	pop_stack(&core.widget_stack)
 }
 
 hover_widget :: proc(widget: ^Widget) {
-	if core.hovered_layer != widget.layer.id {
-		return
-	}
-	if clip, ok := current_clip().?; ok {
-		if !point_in_box(core.mouse_pos, clip) {
-			return
-		}
-	}
+	// Disabled?
+	if widget.disabled do return
+	// Layer not hovered?
+	if core.hovered_layer != widget.layer.id do return
+	// Clipped?
+	if clip, ok := current_clip().?; ok && !point_in_box(core.mouse_pos, current_clip().?) do return
+	// Ok hover
 	core.next_hovered_widget = widget.id
 }

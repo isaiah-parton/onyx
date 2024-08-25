@@ -3,6 +3,7 @@ package onyx
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
+import "core:mem"
 
 import sg "extra:sokol-odin/sokol/gfx"
 
@@ -17,6 +18,10 @@ MAX_FONTS :: 100
 MAX_ATLASES :: 8
 MIN_ATLAS_SIZE :: 1024
 MAX_ATLAS_SIZE :: 8192
+
+BUFFER_SIZE :: mem.Megabyte * 2
+MAX_VERTICES :: 65536
+MAX_INDICES :: 65536
 
 Gradient :: union {
 	Linear_Gradient,
@@ -58,7 +63,7 @@ Matrix :: matrix[4, 4]f32
 Draw_List :: struct {
 	bindings: sg.Bindings,
 	vertices: [dynamic]Vertex,
-	indices:  [dynamic]u16,
+	indices:  [dynamic]u32,
 }
 
 // A draw call to the GPU these are managed internally
@@ -78,14 +83,10 @@ Path :: struct {
 
 init_draw_list :: proc(draw_list: ^Draw_List) {
 	draw_list.bindings.index_buffer = sg.make_buffer(
-		sg.Buffer_Desc{type = .INDEXBUFFER, usage = .STREAM, size = MAX_INDICES * size_of(u16)},
+		sg.Buffer_Desc{type = .INDEXBUFFER, usage = .STREAM, size = BUFFER_SIZE},
 	)
 	draw_list.bindings.vertex_buffers[0] = sg.make_buffer(
-		sg.Buffer_Desc {
-			type = .VERTEXBUFFER,
-			usage = .STREAM,
-			size = MAX_VERTICES * size_of(Vertex),
-		},
+		sg.Buffer_Desc{type = .VERTEXBUFFER, usage = .STREAM, size = BUFFER_SIZE},
 	)
 	draw_list.bindings.fs.samplers[0] = sg.make_sampler(
 		sg.Sampler_Desc {
@@ -134,7 +135,7 @@ set_global_alpha :: proc(alpha: f32) {
 }
 
 // Append a vertex and return it's index
-add_vertex_2f32 :: proc(x, y: f32) -> (i: u16) {
+add_vertex_2f32 :: proc(x, y: f32) -> (i: u32) {
 	pos: [2]f32 = {
 		core.current_matrix[0, 0] * x +
 		core.current_matrix[0, 1] * y +
@@ -153,7 +154,7 @@ add_vertex_2f32 :: proc(x, y: f32) -> (i: u16) {
 	return
 }
 
-add_vertex_point :: proc(point: [2]f32) -> u16 {
+add_vertex_point :: proc(point: [2]f32) -> u32 {
 	return add_vertex_2f32(point.x, point.y)
 }
 
@@ -162,18 +163,20 @@ add_vertex :: proc {
 	add_vertex_point,
 }
 
-add_index :: proc(i: u16) {
+add_index :: proc(i: u32) {
+	assert(core.current_draw_call != nil)
 	append(&core.draw_list.indices, i)
 	core.current_draw_call.elem_count += 1
 }
 
-add_indices :: proc(i: ..u16) {
+add_indices :: proc(i: ..u32) {
+	assert(core.current_draw_call != nil)
 	append(&core.draw_list.indices, ..i)
 	core.current_draw_call.elem_count += len(i)
 }
 
-next_vertex_index :: proc() -> u16 {
-	return u16(len(core.draw_list.vertices))
+next_vertex_index :: proc() -> u32 {
+	return u32(len(core.draw_list.vertices))
 }
 
 current_matrix :: proc() -> Maybe(Matrix) {
@@ -194,11 +197,14 @@ pop_matrix :: proc() {
 	core.current_matrix = &core.matrix_stack.items[max(0, core.matrix_stack.height - 1)]
 }
 
-append_draw_call :: proc(index: int) {
+append_draw_call :: proc(index: int, loc := #caller_location) {
+	assert(core.draw_call_count < MAX_DRAW_CALLS, "outa draw calls dawg", loc)
 	core.current_draw_call = &core.draw_calls[core.draw_call_count]
 	core.current_draw_call^ = Draw_Call {
 		elem_offset = len(core.draw_list.indices),
 		index       = index,
+		clip_box    = current_clip().? or_else view_box(),
+		texture     = core.current_texture,
 	}
 	core.draw_call_count += 1
 }

@@ -69,7 +69,7 @@ fill_path :: proc(color: Color) {
 	for i in 1 ..< path.count {
 		add_vertex(path.points[i])
 		if i < path.count - 1 {
-			add_indices(index, index + u16(i), index + u16(i) + 1)
+			add_indices(index, index + u32(i), index + u32(i) + 1)
 		}
 	}
 }
@@ -148,22 +148,22 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 		if path.closed && i == path.count - 1 {
 			// Join to first endpoint
 			add_indices(
-				first_index + u16(i * 2),
-				first_index + u16(i * 2 + 1),
+				first_index + u32(i * 2),
+				first_index + u32(i * 2 + 1),
 				first_index,
-				first_index + u16(i * 2 + 1),
+				first_index + u32(i * 2 + 1),
 				first_index + 1,
 				first_index,
 			)
 		} else if i < path.count - 1 {
 			// Join to next endpoint
 			add_indices(
-				first_index + u16(i * 2),
-				first_index + u16(i * 2 + 1),
-				first_index + u16(i * 2 + 2),
-				first_index + u16(i * 2 + 3),
-				first_index + u16(i * 2 + 2),
-				first_index + u16(i * 2 + 1),
+				first_index + u32(i * 2),
+				first_index + u32(i * 2 + 1),
+				first_index + u32(i * 2 + 2),
+				first_index + u32(i * 2 + 3),
+				first_index + u32(i * 2 + 2),
+				first_index + u32(i * 2 + 1),
 			)
 		}
 	}
@@ -329,13 +329,20 @@ draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color:
 	da := to - from
 	nsteps := get_arc_steps(radius, da)
 
-	begin_path()
+	set_vertex_color(color)
+	set_vertex_uv({})
+	first_index := add_vertex(center.x, center.y)
+	last_inner, last_outer: u32
 	for n in 0 ..= nsteps {
 		a := from + da * f32(n) / f32(nsteps)
-		point(center + {math.cos(a), math.sin(a)} * radius)
+		norm := [2]f32{math.cos(a), math.sin(a)}
+		inner := add_vertex(center + norm * (radius - thickness))
+		outer := add_vertex(center + norm * radius)
+		if n > 0 {
+			add_indices(last_outer, outer, last_inner, outer, inner, last_inner)
+		}
+		last_inner, last_outer = inner, outer
 	}
-	stroke_path(thickness, color, .Inner)
-	end_path()
 }
 draw_box_fill :: proc(box: Box, color: Color) {
 	set_vertex_color(color)

@@ -48,6 +48,7 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 
 	result.self = widget
 	kind := widget_kind(widget, Menu_Widget_Kind)
+	menu_behavior(widget)
 
 	if widget.visible {
 		color := fade(core.style.color.content, 0.5 + 0.5 * widget.hover_time)
@@ -137,7 +138,6 @@ add_breadcrumb :: proc(info: Breadcrumb_Info) -> (result: Breadcrumb_Result) {
 		}
 	}
 
-	menu_behavior(widget)
 
 	end_widget()
 	return
