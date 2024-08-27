@@ -35,7 +35,7 @@ add_scrollbar :: proc(info: Scrollbar_Info) -> (result: Scrollbar_Result) {
 	travel := (widget.box.hi[i] - widget.box.lo[i]) - handle_size
 
 	handle_box := Box{}
-	handle_box.lo[i] = widget.box.lo[i] + (info.pos / info.travel) * travel
+	handle_box.lo[i] = widget.box.lo[i] + clamp(info.pos / info.travel, 0, 1) * travel
 	handle_box.hi[i] = handle_box.lo[i] + handle_size
 
 	handle_box.lo[j] = widget.box.lo[j]

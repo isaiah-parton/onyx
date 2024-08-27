@@ -84,6 +84,8 @@ begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 			},
 		)
 		foreground()
+		set_width_auto()
+		set_height_auto()
 	}
 
 
@@ -153,6 +155,8 @@ add_selector_option :: proc(info: Selector_Option_Info) -> (result: Generic_Widg
 
 	result.self = widget
 
+	button_behavior(widget)
+
 	if widget.visible {
 		draw_rounded_box_fill(
 			widget.box,
@@ -179,7 +183,6 @@ add_selector_option :: proc(info: Selector_Option_Info) -> (result: Generic_Widg
 			core.style.color.content,
 		)
 	}
-	button_behavior(widget)
 	end_widget()
 	return
 }

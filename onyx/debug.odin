@@ -21,7 +21,7 @@ print_debug_text :: proc() {
 
 	sdtx.color3b(255, 255, 255)
 
-	sdtx.printf("frame %i\n", core.frame_count)
+	sdtx.printf("frame %i / %i\n", core.drawn_frames, core.frames)
 	sdtx.color3b(170, 170, 170)
 	sdtx.printf("\tui: %fms\n", time.duration_milliseconds(time.since(core.last_frame_time)))
 	sdtx.printf("\trender: %fms\n", time.duration_milliseconds(core.render_duration))

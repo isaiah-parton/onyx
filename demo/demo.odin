@@ -72,10 +72,10 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if do_container({}) {
+		if do_container({size = { 0, 2000 }}) {
 			set_width_fill()
 			set_height_auto()
-			for i in 0 ..< 40 {
+			for i in 0 ..< 50 {
 				if i > 0 {
 					add_space(4)
 				}

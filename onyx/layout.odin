@@ -15,6 +15,7 @@ Layout :: struct {
 	original_box, box: Box, // Original box// Current box to cut from
 	next_side:         Side, // Next side to cut from
 	next_size:         [2]f32, // Next cut size
+	next_align_side: Side,
 	next_padding: [2]f32,
 	content_size:      [2]f32,
 	spacing_size:      [2]f32,
@@ -121,7 +122,12 @@ next_widget_box :: proc(info: Generic_Widget_Info) -> Box {
 	box := cut_layout(layout, nil, size)
 	if int(layout.next_side) > 1 {
 		if size.x < box_width(box) {
-			box.hi.x = box.lo.x + size.x
+			#partial switch layout.next_align_side {
+			case .Left:
+				box.hi.x = box.lo.x + size.x
+			case .Right:
+				box.lo.x = box.hi.x - size.x
+			}
 		}
 	} else {
 		if size.y < box_height(box) {

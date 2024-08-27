@@ -26,6 +26,7 @@ Widget :: struct {
 	allocator:                                    runtime.Allocator,
 	variant:                                      Widget_Kind,
 	desired_size:                                 [2]f32,
+	frames: int,
 }
 
 Widget_Kind :: union {
@@ -54,6 +55,7 @@ Generic_Widget_Info :: struct {
 	id:           Maybe(Id),
 	box:          Maybe(Box),
 	fixed_size:   bool,
+	required_size: [2]f32,
 	desired_size: [2]f32,
 	disabled:     bool,
 }
@@ -160,14 +162,20 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 				widget = &core.widgets[i].?
 				core.widget_map[id] = widget
 
-				ok = true
-
 				core.draw_this_frame = true
+				
+				ok = true
 				break
 			}
 		}
 	}
-	if !ok do return
+	
+	if widget == nil do return
+
+	if widget.frames == core.frames {
+		return nil, false
+	}
+	widget.frames = core.frames
 
 	// Widget must have a valid layer
 	widget.layer = current_layer().? or_return
@@ -189,13 +197,14 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 	widget.disabled = true if core.disable_widgets else info.disabled
 	widget.disable_time = animate(widget.disable_time, 0.25, widget.disabled)
 
+	// Compute next frame's layout
+	layout := current_layout().?
 	// If the user set an explicit size with either `set_width()` or `set_height()` the widget's desired size should reflect that
 	// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
-	layout := current_layout().?
-	if layout.next_size.x != box_width(layout.box) {
+	if layout.next_size.x == 0 || layout.next_size.x != box_width(layout.box) {
 		widget.desired_size.x = max(info.desired_size.x, layout.next_size.x)
 	}
-	if layout.next_size.y != box_height(layout.box) {
+	if layout.next_size.y == 0 || layout.next_size.y != box_height(layout.box) {
 		widget.desired_size.y = max(info.desired_size.y, layout.next_size.y)
 	}
 
@@ -224,9 +233,8 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 		widget.state -= {.Pressed, .Hovered}
 		widget.click_count = 0
 	}
-
+	// Mouse press
 	if widget.state >= {.Pressed} {
-
 		// Just released buttons
 		released_buttons := core.last_mouse_bits - core.mouse_bits
 		if released_buttons != {} {
@@ -239,14 +247,14 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 			}
 		}
 	}
-
+	// Focus state
 	if core.focused_widget == widget.id {
 		widget.state += {.Focused}
 	}
-
+	// Reset next state
 	widget.state += widget.next_state
 	widget.next_state = {}
-
+	// Push to the stack
 	ok = push_stack(&core.widget_stack, widget)
 	return
 }

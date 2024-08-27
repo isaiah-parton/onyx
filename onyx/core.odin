@@ -60,7 +60,7 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 Keyboard_Key :: sapp.Keycode
 
 // Private global core instance
-@(private)
+// @(private)
 core: Core
 
 // Input events should be localized to layers
@@ -80,31 +80,39 @@ Debug_State :: struct {
 Core :: struct {
 	debug:                                                    Debug_State,
 	view:                                                     [2]f32,
-	layers:                                                   [MAX_LAYERS]Layer,
-	layer_map:                                                map[Id]^Layer,
-	highest_layer:                                            int,
+
+	// Hashing
+	id_stack:                                                 Stack(Id, MAX_IDS),
 
 	// Widgets
-	drag_offset:                                              [2]f32,
-	last_hovered_widget, hovered_widget, next_hovered_widget: Id,
-	last_focused_widget, focused_widget, dragged_widget:      Id,
 	widgets:                                                  [MAX_WIDGETS]Maybe(Widget),
 	widget_map:                                               map[Id]^Widget,
-	disable_widgets:                                          bool,
-	panels:                                                   [MAX_PANELS]Maybe(Panel),
-	panel_map:                                                map[Id]^Panel,
-	last_hovered_layer, hovered_layer, next_hovered_layer:    Id,
-	focused_layer:                                            Id,
 	widget_stack:                                             Stack(^Widget, 10),
+	last_hovered_widget, hovered_widget, next_hovered_widget: Id,
+	last_focused_widget, focused_widget, dragged_widget:      Id,
+	disable_widgets:                                          bool,
+	drag_offset:                                              [2]f32,
+	
+	// Layout
 	layout_stack:                                             Stack(Layout, MAX_LAYOUTS),
-	layer_stack:                                              Stack(^Layer, MAX_LAYERS),
-	panel_stack:                                              Stack(^Panel, MAX_PANELS),
-	clip_stack:                                               Stack(Box, 100),
+
+	// Containers
 	container_map:                                            map[Id]^Container,
 	container_stack:                                          Stack(^Container, 200),
 	active_container, next_active_container:                  Id,
+
+	// Panels
+	panels:                                                   [MAX_PANELS]Maybe(Panel),
+	panel_map:                                                map[Id]^Panel,
+	panel_stack:                                              Stack(^Panel, MAX_PANELS),
+
+	// Layers
+	layers:                                                   [MAX_LAYERS]Layer,
+	layer_map:                                                map[Id]^Layer,
+	layer_stack:                                              Stack(^Layer, MAX_LAYERS),
+	focused_layer:                                            Id,
 	highest_layer_index:                                      int,
-	id_stack:                                                 Stack(Id, MAX_IDS),
+	last_hovered_layer, hovered_layer, next_hovered_layer:    Id,
 
 	// IO
 	cursor_type:                                              sapp.Mouse_Cursor,
@@ -120,26 +128,28 @@ Core :: struct {
 	style:                                                    Style,
 
 	// Timings
-	frame_count:                                              int,
-	delta_time:                                               f32, // Delta time in seconds
-	last_frame_time, start_time:                              time.Time, // Time of last frame
+	delta_time:                                               f32,
+	last_frame_time, start_time:                              time.Time,
 	render_duration:                                          time.Duration,
 
 	// Text
+	fonts:                                                    [MAX_FONTS]Maybe(Font),
 	glyphs:                                                   [dynamic]Text_Job_Glyph,
 	lines:                                                    [dynamic]Text_Job_Line,
-	fonts:                                                    [MAX_FONTS]Maybe(Font),
-	current_font:                                             int,
 	font_atlas:                                               Atlas,
-	user_images:                                              [300]Maybe(Image),
+	current_font:                                             int,
+	user_images:                                              [100]Maybe(Image),
 
 	// Drawing
 	draw_this_frame, draw_next_frame:                         bool,
-	path_stack:                                               Stack(Path, 10),
 	vertex_state:                                             Vertex_State,
 	current_matrix:                                           ^Matrix,
-	matrix_stack:                                             Stack(Matrix, MAX_MATRICES),
 	current_texture:                                          sg.Image,
+	clip_stack:                                               Stack(Box, 100),
+	path_stack:                                               Stack(Path, 10),
+	matrix_stack:                                             Stack(Matrix, MAX_MATRICES),
+	frames:                                              int,
+	drawn_frames: int,
 
 	// Rendering
 	draw_list:                                                Draw_List,
@@ -159,6 +169,14 @@ view_box :: proc() -> Box {
 
 get_mouse_pos :: proc() -> [2]f32 {
 	return core.mouse_pos
+}
+
+view_width :: proc() -> f32 {
+	return core.view.x
+}
+
+view_height :: proc() -> f32 {
+	return core.view.y
 }
 
 init :: proc() {
@@ -227,6 +245,7 @@ begin_frame :: proc() {
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
+	core.frames += 1
 
 	if key_pressed(.ESCAPE) {
 		core.focused_widget = 0
@@ -342,8 +361,6 @@ end_frame :: proc() {
 
 			core.draw_next_frame = true
 		} else {
-			layer.last_state = layer.state
-			layer.state = {}
 			layer.dead = true
 		}
 	}
@@ -464,7 +481,7 @@ end_frame :: proc() {
 		sg.end_pass()
 		sg.commit()
 
-		core.frame_count += 1
+		core.drawn_frames += 1
 		core.draw_this_frame = false
 		core.render_duration = time.since(start_time)
 	} else {

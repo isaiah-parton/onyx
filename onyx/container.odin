@@ -50,19 +50,6 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 		cnt.desired_scroll -= core.mouse_scroll * 100
 	}
 
-	// Clamp scroll
-	cnt.desired_scroll = linalg.max(
-		linalg.min(cnt.desired_scroll, cnt.size - (cnt.box.hi - cnt.box.lo)),
-		0,
-	)
-	delta_scroll := (cnt.desired_scroll - cnt.scroll) * core.delta_time * 15
-	cnt.scroll += delta_scroll
-
-	// Draw this frame if scroll changed
-	if abs(delta_scroll.x) > 0.1 || abs(delta_scroll.y) > 0.1 {
-		core.draw_this_frame = true
-	}
-
 	append_draw_call(current_layer().?.index)
 	push_clip(cnt.box)
 	push_stack(&core.container_stack, cnt)
@@ -82,17 +69,40 @@ end_container :: proc() {
 	layout := current_layout().?
 	cnt.size = layout.content_size + layout.spacing_size
 
-	draw_text(
-		cnt.box.lo,
-		{text = fmt.tprint(cnt.size), font = core.style.fonts[.Light], size = 20},
-		{255, 255, 255, 255},
+	//TODO: Remove this
+	// draw_text(
+	// 	cnt.box.lo,
+	// 	{text = fmt.tprintf("%.1f", box_size(cnt.box)), font = core.style.fonts[.Light], size = 20},
+	// 	{255, 255, 255, 255},
+	// )
+	// draw_text(
+	// 	cnt.box.lo + {0, 20},
+	// 	{text = fmt.tprintf("%.1f", cnt.size), font = core.style.fonts[.Light], size = 20},
+	// 	{255, 255, 255, 255},
+	// )
+	// draw_text(
+	// 	cnt.box.lo + {0, 40},
+	// 	{text = fmt.tprintf("%.1f", cnt.scroll), font = core.style.fonts[.Light], size = 20},
+	// 	{255, 255, 255, 255},
+	// )
+
+	// Clamp scroll
+	cnt.desired_scroll = linalg.max(
+		linalg.min(cnt.desired_scroll, cnt.size - (cnt.box.hi - cnt.box.lo)),
+		0,
 	)
+	delta_scroll := (cnt.desired_scroll - cnt.scroll) * core.delta_time * 15
+	cnt.scroll += delta_scroll
 
 	cnt.scroll_x = cnt.size.x > box_width(cnt.box) && !cnt.no_scroll_x
 	cnt.scroll_y = cnt.size.y > box_height(cnt.box) && !cnt.no_scroll_y
 
 	cnt.scroll_time.x = animate(cnt.scroll_time.x, 0.2, cnt.scroll_x)
 	cnt.scroll_time.y = animate(cnt.scroll_time.y, 0.2, cnt.scroll_y)
+
+	if abs(delta_scroll.x) > 0.1 || abs(delta_scroll.y) > 0.1 {
+		core.draw_next_frame = true
+	}
 
 	end_layout()
 

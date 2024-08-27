@@ -20,6 +20,11 @@ Layer_Kind :: enum int {
 	Debug,
 }
 
+Layer_Sorting :: enum {
+	Above,
+	Below,
+}
+
 Layer_Status :: enum {
 	Hovered,
 	Focused,
@@ -47,6 +52,7 @@ Layer :: struct {
 	dead:              bool, // Should be deleted?
 	opacity:           f32,
 	index:             int,
+	frames: int,
 }
 
 Layer_Info :: struct {
@@ -59,6 +65,7 @@ Layer_Info :: struct {
 	scale:    Maybe([2]f32),
 	rotation: f32,
 	opacity:  Maybe(f32),
+	sorting: Layer_Sorting,
 }
 
 destroy_layer :: proc(layer: ^Layer) {
@@ -77,13 +84,32 @@ set_layer_index :: proc(layer: ^Layer, index: int) {
 
 	for i in 0 ..< len(core.layers) {
 		other_layer := &core.layers[i]
-		if other_layer.id == 0 do continue
+		if other_layer.id == 0 || other_layer.id == layer.id do continue
 
-		if other_layer.index >= index {
-			other_layer.index += 1
+		assert(other_layer.index != layer.index)
+		if index > layer.index {
+			if layer.index > 0 {
+				if other_layer.index <= index {
+					other_layer.index -= 1
+				} else if other_layer.index > index {
+					other_layer.index += 1
+				}
+			} else {
+				if other_layer.index >= index {
+					other_layer.index += 1
+				}
+			}
+		} else {
+			if other_layer.index >= index && other_layer.index < layer.index {
+				other_layer.index += 1
+			}
 		}
 	}
 	layer.index = index
+}
+
+get_lowest_layer_of_kind :: proc(kind: Layer_Kind) -> int {
+	return get_highest_layer_of_kind(Layer_Kind(int(kind) - 1)) + 1
 }
 
 get_highest_layer_of_kind :: proc(kind: Layer_Kind) -> int {
@@ -93,7 +119,7 @@ get_highest_layer_of_kind :: proc(kind: Layer_Kind) -> int {
 		if layer.id == 0 do continue
 
 		if int(layer.kind) <= int(kind) {
-			index = max(index, layer.index + 1)
+			index = max(index, layer.index)
 		}
 	}
 	return index
@@ -127,11 +153,24 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 			set_layer_parent(layer, info.parent)
 		}
 
-		set_layer_index(
-			layer,
-			layer.parent.index + 1 if layer.parent != nil else get_highest_layer_of_kind(kind),
-		)
+		if layer.parent != nil {
+			set_layer_index(
+				layer,
+				layer.parent.index + 1,
+			)
+		} else {
+			index := (get_highest_layer_of_kind(kind) + 1) if info.sorting == .Above else (get_lowest_layer_of_kind(kind))
+			set_layer_index(
+				layer,
+				index,
+				)
+		}
 	}
+
+	if layer.frames == core.frames {
+		return false
+	}
+	layer.frames = core.frames
 
 	// Push layer
 	push_stack(&core.layer_stack, layer)
@@ -144,11 +183,14 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	layer.kind = kind
 	layer.opacity = info.opacity.? or_else 1
 
+	layer.last_state = layer.state
+	layer.state = {}
+
 	// Set input state
 	if core.hovered_layer == layer.id {
 		layer.state += {.Hovered}
 		// Re-order layers if clicked
-		if mouse_pressed(.Left) {
+		if mouse_pressed(.Left) && layer.kind != .Topmost {
 			bring_layer_to_front(layer)
 		}
 	}
@@ -172,12 +214,10 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 
 	// Push layout
 	push_layout(Layout{box = layer.box, original_box = layer.box, next_side = .Top})
-
 	return true
 }
 
 end_layer :: proc() {
-
 	pop_matrix()
 
 	layer := current_layer().?
@@ -203,10 +243,22 @@ end_layer :: proc() {
 	}
 }
 
+@(deferred_out=__do_layer)
+do_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
+	return begin_layer(info, loc)
+}
+
+@private
+__do_layer :: proc(ok: bool) {
+	if ok {
+		end_layer()
+	}
+}
+
 bring_layer_to_front :: proc(layer: ^Layer) {
 	assert(layer != nil)
 	// First pass determines the new z-index
-	highest_of_kind := get_highest_layer_kind_index(layer.kind)
+	highest_of_kind := get_highest_layer_of_kind(layer.kind)
 	if layer.index >= highest_of_kind {
 		return
 	}
@@ -248,18 +300,6 @@ bring_layer_to_front_of_children :: proc(layer: ^Layer) {
 	}
 
 	layer.index = highest_of_kind
-}
-
-get_highest_layer_kind_index :: proc(kind: Layer_Kind) -> int {
-	index: int
-	for i in 0 ..< len(core.layers) {
-		other_layer := &core.layers[i]
-		if other_layer.id == 0 do continue
-		if int(other_layer.kind) <= int(kind) {
-			index = max(index, other_layer.index)
-		}
-	}
-	return index
 }
 
 set_layer_parent :: proc(layer, parent: ^Layer) {
