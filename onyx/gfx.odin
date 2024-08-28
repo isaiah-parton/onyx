@@ -13,7 +13,7 @@ import "vendor:wgpu/glfwglue"
 import "vendor:glfw"
 import "core:sys/windows"
 
-Shader_Uniform :: struct {
+Shader_Uniforms :: struct {
 	proj_mtx: matrix[4, 4]f32,
 }
 
@@ -38,211 +38,176 @@ Graphics :: struct {
 init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 
 	gfx.instance = wgpu.CreateInstance()
-
-	// gfx.surface = wgpu.InstanceCreateSurface(
-	// 	gfx.instance, 
-	// 	&{
-	// 		nextInChain = &wgpu.SurfaceDescriptorFromWindowsHWND{
-	// 			chain = {
-	// 				sType = .SurfaceDescriptorFromWindowsHWND,
-	// 			},
-	// 			hinstance = windows.GetModuleHandleA(nil),
-	// 			hwnd = glfw.GetWin32Window(window),
-	// 		},
-	// 	})
 	gfx.surface = glfwglue.GetSurface(gfx.instance, window)
-	fmt.println("Created surface")
 
-	adapters := wgpu.InstanceEnumerateAdapters(gfx.instance)
-	defer delete(adapters)
-	fmt.println("Enumerated adapters")
-
-	gfx.waiting = true
-	wgpu.InstanceRequestAdapter(
-		gfx.instance, 
-		&wgpu.RequestAdapterOptions{
-			compatibleSurface = gfx.surface,
-		},
-		proc "c" (status: wgpu.RequestAdapterStatus, adapter: wgpu.Adapter, message: cstring, userdata: rawptr) {
-			context = runtime.default_context()
-			gfx := transmute(^Graphics)userdata
-			#partial switch status {
-			case .Success:
-				gfx.adapter = adapter
-			case:
-				fmt.println(status, message)
-			}
-			gfx.waiting = false
-		},
-		gfx)
-	for gfx.waiting {}
-
-	adapter_properties := wgpu.AdapterGetProperties(gfx.adapter)
-	fmt.printf(
-`Suitable adapter found:
-	Device name: %s
-	Driver version: %s
-	Backend type: %v
-`,
-		adapter_properties.name,
-		adapter_properties.backendType,
-		adapter_properties.driverDescription,
-		)
+	// adapters := wgpu.InstanceEnumerateAdapters(gfx.instance)
+	// defer delete(adapters)
+	// fmt.println("Enumerated adapters")
 
 	gfx.waiting = true
-	wgpu.AdapterRequestDevice(
-		gfx.adapter, 
-		&{}, 
-		proc "c" (status: wgpu.RequestDeviceStatus, device: wgpu.Device, message: cstring, userdata: rawptr) {
-			context = runtime.default_context()
-			gfx := transmute(^Graphics)userdata
-			#partial switch status {
-			case .Success:
-				gfx.device = device
-			case:
-				fmt.println(status, message)
-			}
-			gfx.waiting = false
-		}, 
-		gfx)
-	for gfx.waiting {}
+	wgpu.InstanceRequestAdapter(gfx.instance, &{ compatibleSurface = gfx.surface }, on_adapter, gfx)
 
-	// Create buffers
-	gfx.uniform_buffer = wgpu.DeviceCreateBuffer(gfx.device, &{
-		label = "UniformBuffer",
-		size = size_of(Shader_Uniform),
-		usage = {.Uniform, .CopyDst},
-	})
-	gfx.vertex_buffer = wgpu.DeviceCreateBuffer(gfx.device, &{
-		label = "VertexBuffer",
-		size = BUFFER_SIZE,
-		usage = {.Vertex},
-	})
-	gfx.index_buffer = wgpu.DeviceCreateBuffer(gfx.device, &{
-		label = "IndexBuffer",
-		size = BUFFER_SIZE,
-		usage = {.Index},
-	})
+	on_adapter :: proc "c" (status: wgpu.RequestAdapterStatus, adapter: wgpu.Adapter, message: cstring, userdata: rawptr) {
+		context = runtime.default_context()
+		gfx := transmute(^Graphics)userdata
 
-	// Create bind group layouts
-	uniform_bind_group_layout := wgpu.DeviceCreateBindGroupLayout(gfx.device, &{
-		label = "UniformBindGroupLayout",
-		entryCount = 1,
-		entries = &wgpu.BindGroupLayoutEntry{
-			binding = 0,
-			buffer = wgpu.BufferBindingLayout{
-				type = .Uniform,
-			},
-			visibility = {.Vertex},
+		if status != .Success {
+			return
 		}
-	})
-	fmt.println("Created uniform_bind_group_layout")
-	gfx.texture_bind_group_layout = wgpu.DeviceCreateBindGroupLayout(gfx.device, &{
-		label = "TextureBindGroupLayout",
-		entryCount = 2,
-		entries = transmute([^]wgpu.BindGroupLayoutEntry)&[?]wgpu.BindGroupLayoutEntry{
-			{
+
+		gfx.adapter = adapter
+		wgpu.AdapterRequestDevice(adapter, &{}, on_device, gfx)
+	}
+
+	on_device :: proc "c" (status: wgpu.RequestDeviceStatus, device: wgpu.Device, message: cstring, userdata: rawptr) {
+		context = runtime.default_context()
+		gfx := transmute(^Graphics)userdata
+
+		if status != .Success {
+			return
+		}
+
+		gfx.device = device
+
+		// Create buffers
+		gfx.uniform_buffer = wgpu.DeviceCreateBuffer(gfx.device, &{
+			label = "UniformBuffer",
+			size = size_of(Shader_Uniforms),
+			usage = {.Uniform, .CopyDst},
+		})
+		gfx.vertex_buffer = wgpu.DeviceCreateBuffer(gfx.device, &{
+			label = "VertexBuffer",
+			size = BUFFER_SIZE,
+			usage = {.Vertex},
+		})
+		gfx.index_buffer = wgpu.DeviceCreateBuffer(gfx.device, &{
+			label = "IndexBuffer",
+			size = BUFFER_SIZE,
+			usage = {.Index},
+		})
+		// Create bind group layouts
+		uniform_bind_group_layout := wgpu.DeviceCreateBindGroupLayout(gfx.device, &{
+			label = "UniformBindGroupLayout",
+			entryCount = 1,
+			entries = &wgpu.BindGroupLayoutEntry{
 				binding = 0,
-				texture = wgpu.TextureBindingLayout{
-					sampleType = .Uint,
-					viewDimension = ._2D,
+				buffer = wgpu.BufferBindingLayout{
+					type = .Uniform,
 				},
-				visibility = {.Fragment},
-			},
-			{
-				binding = 1,
-				sampler = wgpu.SamplerBindingLayout{
-					type = .Filtering,
-				},
-				visibility = {.Fragment},
-			},
-		}
-	})
-	fmt.println("Created texture_bind_group_layout")
-
-	// Create bind group
-	// 	Requires: uniform_buffer
-	uniform_bind_group := wgpu.DeviceCreateBindGroup(gfx.device, &wgpu.BindGroupDescriptor{
-		layout = uniform_bind_group_layout,
-		entryCount = 1,
-		entries = &wgpu.BindGroupEntry{
-			binding = 0,
-			buffer = gfx.uniform_buffer,
-			size = 1,
-		}
-	})
-	fmt.println("Created uniform_bind_group")
-
-	// Create pipeline layout
-	pipeline_layout := wgpu.DeviceCreatePipelineLayout(gfx.device, &{
-		label = "PipelineLayout",
-		bindGroupLayoutCount = 2,
-		bindGroupLayouts = transmute([^]wgpu.BindGroupLayout)&[?]wgpu.BindGroupLayout{uniform_bind_group_layout, gfx.texture_bind_group_layout}
-	})
-	fmt.println("Created pipeline_layout")
-
-	module := wgpu.DeviceCreateShaderModule(gfx.device, &wgpu.ShaderModuleDescriptor{
-		nextInChain = &wgpu.ShaderModuleWGSLDescriptor{
-			sType = .ShaderModuleWGSLDescriptor,
-			code = #load("shader.wgsl"),
-		},
-	})
-	fmt.println("Created module")
-
-	gfx.pipeline = wgpu.DeviceCreateRenderPipeline(gfx.device, &{
-		label = "RenderPipeline",
-		vertex = wgpu.VertexState{
-			entryPoint = "vs_main",
-			module = module,
-			buffers = &wgpu.VertexBufferLayout{
-				arrayStride = size_of(Vertex),
-				stepMode = .Vertex,
-				attributeCount = 3,
-				attributes = transmute([^]wgpu.VertexAttribute)&[?]wgpu.VertexAttribute{
-					{
-						format = .Float32x2,
-						shaderLocation = 0,
-					},
-					{
-						format = .Float32x2,
-						shaderLocation = 1,
-					},
-					{
-						format = .Float32x4,
-						shaderLocation = 2,
-					},
-				},
-			},
-		},
-		primitive = {
-			topology = .TriangleList,
-			cullMode = .Back,
-		},
-		multisample = {
-			count = 4,
-			mask = 0xffffffff,
-		},
-		fragment = &{
-			module = module,
-			entryPoint = "fs_main",
-			targets = &wgpu.ColorTargetState{
-				format = .RGBA8Uint,
-				writeMask = wgpu.ColorWriteMaskFlags_All,
-				blend = &{
-					color = {
-						srcFactor = .One,
-						dstFactor = .OneMinusSrcAlpha,
-						operation = .Add,
-					},
-					alpha = {
-						srcFactor = .OneMinusDstAlpha,
-						dstFactor = .One,
-						operation = .Add,
-					},
-				}
+				visibility = {.Vertex},
 			}
-		}
-	})
+		})
+		fmt.println("Created uniform_bind_group_layout")
+		gfx.texture_bind_group_layout = wgpu.DeviceCreateBindGroupLayout(gfx.device, &{
+			label = "TextureBindGroupLayout",
+			entryCount = 2,
+			entries = transmute([^]wgpu.BindGroupLayoutEntry)&[?]wgpu.BindGroupLayoutEntry{
+				{
+					binding = 1,
+					texture = wgpu.TextureBindingLayout{
+						sampleType = .Uint,
+						viewDimension = ._2D,
+					},
+					visibility = {.Fragment},
+				},
+				{
+					binding = 2,
+					sampler = wgpu.SamplerBindingLayout{
+						type = .Filtering,
+					},
+					visibility = {.Fragment},
+				},
+			}
+		})
+		fmt.println("Created texture_bind_group_layout")
+
+		// Create bind group
+		// 	Requires: uniform_buffer
+		uniform_bind_group := wgpu.DeviceCreateBindGroup(gfx.device, &wgpu.BindGroupDescriptor{
+			layout = uniform_bind_group_layout,
+			entryCount = 1,
+			entries = &wgpu.BindGroupEntry{
+				binding = 0,
+				buffer = gfx.uniform_buffer,
+				size = size_of(Shader_Uniforms),
+			}
+		})
+		fmt.println("Created uniform_bind_group")
+
+		// Create pipeline layout
+		pipeline_layout := wgpu.DeviceCreatePipelineLayout(gfx.device, &{
+			label = "PipelineLayout",
+			bindGroupLayoutCount = 2,
+			bindGroupLayouts = transmute([^]wgpu.BindGroupLayout)&[?]wgpu.BindGroupLayout{uniform_bind_group_layout, gfx.texture_bind_group_layout}
+		})
+		fmt.println("Created pipeline_layout")
+
+		module := wgpu.DeviceCreateShaderModule(gfx.device, &wgpu.ShaderModuleDescriptor{
+			nextInChain = &wgpu.ShaderModuleWGSLDescriptor{
+				sType = .ShaderModuleWGSLDescriptor,
+				code = #load("shader.wgsl"),
+			},
+		})
+		fmt.println("Created module")
+
+		gfx.pipeline = wgpu.DeviceCreateRenderPipeline(gfx.device, &{
+			label = "RenderPipeline",
+			vertex = wgpu.VertexState{
+				module = module,
+				entryPoint = "vs_main",
+				buffers = &wgpu.VertexBufferLayout{
+					arrayStride = size_of(Vertex),
+					stepMode = .Vertex,
+					attributeCount = 3,
+					attributes = transmute([^]wgpu.VertexAttribute)&[?]wgpu.VertexAttribute{
+						{
+							format = .Float32x2,
+							offset = u64(offset_of(Vertex, pos)),
+							shaderLocation = 0,
+						},
+						{
+							format = .Float32x2,
+							offset = u64(offset_of(Vertex, uv)),
+							shaderLocation = 1,
+						},
+						{
+							format = .Unorm8x4,
+							offset = u64(offset_of(Vertex, col)),
+							shaderLocation = 2,
+						},
+					},
+				},
+			},
+			fragment = &wgpu.FragmentState{
+				module = module,
+				entryPoint = "fs_main",
+				targets = &wgpu.ColorTargetState{
+					format = .RGBA8Uint,
+					writeMask = wgpu.ColorWriteMaskFlags_All,
+					blend = &{
+						color = {
+							srcFactor = .One,
+							dstFactor = .OneMinusSrcAlpha,
+							operation = .Add,
+						},
+						alpha = {
+							srcFactor = .OneMinusDstAlpha,
+							dstFactor = .One,
+							operation = .Add,
+						},
+					}
+				}
+			},
+			primitive = {
+				topology = .TriangleList,
+				cullMode = .Back,
+			},
+			multisample = {
+				count = 4,
+				mask = 0xffffff00,
+			},
+		})
+	}
 }
 
 draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
@@ -259,7 +224,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	n := f32(1000)
 	f := f32(-1000)
 
-	uniform := Shader_Uniform{
+	uniform := Shader_Uniforms{
 		proj_mtx = linalg.matrix_ortho3d(l, r, b, t, n, f),
 	}
 
