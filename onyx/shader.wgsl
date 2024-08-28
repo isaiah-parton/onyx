@@ -1,24 +1,27 @@
 struct Uniforms {
     projectionMatrix: mat4x4f,
 }
+struct VertexInput {
+    @location(0) pos: vec2<f32>,
+    @location(1) uv: vec2<f32>,
+    @location(2) col: vec4<f32>,
+}; 
 struct VertexOutput {
-    @builtin(position) pos: vec4f,
-    @location(0) uv: vec2f,
-    @location(1) col: vec4f,
+    @builtin(position) pos: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+    @location(1) col: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var draw_call_sampler: sampler;
-@group(0) @binding(2) var draw_call_texture: texture_2d<f32>;
+@group(1) @binding(0) var draw_call_sampler: sampler;
+@group(1) @binding(1) var draw_call_texture: texture_2d<f32>;
 
 @vertex
-fn vs_main(@location(0) in_pos: vec2f,
-           @location(1) in_uv: vec2f,
-           @location(2) in_col: vec4f) -> VertexOutput {
+fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.pos = uniforms.projectionMatrix * vec4f(in_pos.xy, 0.0, 1.0);
-    out.uv = in_uv;
-    out.col = in_col;
+    out.pos = uniforms.projectionMatrix * vec4f(in.pos.xy, 0.0, 1.0);
+    out.uv = in.uv;
+    out.col = in.col;
     return out;
 }
 

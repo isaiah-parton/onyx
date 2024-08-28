@@ -37,12 +37,17 @@ Graphics :: struct {
 
 init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 
-	gfx.instance = wgpu.CreateInstance()
+	gfx.instance = wgpu.CreateInstance(&{
+		nextInChain = &wgpu.InstanceExtras{
+			sType = .InstanceExtras,
+			backends = {.GL},
+			flags = {.Debug},
+		}
+	})
 	gfx.surface = glfwglue.GetSurface(gfx.instance, window)
 
 	// adapters := wgpu.InstanceEnumerateAdapters(gfx.instance)
 	// defer delete(adapters)
-	// fmt.println("Enumerated adapters")
 
 	gfx.waiting = true
 	wgpu.InstanceRequestAdapter(gfx.instance, &{ compatibleSurface = gfx.surface }, on_adapter, gfx)
@@ -55,6 +60,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 			return
 		}
 
+		fmt.println(wgpu.AdapterGetProperties(adapter))
 		gfx.adapter = adapter
 		wgpu.AdapterRequestDevice(adapter, &{}, on_device, gfx)
 	}
@@ -97,7 +103,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 				visibility = {.Vertex},
 			}
 		})
-		fmt.println("Created uniform_bind_group_layout")
 		gfx.texture_bind_group_layout = wgpu.DeviceCreateBindGroupLayout(gfx.device, &{
 			label = "TextureBindGroupLayout",
 			entryCount = 2,
@@ -119,7 +124,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 				},
 			}
 		})
-		fmt.println("Created texture_bind_group_layout")
 
 		// Create bind group
 		// 	Requires: uniform_buffer
@@ -132,7 +136,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 				size = size_of(Shader_Uniforms),
 			}
 		})
-		fmt.println("Created uniform_bind_group")
 
 		// Create pipeline layout
 		pipeline_layout := wgpu.DeviceCreatePipelineLayout(gfx.device, &{
@@ -140,15 +143,36 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 			bindGroupLayoutCount = 2,
 			bindGroupLayouts = transmute([^]wgpu.BindGroupLayout)&[?]wgpu.BindGroupLayout{uniform_bind_group_layout, gfx.texture_bind_group_layout}
 		})
-		fmt.println("Created pipeline_layout")
 
 		module := wgpu.DeviceCreateShaderModule(gfx.device, &wgpu.ShaderModuleDescriptor{
+			hintCount = 1,
+			hints = &wgpu.ShaderModuleCompilationHint{
+				entryPoint = "vs_main",
+				layout = pipeline_layout,
+			},
 			nextInChain = &wgpu.ShaderModuleWGSLDescriptor{
 				sType = .ShaderModuleWGSLDescriptor,
-				code = #load("shader.wgsl"),
+				code = #load("shader.wgsl", cstring),
 			},
 		})
-		fmt.println("Created module")
+
+		vertex_attributes := [?]wgpu.VertexAttribute{
+			{
+				format = .Float32x2,
+				offset = u64(offset_of(Vertex, pos)),
+				shaderLocation = 0,
+			},
+			{
+				format = .Float32x2,
+				offset = u64(offset_of(Vertex, uv)),
+				shaderLocation = 1,
+			},
+			{
+				format = .Unorm8x4,
+				offset = u64(offset_of(Vertex, col)),
+				shaderLocation = 2,
+			},
+		}
 
 		gfx.pipeline = wgpu.DeviceCreateRenderPipeline(gfx.device, &{
 			label = "RenderPipeline",
@@ -158,27 +182,11 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 				buffers = &wgpu.VertexBufferLayout{
 					arrayStride = size_of(Vertex),
 					stepMode = .Vertex,
-					attributeCount = 3,
-					attributes = transmute([^]wgpu.VertexAttribute)&[?]wgpu.VertexAttribute{
-						{
-							format = .Float32x2,
-							offset = u64(offset_of(Vertex, pos)),
-							shaderLocation = 0,
-						},
-						{
-							format = .Float32x2,
-							offset = u64(offset_of(Vertex, uv)),
-							shaderLocation = 1,
-						},
-						{
-							format = .Unorm8x4,
-							offset = u64(offset_of(Vertex, col)),
-							shaderLocation = 2,
-						},
-					},
+					attributeCount = len(vertex_attributes),
+					attributes = &vertex_attributes[0]
 				},
 			},
-			fragment = &wgpu.FragmentState{
+			fragment = &{
 				module = module,
 				entryPoint = "fs_main",
 				targets = &wgpu.ColorTargetState{
@@ -203,7 +211,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 				cullMode = .Back,
 			},
 			multisample = {
-				count = 4,
+				count = 1,
 				mask = 0xffffff00,
 			},
 		})
