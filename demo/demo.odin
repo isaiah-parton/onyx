@@ -10,8 +10,7 @@ import "core:strings"
 import "core:time"
 
 import "extra:onyx/onyx"
-import sapp "extra:sokol-odin/sokol/app"
-import sg "extra:sokol-odin/sokol/gfx"
+import "vendor:glfw"
 
 Option :: enum {
 	Process,
@@ -177,7 +176,6 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	case .Graph:
 		set_side(.Left)
 		set_width_percent(50)
-		set_height(100)
 		if do_layout({}) {
 			shrink(30)
 			set_width_fill()
@@ -223,17 +221,17 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					label_tooltip = true,
 					fields = {{"Minecraft", {255, 25, 96, 255}}, {"Terraria", {0, 58, 255, 255}}},
 					entries = {
-						{label = "Jan 5th", values = {1, 5, 9}},
-						{label = "Jan 6th", values = {4, 2, 2}},
-						{label = "Jan 7th", values = {6, 5, 10}},
-						{label = "Jan 8th", values = {2, 6, 1}},
-						{label = "Jan 9th", values = {4, 7, 2}},
-						{label = "Jan 10th", values = {2, 4, 8}},
-						{label = "Jan 11th", values = {8, 5, 8}},
-						{label = "Jan 12th", values = {18, 6, 8}},
-						{label = "Jan 13th", values = {15, 7, 8}},
-						{label = "Jan 14th", values = {14, 8, 8}},
-						{label = "Jan 15th", values = {11, 6, 8}},
+						{label = "Jan 5th", values = {1, 5}},
+						{label = "Jan 6th", values = {4, 2}},
+						{label = "Jan 7th", values = {6, 5,}},
+						{label = "Jan 8th", values = {2, 6}},
+						{label = "Jan 9th", values = {4, 7}},
+						{label = "Jan 10th", values = {2, 4}},
+						{label = "Jan 11th", values = {8, 5}},
+						{label = "Jan 12th", values = {18, 6}},
+						{label = "Jan 13th", values = {15, 7}},
+						{label = "Jan 14th", values = {14, 8}},
+						{label = "Jan 15th", values = {11, 6}},
 					},
 				},
 			)
@@ -273,69 +271,13 @@ main :: proc() {
 
 	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
 
-	sapp.run(
-		sapp.Desc {
-			user_data = &state,
-			init_userdata_cb = proc "c" (userdata: rawptr) {
-				context = runtime.default_context()
-				context.allocator = allocator
-				state := transmute(^State)userdata
+	onyx.init(1000, 800, "demo")
 
-				onyx.init()
-				onyx.set_style_font(.Medium, "fonts/Geist-Medium.ttf")
-				onyx.set_style_font(.Bold, "fonts/Geist-Bold.ttf")
-				onyx.set_style_font(.Light, "fonts/Geist-Light.ttf")
-				onyx.set_style_font(.Regular, "fonts/Geist-Regular.ttf")
-				onyx.set_style_font(.Icon, "fonts/remixicon.ttf")
+	for !glfw.WindowShouldClose(onyx.core.window) {
+		onyx.begin_frame()
+		do_component_showcase(&state.component_showcase)
+		onyx.end_frame()
+	}
 
-				// for i in 0 ..< 4 {
-				// 	state.images[i] =
-				// 		onyx.load_image_from_file(fmt.aprintf("%i.png", i + 1)) or_else panic(
-				// 			"failed lol",
-				// 		)
-				// }
-			},
-			frame_userdata_cb = proc "c" (userdata: rawptr) {
-				context = runtime.default_context()
-				context.allocator = allocator
-				state := transmute(^State)userdata
-
-				using onyx
-
-				begin_frame()
-				do_component_showcase(&state.component_showcase)
-				end_frame()
-			},
-			cleanup_cb = proc "c" () {
-				context = runtime.default_context()
-				context.allocator = allocator
-
-				onyx.uninit()
-			},
-			event_cb = proc "c" (e: ^sapp.Event) {
-				context = runtime.default_context()
-				context.allocator = allocator
-
-				onyx.handle_event(e)
-			},
-			enable_clipboard = true,
-			enable_dragndrop = true,
-			sample_count = 4,
-			width = 1800,
-			height = 960,
-			// fullscreen = true,
-			window_title = "o n y x",
-			// icon = sapp.Icon_Desc{
-			// 	images = {
-			// 		0 = {
-			// 			width = 2,
-			// 			height = 2,
-			// 			pixels = {
-
-			// 			},
-			// 		},
-			// 	},
-			// },
-		},
-	)
+	onyx.uninit()
 }

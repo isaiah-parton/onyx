@@ -12,8 +12,6 @@ import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
 
-import sapp "extra:sokol-odin/sokol/app"
-
 import ttf "vendor:stb/truetype"
 
 FMT_BUFFER_COUNT :: 128
@@ -513,6 +511,7 @@ get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (glyph: Gly
 				int(image_width),
 				int(image_height),
 				&core.font_atlas,
+				&core.gfx,
 			),
 			offset  = {f32(glyph_offset_x), f32(glyph_offset_y) + size.ascent},
 			advance = f32((f32(advance) - f32(left_side_bearing)) * size.scale),

@@ -202,7 +202,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 			}
 
 			if .Hovered in widget.state {
-				core.cursor_type = .RESIZE_NS if int(side) > 1 else .RESIZE_EW
+				core.cursor_type = .Resize_NS if int(side) > 1 else .Resize_EW
 			}
 
 			end_widget()

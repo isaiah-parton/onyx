@@ -50,7 +50,7 @@ add_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Resu
 				if was_clicked(result) {
 					result.index = o
 				}
-				core.cursor_type = .POINTING_HAND
+				core.cursor_type = .Pointing_Hand
 			}
 		}
 		if widget.visible {

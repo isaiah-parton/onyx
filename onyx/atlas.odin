@@ -8,17 +8,18 @@ import "core:math/linalg"
 import "core:mem"
 import "core:slice"
 
-import sg "extra:sokol-odin/sokol/gfx"
+import "vendor:wgpu"
 
 Atlas :: struct {
 	image:          img.Image,
 	texture:        Texture,
+	width, height: 	int,
 	offset:         [2]f32,
 	row_height:     f32,
 	full, modified: bool,
 }
 
-init_atlas :: proc(atlas: ^Atlas, width, height: int) {
+init_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics, width, height: int) {
 	pixels := make([]u8, width * height * 4)
 	defer delete(pixels)
 
@@ -28,51 +29,46 @@ init_atlas :: proc(atlas: ^Atlas, width, height: int) {
 	pixels[3] = 255
 	atlas.offset = {1, 1}
 
-	image_desc := sg.Image_Desc {
-		width = i32(width),
-		height = i32(height),
-		usage = .DYNAMIC,
-		pixel_format = .RGBA8,
-	}
-
-		image_desc.data = {subimage = {0 = {0 = {ptr = raw_data(pixels), size = u64(len(pixels))}}}}
-
 	atlas.texture = {
-		image  = sg.make_image(image_desc),
-		width  = width,
+		width = width,
 		height = height,
+		internal = wgpu.DeviceCreateTexture(gfx.device, &{
+
+		})
 	}
 	bytes.buffer_init(&atlas.image.pixels, pixels)
 }
 
 destroy_atlas :: proc(atlas: ^Atlas) {
 	bytes.buffer_destroy(&atlas.image.pixels)
-	sg.destroy_image(atlas.texture)
+	wgpu.TextureDestroy(atlas.texture.internal)
 }
 
-update_atlas :: proc(atlas: ^Atlas) {
-	sg.update_image(
-		atlas.texture,
-		{
-			subimage = {
-				0 = {
-					0 = {
-						ptr = raw_data(atlas.image.pixels.buf),
-						size = u64(len(atlas.image.pixels.buf)),
-					},
-				},
-			},
+update_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics) {
+	wgpu.QueueWriteTexture(
+		gfx.queue, 
+		&{
+			texture = atlas.texture.internal
+		}, 
+		raw_data(atlas.image.pixels.buf),
+		len(atlas.image.pixels.buf),
+		&{
+			bytesPerRow = u32(atlas.width) * 4
 		},
-	)
+		&{
+			width = u32(atlas.width),
+			height = u32(atlas.height),
+		})
+	
 }
 
-add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas) -> Box {
-	box := get_next_atlas_box(atlas, {f32(width), f32(height)})
+add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas, gfx: ^Graphics) -> Box {
+	box := get_next_atlas_box(atlas, gfx, {f32(width), f32(height)})
 
 	pixel_size: int = 4
 
 	for y in 0 ..< height {
-		target_row_offset := (y + int(box.lo.y)) * atlas.texture.width * pixel_size
+		target_row_offset := (y + int(box.lo.y)) * atlas.width * pixel_size
 		source_row_offset := y * width
 		for x in 0 ..< width {
 			target_offset := target_row_offset + (x + int(box.lo.x)) * pixel_size
@@ -86,11 +82,11 @@ add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas) -> Bo
 	return box
 }
 
-add_image_to_atlas :: proc(image: img.Image, atlas: ^Atlas) -> Box {
-	box := get_next_atlas_box(atlas, {f32(image.width), f32(image.height)})
+add_image_to_atlas :: proc(image: img.Image, atlas: ^Atlas, gfx: ^Graphics) -> Box {
+	box := get_next_atlas_box(atlas, gfx, {f32(image.width), f32(image.height)})
 	pixel_size := 4
 	for y in 0 ..< image.height {
-		target_row_offset := (y + int(box.lo.y)) * atlas.texture.width * pixel_size
+		target_row_offset := (y + int(box.lo.y)) * atlas.width * pixel_size
 		source_row_offset := y * image.width
 		for x in 0 ..< image.width {
 			target_offset := target_row_offset + (x + int(box.lo.x)) * pixel_size
@@ -104,26 +100,26 @@ add_image_to_atlas :: proc(image: img.Image, atlas: ^Atlas) -> Box {
 	return box
 }
 
-reset_atlas :: proc(atlas: ^Atlas) -> bool {
-	width, height := atlas.texture.width, atlas.texture.height
+reset_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics) -> bool {
+	width, height := atlas.width, atlas.height
 	destroy_atlas(atlas)
-	init_atlas(atlas, width, height)
+	init_atlas(atlas, gfx, width, height)
 	atlas.full = false
 
 	return true
 }
 
-get_next_atlas_box :: proc(atlas: ^Atlas, size: [2]f32) -> (box: Box) {
+get_next_atlas_box :: proc(atlas: ^Atlas, gfx: ^Graphics, size: [2]f32) -> (box: Box) {
 
-	if atlas.offset.x + size.x > f32(atlas.texture.width) {
+	if atlas.offset.x + size.x > f32(atlas.width) {
 		atlas.offset.x = 0
 		atlas.offset.y += atlas.row_height + 1
 		atlas.row_height = 0
 	}
 
-	if atlas.offset.y + size.y > f32(atlas.texture.height) {
+	if atlas.offset.y + size.y > f32(atlas.height) {
 		atlas.full = true
-		reset_atlas(atlas)
+		reset_atlas(atlas, gfx)
 	}
 
 	box = {atlas.offset, atlas.offset + size}

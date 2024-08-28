@@ -5,7 +5,7 @@ import "core:math"
 import "core:math/linalg"
 import "core:mem"
 
-import sg "extra:sokol-odin/sokol/gfx"
+import "vendor:wgpu"
 
 // ANGLE_TOLERANCE :: 0.1
 MAX_PATH_POINTS :: 400
@@ -61,7 +61,6 @@ Vertex_State :: struct {
 Matrix :: matrix[4, 4]f32
 
 Draw_List :: struct {
-	bindings: sg.Bindings,
 	vertices: [dynamic]Vertex,
 	indices:  [dynamic]u32,
 }
@@ -70,7 +69,7 @@ Draw_List :: struct {
 Draw_Call :: struct {
 	gradient:                Gradient,
 	clip_box:                Box,
-	texture:                 sg.Image,
+	texture:                 wgpu.Texture,
 	elem_offset, elem_count: int,
 	index:                   int,
 }
@@ -82,28 +81,11 @@ Path :: struct {
 }
 
 init_draw_list :: proc(draw_list: ^Draw_List) {
-	draw_list.bindings.index_buffer = sg.make_buffer(
-		sg.Buffer_Desc{type = .INDEXBUFFER, usage = .STREAM, size = BUFFER_SIZE},
-	)
-	draw_list.bindings.vertex_buffers[0] = sg.make_buffer(
-		sg.Buffer_Desc{type = .VERTEXBUFFER, usage = .STREAM, size = BUFFER_SIZE},
-	)
-	draw_list.bindings.fs.samplers[0] = sg.make_sampler(
-		sg.Sampler_Desc {
-			min_filter = .LINEAR,
-			mag_filter = .LINEAR,
-			wrap_u = .MIRRORED_REPEAT,
-			wrap_v = .MIRRORED_REPEAT,
-		},
-	)
 	reserve(&draw_list.vertices, MAX_VERTICES)
 	reserve(&draw_list.indices, MAX_INDICES)
 }
 
 destroy_draw_list :: proc(draw_list: ^Draw_List) {
-	sg.destroy_buffer(draw_list.bindings.index_buffer)
-	sg.destroy_buffer(draw_list.bindings.vertex_buffers[0])
-	sg.destroy_sampler(draw_list.bindings.fs.samplers[0])
 	delete(draw_list.vertices)
 	delete(draw_list.indices)
 }

@@ -6,10 +6,7 @@ import "core:os"
 
 import img "core:image"
 import png "core:image/png"
-
-import sg "extra:sokol-odin/sokol/gfx"
-
-Pixel_Format :: sg.Pixel_Format
+import "vendor:wgpu"
 
 Image :: struct {
 	using image: img.Image,
@@ -17,9 +14,8 @@ Image :: struct {
 }
 
 Texture :: struct {
-	using image: sg.Image,
-	width:       int,
-	height:      int,
+	internal: wgpu.Texture,
+	width, height: int,
 }
 
 upload_image :: proc(image: img.Image) -> (index: int, ok: bool) {
@@ -43,8 +39,8 @@ destroy_image :: proc(image: ^Image) {
 }
 
 draw_texture :: proc(texture: Texture, box: Box, tint: Color) {
-	prev_image := get_current_texture()
-	set_texture(texture)
+	last_texture := get_current_texture()
+	set_texture(texture.internal)
 
 	set_vertex_color(tint)
 
@@ -59,13 +55,13 @@ draw_texture :: proc(texture: Texture, box: Box, tint: Color) {
 
 	add_indices(tl, br, bl, tl, tr, br)
 
-	set_texture(prev_image)
+	set_texture(last_texture)
 
 }
 
 draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color) {
-	prev_image := get_current_texture()
-	set_texture(texture)
+	last_texture := get_current_texture()
+	set_texture(texture.internal)
 
 	set_vertex_color(tint)
 
@@ -82,10 +78,10 @@ draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color)
 
 	add_indices(tl, br, bl, tl, tr, br)
 
-	set_texture(prev_image)
+	set_texture(last_texture)
 }
 
-set_texture :: proc(texture: sg.Image) {
+set_texture :: proc(texture: wgpu.Texture) {
 	core.current_texture = texture
 	if core.current_draw_call == nil do return
 	if core.current_draw_call.texture == core.current_texture do return
@@ -94,68 +90,35 @@ set_texture :: proc(texture: sg.Image) {
 	}
 }
 
-get_current_texture :: proc() -> sg.Image {
+get_current_texture :: proc() -> wgpu.Texture {
 	return core.current_texture
 }
 
-get_pixel_format :: proc(channels, depth: int) -> sg.Pixel_Format {
-	switch channels {
-	case 1:
-		switch depth {
-		case 8:
-			return .R8
-		case 16:
-			return .R16
-		case 32:
-			return .R32F
-		}
-	case 2:
-		switch depth {
-		case 8:
-			return .RG8
-		case 16:
-			return .RG16
-		case 32:
-			return .RG32F
-		}
-	case 4:
-		switch depth {
-		case 8:
-			return .RGBA8
-		case 16:
-			return .RGBA16
-		case 32:
-			return .RGBA32F
-		}
-	}
-	return .NONE
-}
+// load_texture_from_file :: proc(file: string) -> (result: Texture, err: png.Error) {
+// 	_image := png.load_from_file(file) or_return
+// 	img.alpha_add_if_missing(_image)
+// 	pixel_format := get_pixel_format(_image.channels, _image.depth)
+// 	result = Texture {
+// 		image = sg.make_image(
+// 			u32_Desc {
+// 				data = {
+// 					subimage = {
+// 						0 = {
+// 							0 = {
+// 								ptr = raw_data(_image.pixels.buf),
+// 								size = u64(len(_image.pixels.buf)),
+// 							},
+// 						},
+// 					},
+// 				},
+// 				width = i32(_image.width),
+// 				height = i32(_image.height),
+// 				pixel_format = pixel_format,
+// 			},
+// 		),
+// 		width  = _image.width,
+// 		height = _image.height,
+// 	}
 
-load_texture_from_file :: proc(file: string) -> (result: Texture, err: png.Error) {
-	_image := png.load_from_file(file) or_return
-	img.alpha_add_if_missing(_image)
-	pixel_format := get_pixel_format(_image.channels, _image.depth)
-	result = Texture {
-		image  = sg.make_image(
-			sg.Image_Desc {
-				data = {
-					subimage = {
-						0 = {
-							0 = {
-								ptr = raw_data(_image.pixels.buf),
-								size = u64(len(_image.pixels.buf)),
-							},
-						},
-					},
-				},
-				width = i32(_image.width),
-				height = i32(_image.height),
-				pixel_format = pixel_format,
-			},
-		),
-		width  = _image.width,
-		height = _image.height,
-	}
-
-	return
-}
+// 	return
+// }

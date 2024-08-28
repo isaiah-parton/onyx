@@ -3,7 +3,7 @@ package onyx
 button_behavior :: proc(widget: ^Widget) {
 	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
 	if .Hovered in widget.state {
-		core.cursor_type = .POINTING_HAND
+		core.cursor_type = .Pointing_Hand
 	}
 	if point_in_box(core.mouse_pos, widget.box) {
 		hover_widget(widget)

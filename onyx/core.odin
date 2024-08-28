@@ -1,11 +1,6 @@
 package onyx
 
-import sapp "extra:sokol-odin/sokol/app"
-import sdtx "extra:sokol-odin/sokol/debugtext"
-import sg "extra:sokol-odin/sokol/gfx"
-import sgl "extra:sokol-odin/sokol/gl"
-import sglue "extra:sokol-odin/sokol/glue"
-import slog "extra:sokol-odin/sokol/log"
+import "vendor:glfw"
 
 import "vendor:fontstash"
 
@@ -18,12 +13,13 @@ import "core:slice"
 import "core:strings"
 import "core:time"
 
+import "vendor:wgpu"
+
 MAX_IDS :: 10
 MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
 MAX_LAYOUTS :: 100
 MAX_PANELS :: 100
-
 
 Stack :: struct($T: typeid, $N: int) {
 	items:  [N]T,
@@ -57,20 +53,9 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 	stack.height = 0
 }
 
-Keyboard_Key :: sapp.Keycode
-
 // Private global core instance
 // @(private)
 core: Core
-
-// Input events should be localized to layers
-Mouse_Button :: enum {
-	Left,
-	Right,
-	Middle,
-}
-
-Mouse_Bits :: bit_set[Mouse_Button]
 
 Debug_State :: struct {
 	enabled, widgets, panels, layers: bool,
@@ -78,6 +63,8 @@ Debug_State :: struct {
 
 // The global core data
 Core :: struct {
+	window: glfw.WindowHandle,
+	window_title: string,
 	debug:                                                    Debug_State,
 	view:                                                     [2]f32,
 
@@ -115,12 +102,12 @@ Core :: struct {
 	last_hovered_layer, hovered_layer, next_hovered_layer:    Id,
 
 	// IO
-	cursor_type:                                              sapp.Mouse_Cursor,
+	cursor_type:                                              Mouse_Cursor,
 	mouse_button:                                             Mouse_Button,
 	last_mouse_pos, mouse_pos:                                [2]f32,
 	mouse_scroll:                                             [2]f32,
 	mouse_bits, last_mouse_bits:                              Mouse_Bits,
-	keys, last_keys:                                          [max(sapp.Keycode)]bool,
+	keys, last_keys:                                          #sparse[Keyboard_Key]bool,
 	runes:                                                    [dynamic]rune,
 	visible, focused:                                         bool,
 
@@ -144,20 +131,18 @@ Core :: struct {
 	draw_this_frame, draw_next_frame:                         bool,
 	vertex_state:                                             Vertex_State,
 	current_matrix:                                           ^Matrix,
-	current_texture:                                          sg.Image,
+	current_texture:                                          wgpu.Texture,
 	clip_stack:                                               Stack(Box, 100),
 	path_stack:                                               Stack(Path, 10),
 	matrix_stack:                                             Stack(Matrix, MAX_MATRICES),
 	frames:                                              int,
 	drawn_frames: int,
-
-	// Rendering
 	draw_list:                                                Draw_List,
 	draw_calls:                                               [MAX_DRAW_CALLS]Draw_Call,
 	draw_call_count:                                          int,
 	current_draw_call:                                        ^Draw_Call,
-	pipeline:                                                 sg.Pipeline,
-	limits:                                                   sg.Limits,
+
+	gfx: Graphics,
 
 	// Allocators
 	scratch_allocator:                                        mem.Scratch_Allocator,
@@ -179,59 +164,50 @@ view_height :: proc() -> f32 {
 	return core.view.y
 }
 
-init :: proc() {
+init :: proc(width, height: i32, title: cstring = nil) {
 
 	// Set view parameters
 	core.visible = true
 	core.focused = true
-	core.view = {sapp.widthf(), sapp.heightf()}
+	core.view = {f32(width), f32(height)}
 	core.last_frame_time = time.now()
 	core.draw_next_frame = true
 	core.start_time = time.now()
 
-	// Set up graphics environment
-	environment := sglue.environment()
-	sg.setup(sg.Desc{environment = environment, logger = {func = slog.func}})
+	glfw.Init()
+	glfw.WindowHint(glfw.DECORATED, true)
+	glfw.WindowHint(glfw.VISIBLE, true)
+	core.window = glfw.CreateWindow(width, height, title, nil, nil)
 
-	// Query hardware limitations
-	core.limits = sg.query_limits()
+	glfw.SetKeyCallback(core.window, proc "c" (_: glfw.WindowHandle, key, action, _, _: i32) {
+		switch action {
+		case glfw.PRESS:
+			core.keys[Keyboard_Key(key)] = true
+		case glfw.RELEASE:
+			core.keys[Keyboard_Key(key)] = false
+		case glfw.REPEAT:
+			core.keys[Keyboard_Key(key)] = true
+			core.last_keys[Keyboard_Key(key)] = false
+		}
+	})
+	glfw.SetCursorPosCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
+		core.mouse_pos = {f32(x), f32(y)}
+	})
+	glfw.SetMouseButtonCallback(core.window, proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
+		switch action {
+		case glfw.PRESS:
+			core.mouse_bits += {Mouse_Button(button)}
+		case glfw.RELEASE:
+			core.mouse_bits -= {Mouse_Button(button)}
+		}
+	})
 
-	// Prepare debug text context
-	sdtx.setup(sdtx.Desc{logger = {func = slog.func}, fonts = {0 = sdtx.font_cpc()}})
-
-	// Prepare the graphics pipeline
-	core.pipeline = sg.make_pipeline(
-		sg.Pipeline_Desc {
-			shader = sg.make_shader(ui_shader_desc(sg.query_backend())),
-			index_type = .UINT32,
-			layout = {
-				attrs = {
-					0 = {offset = i32(offset_of(Vertex, pos)), format = .FLOAT2},
-					1 = {offset = i32(offset_of(Vertex, uv)), format = .FLOAT2},
-					2 = {offset = i32(offset_of(Vertex, col)), format = .UBYTE4N},
-				},
-				buffers = {0 = {stride = size_of(Vertex)}},
-			},
-			colors = {
-				0 = {
-					pixel_format = sg.Pixel_Format.RGBA8,
-					write_mask = sg.Color_Mask.RGB,
-					blend = sg.Blend_State {
-						enabled = true,
-						src_factor_rgb = .SRC_ALPHA,
-						dst_factor_rgb = .ONE_MINUS_SRC_ALPHA,
-					},
-				},
-			},
-			label = "pipeline",
-			cull_mode = .BACK,
-		},
-	)
+	init_graphics(&core.gfx, core.window)
 
 	// Init font atlas
-	max_atlas_size := int(core.limits.max_image_size_2d)
+	max_atlas_size := 4096
 	atlas_size: int = min(max_atlas_size, MAX_ATLAS_SIZE)
-	init_atlas(&core.font_atlas, atlas_size, atlas_size)
+	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
 
 	init_draw_list(&core.draw_list)
 
@@ -241,13 +217,15 @@ init :: proc() {
 }
 
 begin_frame :: proc() {
+	glfw.PollEvents()
+	
 	// Timings
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
 	core.frames += 1
 
-	if key_pressed(.ESCAPE) {
+	if key_pressed(.Escape) {
 		core.focused_widget = 0
 	}
 
@@ -273,7 +251,7 @@ begin_frame :: proc() {
 	}
 
 	// Tab/shift-tab selection
-	if key_pressed(.TAB) {
+	if key_pressed(.Tab) {
 		widget_list: [dynamic]^Widget
 		defer delete(widget_list)
 
@@ -287,7 +265,7 @@ begin_frame :: proc() {
 			return i.box.lo.y < j.box.lo.y || i.box.lo.x < j.box.lo.x
 		}
 
-		if key_down(.LEFT_SHIFT) {
+		if key_down(.Left_Shift) {
 			slice.reverse_sort_by(widget_list[:], sort_proc)
 		} else {
 			slice.sort_by(widget_list[:], sort_proc)
@@ -306,7 +284,7 @@ begin_frame :: proc() {
 
 	// Push initial matrix
 	push_matrix()
-	set_texture(core.font_atlas.texture)
+	set_texture(core.font_atlas.texture.internal)
 }
 
 end_frame :: proc() {
@@ -317,8 +295,8 @@ end_frame :: proc() {
 	pop_matrix()
 
 	// Set and reset cursor
-	sapp.set_mouse_cursor(core.cursor_type)
-	core.cursor_type = sapp.Mouse_Cursor.DEFAULT
+	// sapp.set_mouse_cursor(core.cursor_type)
+	// core.cursor_type = sapp.Mouse_Cursor.DEFAULT
 
 	// Update layer ids
 	core.highest_layer_index = 0
@@ -389,113 +367,18 @@ end_frame :: proc() {
 
 	// Update the atlas if needed
 	if core.font_atlas.modified {
-		update_atlas(&core.font_atlas)
+		update_atlas(&core.font_atlas, &core.gfx)
 		core.font_atlas.modified = false
 	}
 
 	if core.draw_this_frame {
 		start_time := time.now()
 
-		// First things first ima upload all my data
-		sg.apply_bindings(core.draw_list.bindings)
-		sg.update_buffer(
-			core.draw_list.bindings.index_buffer,
-			{
-				ptr = raw_data(core.draw_list.indices),
-				size = u64(len(core.draw_list.indices) * size_of(u32)),
-			},
-		)
-		sg.update_buffer(
-			core.draw_list.bindings.vertex_buffers[0],
-			{
-				ptr = raw_data(core.draw_list.vertices),
-				size = u64(len(core.draw_list.vertices) * size_of(Vertex)),
-			},
-		)
-
-		// Normal render pass
-		sg.begin_pass(
-			{
-				action = sg.Pass_Action {
-					colors = {0 = {load_action = .CLEAR, clear_value = {0, 0, 0, 1}}},
-					depth = {load_action = .CLEAR},
-				},
-				swapchain = sglue.swapchain(),
-			},
-		)
-		sg.apply_pipeline(core.pipeline)
-
-		// Set view bounds
-		t := f32(0)
-		b := f32(core.view.y)
-		l := f32(0)
-		r := f32(core.view.x)
-		n := f32(1000)
-		f := f32(-1000)
-
-		// Thank you linalg!
-		projection_matrix := linalg.matrix_ortho3d(l, r, b, t, n, f)
-
-		// Apply projection matrix
-		sg.apply_uniforms(.VS, 0, {ptr = &projection_matrix, size = size_of(projection_matrix)})
-
-		// Sort draw calls by index
-		slice.sort_by(core.draw_calls[:core.draw_call_count], proc(i, j: Draw_Call) -> bool {
-			return i.index < j.index
-		})
-
-		// Render them
-		for &call in core.draw_calls[:core.draw_call_count] {
-			if call.elem_count == 0 {
-				continue
-			}
-
-			bindings := core.draw_list.bindings
-			bindings.fs.images[0] = call.texture
-			sg.apply_bindings(bindings)
-
-			// Apply scissor
-			sg.apply_scissor_rectf(
-				call.clip_box.lo.x,
-				call.clip_box.lo.y,
-				(call.clip_box.hi.x - call.clip_box.lo.x),
-				(call.clip_box.hi.y - call.clip_box.lo.y),
-				true,
-			)
-
-			// Draw elements
-			sg.draw(call.elem_offset, call.elem_count, 1)
-		}
-
-		sg.apply_scissor_rectf(0, 0, core.view.x, core.view.y, true)
-
-		// Display debug text
-		if core.debug.enabled {
-			if core.debug.enabled {
-				print_debug_text()
-			}
-			sdtx.draw()
-		}
-
-		// Done rendering
-		sg.end_pass()
-		sg.commit()
+		draw(&core.gfx, &core.draw_list, core.draw_calls[:])
 
 		core.drawn_frames += 1
 		core.draw_this_frame = false
 		core.render_duration = time.since(start_time)
-	} else {
-		// Normal render pass
-		sg.begin_pass(
-			{
-				action = sg.Pass_Action {
-					colors = {0 = {load_action = .LOAD, store_action = .STORE}},
-					depth = {load_action = .LOAD, store_action = .STORE},
-				},
-				swapchain = sglue.swapchain(),
-			},
-		)
-		sg.end_pass()
 	}
 
 	// Reset draw calls and draw list
@@ -558,62 +441,6 @@ uninit :: proc() {
 	delete(core.glyphs)
 	delete(core.lines)
 	delete(core.runes)
-
-	// Now uninit gpu stuff
-	sg.destroy_pipeline(core.pipeline)
-
-	// Shutdown subsystems
-	sdtx.shutdown()
-	sg.shutdown()
-}
-
-handle_event :: proc(e: ^sapp.Event) {
-	#partial switch e.type {
-
-	case .FOCUSED, .SUSPENDED:
-		core.focused = true
-
-	case .UNFOCUSED, .RESUMED:
-		core.focused = false
-
-	case .ICONIFIED:
-		core.visible = false
-
-	case .RESTORED:
-		core.visible = true
-
-	case .MOUSE_DOWN:
-		core.mouse_bits += {Mouse_Button(e.mouse_button)}
-		core.mouse_button = Mouse_Button(e.mouse_button)
-
-	case .MOUSE_UP:
-		core.mouse_bits -= {Mouse_Button(e.mouse_button)}
-
-	case .MOUSE_MOVE:
-		core.mouse_pos = {e.mouse_x, e.mouse_y}
-
-	case .MOUSE_SCROLL:
-		core.mouse_scroll = {e.scroll_x, e.scroll_y}
-
-	case .KEY_DOWN:
-		core.keys[e.key_code] = true
-		if e.key_repeat {
-			core.last_keys[e.key_code] = false
-		}
-
-	case .KEY_UP:
-		core.keys[e.key_code] = false
-
-	case .CHAR:
-		append(&core.runes, rune(e.char_code))
-
-	case .QUIT_REQUESTED:
-	// sapp.quit()
-
-	case .RESIZED:
-		core.view = {sapp.widthf(), sapp.heightf()}
-		core.draw_next_frame = true
-	}
 }
 
 key_down :: proc(key: Keyboard_Key) -> bool {
@@ -643,16 +470,12 @@ mouse_released :: proc(button: Mouse_Button) -> bool {
 set_clipboard_string :: proc(_: rawptr, str: string) -> bool {
 	cstr := strings.clone_to_cstring(str)
 	defer delete(cstr)
-	sapp.set_clipboard_string(cstr)
+	glfw.SetClipboardString(core.window, cstr)
 	return true
 }
 
 get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
-	cstr := sapp.get_clipboard_string()
-	if cstr == nil {
-		return
-	}
-	str = string(cstr)
-	ok = true
+	str = glfw.GetClipboardString(core.window)
+	ok = len(str) > 0
 	return
 }

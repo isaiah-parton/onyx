@@ -57,7 +57,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	variant.icon_time = animate(variant.icon_time, 0.2, info.decal != .None)
 
 	if .Hovered in widget.state {
-		core.cursor_type = .IBEAM
+		core.cursor_type = .I_Beam
 	}
 
 	if point_in_box(core.mouse_pos, widget.box) {
@@ -66,8 +66,8 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 
 	if .Focused in widget.state {
 		cmd: Command
-		control_down := key_down(.LEFT_CONTROL) || key_down(.RIGHT_CONTROL)
-		shift_down := key_down(.LEFT_SHIFT) || key_down(.RIGHT_SHIFT)
+		control_down := key_down(.Left_Control) || key_down(.Right_Control)
+		shift_down := key_down(.Left_Shift) || key_down(.Right_Shift)
 		if control_down {
 			if key_pressed(.A) do cmd = .Select_All
 			if key_pressed(.C) do cmd = .Copy
@@ -83,9 +83,9 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			}
 			input_runes(e, core.runes[:])
 		}
-		if key_pressed(.BACKSPACE) do cmd = .Delete_Word_Left if control_down else .Backspace
-		if key_pressed(.DELETE) do cmd = .Delete_Word_Right if control_down else .Delete
-		if key_pressed(.ENTER) {
+		if key_pressed(.Backspace) do cmd = .Delete_Word_Left if control_down else .Backspace
+		if key_pressed(.Delete) do cmd = .Delete_Word_Right if control_down else .Delete
+		if key_pressed(.Enter) {
 			cmd = .New_Line
 			if info.multiline {
 				if control_down {
@@ -95,26 +95,26 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 				result.submitted = true
 			}
 		}
-		if key_pressed(.LEFT) {
+		if key_pressed(.Left) {
 			if shift_down do cmd = .Select_Word_Left if control_down else .Select_Left
 			else do cmd = .Word_Left if control_down else .Left
 		}
-		if key_pressed(.RIGHT) {
+		if key_pressed(.Right) {
 			if shift_down do cmd = .Select_Word_Right if control_down else .Select_Right
 			else do cmd = .Word_Right if control_down else .Right
 		}
-		if key_pressed(.UP) {
+		if key_pressed(.Up) {
 			if shift_down do cmd = .Select_Up
 			else do cmd = .Up
 		}
-		if key_pressed(.DOWN) {
+		if key_pressed(.Down) {
 			if shift_down do cmd = .Select_Down
 			else do cmd = .Down
 		}
-		if key_pressed(.HOME) {
+		if key_pressed(.Home) {
 			cmd = .Select_Line_Start if control_down else .Line_Start
 		}
-		if key_pressed(.END) {
+		if key_pressed(.End) {
 			cmd = .Select_Line_End if control_down else .Line_End
 		}
 		if !info.multiline && (cmd in MULTILINE_COMMANDS) {
