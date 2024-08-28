@@ -1,13 +1,13 @@
 struct Uniforms {
-    projectionMatrix: mat4x4f,
+    projection_matrix: mat4x4f,
 }
 struct VertexInput {
-    @location(0) pos: vec2<f32>,
+    @location(0) position: vec2<f32>,
     @location(1) uv: vec2<f32>,
     @location(2) col: vec4<f32>,
 }; 
 struct VertexOutput {
-    @builtin(position) pos: vec4<f32>,
+    @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) col: vec4<f32>,
 };
@@ -17,11 +17,13 @@ struct VertexOutput {
 @group(1) @binding(1) var draw_call_texture: texture_2d<f32>;
 
 @vertex
-fn vs_main(in: VertexInput) -> VertexOutput {
+fn vs_main(
+    model: VertexInput
+) -> VertexOutput {
     var out: VertexOutput;
-    out.pos = uniforms.projectionMatrix * vec4f(in.pos.xy, 0.0, 1.0);
-    out.uv = in.uv;
-    out.col = in.col;
+    out.clip_position = vec4<f32>(model.position, 0.0, 1.0);
+    out.uv = model.uv;
+    out.col = model.col;
     return out;
 }
 

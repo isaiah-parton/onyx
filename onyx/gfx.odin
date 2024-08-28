@@ -18,6 +18,8 @@ Shader_Uniforms :: struct {
 }
 
 Graphics :: struct {
+	width, height: u32,
+
 	instance: wgpu.Instance,
 	adapter: wgpu.Adapter,
 	pipeline: wgpu.RenderPipeline,
@@ -36,6 +38,9 @@ Graphics :: struct {
 }
 
 init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
+
+	width, height := glfw.GetWindowSize(window)
+	gfx.width, gfx.height = u32(width), u32(height)
 
 	gfx.instance = wgpu.CreateInstance(&{
 		nextInChain = &wgpu.InstanceExtras{
@@ -74,6 +79,17 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 		}
 
 		gfx.device = device
+
+		// surface_capabilities := wgpu.SurfaceGetCapabilities(gfx.surface, gfx.adapter)
+		// wgpu.SurfaceConfigure(gfx.surface, &{
+		// 	usage = {.RenderAttachment},
+		// 	width = gfx.width,
+		// 	height = gfx.height,
+		// 	device = gfx.device,
+		// 	format = surface_capabilities.formats[0],
+		// 	presentMode = surface_capabilities.presentModes[0],
+		// 	alphaMode = surface_capabilities.alphaModes[0],
+		// })
 
 		// Create buffers
 		gfx.uniform_buffer = wgpu.DeviceCreateBuffer(gfx.device, &{
@@ -145,11 +161,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 		})
 
 		module := wgpu.DeviceCreateShaderModule(gfx.device, &wgpu.ShaderModuleDescriptor{
-			hintCount = 1,
-			hints = &wgpu.ShaderModuleCompilationHint{
-				entryPoint = "vs_main",
-				layout = pipeline_layout,
-			},
 			nextInChain = &wgpu.ShaderModuleWGSLDescriptor{
 				sType = .ShaderModuleWGSLDescriptor,
 				code = #load("shader.wgsl", cstring),
@@ -190,7 +201,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 				module = module,
 				entryPoint = "fs_main",
 				targets = &wgpu.ColorTargetState{
-					format = .RGBA8Uint,
+					format = .RGBA8Unorm,
 					writeMask = wgpu.ColorWriteMaskFlags_All,
 					blend = &{
 						color = {
@@ -206,7 +217,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 					}
 				}
 			},
-			primitive = {
+			primitive = wgpu.PrimitiveState{
 				topology = .TriangleList,
 				cullMode = .Back,
 			},
@@ -255,6 +266,9 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 				}
 			}
 		})
+	wgpu.RenderPassEncoderSetPipeline(pass, gfx.pipeline)
+	wgpu.RenderPassEncoderSetVertexBuffer(pass, 0, gfx.vertex_buffer, 0, u64(len(draw_list.vertices) * size_of(Vertex)))
+	wgpu.RenderPassEncoderSetIndexBuffer(pass, gfx.index_buffer, .Uint32, 0, u64(len(draw_list.indices) * size_of(u32)))
 	// Render them
 	for &call in core.draw_calls[:core.draw_call_count] {
 		if call.elem_count == 0 {
@@ -271,6 +285,9 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			gfx.index_buffer, 
 			cast(u64)call.elem_offset)
 	}
+	wgpu.QueueSubmit(gfx.queue, {wgpu.CommandEncoderFinish(encoder)})
+	wgpu.SurfacePresent(gfx.surface)
+
 	wgpu.RenderPassEncoderRelease(pass)
 	wgpu.CommandEncoderRelease(encoder)
 }
