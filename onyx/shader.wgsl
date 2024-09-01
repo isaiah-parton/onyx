@@ -1,11 +1,6 @@
 struct Uniforms {
     projection_matrix: mat4x4f,
 }
-struct VertexInput {
-    @location(0) position: vec2<f32>,
-    @location(1) uv: vec2<f32>,
-    @location(2) col: vec4<f32>,
-}; 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) uv: vec2<f32>,
@@ -18,12 +13,14 @@ struct VertexOutput {
 
 @vertex
 fn vs_main(
-    model: VertexInput
+		@location(0) in_pos: vec2<f32>,
+		@location(1) in_uv: vec2<f32>,
+		@location(2) in_col: vec4<f32>,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.clip_position = vec4<f32>(model.position, 0.0, 1.0);
-    out.uv = model.uv;
-    out.col = model.col;
+    out.clip_position = vec4<f32>(in_pos, 0.0, 1.0);
+    out.uv = in_uv;
+    out.col = in_col;
     return out;
 }
 

@@ -71,7 +71,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if do_container({size = { 0, 2000 }}) {
+		if do_container({size = {0, 2000}}) {
 			set_width_fill()
 			set_height_auto()
 			for i in 0 ..< 50 {
@@ -223,7 +223,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					entries = {
 						{label = "Jan 5th", values = {1, 5}},
 						{label = "Jan 6th", values = {4, 2}},
-						{label = "Jan 7th", values = {6, 5,}},
+						{label = "Jan 7th", values = {6, 5}},
 						{label = "Jan 8th", values = {2, 6}},
 						{label = "Jan 9th", values = {4, 7}},
 						{label = "Jan 10th", values = {2, 4}},
@@ -272,6 +272,11 @@ main :: proc() {
 	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
 
 	onyx.init(1000, 800, "demo")
+	onyx.set_style_font(.Medium, "fonts/Geist-Medium.ttf")
+	onyx.set_style_font(.Bold, "fonts/Geist-Bold.ttf")
+	onyx.set_style_font(.Light, "fonts/Geist-Light.ttf")
+	onyx.set_style_font(.Regular, "fonts/Geist-Regular.ttf")
+	onyx.set_style_font(.Icon, "fonts/remixicon.ttf")
 
 	for !glfw.WindowShouldClose(onyx.core.window) {
 		onyx.begin_frame()

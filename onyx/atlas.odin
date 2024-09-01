@@ -13,16 +13,17 @@ import "vendor:wgpu"
 Atlas :: struct {
 	image:          img.Image,
 	texture:        Texture,
-	width, height: 	int,
+	width, height:  int,
 	offset:         [2]f32,
 	row_height:     f32,
 	full, modified: bool,
 }
 
 init_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics, width, height: int) {
+	atlas.width, atlas.height = width, height
 	pixels := make([]u8, width * height * 4)
 	defer delete(pixels)
-
+	assert(len(pixels) > 0)
 	pixels[0] = 255
 	pixels[1] = 255
 	pixels[2] = 255
@@ -30,11 +31,19 @@ init_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics, width, height: int) {
 	atlas.offset = {1, 1}
 
 	atlas.texture = {
-		width = width,
-		height = height,
-		internal = wgpu.DeviceCreateTexture(gfx.device, &{
-
-		})
+		width    = width,
+		height   = height,
+		internal = wgpu.DeviceCreateTexture(
+			gfx.device,
+			&{
+				usage = {.CopySrc, .TextureBinding},
+				dimension = ._2D,
+				size = {u32(width), u32(height), 1},
+				format = .RGBA32Float,
+				mipLevelCount = 1,
+				sampleCount = 1,
+			},
+		),
 	}
 	bytes.buffer_init(&atlas.image.pixels, pixels)
 }
@@ -46,20 +55,13 @@ destroy_atlas :: proc(atlas: ^Atlas) {
 
 update_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics) {
 	wgpu.QueueWriteTexture(
-		gfx.queue, 
-		&{
-			texture = atlas.texture.internal
-		}, 
+		gfx.queue,
+		&{texture = atlas.texture.internal},
 		raw_data(atlas.image.pixels.buf),
 		len(atlas.image.pixels.buf),
-		&{
-			bytesPerRow = u32(atlas.width) * 4
-		},
-		&{
-			width = u32(atlas.width),
-			height = u32(atlas.height),
-		})
-	
+		&{bytesPerRow = u32(atlas.width) * 4, rowsPerImage = u32(atlas.height)},
+		&{width = u32(atlas.width), height = u32(atlas.height)},
+	)
 }
 
 add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas, gfx: ^Graphics) -> Box {
