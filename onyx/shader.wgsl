@@ -18,7 +18,7 @@ fn vs_main(
 		@location(2) in_col: vec4<f32>,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.clip_position = vec4<f32>(in_pos, 0.0, 1.0);
+    out.clip_position = uniforms.projection_matrix * vec4<f32>(in_pos, 0.0, 1.0);
     out.uv = in_uv;
     out.col = in_col;
     return out;

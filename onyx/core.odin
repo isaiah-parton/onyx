@@ -63,8 +63,8 @@ Debug_State :: struct {
 
 // The global core data
 Core :: struct {
-	window: glfw.WindowHandle,
-	window_title: string,
+	window:                                                   glfw.WindowHandle,
+	window_title:                                             string,
 	debug:                                                    Debug_State,
 	view:                                                     [2]f32,
 
@@ -79,7 +79,7 @@ Core :: struct {
 	last_focused_widget, focused_widget, dragged_widget:      Id,
 	disable_widgets:                                          bool,
 	drag_offset:                                              [2]f32,
-	
+
 	// Layout
 	layout_stack:                                             Stack(Layout, MAX_LAYOUTS),
 
@@ -135,14 +135,13 @@ Core :: struct {
 	clip_stack:                                               Stack(Box, 100),
 	path_stack:                                               Stack(Path, 10),
 	matrix_stack:                                             Stack(Matrix, MAX_MATRICES),
-	frames:                                              int,
-	drawn_frames: int,
+	frames:                                                   int,
+	drawn_frames:                                             int,
 	draw_list:                                                Draw_List,
 	draw_calls:                                               [MAX_DRAW_CALLS]Draw_Call,
 	draw_call_count:                                          int,
 	current_draw_call:                                        ^Draw_Call,
-
-	gfx: Graphics,
+	gfx:                                                      Graphics,
 
 	// Allocators
 	scratch_allocator:                                        mem.Scratch_Allocator,
@@ -193,14 +192,17 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	glfw.SetCursorPosCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
 		core.mouse_pos = {f32(x), f32(y)}
 	})
-	glfw.SetMouseButtonCallback(core.window, proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
-		switch action {
-		case glfw.PRESS:
-			core.mouse_bits += {Mouse_Button(button)}
-		case glfw.RELEASE:
-			core.mouse_bits -= {Mouse_Button(button)}
-		}
-	})
+	glfw.SetMouseButtonCallback(
+		core.window,
+		proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
+			switch action {
+			case glfw.PRESS:
+				core.mouse_bits += {Mouse_Button(button)}
+			case glfw.RELEASE:
+				core.mouse_bits -= {Mouse_Button(button)}
+			}
+		},
+	)
 
 	init_graphics(&core.gfx, core.window)
 
@@ -218,7 +220,7 @@ init :: proc(width, height: i32, title: cstring = nil) {
 
 begin_frame :: proc() {
 	glfw.PollEvents()
-	
+
 	// Timings
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
@@ -375,6 +377,7 @@ end_frame :: proc() {
 		start_time := time.now()
 
 		draw(&core.gfx, &core.draw_list, core.draw_calls[:])
+		glfw.SwapBuffers(core.window)
 
 		core.drawn_frames += 1
 		core.draw_this_frame = false

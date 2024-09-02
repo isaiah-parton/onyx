@@ -33,6 +33,12 @@ Graphics :: struct {
 	surface_config:                              wgpu.SurfaceConfiguration,
 }
 
+resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
+	gfx.surface_config.width = u32(width)
+	gfx.surface_config.height = u32(height)
+	wgpu.SurfaceConfigure(gfx.surface, &gfx.surface_config)
+}
+
 init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 
 	width, height := glfw.GetWindowSize(window)
@@ -67,7 +73,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 		if status != .Success {
 			return
 		}
-		fmt.println(wgpu.AdapterGetInfo(adapter))
 		gfx.adapter = adapter
 		wgpu.AdapterRequestDevice(adapter, &{}, on_device, gfx)
 	}
@@ -265,8 +270,6 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		proj_mtx = linalg.matrix_ortho3d(l, r, b, t, n, f),
 	}
 
-	// Apply projection matrix
-	wgpu.QueueWriteBuffer(gfx.queue, gfx.uniform_buffer, 0, &uniform, size_of(uniform))
 
 	// Sort draw calls by index
 	slice.sort_by(core.draw_calls[:core.draw_call_count], proc(i, j: Draw_Call) -> bool {
@@ -303,7 +306,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 				view = frame,
 				loadOp = .Clear,
 				storeOp = .Store,
-				clearValue = {0, 0, 0, 1},
+				clearValue = {0, 0, 0, 0},
 			},
 		},
 	)
@@ -323,16 +326,19 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		u64(len(draw_list.indices) * size_of(u32)),
 	)
 	wgpu.RenderPassEncoderSetBindGroup(pass, 0, gfx.uniform_bind_group)
+	wgpu.RenderPassEncoderSetViewport(pass, 0, 0, core.view.x, core.view.y, 0, 0)
+
+	// Apply projection matrix
+	wgpu.QueueWriteBuffer(gfx.queue, gfx.uniform_buffer, 0, &uniform, size_of(uniform))
+
+
 	// Render them
 	for &call in core.draw_calls[:core.draw_call_count] {
 		if call.elem_count == 0 {
 			continue
 		}
 
-		texture_view := wgpu.TextureCreateView(
-			call.texture,
-			&{format = .RGBA32Float, mipLevelCount = 1, arrayLayerCount = 1},
-		)
+		texture_view := wgpu.TextureCreateView(call.texture)
 		defer wgpu.TextureViewRelease(texture_view)
 
 		sampler := wgpu.DeviceCreateSampler(
@@ -362,10 +368,13 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			u32(call.clip_box.hi.x - call.clip_box.lo.x),
 			u32(call.clip_box.hi.y - call.clip_box.lo.y),
 		)
-		wgpu.RenderPassEncoderDrawIndexedIndirect(
+		wgpu.RenderPassEncoderDrawIndexed(
 			pass,
-			gfx.index_buffer,
-			cast(u64)call.elem_offset,
+			u32(call.elem_count),
+			1,
+			u32(call.elem_offset),
+			0,
+			0,
 		)
 	}
 	wgpu.RenderPassEncoderEnd(pass)

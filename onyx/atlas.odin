@@ -36,16 +36,17 @@ init_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics, width, height: int) {
 		internal = wgpu.DeviceCreateTexture(
 			gfx.device,
 			&{
-				usage = {.CopySrc, .TextureBinding},
+				usage = {.CopySrc, .CopyDst, .TextureBinding},
 				dimension = ._2D,
 				size = {u32(width), u32(height), 1},
-				format = .RGBA32Float,
+				format = .RGBA8Unorm,
 				mipLevelCount = 1,
 				sampleCount = 1,
 			},
 		),
 	}
 	bytes.buffer_init(&atlas.image.pixels, pixels)
+
 }
 
 destroy_atlas :: proc(atlas: ^Atlas) {
@@ -60,7 +61,7 @@ update_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics) {
 		raw_data(atlas.image.pixels.buf),
 		len(atlas.image.pixels.buf),
 		&{bytesPerRow = u32(atlas.width) * 4, rowsPerImage = u32(atlas.height)},
-		&{width = u32(atlas.width), height = u32(atlas.height)},
+		&{width = u32(atlas.width), height = u32(atlas.height), depthOrArrayLayers = 1},
 	)
 }
 
