@@ -183,6 +183,9 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	glfw.WindowHint(glfw.VISIBLE, true)
 	core.window = glfw.CreateWindow(width, height, title, nil, nil)
 
+	glfw.SetScrollCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
+		core.mouse_scroll = {f32(x), f32(y)}
+	})
 	glfw.SetWindowSizeCallback(core.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
 		context = runtime.default_context()
 		core.draw_this_frame = true

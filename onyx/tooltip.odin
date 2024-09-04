@@ -56,7 +56,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		},
 		loc,
 	)
-	draw_rounded_box_fill(box, core.style.rounding, fade(core.style.color.background, 0.95))
+	draw_rounded_box_fill(box, core.style.rounding, fade(core.style.color.background, 0.8))
 
 	end_widget()
 	return true

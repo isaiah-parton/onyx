@@ -114,7 +114,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 			width       = gfx.width,
 			height      = gfx.height,
 			device      = gfx.device,
-			format      = surface_capabilities.formats[0],
+			format      = .BGRA8Unorm, //surface_capabilities.formats[0],
 			presentMode = surface_capabilities.presentModes[0],
 			alphaMode   = surface_capabilities.alphaModes[0],
 		}
@@ -374,7 +374,13 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 
 		sampler := wgpu.DeviceCreateSampler(
 			gfx.device,
-			&{magFilter = .Nearest, minFilter = .Linear, maxAnisotropy = 1},
+			&{
+				magFilter = .Linear,
+				minFilter = .Linear,
+				addressModeU = .ClampToEdge,
+				addressModeV = .ClampToEdge,
+				maxAnisotropy = 1,
+			},
 		)
 		defer wgpu.SamplerRelease(sampler)
 

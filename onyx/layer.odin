@@ -210,7 +210,13 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	translate_matrix(-info.origin.x, -info.origin.y, 0)
 
 	// Push layout
-	push_layout(Layout{box = layer.box, original_box = layer.box, next_side = .Top})
+	push_layout(
+		Layout {
+			box = {linalg.floor(layer.box.lo), linalg.floor(layer.box.hi)},
+			original_box = layer.box,
+			next_side = .Top,
+		},
+	)
 	return true
 }
 
