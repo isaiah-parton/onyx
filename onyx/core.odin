@@ -142,6 +142,7 @@ Core :: struct {
 	draw_call_count:                                          int,
 	current_draw_call:                                        ^Draw_Call,
 	gfx:                                                      Graphics,
+	cursors:                                                  #sparse[Mouse_Cursor]glfw.CursorHandle,
 
 	// Allocators
 	scratch_allocator:                                        mem.Scratch_Allocator,
@@ -174,10 +175,20 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.start_time = time.now()
 
 	glfw.Init()
+	core.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
+	core.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(glfw.POINTING_HAND_CURSOR)
+	core.cursors[.I_Beam] = glfw.CreateStandardCursor(glfw.IBEAM_CURSOR)
 	glfw.WindowHint(glfw.DECORATED, true)
+	glfw.WindowHint(glfw.TRANSPARENT_FRAMEBUFFER, false)
 	glfw.WindowHint(glfw.VISIBLE, true)
 	core.window = glfw.CreateWindow(width, height, title, nil, nil)
 
+	glfw.SetWindowSizeCallback(core.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
+		context = runtime.default_context()
+		core.draw_this_frame = true
+		core.view = {f32(width), f32(height)}
+		resize_graphics(&core.gfx, int(width), int(height))
+	})
 	glfw.SetKeyCallback(core.window, proc "c" (_: glfw.WindowHandle, key, action, _, _: i32) {
 		switch action {
 		case glfw.PRESS:
@@ -287,9 +298,13 @@ begin_frame :: proc() {
 	// Push initial matrix
 	push_matrix()
 	set_texture(core.font_atlas.texture.internal)
+
+	begin_layer({box = view_box(), sorting = .Below, kind = .Background})
+	foreground()
 }
 
 end_frame :: proc() {
+	end_layer()
 
 	assert(core.clip_stack.height == 0)
 
@@ -297,8 +312,9 @@ end_frame :: proc() {
 	pop_matrix()
 
 	// Set and reset cursor
+	glfw.SetCursor(core.window, core.cursors[core.cursor_type])
 	// sapp.set_mouse_cursor(core.cursor_type)
-	// core.cursor_type = sapp.Mouse_Cursor.DEFAULT
+	core.cursor_type = .Normal
 
 	// Update layer ids
 	core.highest_layer_index = 0
@@ -377,7 +393,6 @@ end_frame :: proc() {
 		start_time := time.now()
 
 		draw(&core.gfx, &core.draw_list, core.draw_calls[:])
-		glfw.SwapBuffers(core.window)
 
 		core.drawn_frames += 1
 		core.draw_this_frame = false

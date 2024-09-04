@@ -31,12 +31,28 @@ Graphics :: struct {
 	waiting:                                     bool,
 	uniform_buffer, vertex_buffer, index_buffer: wgpu.Buffer,
 	surface_config:                              wgpu.SurfaceConfiguration,
+	msaa_texture:                                wgpu.Texture,
 }
 
 resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
-	gfx.surface_config.width = u32(width)
-	gfx.surface_config.height = u32(height)
+	gfx.width = u32(width)
+	gfx.height = u32(height)
+	gfx.surface_config.width = gfx.width
+	gfx.surface_config.height = gfx.height
 	wgpu.SurfaceConfigure(gfx.surface, &gfx.surface_config)
+	wgpu.TextureDestroy(gfx.msaa_texture)
+	wgpu.TextureRelease(gfx.msaa_texture)
+	gfx.msaa_texture = wgpu.DeviceCreateTexture(
+		gfx.device,
+		&{
+			sampleCount = 4,
+			format = gfx.surface_config.format,
+			usage = {.RenderAttachment},
+			dimension = ._2D,
+			mipLevelCount = 1,
+			size = {gfx.width, gfx.height, 1},
+		},
+	)
 }
 
 init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
@@ -44,15 +60,15 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 	width, height := glfw.GetWindowSize(window)
 	gfx.width, gfx.height = u32(width), u32(height)
 
-	gfx.instance = wgpu.CreateInstance(
-		&{
-			nextInChain = &wgpu.InstanceExtras {
-				sType = .InstanceExtras,
-				backends = {.GL},
-				flags = {.Debug},
-			},
-		},
-	)
+	// &{
+	// 		nextInChain = &wgpu.InstanceExtras {
+	// 			sType = .InstanceExtras,
+	// 			backends = {.GL},
+	// 			flags = {.Debug},
+	// 		},
+	// 	},
+	// }
+	gfx.instance = wgpu.CreateInstance()
 	gfx.surface = glfwglue.GetSurface(gfx.instance, window)
 
 	// adapters := wgpu.InstanceEnumerateAdapters(gfx.instance)
@@ -103,6 +119,20 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 			alphaMode   = surface_capabilities.alphaModes[0],
 		}
 		wgpu.SurfaceConfigure(gfx.surface, &gfx.surface_config)
+
+
+		// Create MSAA Texture
+		gfx.msaa_texture = wgpu.DeviceCreateTexture(
+			gfx.device,
+			&{
+				sampleCount = 4,
+				format = gfx.surface_config.format,
+				usage = {.RenderAttachment},
+				dimension = ._2D,
+				mipLevelCount = 1,
+				size = {u32(gfx.width), u32(gfx.height), 1},
+			},
+		)
 
 		gfx.queue = wgpu.DeviceGetQueue(gfx.device)
 
@@ -218,23 +248,19 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 					targetCount = 1,
 					targets = &wgpu.ColorTargetState {
 						format = gfx.surface_config.format,
-						writeMask = wgpu.ColorWriteMaskFlags_All,
+						writeMask = {.Red, .Green, .Blue, .Alpha},
 						blend = &{
 							color = {
-								srcFactor = .One,
+								srcFactor = .SrcAlpha,
 								dstFactor = .OneMinusSrcAlpha,
 								operation = .Add,
 							},
-							alpha = {
-								srcFactor = .OneMinusDstAlpha,
-								dstFactor = .One,
-								operation = .Add,
-							},
+							alpha = {srcFactor = .One, dstFactor = .One, operation = .Add},
 						},
 					},
 				},
-				primitive = wgpu.PrimitiveState{topology = .TriangleList, cullMode = .Back},
-				multisample = {count = 1, mask = 0xffffff00},
+				primitive = {topology = .TriangleList},
+				multisample = {count = 4, mask = 0xffffffff},
 			},
 		)
 	}
@@ -295,15 +321,19 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	}
 	defer wgpu.TextureRelease(surface_texture.texture)
 
-	frame := wgpu.TextureCreateView(surface_texture.texture, nil)
-	defer wgpu.TextureViewRelease(frame)
+	msaa_view := wgpu.TextureCreateView(gfx.msaa_texture, nil)
+	defer wgpu.TextureViewRelease(msaa_view)
+
+	surface_view := wgpu.TextureCreateView(surface_texture.texture, nil)
+	defer wgpu.TextureViewRelease(surface_view)
 
 	pass := wgpu.CommandEncoderBeginRenderPass(
 		encoder,
 		&{
 			colorAttachmentCount = 1,
 			colorAttachments = &wgpu.RenderPassColorAttachment {
-				view = frame,
+				view = msaa_view,
+				resolveTarget = surface_view,
 				loadOp = .Clear,
 				storeOp = .Store,
 				clearValue = {0, 0, 0, 0},
@@ -331,10 +361,11 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	// Apply projection matrix
 	wgpu.QueueWriteBuffer(gfx.queue, gfx.uniform_buffer, 0, &uniform, size_of(uniform))
 
-
 	// Render them
 	for &call in core.draw_calls[:core.draw_call_count] {
-		if call.elem_count == 0 {
+		if call.elem_count == 0 ||
+		   call.clip_box.hi.x <= call.clip_box.lo.x ||
+		   call.clip_box.hi.y <= call.clip_box.lo.y {
 			continue
 		}
 
@@ -343,7 +374,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 
 		sampler := wgpu.DeviceCreateSampler(
 			gfx.device,
-			&{magFilter = .Linear, minFilter = .Linear, maxAnisotropy = 1},
+			&{magFilter = .Nearest, minFilter = .Linear, maxAnisotropy = 1},
 		)
 		defer wgpu.SamplerRelease(sampler)
 

@@ -271,7 +271,7 @@ main :: proc() {
 
 	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
 
-	onyx.init(1000, 800, "demo")
+	onyx.init(1600, 900, "demo")
 	onyx.set_style_font(.Medium, "fonts/Geist-Medium.ttf")
 	onyx.set_style_font(.Bold, "fonts/Geist-Bold.ttf")
 	onyx.set_style_font(.Light, "fonts/Geist-Light.ttf")

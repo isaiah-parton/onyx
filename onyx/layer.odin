@@ -52,7 +52,7 @@ Layer :: struct {
 	dead:              bool, // Should be deleted?
 	opacity:           f32,
 	index:             int,
-	frames: int,
+	frames:            int,
 }
 
 Layer_Info :: struct {
@@ -65,7 +65,7 @@ Layer_Info :: struct {
 	scale:    Maybe([2]f32),
 	rotation: f32,
 	opacity:  Maybe(f32),
-	sorting: Layer_Sorting,
+	sorting:  Layer_Sorting,
 }
 
 destroy_layer :: proc(layer: ^Layer) {
@@ -154,16 +154,13 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 		}
 
 		if layer.parent != nil {
-			set_layer_index(
-				layer,
-				layer.parent.index + 1,
-			)
+			set_layer_index(layer, layer.parent.index + 1)
 		} else {
-			index := (get_highest_layer_of_kind(kind) + 1) if info.sorting == .Above else (get_lowest_layer_of_kind(kind))
-			set_layer_index(
-				layer,
-				index,
-				)
+			if info.sorting == .Above {
+				set_layer_index(layer, get_highest_layer_of_kind(kind) + 1)
+			} else {
+				set_layer_index(layer, get_lowest_layer_of_kind(kind))
+			}
 		}
 	}
 
@@ -190,7 +187,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	if core.hovered_layer == layer.id {
 		layer.state += {.Hovered}
 		// Re-order layers if clicked
-		if mouse_pressed(.Left) && layer.kind != .Topmost {
+		if mouse_pressed(.Left) && layer.kind == .Floating {
 			bring_layer_to_front(layer)
 		}
 	}
@@ -243,12 +240,12 @@ end_layer :: proc() {
 	}
 }
 
-@(deferred_out=__do_layer)
+@(deferred_out = __do_layer)
 do_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	return begin_layer(info, loc)
 }
 
-@private
+@(private)
 __do_layer :: proc(ok: bool) {
 	if ok {
 		end_layer()
