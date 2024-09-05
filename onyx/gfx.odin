@@ -32,6 +32,7 @@ Graphics :: struct {
 	uniform_buffer, vertex_buffer, index_buffer: wgpu.Buffer,
 	surface_config:                              wgpu.SurfaceConfiguration,
 	msaa_texture:                                wgpu.Texture,
+	sample_count: int,
 }
 
 resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
@@ -45,7 +46,7 @@ resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
 	gfx.msaa_texture = wgpu.DeviceCreateTexture(
 		gfx.device,
 		&{
-			sampleCount = 4,
+			sampleCount = u32(gfx.sample_count),
 			format = gfx.surface_config.format,
 			usage = {.RenderAttachment},
 			dimension = ._2D,
@@ -55,10 +56,11 @@ resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
 	)
 }
 
-init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
+init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: int) {
 
 	width, height := glfw.GetWindowSize(window)
 	gfx.width, gfx.height = u32(width), u32(height)
+	gfx.sample_count = sample_count
 
 	// &{
 	// 		nextInChain = &wgpu.InstanceExtras {
@@ -68,13 +70,19 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 	// 		},
 	// 	},
 	// }
-	gfx.instance = wgpu.CreateInstance()
+	// gfx.instance = wgpu.CreateInstance()
+	gfx.instance = wgpu.CreateInstance(
+		&{
+			nextInChain = &wgpu.InstanceExtras {
+				sType = .InstanceExtras,
+				backends = {.DX12},
+			},
+		})
 	gfx.surface = glfwglue.GetSurface(gfx.instance, window)
 
 	// adapters := wgpu.InstanceEnumerateAdapters(gfx.instance)
 	// defer delete(adapters)
 
-	gfx.waiting = true
 	wgpu.InstanceRequestAdapter(gfx.instance, &{compatibleSurface = gfx.surface}, on_adapter, gfx)
 
 	on_adapter :: proc "c" (
@@ -125,7 +133,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 		gfx.msaa_texture = wgpu.DeviceCreateTexture(
 			gfx.device,
 			&{
-				sampleCount = 4,
+				sampleCount = u32(gfx.sample_count),
 				format = gfx.surface_config.format,
 				usage = {.RenderAttachment},
 				dimension = ._2D,
@@ -260,7 +268,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 					},
 				},
 				primitive = {topology = .TriangleList},
-				multisample = {count = 4, mask = 0xffffffff},
+				multisample = {count = u32(gfx.sample_count), mask = 0xffffffff},
 			},
 		)
 	}
@@ -332,8 +340,8 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		&{
 			colorAttachmentCount = 1,
 			colorAttachments = &wgpu.RenderPassColorAttachment {
-				view = msaa_view,
-				resolveTarget = surface_view,
+				view = surface_view if gfx.sample_count == 1 else msaa_view,
+				resolveTarget = nil if gfx.sample_count == 1 else surface_view,
 				loadOp = .Clear,
 				storeOp = .Store,
 				clearValue = {0, 0, 0, 0},
@@ -369,9 +377,11 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			continue
 		}
 
+		// Create transient texture view
 		texture_view := wgpu.TextureCreateView(call.texture)
 		defer wgpu.TextureViewRelease(texture_view)
 
+		// Create transient sampler
 		sampler := wgpu.DeviceCreateSampler(
 			gfx.device,
 			&{
@@ -384,6 +394,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		)
 		defer wgpu.SamplerRelease(sampler)
 
+		// Create transient bind group
 		texture_bind_group := wgpu.DeviceCreateBindGroup(
 			gfx.device,
 			&{
@@ -396,8 +407,10 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 				},
 			},
 		)
-		wgpu.RenderPassEncoderSetBindGroup(pass, 1, texture_bind_group)
+		defer wgpu.BindGroupRelease(texture_bind_group)
 
+		// Configure render pass
+		wgpu.RenderPassEncoderSetBindGroup(pass, 1, texture_bind_group)
 		wgpu.RenderPassEncoderSetScissorRect(
 			pass,
 			u32(call.clip_box.lo.x),
@@ -405,6 +418,8 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			u32(call.clip_box.hi.x - call.clip_box.lo.x),
 			u32(call.clip_box.hi.y - call.clip_box.lo.y),
 		)
+
+		// Draw elements
 		wgpu.RenderPassEncoderDrawIndexed(
 			pass,
 			u32(call.elem_count),

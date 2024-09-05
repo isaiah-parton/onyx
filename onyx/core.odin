@@ -218,7 +218,7 @@ init :: proc(width, height: i32, title: cstring = nil) {
 		},
 	)
 
-	init_graphics(&core.gfx, core.window)
+	init_graphics(&core.gfx, core.window, 4)
 
 	// Init font atlas
 	max_atlas_size := 4096

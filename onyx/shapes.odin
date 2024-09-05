@@ -346,7 +346,7 @@ draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color:
 }
 draw_box_fill :: proc(box: Box, color: Color) {
 	set_vertex_color(color)
-	core.vertex_state.uv = {}
+	set_vertex_uv({})
 	tl := add_vertex(box.lo)
 	bl := add_vertex({box.lo.x, box.hi.y})
 	br := add_vertex(box.hi)
