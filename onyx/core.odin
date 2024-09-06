@@ -61,12 +61,17 @@ Debug_State :: struct {
 	enabled, widgets, panels, layers: bool,
 }
 
+DEFAULT_DESIRED_FPS :: 75
+
 // The global core data
 Core :: struct {
 	window:                                                   glfw.WindowHandle,
 	window_title:                                             string,
 	debug:                                                    Debug_State,
 	view:                                                     [2]f32,
+	desired_fps:                                              int,
+	last_second:                                              time.Time,
+	frames_so_far, frames_this_second:                        int,
 
 	// Hashing
 	id_stack:                                                 Stack(Id, MAX_IDS),
@@ -174,15 +179,18 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.draw_next_frame = true
 	core.start_time = time.now()
 
+	// Initialize glfw
 	glfw.Init()
+
+	// Create cursors
 	core.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
 	core.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(glfw.POINTING_HAND_CURSOR)
 	core.cursors[.I_Beam] = glfw.CreateStandardCursor(glfw.IBEAM_CURSOR)
-	glfw.WindowHint(glfw.DECORATED, true)
-	glfw.WindowHint(glfw.TRANSPARENT_FRAMEBUFFER, false)
-	glfw.WindowHint(glfw.VISIBLE, true)
+
+	// Create the main window
 	core.window = glfw.CreateWindow(width, height, title, nil, nil)
 
+	// Set event callbacks
 	glfw.SetScrollCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
 		core.mouse_scroll = {f32(x), f32(y)}
 	})
@@ -192,7 +200,11 @@ init :: proc(width, height: i32, title: cstring = nil) {
 		core.view = {f32(width), f32(height)}
 		resize_graphics(&core.gfx, int(width), int(height))
 	})
-	glfw.SetKeyCallback(core.window, proc "c" (_: glfw.WindowHandle, key, action, _, _: i32) {
+	glfw.SetCharCallback(core.window, proc "c" (_: glfw.WindowHandle, char: rune) {
+		context = runtime.default_context()
+		append(&core.runes, char)
+	})
+	glfw.SetKeyCallback(core.window, proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
 		switch action {
 		case glfw.PRESS:
 			core.keys[Keyboard_Key(key)] = true
@@ -218,14 +230,15 @@ init :: proc(width, height: i32, title: cstring = nil) {
 		},
 	)
 
+	// Initialize graphics pipeline
 	init_graphics(&core.gfx, core.window, 4)
 
-	// Init font atlas
-	max_atlas_size := 4096
-	atlas_size: int = min(max_atlas_size, MAX_ATLAS_SIZE)
-	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
-
+	// Initalize draw list
 	init_draw_list(&core.draw_list)
+
+	// Init font atlas
+	atlas_size: int = min(cast(int)core.gfx.adapter_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
+	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
 
 	// Default style
 	core.style.color = dark_color_scheme()
@@ -233,13 +246,25 @@ init :: proc(width, height: i32, title: cstring = nil) {
 }
 
 begin_frame :: proc() {
-	glfw.PollEvents()
 
 	// Timings
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
+	time.sleep(
+		time.Duration(time.Second) / time.Duration(max(core.desired_fps, DEFAULT_DESIRED_FPS)) -
+		time.since(core.last_frame_time),
+	)
 	core.last_frame_time = now
 	core.frames += 1
+
+	core.frames_so_far += 1
+	if time.since(core.last_second) >= time.Second {
+		core.last_second = time.now()
+		core.frames_this_second = core.frames_so_far
+		core.frames_so_far = 0
+	}
+
+	glfw.PollEvents()
 
 	if key_pressed(.Escape) {
 		core.focused_widget = 0
@@ -303,10 +328,31 @@ begin_frame :: proc() {
 	set_texture(core.font_atlas.texture.internal)
 
 	begin_layer({box = view_box(), sorting = .Below, kind = .Background})
-	foreground()
+
+
 }
 
 end_frame :: proc() {
+
+	draw_text(
+		{},
+		{
+			text = fmt.tprintf("fps: %i", core.frames_this_second),
+			font = core.style.fonts[.Regular],
+			size = 20,
+		},
+		255,
+	)
+	draw_text(
+		{0, 20},
+		{
+			text = fmt.tprintf("frames drawn: %i", core.drawn_frames),
+			font = core.style.fonts[.Regular],
+			size = 20,
+		},
+		255,
+	)
+
 	end_layer()
 
 	assert(core.clip_stack.height == 0)

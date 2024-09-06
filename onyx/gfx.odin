@@ -32,7 +32,8 @@ Graphics :: struct {
 	uniform_buffer, vertex_buffer, index_buffer: wgpu.Buffer,
 	surface_config:                              wgpu.SurfaceConfiguration,
 	msaa_texture:                                wgpu.Texture,
-	sample_count: int,
+	sample_count:                                int,
+	adapter_limits:                              wgpu.Limits,
 }
 
 resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
@@ -62,28 +63,34 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	gfx.width, gfx.height = u32(width), u32(height)
 	gfx.sample_count = sample_count
 
-	// &{
+	gfx.instance = wgpu.CreateInstance()
+	// gfx.instance = wgpu.CreateInstance(
+	// 	&{
 	// 		nextInChain = &wgpu.InstanceExtras {
 	// 			sType = .InstanceExtras,
-	// 			backends = {.GL},
-	// 			flags = {.Debug},
+	// 			backends = {.DX12},
 	// 		},
-	// 	},
-	// }
-	// gfx.instance = wgpu.CreateInstance()
-	gfx.instance = wgpu.CreateInstance(
-		&{
-			nextInChain = &wgpu.InstanceExtras {
-				sType = .InstanceExtras,
-				backends = {.DX12},
-			},
-		})
+	// 	})
 	gfx.surface = glfwglue.GetSurface(gfx.instance, window)
 
-	// adapters := wgpu.InstanceEnumerateAdapters(gfx.instance)
-	// defer delete(adapters)
+	when true {
+		wgpu.InstanceRequestAdapter(
+			gfx.instance,
+			&{compatibleSurface = gfx.surface},
+			on_adapter,
+			gfx,
+		)
+	} else {
+		adapters := wgpu.InstanceEnumerateAdapters(gfx.instance)
+		defer delete(adapters)
 
-	wgpu.InstanceRequestAdapter(gfx.instance, &{compatibleSurface = gfx.surface}, on_adapter, gfx)
+		gfx.adapter = adapter
+		wgpu.AdapterRequestDevice(adapter, &{}, on_device, gfx)
+	}
+
+	info := wgpu.AdapterGetInfo(gfx.adapter)
+	fmt.println("Using", info.backendType, "backend")
+	fmt.println(gfx.adapter_limits)
 
 	on_adapter :: proc "c" (
 		status: wgpu.RequestAdapterStatus,
@@ -98,6 +105,9 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			return
 		}
 		gfx.adapter = adapter
+		if supported_limits, ok := wgpu.AdapterGetLimits(gfx.adapter); ok {
+			gfx.adapter_limits = supported_limits.limits
+		}
 		wgpu.AdapterRequestDevice(adapter, &{}, on_device, gfx)
 	}
 

@@ -47,7 +47,11 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 
 	// Mouse wheel input
 	if cnt.active {
-		cnt.desired_scroll -= core.mouse_scroll * 100
+		delta_scroll := core.mouse_scroll
+		if key_down(.Left_Shift) || key_down(.Right_Shift) {
+			delta_scroll.xy = delta_scroll.yx
+		}
+		cnt.desired_scroll -= delta_scroll * 100
 	}
 
 	append_draw_call(current_layer().?.index)

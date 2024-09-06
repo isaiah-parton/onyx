@@ -41,7 +41,7 @@ default_style_shape :: proc() -> Style_Shape {
 		content_text_size = 18,
 		rounding = 0,
 		menu_padding = 5,
-		scrollbar_thickness = 10,
+		scrollbar_thickness = 2,
 	}
 }
 

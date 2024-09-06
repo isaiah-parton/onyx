@@ -16,7 +16,7 @@ Keyboard_Key :: enum {
 	Left_Control  = glfw.KEY_LEFT_CONTROL,
 	Left_Alt      = glfw.KEY_LEFT_ALT,
 	Left_Super    = glfw.KEY_LEFT_SUPER,
-	Left_Shift    = glfw.KEY_RIGHT_SHIFT,
+	Left_Shift    = glfw.KEY_LEFT_SHIFT,
 	Right_Control = glfw.KEY_RIGHT_CONTROL,
 	Right_Alt     = glfw.KEY_RIGHT_ALT,
 	Right_Super   = glfw.KEY_RIGHT_SUPER,
