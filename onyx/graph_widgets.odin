@@ -360,9 +360,20 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 		}
 		for &field, f in info.fields {
 			tip_box := shrink_box(cut_box(&current_layout().?.box, .Top, 26), 3)
-			draw_rounded_box_fill(cut_box_left(&tip_box, 6), core.style.rounding, field.color)
+			layout_box := current_layer().?.box
+			gradient_box := Box{{layout_box.lo.x, tip_box.lo.y}, {layout_box.hi.x, tip_box.hi.y}}
+			draw_horizontal_box_gradient(
+				{gradient_box.lo, {box_center_x(gradient_box), gradient_box.hi.y}},
+				fade(field.color, 0.2),
+				fade(field.color, 0.1),
+			)
+			draw_horizontal_box_gradient(
+				{{box_center_x(gradient_box), gradient_box.lo.y}, gradient_box.hi},
+				fade(field.color, 0.1),
+				fade(field.color, 0.2),
+			)
 			draw_text(
-				{tip_box.lo.x + 8, (tip_box.lo.y + tip_box.hi.y) / 2},
+				{tip_box.lo.x, (tip_box.lo.y + tip_box.hi.y) / 2},
 				{
 					text = field.name,
 					font = core.style.fonts[.Medium],
@@ -372,7 +383,7 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 				color = fade(core.style.color.content, 0.5),
 			)
 			draw_text(
-				{tip_box.hi.x - 4, (tip_box.lo.y + tip_box.hi.y) / 2},
+				{tip_box.hi.x, (tip_box.lo.y + tip_box.hi.y) / 2},
 				{
 					text = tmp_printf("%v", info.entries[tooltip_idx].values[f]),
 					font = core.style.fonts[.Regular],

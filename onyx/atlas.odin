@@ -17,6 +17,7 @@ Atlas :: struct {
 	offset:         [2]f32,
 	row_height:     f32,
 	full, modified: bool,
+	modified_box:   Box,
 }
 
 init_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics, width, height: int) {
@@ -46,7 +47,8 @@ init_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics, width, height: int) {
 		),
 	}
 	bytes.buffer_init(&atlas.image.pixels, pixels)
-
+	atlas.modified = true
+	atlas.modified_box = {0, 1}
 }
 
 destroy_atlas :: proc(atlas: ^Atlas) {
@@ -55,14 +57,31 @@ destroy_atlas :: proc(atlas: ^Atlas) {
 }
 
 update_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics) {
+	if atlas.modified_box.hi.x <= atlas.modified_box.lo.x ||
+	   atlas.modified_box.hi.y <= atlas.modified_box.lo.y {
+		return
+	}
+
+	pixel_offset := (int(atlas.modified_box.lo.x) + int(atlas.modified_box.lo.y) * atlas.width) * 4
+	pixels := atlas.image.pixels.buf[pixel_offset:]
+
 	wgpu.QueueWriteTexture(
 		gfx.queue,
-		&{texture = atlas.texture.internal},
-		raw_data(atlas.image.pixels.buf),
-		len(atlas.image.pixels.buf),
+		&{
+			texture = atlas.texture.internal,
+			origin = {x = u32(atlas.modified_box.lo.x), y = u32(atlas.modified_box.lo.y)},
+		},
+		raw_data(pixels),
+		len(pixels),
 		&{bytesPerRow = u32(atlas.width) * 4, rowsPerImage = u32(atlas.height)},
-		&{width = u32(atlas.width), height = u32(atlas.height), depthOrArrayLayers = 1},
+		&{
+			width = u32(box_width(atlas.modified_box)),
+			height = u32(box_height(atlas.modified_box)),
+			depthOrArrayLayers = 1,
+		},
 	)
+	wgpu.QueueSubmit(gfx.queue, {})
+	atlas.modified_box = {math.F32_MAX, 0}
 }
 
 add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas, gfx: ^Graphics) -> Box {
@@ -82,6 +101,7 @@ add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas, gfx: 
 		}
 	}
 	atlas.modified = true
+	atlas.modified_box = update_bounding(atlas.modified_box, box)
 	return box
 }
 
@@ -100,6 +120,7 @@ add_image_to_atlas :: proc(image: img.Image, atlas: ^Atlas, gfx: ^Graphics) -> B
 		}
 	}
 	atlas.modified = true
+	atlas.modified_box = update_bounding(atlas.modified_box, box)
 	return box
 }
 

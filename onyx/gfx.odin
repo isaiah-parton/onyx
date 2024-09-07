@@ -19,21 +19,22 @@ Shader_Uniforms :: struct {
 
 Graphics :: struct {
 	width, height:                               u32,
+	// Infrastructure
 	instance:                                    wgpu.Instance,
 	adapter:                                     wgpu.Adapter,
 	pipeline:                                    wgpu.RenderPipeline,
 	surface:                                     wgpu.Surface,
 	device:                                      wgpu.Device,
 	queue:                                       wgpu.Queue,
-	config:                                      wgpu.SurfaceConfiguration,
+	// Settings
+	sample_count:                                int,
+	surface_config:                              wgpu.SurfaceConfiguration,
+	adapter_limits:                              wgpu.Limits,
+	// Resources
 	uniform_bind_group, texture_bind_group:      wgpu.BindGroup,
 	texture_bind_group_layout:                   wgpu.BindGroupLayout,
-	waiting:                                     bool,
 	uniform_buffer, vertex_buffer, index_buffer: wgpu.Buffer,
-	surface_config:                              wgpu.SurfaceConfiguration,
 	msaa_texture:                                wgpu.Texture,
-	sample_count:                                int,
-	adapter_limits:                              wgpu.Limits,
 }
 
 resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
@@ -74,6 +75,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	gfx.surface = glfwglue.GetSurface(gfx.instance, window)
 
 	when true {
+		// Works on my machine
 		wgpu.InstanceRequestAdapter(
 			gfx.instance,
 			&{compatibleSurface = gfx.surface},
@@ -89,8 +91,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	}
 
 	info := wgpu.AdapterGetInfo(gfx.adapter)
-	fmt.println("Using", info.backendType, "backend")
-	fmt.println(gfx.adapter_limits)
+	fmt.println("Created graphics pipeline with", info.backendType, "backend")
 
 	on_adapter :: proc "c" (
 		status: wgpu.RequestAdapterStatus,
@@ -137,7 +138,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			alphaMode   = surface_capabilities.alphaModes[0],
 		}
 		wgpu.SurfaceConfigure(gfx.surface, &gfx.surface_config)
-
 
 		// Create MSAA Texture
 		gfx.msaa_texture = wgpu.DeviceCreateTexture(
@@ -301,7 +301,6 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		len(draw_list.indices) * size_of(u32),
 	)
 
-
 	// Set view bounds
 	t := f32(0)
 	b := f32(core.view.y)
@@ -313,7 +312,6 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	uniform := Shader_Uniforms {
 		proj_mtx = linalg.matrix_ortho3d(l, r, b, t, n, f),
 	}
-
 
 	// Sort draw calls by index
 	slice.sort_by(core.draw_calls[:core.draw_call_count], proc(i, j: Draw_Call) -> bool {

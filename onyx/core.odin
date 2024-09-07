@@ -20,6 +20,8 @@ MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
 MAX_LAYOUTS :: 100
 MAX_PANELS :: 100
+DEFAULT_DESIRED_FPS :: 75
+
 
 Stack :: struct($T: typeid, $N: int) {
 	items:  [N]T,
@@ -59,9 +61,9 @@ core: Core
 
 Debug_State :: struct {
 	enabled, widgets, panels, layers: bool,
+	delta_time:                       [dynamic]f32,
 }
 
-DEFAULT_DESIRED_FPS :: 75
 
 // The global core data
 Core :: struct {
@@ -197,6 +199,7 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	glfw.SetWindowSizeCallback(core.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
 		context = runtime.default_context()
 		core.draw_this_frame = true
+		core.draw_next_frame = true
 		core.view = {f32(width), f32(height)}
 		resize_graphics(&core.gfx, int(width), int(height))
 	})
@@ -248,12 +251,12 @@ init :: proc(width, height: i32, title: cstring = nil) {
 begin_frame :: proc() {
 
 	// Timings
-	now := time.now()
-	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	time.sleep(
 		time.Duration(time.Second) / time.Duration(max(core.desired_fps, DEFAULT_DESIRED_FPS)) -
 		time.since(core.last_frame_time),
 	)
+	now := time.now()
+	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
 	core.frames += 1
 
@@ -264,6 +267,7 @@ begin_frame :: proc() {
 		core.frames_so_far = 0
 	}
 
+	// Handle window events
 	glfw.PollEvents()
 
 	if key_pressed(.Escape) {
@@ -293,25 +297,25 @@ begin_frame :: proc() {
 
 	// Tab/shift-tab selection
 	if key_pressed(.Tab) {
+		// Create a temporary list
 		widget_list: [dynamic]^Widget
 		defer delete(widget_list)
-
+		// Append eligible widgets
 		for id, &widget in core.widget_map {
 			if widget.is_field {
 				append(&widget_list, widget)
 			}
 		}
-
+		// Sort them
 		sort_proc :: proc(i, j: ^Widget) -> bool {
 			return i.box.lo.y < j.box.lo.y || i.box.lo.x < j.box.lo.x
 		}
-
 		if key_down(.Left_Shift) {
 			slice.reverse_sort_by(widget_list[:], sort_proc)
 		} else {
 			slice.sort_by(widget_list[:], sort_proc)
 		}
-
+		// Find the currently focused widget and focus the next widget in the list
 		for widget, w in widget_list {
 			if widget.id == core.focused_widget {
 				core.focused_widget = widget_list[(w + 1) % len(widget_list)].id
@@ -326,14 +330,10 @@ begin_frame :: proc() {
 	// Push initial matrix
 	push_matrix()
 	set_texture(core.font_atlas.texture.internal)
-
-	begin_layer({box = view_box(), sorting = .Below, kind = .Background})
-
-
 }
 
 end_frame :: proc() {
-
+	begin_layer({box = view_box(), sorting = .Above, kind = .Debug, options = {.Ghost}})
 	draw_text(
 		{},
 		{
@@ -352,7 +352,6 @@ end_frame :: proc() {
 		},
 		255,
 	)
-
 	end_layer()
 
 	assert(core.clip_stack.height == 0)
@@ -423,6 +422,8 @@ end_frame :: proc() {
 			widget.dead = true
 		}
 	}
+
+	// Free unused containers
 	for id, cnt in core.container_map {
 		if cnt.dead {
 			delete_key(&core.container_map, id)
@@ -434,7 +435,11 @@ end_frame :: proc() {
 
 	// Update the atlas if needed
 	if core.font_atlas.modified {
+		t := time.now()
 		update_atlas(&core.font_atlas, &core.gfx)
+		when ODIN_DEBUG {
+			fmt.printf("Updated font atlas in %v\n", time.since(t))
+		}
 		core.font_atlas.modified = false
 	}
 

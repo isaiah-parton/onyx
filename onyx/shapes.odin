@@ -273,6 +273,17 @@ draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
 	}
 }
 
+draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
+	set_vertex_uv({})
+	set_vertex_color(left)
+	tl := add_vertex(box.lo)
+	bl := add_vertex({box.lo.x, box.hi.y})
+	set_vertex_color(right)
+	br := add_vertex(box.hi)
+	tr := add_vertex({box.hi.x, box.lo.y})
+	add_indices(tl, br, bl, tl, tr, br)
+}
+
 draw_ellipse_fill :: proc(center, size: [2]f32, from, to: f32, color: Color) {
 	from, to := from, to
 	if from > to do from, to = to, from
