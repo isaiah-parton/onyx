@@ -26,7 +26,7 @@ Widget :: struct {
 	allocator:                                    runtime.Allocator,
 	variant:                                      Widget_Kind,
 	desired_size:                                 [2]f32,
-	frames: int,
+	frames:                                       int,
 }
 
 Widget_Kind :: union {
@@ -35,7 +35,7 @@ Widget_Kind :: union {
 	Tooltip_Widget_Kind,
 	Tabs_Widget_Kind,
 	Text_Input_Widget_Kind,
-	Switch_Widget_Kind,
+	Generic_Boolean_Widget_Kind,
 	Date_Picker_Widget_Kind,
 }
 
@@ -52,12 +52,12 @@ Widget_Status :: enum {
 Widget_State :: bit_set[Widget_Status;u8]
 
 Generic_Widget_Info :: struct {
-	id:           Maybe(Id),
-	box:          Maybe(Box),
-	fixed_size:   bool,
+	id:            Maybe(Id),
+	box:           Maybe(Box),
+	fixed_size:    bool,
 	required_size: [2]f32,
-	desired_size: [2]f32,
-	disabled:     bool,
+	desired_size:  [2]f32,
+	disabled:      bool,
 }
 
 Generic_Widget_Result :: struct {
@@ -163,16 +163,20 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 				core.widget_map[id] = widget
 
 				core.draw_this_frame = true
-				
+
 				ok = true
 				break
 			}
 		}
 	}
-	
+
 	if widget == nil do return
 
 	if widget.frames == core.frames {
+		fmt.printf(
+			"Two or more widgets with the same ID '%v' were called in the same frame\n",
+			widget.id,
+		)
 		return nil, false
 	}
 	widget.frames = core.frames
@@ -275,4 +279,8 @@ hover_widget :: proc(widget: ^Widget) {
 	if clip, ok := current_clip().?; ok && !point_in_box(core.mouse_pos, current_clip().?) do return
 	// Ok hover
 	core.next_hovered_widget = widget.id
+}
+
+focus_widget :: proc(widget: ^Widget) {
+	core.focused_widget = widget.id
 }

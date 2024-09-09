@@ -43,14 +43,14 @@ Text_Info :: struct {
 }
 
 Text_Options :: struct {
-	font:          int, // Font index
-	spacing, size: f32, // Glyph spacing// Font size
-	width:         Maybe(f32), // Maximum line width
-	max_lines:     Maybe(int), // Maximum number of lines
-	wrap:          Text_Wrap, // Wrapping type
-	align_h:       Horizontal_Text_Align, // Alignment
-	align_v:       Vertical_Text_Align,
-	hidden:        bool, // Every glyph appears as a bullet
+	font:      int, // Font index
+	size:      f32, // Glyph spacing// Font size
+	width:     Maybe(f32), // Maximum line width
+	max_lines: Maybe(int), // Maximum number of lines
+	wrap:      Text_Wrap, // Wrapping type
+	align_h:   Horizontal_Text_Align, // Alignment
+	align_v:   Vertical_Text_Align,
+	hidden:    bool, // Every glyph appears as a bullet
 }
 
 Interactive_Text_Result :: struct {
@@ -81,6 +81,7 @@ Font :: struct {
 	name, path: string,
 	data:       ttf.fontinfo,
 	sizes:      map[f32]Font_Size,
+	spacing:    f32,
 }
 
 Glyph :: struct {
@@ -338,7 +339,7 @@ iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 
 	// Update horizontal offset with last glyph
-	iter.glyph_pos.x += math.floor(iter.glyph.advance + iter.info.spacing)
+	iter.glyph_pos.x += math.floor(iter.glyph.advance + iter.font.spacing)
 
 	// Get the next glyph
 	ok = iterate_text_rune(iter)
@@ -403,7 +404,7 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 		}
 		iter.glyph_pos.y += iter.size.ascent - iter.size.descent + iter.size.line_gap
 	}
-	iter.line_size.x += math.floor(iter.glyph.advance + iter.info.spacing)
+	iter.line_size.x += math.floor(iter.glyph.advance + iter.font.spacing)
 
 	return
 }
@@ -421,7 +422,7 @@ measure_next_line :: proc(iter: Text_Iterator) -> f32 {
 measure_next_word :: proc(iter: Text_Iterator) -> (size: f32, end: int) {
 	iter := iter
 	for iterate_text_rune(&iter) {
-		size += iter.glyph.advance + iter.info.spacing
+		size += iter.glyph.advance + iter.font.spacing
 		if iter.codepoint == ' ' {
 			break
 		}
@@ -441,6 +442,7 @@ load_font :: proc(file_path: string) -> (handle: int, success: bool) {
 	file_data := os.read_entire_file(file_path) or_return
 
 	if ttf.InitFont(&font.data, raw_data(file_data), 0) {
+		font.spacing = 1
 		for i in 0 ..< MAX_FONTS {
 			if core.fonts[i] == nil {
 				core.fonts[i] = font

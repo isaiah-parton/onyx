@@ -360,18 +360,8 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 		}
 		for &field, f in info.fields {
 			tip_box := shrink_box(cut_box(&current_layout().?.box, .Top, 26), 3)
-			layout_box := current_layer().?.box
-			gradient_box := Box{{layout_box.lo.x, tip_box.lo.y}, {layout_box.hi.x, tip_box.hi.y}}
-			draw_horizontal_box_gradient(
-				{gradient_box.lo, {box_center_x(gradient_box), gradient_box.hi.y}},
-				fade(field.color, 0.2),
-				fade(field.color, 0.1),
-			)
-			draw_horizontal_box_gradient(
-				{{box_center_x(gradient_box), gradient_box.lo.y}, gradient_box.hi},
-				fade(field.color, 0.1),
-				fade(field.color, 0.2),
-			)
+			blip_box := shrink_box(cut_box_left(&tip_box, box_height(tip_box)), 4)
+			draw_box_fill(blip_box, field.color)
 			draw_text(
 				{tip_box.lo.x, (tip_box.lo.y + tip_box.hi.y) / 2},
 				{

@@ -193,7 +193,7 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 						fade(core.style.color.substance, widget.hover_time),
 					)
 				}
-			 	if date == todays_date() {
+				if date == todays_date() {
 					draw_rounded_box_stroke(
 						widget.box,
 						core.style.shape.rounding,
@@ -220,7 +220,7 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 					align_v = .Middle,
 					align_h = .Middle,
 				},
-				blend_colors(
+				interpolate_colors(
 					widget.focus_time,
 					core.style.color.content if is_month else fade(core.style.color.content, 0.5),
 					core.style.color.background,

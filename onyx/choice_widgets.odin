@@ -22,7 +22,6 @@ make_selector :: proc(info: Selector_Info, loc := #caller_location) -> Selector_
 	text_info := Text_Info {
 		text    = info.text,
 		size    = core.style.button_text_size,
-		spacing = 1,
 		font    = core.style.fonts[.Medium],
 		align_v = .Middle,
 		align_h = .Middle,
@@ -54,7 +53,7 @@ begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 	}
 
 	menu_behavior(widget)
-	
+
 	if .Open in widget.state {
 		layer_pos := [2]f32{widget.box.lo.x, widget.box.hi.y + core.style.shape.menu_padding}
 		layer_size := kind.size
@@ -139,7 +138,6 @@ make_selector_option :: proc(
 	text_info := Text_Info {
 		text    = info.text,
 		size    = core.style.button_text_size,
-		spacing = 1,
 		font    = core.style.fonts[.Medium],
 		align_v = .Middle,
 	}

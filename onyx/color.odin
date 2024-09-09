@@ -5,7 +5,7 @@ import "core:math/linalg"
 
 Color :: [4]u8
 
-blend_colors :: proc(time: f32, colors: ..Color) -> Color {
+interpolate_colors :: proc(time: f32, colors: ..Color) -> Color {
 	if len(colors) > 0 {
 		if len(colors) == 1 {
 			return colors[0]
@@ -31,7 +31,6 @@ blend_colors :: proc(time: f32, colors: ..Color) -> Color {
 	return {}
 }
 
-// Color processing
 set_color_brightness :: proc(color: Color, value: f32) -> Color {
 	delta := clamp(i32(255.0 * value), -255, 255)
 	return {
@@ -46,7 +45,7 @@ get_color_brightness :: proc(color: Color) -> f32 {
 	return f32(color.r / 255) * 0.3 + f32(color.g / 255) * 0.59 + f32(color.b / 255) * 0.11
 }
 
-color_to_hsv :: proc(color: Color) -> [4]f32 {
+color_to_hsl :: proc(color: Color) -> [4]f32 {
 	hsva := linalg.vector4_rgb_to_hsl(
 		linalg.Vector4f32 {
 			f32(color.r) / 255.0,
@@ -58,7 +57,7 @@ color_to_hsv :: proc(color: Color) -> [4]f32 {
 	return hsva.xyzw
 }
 
-color_from_hsv :: proc(hue, saturation, value: f32) -> Color {
+color_from_hsl :: proc(hue, saturation, value: f32) -> Color {
 	rgba := linalg.vector4_hsl_to_rgb(hue, saturation, value, 1.0)
 	return {u8(rgba.r * 255.0), u8(rgba.g * 255.0), u8(rgba.b * 255.0), u8(rgba.a * 255.0)}
 }

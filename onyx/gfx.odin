@@ -64,7 +64,10 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	gfx.width, gfx.height = u32(width), u32(height)
 	gfx.sample_count = sample_count
 
+	// Create the wgpu instance
 	gfx.instance = wgpu.CreateInstance()
+
+	// This argument can be passed to specify a backend type
 	// gfx.instance = wgpu.CreateInstance(
 	// 	&{
 	// 		nextInChain = &wgpu.InstanceExtras {
@@ -72,8 +75,11 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	// 			backends = {.DX12},
 	// 		},
 	// 	})
+
+	// Create the surface to render onto
 	gfx.surface = glfwglue.GetSurface(gfx.instance, window)
 
+	// Find an adapter to use (graphics device and driver combined)
 	when true {
 		// Works on my machine
 		wgpu.InstanceRequestAdapter(
@@ -83,6 +89,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			gfx,
 		)
 	} else {
+		// Some cases might require we get the adapter from a list
 		adapters := wgpu.InstanceEnumerateAdapters(gfx.instance)
 		defer delete(adapters)
 
@@ -90,6 +97,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		wgpu.AdapterRequestDevice(adapter, &{}, on_device, gfx)
 	}
 
+	// Print the backend type
 	info := wgpu.AdapterGetInfo(gfx.adapter)
 	fmt.println("Created graphics pipeline with", info.backendType, "backend")
 
@@ -101,14 +109,16 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	) {
 		context = runtime.default_context()
 		gfx := transmute(^Graphics)userdata
-
 		if status != .Success {
 			return
 		}
+		// Set adapter
 		gfx.adapter = adapter
+		// Save adapter limits for later
 		if supported_limits, ok := wgpu.AdapterGetLimits(gfx.adapter); ok {
 			gfx.adapter_limits = supported_limits.limits
 		}
+		// Request a device
 		wgpu.AdapterRequestDevice(adapter, &{}, on_device, gfx)
 	}
 
@@ -120,13 +130,12 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	) {
 		context = runtime.default_context()
 		gfx := transmute(^Graphics)userdata
-
 		if status != .Success {
 			return
 		}
-
+		// Save device for later
 		gfx.device = device
-
+		// Initial surface config
 		surface_capabilities := wgpu.SurfaceGetCapabilities(gfx.surface, gfx.adapter)
 		gfx.surface_config = {
 			usage       = {.RenderAttachment},
@@ -138,7 +147,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			alphaMode   = surface_capabilities.alphaModes[0],
 		}
 		wgpu.SurfaceConfigure(gfx.surface, &gfx.surface_config)
-
 		// Create MSAA Texture
 		gfx.msaa_texture = wgpu.DeviceCreateTexture(
 			gfx.device,
@@ -151,9 +159,8 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 				size = {u32(gfx.width), u32(gfx.height), 1},
 			},
 		)
-
+		// Get the command queue
 		gfx.queue = wgpu.DeviceGetQueue(gfx.device)
-
 		// Create buffers
 		gfx.uniform_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
@@ -199,9 +206,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 				},
 			},
 		)
-
 		// Create bind group
-		// 	Requires: uniform_buffer
 		gfx.uniform_bind_group = wgpu.DeviceCreateBindGroup(
 			gfx.device,
 			&{
@@ -215,7 +220,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 				},
 			},
 		)
-
 		// Create pipeline layout
 		pipeline_layout := wgpu.DeviceCreatePipelineLayout(
 			gfx.device,
@@ -228,6 +232,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 				},
 			},
 		)
+		// Create shader module
 		module := wgpu.DeviceCreateShaderModule(
 			gfx.device,
 			&wgpu.ShaderModuleDescriptor {
@@ -243,7 +248,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			{format = .Float32x2, offset = u64(offset_of(Vertex, uv)), shaderLocation = 1},
 			{format = .Unorm8x4, offset = u64(offset_of(Vertex, col)), shaderLocation = 2},
 		}
-
+		// Create the pipeline
 		gfx.pipeline = wgpu.DeviceCreateRenderPipeline(
 			gfx.device,
 			&{
@@ -285,7 +290,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 }
 
 draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
-	// UPDATE BUFFERS
+	// Write buffer data
 	wgpu.QueueWriteBuffer(
 		gfx.queue,
 		gfx.vertex_buffer,

@@ -29,7 +29,6 @@ make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 	text_info := Text_Info {
 		text    = info.text,
 		size    = info.font_size.? or_else core.style.button_text_size,
-		spacing = 1,
 		font    = core.style.fonts[info.font_style.? or_else .Medium],
 		align_v = .Middle,
 		align_h = .Middle,
@@ -71,7 +70,7 @@ add_button :: proc(info: Button_Info) -> (result: Generic_Widget_Result) {
 			draw_rounded_box_fill(
 				widget.box,
 				core.style.rounding,
-				blend_colors(
+				interpolate_colors(
 					widget.hover_time * 0.25,
 					info.color.? or_else core.style.color.substance,
 					core.style.color.foreground,
@@ -83,7 +82,7 @@ add_button :: proc(info: Button_Info) -> (result: Generic_Widget_Result) {
 			draw_rounded_box_fill(
 				widget.box,
 				core.style.rounding,
-				blend_colors(
+				interpolate_colors(
 					widget.hover_time * 0.25,
 					info.color.? or_else core.style.color.accent,
 					core.style.color.foreground,

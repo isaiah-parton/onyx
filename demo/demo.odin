@@ -22,7 +22,7 @@ Option :: enum {
 Component :: enum {
 	Button,
 	Data_Input,
-	Checkbox,
+	Boolean,
 	Graph,
 	Slider,
 	Scroll_Zone,
@@ -146,7 +146,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			state.date_range = result.selection
 		}
 
-	case .Checkbox:
+	case .Boolean:
 		set_side(.Top)
 		do_label({text = "Checkboxes", font_style = .Bold, font_size = 24})
 		add_space(10)
@@ -156,19 +156,42 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				add_space(10)
 			}
 			if was_clicked(
-				do_checkbox({text = tmp_print(member), value = state.checkboxes[member]}),
+				do_checkbox({text = tmp_print(member), state = state.checkboxes[member]}),
 			) {
 				state.checkboxes[member] = !state.checkboxes[member]
 			}
 			pop_id()
 		}
 
+		add_space(10)
+		do_label({text = "Radio Buttons", font_style = .Bold, font_size = 24})
+		add_space(10)
+		enable_widgets(false)
+		for member, m in Option {
+			push_id(m)
+			if m > 0 {
+				add_space(10)
+			}
+			if was_clicked(
+				do_radio_button({text = tmp_print(member), state = state.option == member}),
+			) {
+				state.option = member
+			}
+			pop_id()
+		}
+		enable_widgets()
+
 	case .Data_Input:
 		set_side(.Top)
 		set_width(200)
 		set_height(120)
 		do_text_input(
-			{builder = &state.text_builder, placeholder = "Type something", multiline = true},
+			{
+				builder = &state.text_builder,
+				placeholder = "Type something",
+				multiline = true,
+				numeric = true,
+			},
 		)
 		add_space(10)
 		do_text_input({builder = &state.text_builder})
@@ -188,7 +211,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					spacing = 10,
 					kind = Bar_Graph{value_labels = true, show_tooltip = true},
 					label_tooltip = true,
-					fields = {{"Minecraft", {255, 25, 96, 255}}, {"Terraria", {0, 58, 255, 255}}},
+					fields = {{"Field 1", {255, 25, 96, 255}}, {"Field 2", {0, 58, 255, 255}}},
 					entries = {
 						{"Feb 2nd", {1, 5}},
 						{"Feb 3rd", {4, 2}},

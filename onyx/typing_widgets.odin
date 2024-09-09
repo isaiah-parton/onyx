@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:slice"
 import "core:strings"
 import "core:time"
+import "core:unicode"
 
 Text_Input_Decal :: enum {
 	None,
@@ -15,6 +16,8 @@ Text_Input_Info :: struct {
 	using _:                      Generic_Widget_Info,
 	builder:                      ^strings.Builder,
 	placeholder:                  string,
+	auto_focus:                   bool,
+	numeric, integer:             bool,
 	multiline, read_only, hidden: bool,
 	decal:                        Text_Input_Decal,
 }
@@ -56,14 +59,17 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	widget.focus_time = animate(widget.focus_time, 0.15, .Focused in widget.state)
 	variant.icon_time = animate(variant.icon_time, 0.2, info.decal != .None)
 
+	// Hover cursor
 	if .Hovered in widget.state {
 		core.cursor_type = .I_Beam
 	}
 
+	// Hover
 	if point_in_box(core.mouse_pos, widget.box) {
 		hover_widget(widget)
 	}
 
+	// Receive and execute editor commands
 	if .Focused in widget.state {
 		cmd: Command
 		control_down := key_down(.Left_Control) || key_down(.Right_Control)
@@ -76,12 +82,23 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			if key_pressed(.Z) do cmd = .Undo
 			if key_pressed(.Y) do cmd = .Redo
 		}
-		if !info.read_only {
-			if len(core.runes) > 0 {
+		// Write allowed and runes available?
+		if !info.read_only && len(core.runes) > 0 {
+			// Determine filter string
+			allowed: string
+			if info.numeric {
+				allowed = "0123456789."
+				if info.integer || strings.contains_rune(strings.to_string(info.builder^), '.') {
+					allowed = allowed[:len(allowed) - 1]
+				}
+			}
+			// Input filtered runes
+			for char, c in core.runes {
+				if len(allowed) > 0 && !strings.contains_rune(allowed, char) do continue
+				input_runes(e, {char})
 				result.changed = true
 				core.draw_this_frame = true
 			}
-			input_runes(e, core.runes[:])
 		}
 		if key_pressed(.Backspace) do cmd = .Delete_Word_Left if control_down else .Backspace
 		if key_pressed(.Delete) do cmd = .Delete_Word_Right if control_down else .Delete
@@ -130,16 +147,17 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		}
 	}
 
+	// Initial text info
 	text_info: Text_Info = {
-		font    = core.style.fonts[.Medium],
-		text    = strings.to_string(info.builder^),
-		size    = core.style.content_text_size,
-		spacing = 1 if info.hidden else 0,
-		hidden  = info.hidden,
+		font   = core.style.fonts[.Medium],
+		text   = strings.to_string(info.builder^),
+		size   = core.style.content_text_size,
+		hidden = info.hidden,
 	}
 
 	text_origin: [2]f32 = {widget.box.lo.x + 5, 0}
 
+	// Offset text origin based on font size
 	if font, ok := &core.fonts[text_info.font].?; ok {
 		if font_size, ok := get_font_size(font, text_info.size); ok {
 			if info.multiline {
@@ -152,6 +170,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		}
 	}
 
+	// Initialize editor state when just focused
 	if .Focused in (widget.state - widget.last_state) {
 		make_text_editor(e, widget.allocator, widget.allocator)
 		begin(e, 0, info.builder)
@@ -162,28 +181,35 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	// Make text job
 	if text_job, ok := make_text_job(text_info, e, core.mouse_pos - text_origin); ok {
 		if widget.visible || .Focused in widget.state {
+			// Draw body
 			draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.background)
-			draw_rounded_box_stroke(widget.box, core.style.rounding, 1, core.style.color.substance)
+			draw_rounded_box_stroke(
+				widget.box,
+				core.style.rounding,
+				1 + widget.focus_time,
+				interpolate_colors(
+					widget.focus_time,
+					core.style.color.substance,
+					core.style.color.accent,
+				),
+			)
+			// Draw text placeholder
 			if len(text_info.text) == 0 {
 				text_info := text_info
 				text_info.text = info.placeholder
 				draw_text(text_origin, text_info, core.style.color.substance)
 			}
-			if .Focused in widget.state {
+			// First draw the highlighting behind the text
+			if .Focused in widget.last_state {
 				draw_text_highlight(text_job, text_origin, fade(core.style.color.accent, 0.5))
 			}
+			// Then draw the text
 			draw_text_glyphs(text_job, text_origin, core.style.color.content)
-			if .Focused in widget.state {
+			// Draw the cursor in front of the text
+			if .Focused in widget.last_state {
 				draw_text_cursor(text_job, text_origin, core.style.color.accent)
 			}
-			if widget.focus_time > 0 {
-				draw_rounded_box_stroke(
-					expand_box(widget.box, 4),
-					core.style.rounding * 1.5,
-					2,
-					fade(core.style.color.accent, widget.focus_time),
-				)
-			}
+			// Draw decal
 			if variant.icon_time > 0 {
 				a := box_height(widget.box) / 2
 				center := [2]f32{widget.box.hi.x, widget.box.lo.y} + [2]f32{-a, a}
@@ -202,6 +228,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 					draw_loader(center, 5, core.style.color.content)
 				}
 			}
+			// Draw disabled overlay
 			if widget.disable_time > 0 {
 				draw_rounded_box_fill(
 					widget.box,
@@ -271,7 +298,6 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			core.draw_next_frame = true
 		}
 	}
-
 
 	end_widget()
 	return
