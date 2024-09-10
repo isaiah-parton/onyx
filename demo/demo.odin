@@ -190,10 +190,10 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				builder = &state.text_builder,
 				placeholder = "Type something",
 				multiline = true,
-				numeric = true,
 			},
 		)
 		add_space(10)
+		set_height_auto()
 		do_text_input({builder = &state.text_builder})
 
 	case .Graph:

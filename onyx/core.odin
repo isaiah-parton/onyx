@@ -238,9 +238,8 @@ init :: proc(width, height: i32, title: cstring = nil) {
 
 	// Initalize draw list
 	init_draw_list(&core.draw_list)
-
 	// Init font atlas
-	atlas_size: int = min(cast(int)core.gfx.adapter_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
+	atlas_size: int = min(cast(int)core.gfx.device_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
 
 	// Default style
@@ -249,11 +248,10 @@ init :: proc(width, height: i32, title: cstring = nil) {
 }
 
 begin_frame :: proc() {
-
 	// Timings
 	time.sleep(
-		time.Duration(time.Second) / time.Duration(max(core.desired_fps, DEFAULT_DESIRED_FPS)) -
-		time.since(core.last_frame_time),
+		max(0, time.Duration(time.Second) / time.Duration(max(core.desired_fps, DEFAULT_DESIRED_FPS)) -
+		time.since(core.last_frame_time)),
 	)
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
@@ -445,7 +443,6 @@ end_frame :: proc() {
 
 	if core.draw_this_frame {
 		start_time := time.now()
-
 		draw(&core.gfx, &core.draw_list, core.draw_calls[:])
 
 		core.drawn_frames += 1
@@ -513,6 +510,8 @@ uninit :: proc() {
 	delete(core.glyphs)
 	delete(core.lines)
 	delete(core.runes)
+
+	uninit_graphics(&core.gfx)
 }
 
 key_down :: proc(key: Keyboard_Key) -> bool {

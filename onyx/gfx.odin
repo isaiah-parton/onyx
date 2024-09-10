@@ -29,7 +29,7 @@ Graphics :: struct {
 	// Settings
 	sample_count:                                int,
 	surface_config:                              wgpu.SurfaceConfiguration,
-	adapter_limits:                              wgpu.Limits,
+	device_limits:                              wgpu.Limits,
 	// Resources
 	uniform_bind_group, texture_bind_group:      wgpu.BindGroup,
 	texture_bind_group_layout:                   wgpu.BindGroupLayout,
@@ -65,16 +65,17 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	gfx.sample_count = sample_count
 
 	// Create the wgpu instance
-	gfx.instance = wgpu.CreateInstance()
-
-	// This argument can be passed to specify a backend type
-	// gfx.instance = wgpu.CreateInstance(
-	// 	&{
-	// 		nextInChain = &wgpu.InstanceExtras {
-	// 			sType = .InstanceExtras,
-	// 			backends = {.DX12},
-	// 		},
-	// 	})
+	when ODIN_OS == .Windows {
+		gfx.instance = wgpu.CreateInstance(
+			&{
+				nextInChain = &wgpu.InstanceExtras {
+					sType = .InstanceExtras,
+					backends = {.DX12},
+				},
+			})
+	} else {
+		gfx.instance = wgpu.CreateInstance()
+	}
 
 	// Create the surface to render onto
 	gfx.surface = glfwglue.GetSurface(gfx.instance, window)
@@ -93,8 +94,14 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		adapters := wgpu.InstanceEnumerateAdapters(gfx.instance)
 		defer delete(adapters)
 
-		gfx.adapter = adapter
-		wgpu.AdapterRequestDevice(adapter, &{}, on_device, gfx)
+		for adapter in adapters {
+			info := wgpu.AdapterGetInfo(adapter)
+			defer wgpu.AdapterInfoFreeMembers(info)
+			if info.backendType == .D3D12 {
+				on_adapter(.Success, adapter, nil, gfx)
+				break
+			}
+		}
 	}
 
 	// Print the backend type
@@ -114,12 +121,14 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		}
 		// Set adapter
 		gfx.adapter = adapter
-		// Save adapter limits for later
-		if supported_limits, ok := wgpu.AdapterGetLimits(gfx.adapter); ok {
-			gfx.adapter_limits = supported_limits.limits
-		}
 		// Request a device
-		wgpu.AdapterRequestDevice(adapter, &{}, on_device, gfx)
+		wgpu.AdapterRequestDevice(adapter, &{
+			deviceLostUserdata = gfx,
+			deviceLostCallback = proc "c" (reason: wgpu.DeviceLostReason, message: cstring, userdata: rawptr) {
+				context = runtime.default_context()
+				fmt.println(reason, message)
+			}
+		}, on_device, gfx)
 	}
 
 	on_device :: proc "c" (
@@ -135,6 +144,10 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		}
 		// Save device for later
 		gfx.device = device
+		if supported_limits, ok := wgpu.DeviceGetLimits(gfx.device); ok {
+			gfx.device_limits = supported_limits.limits
+			fmt.println(gfx.device_limits)
+		}
 		// Initial surface config
 		surface_capabilities := wgpu.SurfaceGetCapabilities(gfx.surface, gfx.adapter)
 		gfx.surface_config = {
@@ -287,6 +300,17 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			},
 		)
 	}
+}
+
+uninit_graphics :: proc(gfx: ^Graphics) {
+	wgpu.SurfaceRelease(gfx.surface)
+	wgpu.BufferRelease(gfx.vertex_buffer)
+	wgpu.BufferRelease(gfx.index_buffer)
+	wgpu.AdapterRelease(gfx.adapter)
+	wgpu.QueueRelease(gfx.queue)
+	wgpu.RenderPipelineRelease(gfx.pipeline)
+	wgpu.TextureRelease(gfx.msaa_texture)
+	wgpu.DeviceRelease(gfx.device)
 }
 
 draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
