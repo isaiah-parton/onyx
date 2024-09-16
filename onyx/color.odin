@@ -5,6 +5,20 @@ import "core:math/linalg"
 
 Color :: [4]u8
 
+color_from_hex :: proc(hex: u32) -> Color {
+	return Color {
+		u8(0xff & (hex >> 6)),
+		u8(0xff & (hex >> 4)),
+		u8(0xff & (hex >> 2)),
+		u8(0xff & hex),
+	}
+}
+
+color_from :: proc {
+	color_from_hex,
+	color_from_hsl,
+}
+
 interpolate_colors :: proc(time: f32, colors: ..Color) -> Color {
 	if len(colors) > 0 {
 		if len(colors) == 1 {

@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:math/linalg"
 
 Container_Info :: struct {
+	id:   Id,
 	size: [2]f32,
 	box:  Maybe(Box),
 }
@@ -22,7 +23,7 @@ Container :: struct {
 }
 
 begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
-	id := hash(loc)
+	id := info.id if info.id != 0 else hash(loc)
 	cnt, ok := core.container_map[id]
 	if !ok {
 		cnt = new(Container)
@@ -154,11 +155,11 @@ current_container :: proc() -> Maybe(^Container) {
 push_clip :: proc(box: Box) {
 	push_stack(&core.clip_stack, box)
 
+	append_draw_call(current_layer().?.index)
 	if core.current_draw_call != nil {
 		core.current_draw_call.clip_box = box
 		return
 	}
-	append_draw_call(current_layer().?.index)
 }
 
 pop_clip :: proc() {

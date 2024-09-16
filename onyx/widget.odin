@@ -174,7 +174,7 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 
 	if widget.frames == core.frames {
 		fmt.printf(
-			"Two or more widgets with the same ID '%v' were called in the same frame\n",
+			"More than one widget with the same ID '%v' were called in the same frame\n",
 			widget.id,
 		)
 		return nil, false

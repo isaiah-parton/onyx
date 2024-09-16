@@ -29,7 +29,7 @@ Graphics :: struct {
 	// Settings
 	sample_count:                                int,
 	surface_config:                              wgpu.SurfaceConfiguration,
-	device_limits:                              wgpu.Limits,
+	device_limits:                               wgpu.Limits,
 	// Resources
 	uniform_bind_group, texture_bind_group:      wgpu.BindGroup,
 	texture_bind_group_layout:                   wgpu.BindGroupLayout,
@@ -67,12 +67,8 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	// Create the wgpu instance
 	when ODIN_OS == .Windows {
 		gfx.instance = wgpu.CreateInstance(
-			&{
-				nextInChain = &wgpu.InstanceExtras {
-					sType = .InstanceExtras,
-					backends = {.DX12},
-				},
-			})
+			&{nextInChain = &wgpu.InstanceExtras{sType = .InstanceExtras, backends = {.DX12}}},
+		)
 	} else {
 		gfx.instance = wgpu.CreateInstance()
 	}
@@ -122,13 +118,22 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		// Set adapter
 		gfx.adapter = adapter
 		// Request a device
-		wgpu.AdapterRequestDevice(adapter, &{
-			deviceLostUserdata = gfx,
-			deviceLostCallback = proc "c" (reason: wgpu.DeviceLostReason, message: cstring, userdata: rawptr) {
-				context = runtime.default_context()
-				fmt.println(reason, message)
-			}
-		}, on_device, gfx)
+		wgpu.AdapterRequestDevice(
+			adapter,
+			&{
+				deviceLostUserdata = gfx,
+				deviceLostCallback = proc "c" (
+					reason: wgpu.DeviceLostReason,
+					message: cstring,
+					userdata: rawptr,
+				) {
+					context = runtime.default_context()
+					fmt.println(reason, message)
+				},
+			},
+			on_device,
+			gfx,
+		)
 	}
 
 	on_device :: proc "c" (
@@ -146,7 +151,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		gfx.device = device
 		if supported_limits, ok := wgpu.DeviceGetLimits(gfx.device); ok {
 			gfx.device_limits = supported_limits.limits
-			fmt.println(gfx.device_limits)
 		}
 		// Initial surface config
 		surface_capabilities := wgpu.SurfaceGetCapabilities(gfx.surface, gfx.adapter)

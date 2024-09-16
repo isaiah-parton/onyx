@@ -20,6 +20,7 @@ Option :: enum {
 }
 
 Component :: enum {
+	Tables,
 	Button,
 	Data_Input,
 	Boolean,
@@ -42,12 +43,20 @@ Component_Showcase :: struct {
 	option:       Option,
 	date_range:   [2]Maybe(onyx.Date),
 	month_offset: int,
+	entries:      []Struct,
 }
 
 State :: struct {
 	component_showcase: Component_Showcase,
 	images:             [4]onyx.Image,
 }
+
+Struct :: struct {
+	name:   string,
+	active: bool,
+	value:  f32,
+}
+
 
 do_component_showcase :: proc(state: ^Component_Showcase) {
 	using onyx
@@ -67,6 +76,36 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	shrink(30)
 
 	#partial switch state.section.component {
+	case .Tables:
+		set_side(.Left)
+
+
+		rows_active: [dynamic]bool
+		resize(&rows_active, len(state.entries))
+		begin_table(
+			{
+				columns = {
+					{name = "Active", width = 50},
+					{name = "Name", width = 150},
+					{name = "Wage", width = 100},
+				},
+				row_count = len(state.entries),
+				max_displayed_rows = 3,
+			},
+		)
+		for &entry, e in state.entries {
+			begin_table_row({index = e})
+			if was_clicked(do_checkbox({state = entry.active})) {
+				entry.active = !entry.active
+			}
+			do_text_input({content = &entry.name})
+			if value, ok := do_slider(Slider_Info(f32){value = entry.value}).value.?; ok {
+				entry.value = value
+			}
+			end_table_row()
+		}
+		end_table()
+
 	case .Scroll_Zone:
 		set_side(.Left)
 		set_width(300)
@@ -186,15 +225,11 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_width(200)
 		set_height(120)
 		do_text_input(
-			{
-				builder = &state.text_builder,
-				placeholder = "Type something",
-				multiline = true,
-			},
+			{content = &state.text_builder, placeholder = "Type something", multiline = true},
 		)
 		add_space(10)
 		set_height_auto()
-		do_text_input({builder = &state.text_builder})
+		do_text_input({content = &state.text_builder})
 
 	case .Graph:
 		set_side(.Left)
@@ -293,6 +328,13 @@ main :: proc() {
 	state: State
 
 	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
+	state.component_showcase.entries = {
+		{"crank", true, 1.75},
+		{"yank", false, 2.5},
+		{"dank", false, 4.25},
+		{"shrank", true, 0.5},
+		{"stank", true, 9.25},
+	}
 
 	onyx.init(1600, 900, "demo")
 	onyx.set_style_font(.Medium, "fonts/Geist-Medium.ttf")
@@ -302,9 +344,9 @@ main :: proc() {
 	onyx.set_style_font(.Icon, "fonts/remixicon.ttf")
 
 	for !glfw.WindowShouldClose(onyx.core.window) {
-		onyx.begin_frame()
+		onyx.new_frame()
 		do_component_showcase(&state.component_showcase)
-		onyx.end_frame()
+		onyx.render()
 	}
 
 	onyx.uninit()

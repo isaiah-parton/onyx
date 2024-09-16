@@ -208,6 +208,7 @@ init :: proc(width, height: i32, title: cstring = nil) {
 		append(&core.runes, char)
 	})
 	glfw.SetKeyCallback(core.window, proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
+		key := max(key, 0)
 		switch action {
 		case glfw.PRESS:
 			core.keys[Keyboard_Key(key)] = true
@@ -247,11 +248,15 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.style.shape = default_style_shape()
 }
 
-begin_frame :: proc() {
+new_frame :: proc() {
 	// Timings
 	time.sleep(
-		max(0, time.Duration(time.Second) / time.Duration(max(core.desired_fps, DEFAULT_DESIRED_FPS)) -
-		time.since(core.last_frame_time)),
+		max(
+			0,
+			time.Duration(time.Second) /
+				time.Duration(max(core.desired_fps, DEFAULT_DESIRED_FPS)) -
+			time.since(core.last_frame_time),
+		),
 	)
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
@@ -267,6 +272,10 @@ begin_frame :: proc() {
 
 	// Handle window events
 	glfw.PollEvents()
+
+	// Set and reset cursor
+	glfw.SetCursor(core.window, core.cursors[core.cursor_type])
+	core.cursor_type = .Normal
 
 	if key_pressed(.Escape) {
 		core.focused_widget = 0
@@ -330,37 +339,13 @@ begin_frame :: proc() {
 	set_texture(core.font_atlas.texture.internal)
 }
 
-end_frame :: proc() {
-	begin_layer({box = view_box(), sorting = .Above, kind = .Debug, options = {.Ghost}})
-	draw_text(
-		{},
-		{
-			text = fmt.tprintf("fps: %i", core.frames_this_second),
-			font = core.style.fonts[.Regular],
-			size = 20,
-		},
-		255,
-	)
-	draw_text(
-		{0, 20},
-		{
-			text = fmt.tprintf("frames drawn: %i", core.drawn_frames),
-			font = core.style.fonts[.Regular],
-			size = 20,
-		},
-		255,
-	)
-	end_layer()
+render :: proc() {
+	do_debug_layer()
 
 	assert(core.clip_stack.height == 0)
 
 	// Pop the last vertex matrix
 	pop_matrix()
-
-	// Set and reset cursor
-	glfw.SetCursor(core.window, core.cursors[core.cursor_type])
-	// sapp.set_mouse_cursor(core.cursor_type)
-	core.cursor_type = .Normal
 
 	// Update layer ids
 	core.highest_layer_index = 0

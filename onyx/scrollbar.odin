@@ -47,28 +47,7 @@ add_scrollbar :: proc(info: Scrollbar_Info) -> (result: Scrollbar_Result) {
 
 	if widget.visible {
 		draw_rounded_box_fill(widget.box, rounding, core.style.color.background)
-		// draw_rounded_box_fill(handle_box, rounding, core.style.color.substance)
-		set_vertex_uv({})
-		set_vertex_color(core.style.color.accent)
-		if info.vertical {
-			v0 := add_vertex({handle_box.lo.x, (handle_box.lo.y + handle_box.hi.y) / 2})
-			v1 := add_vertex({handle_box.hi.x, (handle_box.lo.y + handle_box.hi.y) / 2})
-			set_vertex_color(fade(core.style.color.accent, 0))
-			v2 := add_vertex(handle_box.lo)
-			v3 := add_vertex({handle_box.hi.x, handle_box.lo.y})
-			v4 := add_vertex(handle_box.hi)
-			v5 := add_vertex({handle_box.lo.x, handle_box.hi.y})
-			add_indices(v0, v1, v2, v1, v3, v2, v0, v5, v4, v0, v1, v4)
-		} else {
-			v0 := add_vertex({(handle_box.lo.x + handle_box.hi.x) / 2, handle_box.lo.y})
-			v1 := add_vertex({(handle_box.lo.x + handle_box.hi.x) / 2, handle_box.hi.y})
-			set_vertex_color(fade(core.style.color.accent, 0))
-			v2 := add_vertex(handle_box.lo)
-			v3 := add_vertex({handle_box.lo.x, handle_box.hi.y})
-			v4 := add_vertex(handle_box.hi)
-			v5 := add_vertex({handle_box.hi.x, handle_box.lo.y})
-			add_indices(v0, v1, v2, v1, v3, v2, v0, v5, v4, v0, v1, v4)
-		}
+		draw_rounded_box_fill(handle_box, rounding, core.style.color.substance)
 	}
 
 	if .Pressed in widget.state {

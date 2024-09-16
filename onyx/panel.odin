@@ -225,7 +225,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		}
 	}
 
-	push_layout(Layout{box = inner_box, next_side = .Top})
+	push_layout(Layout{box = inner_box, next_cut_side = .Top})
 
 	return true
 }

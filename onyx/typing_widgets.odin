@@ -14,7 +14,10 @@ Text_Input_Decal :: enum {
 
 Text_Input_Info :: struct {
 	using _:                      Generic_Widget_Info,
-	builder:                      ^strings.Builder,
+	content:                      union {
+		^strings.Builder,
+		^string,
+	},
 	placeholder:                  string,
 	auto_focus:                   bool,
 	numeric, integer:             bool,
@@ -24,6 +27,7 @@ Text_Input_Info :: struct {
 
 Text_Input_Widget_Kind :: struct {
 	editor:    Text_Editor,
+	builder:   strings.Builder,
 	anchor:    int,
 	icon_time: f32,
 }
@@ -41,7 +45,7 @@ make_text_input :: proc(info: Text_Input_Info, loc := #caller_location) -> Text_
 }
 
 add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
-	if info.builder == nil {
+	if info.content == nil {
 		return
 	}
 
@@ -53,11 +57,19 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 
 	result.self = widget
 
-	variant := widget_kind(widget, Text_Input_Widget_Kind)
-	e := &variant.editor
+	kind := widget_kind(widget, Text_Input_Widget_Kind)
+	e := &kind.editor
+
+	// Use given string builder or provision one
+	builder, has_builder := info.content.(^strings.Builder)
+	if !has_builder {
+		kind.builder = strings.builder_make(widget.allocator)
+		builder = &kind.builder
+		strings.write_string(builder, info.content.(^string)^)
+	}
 
 	widget.focus_time = animate(widget.focus_time, 0.15, .Focused in widget.state)
-	variant.icon_time = animate(variant.icon_time, 0.2, info.decal != .None)
+	kind.icon_time = animate(kind.icon_time, 0.2, info.decal != .None)
 
 	// Hover cursor
 	if .Hovered in widget.state {
@@ -88,7 +100,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			allowed: string
 			if info.numeric {
 				allowed = "0123456789."
-				if info.integer || strings.contains_rune(strings.to_string(info.builder^), '.') {
+				if info.integer || strings.contains_rune(strings.to_string(builder^), '.') {
 					allowed = allowed[:len(allowed) - 1]
 				}
 			}
@@ -150,7 +162,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	// Initial text info
 	text_info: Text_Info = {
 		font   = core.style.fonts[.Medium],
-		text   = strings.to_string(info.builder^),
+		text   = strings.to_string(builder^),
 		size   = core.style.content_text_size,
 		hidden = info.hidden,
 	}
@@ -173,7 +185,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	// Initialize editor state when just focused
 	if .Focused in (widget.state - widget.last_state) {
 		make_text_editor(e, widget.allocator, widget.allocator)
-		begin(e, 0, info.builder)
+		begin(e, 0, builder)
 		e.set_clipboard = set_clipboard_string
 		e.get_clipboard = get_clipboard_string
 	}
@@ -183,16 +195,8 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		if widget.visible || .Focused in widget.state {
 			// Draw body
 			draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.background)
-			draw_rounded_box_stroke(
-				widget.box,
-				core.style.rounding,
-				1 + widget.focus_time,
-				interpolate_colors(
-					widget.focus_time,
-					core.style.color.substance,
-					core.style.color.accent,
-				),
-			)
+
+			push_clip(widget.box)
 			// Draw text placeholder
 			if len(text_info.text) == 0 {
 				text_info := text_info
@@ -209,15 +213,17 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			if .Focused in widget.last_state {
 				draw_text_cursor(text_job, text_origin, core.style.color.accent)
 			}
+			pop_clip()
+
 			// Draw decal
-			if variant.icon_time > 0 {
+			if kind.icon_time > 0 {
 				a := box_height(widget.box) / 2
 				center := [2]f32{widget.box.hi.x, widget.box.lo.y} + [2]f32{-a, a}
 				switch info.decal {
 				case .None:
 					break
 				case .Check:
-					scale := [2]f32{1 + 4 * variant.icon_time, 5}
+					scale := [2]f32{1 + 4 * kind.icon_time, 5}
 					begin_path()
 					point(center + {-1, -0.047} * scale)
 					point(center + {-0.333, 0.619} * scale)
@@ -228,6 +234,18 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 					draw_loader(center, 5, core.style.color.content)
 				}
 			}
+
+			draw_rounded_box_stroke(
+				widget.box,
+				core.style.rounding,
+				1 + widget.focus_time,
+				interpolate_colors(
+					widget.focus_time,
+					core.style.color.substance,
+					core.style.color.accent,
+				),
+			)
+
 			// Draw disabled overlay
 			if widget.disable_time > 0 {
 				draw_rounded_box_fill(
@@ -243,7 +261,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		if .Pressed in widget.state && text_job.hovered_rune != -1 {
 			if .Pressed not_in widget.last_state {
 				// Set click anchor
-				variant.anchor = text_job.hovered_rune
+				kind.anchor = text_job.hovered_rune
 				// Initial selection
 				if widget.click_count == 3 {
 					text_editor_execute(e, .Select_All)
@@ -254,7 +272,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			switch widget.click_count {
 
 			case 2:
-				if text_job.hovered_rune < variant.anchor {
+				if text_job.hovered_rune < kind.anchor {
 					if text_info.text[text_job.hovered_rune] == ' ' {
 						e.selection[0] = text_job.hovered_rune
 					} else {
@@ -264,16 +282,16 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 							1,
 						)
 					}
-					e.selection[1] = strings.index_any(text_info.text[variant.anchor:], " \n")
+					e.selection[1] = strings.index_any(text_info.text[kind.anchor:], " \n")
 					if e.selection[1] == -1 {
 						e.selection[1] = len(text_info.text)
 					} else {
-						e.selection[1] += variant.anchor
+						e.selection[1] += kind.anchor
 					}
 				} else {
 					e.selection[1] = max(
 						0,
-						strings.last_index_any(text_info.text[:variant.anchor], " \n") + 1,
+						strings.last_index_any(text_info.text[:kind.anchor], " \n") + 1,
 					)
 					if (text_job.hovered_rune > 0 &&
 						   text_info.text[text_job.hovered_rune - 1] == ' ') {

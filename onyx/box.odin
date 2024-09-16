@@ -165,6 +165,27 @@ align_inner :: proc(b: Box, size: [2]f32, align: [2]Alignment) -> Box {
 	return a
 }
 
+point_aligned_in_box :: proc(box: Box, align_h: Alignment, align_v: Alignment) -> [2]f32 {
+	point: [2]f32
+	switch align_h {
+	case .Near:
+		point.x = box.lo.x
+	case .Far:
+		point.x = box.hi.x
+	case .Middle:
+		point.x = (box.lo.x + box.hi.x) / 2
+	}
+	switch align_v {
+	case .Near:
+		point.y = box.lo.y
+	case .Far:
+		point.y = box.hi.y
+	case .Middle:
+		point.y = (box.lo.y + box.hi.y) / 2
+	}
+	return point
+}
+
 shrink_box_single :: proc(a: Box, amount: f32) -> Box {
 	return {a.lo + amount, a.hi - amount}
 }

@@ -197,7 +197,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	}
 
 	// Set vertex z position
-	append_draw_call(current_layer().?.index)
+	// append_draw_call(current_layer().?.index)
 	push_clip(layer.box)
 	set_global_alpha(layer.opacity)
 
@@ -214,7 +214,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 		Layout {
 			box = {linalg.floor(layer.box.lo), linalg.floor(layer.box.hi)},
 			original_box = layer.box,
-			next_side = .Top,
+			next_cut_side = .Top,
 		},
 	)
 	return true
