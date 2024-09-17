@@ -1,5 +1,7 @@
 package onyx
 
+import "core:math"
+
 // Column formating info
 Table_Column_Info :: struct {
 	name:             string,
@@ -28,14 +30,14 @@ Table_Info :: struct {
 begin_table_row :: proc(info: Table_Row_Info) {
 	push_id(info.index)
 	table_info := current_layout().?.table_info.?
-	begin_layout({side = .Top, size = core.style.shape.table_row_height})
+	begin_layout({side = .Top, size = core.style.table_row_height})
 	set_side(.Left)
 	layout := current_layout().?
+	layout.fixed = true
 	layout.queue_len += copy(layout.size_queue[:], table_info.__widths[:table_info.__widths_len])
 }
 
 end_table_row :: proc() {
-
 	end_layout()
 	pop_id()
 }
@@ -72,15 +74,41 @@ begin_table :: proc(info: Table_Info, loc := #caller_location) -> (ok: bool) {
 	info := make_table(info, loc)
 	widget := begin_widget(info) or_return
 
-	begin_layout({box = widget.box})
-	begin_layout({side = .Top, size = core.style.shape.table_row_height})
-	set_side(.Left)
-	layout := current_layout().?
-	layout.queue_len += copy(layout.size_queue[:], info.__widths[:info.__widths_len])
-
+	begin_container({id = info.id.?, box = widget.box, size = {0, f32(info.row_count) * core.style.table_row_height}}) or_return
+	current_layout().?.table_info = info
+	cut_layout(current_layout().?, .Top, core.style.table_row_height)
 	push_id(info.id.?)
-	set_height_fill()
-	for &column, c in info.columns {
+	ok = true
+	return
+}
+
+// End the current table
+end_table :: proc() {
+	table_info := current_layout().?.table_info.?
+	box := current_layout().?.bounds
+	cnt := current_container().?
+	offset := f32(0)
+	for i in 0..<table_info.__widths_len {
+		if i > 0 {
+			// draw_box_fill({{box.lo.x + offset, box.lo.y}, {box.lo.x + offset + 1, box.hi.y}}, core.style.color.substance)
+		}
+		offset += table_info.__widths[i]
+	}
+
+	// Header
+	bax := get_box_cut_top(box, core.style.table_row_height)
+	// Background and lower border
+	draw_box_fill(bax, core.style.color.foreground)
+	draw_box_fill(get_box_cut_bottom(bax, 1), core.style.color.substance)
+	begin_layout({box = bax})
+	// Set layout sizes
+	layout := current_layout().?
+	set_side(.Left)
+	layout.fixed = true
+	layout.isolated = true
+	layout.queue_len += copy(layout.size_queue[:], table_info.__widths[:table_info.__widths_len])
+	// set_height_fill()
+	for &column, c in table_info.columns {
 		widget := begin_widget({id = hash(c + 1)}) or_continue
 		defer end_widget()
 		button_behavior(widget)
@@ -89,21 +117,14 @@ begin_table :: proc(info: Table_Info, loc := #caller_location) -> (ok: bool) {
 			draw_box_fill(get_box_cut_left(widget.box, 1), core.style.color.substance)
 		}
 	}
+	end_layout()
+	end_container()
+
 	pop_id()
 
-	end_layout()
-	begin_container({id = info.id.?, box = layout_box(), size = {0, f32(info.row_count) * core.style.shape.table_row_height}}) or_return
-	current_layout().?.table_info = info
+	// Table outline
+	draw_rounded_box_stroke(current_widget().?.box, core.style.shape.rounding, 1, core.style.color.substance)
 
-	ok = true
-	return
-}
-
-// End the current table
-end_table :: proc() {
-	end_container()
-	draw_rounded_box_stroke(current_layout().?.original_box, core.style.shape.rounding, 1, core.style.color.substance)
-	end_layout()
 	end_widget()
 }
 

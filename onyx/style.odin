@@ -20,6 +20,7 @@ Style :: struct {
 }
 
 Style_Shape :: struct {
+	visual_size: [2]f32,
 	header_text_size, button_text_size, tab_text_size, content_text_size: f32,
 	text_input_height, button_height:                                     f32,
 	tooltip_rounding, tooltip_padding, panel_padding, rounding:           f32,
@@ -29,7 +30,6 @@ Style_Shape :: struct {
 	menu_padding:                                                         f32,
 	scrollbar_thickness:                                                  f32,
 	table_row_height:                                                     f32,
-	rounded_scrollbars:                                                   bool,
 }
 
 default_style_shape :: proc() -> Style_Shape {
@@ -42,8 +42,9 @@ default_style_shape :: proc() -> Style_Shape {
 		content_text_size = 18,
 		rounding = 0,
 		menu_padding = 5,
-		scrollbar_thickness = 4,
-		table_row_height = 30,
+		scrollbar_thickness = 12,
+		table_row_height = 40,
+		visual_size = {200, 30},
 	}
 }
 

@@ -213,7 +213,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	push_layout(
 		Layout {
 			box = {linalg.floor(layer.box.lo), linalg.floor(layer.box.hi)},
-			original_box = layer.box,
+			bounds = layer.box,
 			next_cut_side = .Top,
 		},
 	)
@@ -237,11 +237,11 @@ end_layer :: proc() {
 	pop_layout()
 	pop_stack(&core.layer_stack)
 
-	// AFTER LAYER!
 	pop_clip()
 
-	// Reset z-level to that of the previous layer or to zero
+	// Append a new draw call for the previous layer if there is one and reset the global alpha
 	if layer, ok := current_layer().?; ok {
+		append_draw_call(layer.index)
 		set_global_alpha(layer.opacity)
 	}
 }

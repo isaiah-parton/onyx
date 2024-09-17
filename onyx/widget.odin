@@ -266,7 +266,7 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 end_widget :: proc() {
 	widget := current_widget().?
 	layout := current_layout().?
-	add_layout_content_size(layout, widget.desired_size)
+	add_layout_content_size(layout, box_size(widget.box) if layout.fixed else widget.desired_size)
 	pop_stack(&core.widget_stack)
 }
 

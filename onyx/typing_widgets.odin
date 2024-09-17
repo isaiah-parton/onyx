@@ -1,6 +1,7 @@
 package onyx
 
 import "core:fmt"
+import "core:math/linalg"
 import "core:slice"
 import "core:strings"
 import "core:time"
@@ -19,7 +20,6 @@ Text_Input_Info :: struct {
 		^string,
 	},
 	placeholder:                  string,
-	auto_focus:                   bool,
 	numeric, integer:             bool,
 	multiline, read_only, hidden: bool,
 	decal:                        Text_Input_Decal,
@@ -42,7 +42,7 @@ Text_Input_Result :: struct {
 make_text_input :: proc(info: Text_Input_Info, loc := #caller_location) -> Text_Input_Info {
 	info := info
 	info.id = hash(loc)
-	info.desired_size = {200, 30}
+	info.desired_size = core.style.visual_size
 	return info
 }
 
@@ -169,7 +169,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		hidden = info.hidden,
 	}
 
-	text_origin := [2]f32{widget.box.lo.x + 5, 0} - kind.offset
+	text_origin := [2]f32{widget.box.lo.x + 5, 0}
 
 	// Offset text origin based on font size
 	if font, ok := &core.fonts[text_info.font].?; ok {
@@ -192,14 +192,33 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 
 	// Make text job
 	if text_job, ok := make_text_job(text_info, e, core.mouse_pos - (text_origin - kind.offset)); ok {
-
-		if result.changed {
-			if text_job.glyphs[text_job.cursor_glyph].pos {
-
+		// Resolve view offset so the cursor is always shown
+		if .Focused in widget.last_state {
+			glyph := text_job.glyphs[text_job.cursor_glyph]
+			glyph_pos := (text_origin - kind.offset) + glyph.pos
+			// The cursor's own bounding box
+			cursor_box := Box{glyph_pos + {-1, -2}, glyph_pos + {1, text_job.line_height + 2}}
+			// The box we want the cursor to stay in
+			inner_box := shrink_box(widget.box, 4)
+			// Move view offset
+			kind.offset.x += max(0, cursor_box.hi.x - inner_box.hi.x)
+			if box_width(inner_box) > box_width(cursor_box) {
+				kind.offset.x -= max(0, inner_box.lo.x - cursor_box.lo.x)
 			}
+			if info.multiline {
+				kind.offset.y += max(0, cursor_box.hi.y - inner_box.hi.y)
+				if box_height(inner_box) > box_height(cursor_box) {
+					kind.offset.y -= max(0, inner_box.lo.y - cursor_box.lo.y)
+				}
+			}
+		} else {
+			kind.offset = {}
 		}
 
-		if widget.visible || .Focused in widget.state {
+		// Apply offset after it's been verified!!
+		text_origin -= kind.offset
+
+		if widget.visible {
 			// Draw body
 			draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.background)
 
@@ -242,7 +261,12 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 				}
 			}
 
-			draw_rounded_box_stroke(widget.box, core.style.rounding, 1 + widget.focus_time, interpolate_colors(widget.focus_time, core.style.color.substance, core.style.color.accent))
+			// Optional outline
+			if info.multiline {
+				draw_rounded_box_stroke(widget.box, core.style.rounding, 1 + widget.focus_time, interpolate_colors(widget.focus_time, core.style.color.substance, core.style.color.accent))
+			} else {
+				draw_box_fill(get_box_cut_bottom(widget.box, 1 + widget.focus_time), interpolate_colors(widget.focus_time, core.style.color.substance, core.style.color.accent))
+			}
 
 			// Draw disabled overlay
 			if widget.disable_time > 0 {

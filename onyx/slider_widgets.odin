@@ -17,7 +17,7 @@ Slider_Result :: struct($T: typeid) {
 make_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T) {
 	info := info
 	info.id = hash(loc)
-	info.desired_size = {100, 20}
+	info.desired_size = {100, core.style.visual_size.y}
 	info.hi = max(info.hi, info.lo + 1)
 	return info
 }
@@ -76,6 +76,7 @@ make_box_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slide
 	info := info
 	info.id = hash(loc)
 	info.hi = max(info.hi, info.lo + 1)
+	info.desired_size = {100, core.style.visual_size.y}
 	return info
 }
 

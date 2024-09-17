@@ -334,8 +334,6 @@ new_frame :: proc() {
 	// Process widgets
 	process_widgets()
 
-	// Push initial matrix
-	push_matrix()
 	set_texture(core.font_atlas.texture.internal)
 }
 
@@ -343,9 +341,11 @@ render :: proc() {
 	do_debug_layer()
 
 	assert(core.clip_stack.height == 0)
-
-	// Pop the last vertex matrix
-	pop_matrix()
+	assert(core.matrix_stack.height == 0)
+	assert(core.layer_stack.height == 0)
+	assert(core.layout_stack.height == 0)
+	assert(core.container_stack.height == 0)
+	assert(core.widget_stack.height == 0)
 
 	// Update layer ids
 	core.highest_layer_index = 0

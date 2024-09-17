@@ -7,14 +7,12 @@ Layout_Info :: struct {
 	box:        Maybe(Box),
 	side:       Maybe(Side),
 	size:       Maybe(f32),
-	show_lines: bool,
 }
 
 // Layout
 // Next size = `content_sizes[content_index]`
 Layout :: struct {
-	original_box, box: Box,
-	show_lines:        bool,
+	bounds, box: Box,
 	// Side from which new content is cut
 	next_cut_side:     Side,
 	next_align:        Alignment,
@@ -28,6 +26,11 @@ Layout :: struct {
 	// Store accumulative size for next frame
 	content_size:      [2]f32,
 	spacing_size:      [2]f32,
+	// When true, only exact sizes are accumulated
+	// instead of desired sizes
+	fixed: bool,
+	// Isolated from previous layout?
+	isolated: bool,
 	// Attachments
 	table_info:        Maybe(Table_Info),
 }
@@ -61,9 +64,8 @@ begin_layout :: proc(info: Layout_Info) -> bool {
 	box := info.box.? or_else cut_box(&last_layout.box, side, size)
 	layout := Layout {
 		box           = box,
-		original_box  = box,
+		bounds  = box,
 		side          = info.side,
-		show_lines    = info.show_lines,
 		next_cut_side = .Left if int(side) > 1 else .Top,
 		next_size     = last_layout.next_size,
 		next_padding  = last_layout.next_padding,
@@ -75,25 +77,23 @@ end_layout :: proc() {
 	layout := current_layout().?
 	pop_layout()
 
-	// Update previous layout's content size
-	if previous_layout, ok := current_layout().?; ok {
-		add_layout_content_size(previous_layout, layout.content_size + layout.spacing_size)
+	if layout.isolated {
+		return
 	}
 
-	// Draw layout lines
-	if layout.show_lines {
+	// Update previous layout's content size
+	if previous_layout, ok := current_layout().?; ok {
+		size := layout.content_size + layout.spacing_size
 		if side, ok := layout.side.?; ok {
-			box := layout.original_box
-			switch layout.side {
-			case .Top:
-				draw_box_fill({{box.lo.x, box.hi.y - 1}, box.hi}, core.style.color.substance)
-			case .Bottom:
-				draw_box_fill({box.lo, {box.hi.x, box.lo.y + 1}}, core.style.color.substance)
-			case .Left:
-				draw_box_fill({{box.hi.x - 1, box.lo.y}, box.hi}, core.style.color.substance)
-			case .Right:
-				draw_box_fill({box.lo, {box.lo.x + 1, box.hi.y}}, core.style.color.substance)
+			if int(side) > 1 {
+				previous_layout.content_size.x = max(previous_layout.content_size.x, size.x)
+				previous_layout.content_size.y += size.y
+			} else {
+				previous_layout.content_size.y = max(previous_layout.content_size.y, size.y)
+				previous_layout.content_size.x += size.x
 			}
+		} else {
+			add_layout_content_size(previous_layout, size)
 		}
 	}
 }

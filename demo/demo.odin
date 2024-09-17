@@ -37,13 +37,15 @@ Component_Showcase :: struct {
 	light_mode:   bool,
 	section:      Component_Section,
 	checkboxes:   [Option]bool,
-	text_builder: strings.Builder,
+	bio: strings.Builder,
+	full_name: strings.Builder,
+	birth_country: strings.Builder,
 	slider_value: f32,
 	start_time:   time.Time,
 	option:       Option,
 	date_range:   [2]Maybe(onyx.Date),
 	month_offset: int,
-	entries:      []Table_Entry,
+	entries:      [dynamic]Table_Entry,
 }
 
 State :: struct {
@@ -53,8 +55,10 @@ State :: struct {
 
 Table_Entry :: struct {
 	name:   string,
-	active: bool,
-	value:  f32,
+	hash: string,
+	public_key: string,
+	private_key: string,
+	location: string,
 }
 
 do_component_showcase :: proc(state: ^Component_Showcase) {
@@ -63,7 +67,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	layer_box := shrink_box(view_box(), 100)
 	begin_layer({box = layer_box, kind = .Background})
 	foreground()
-	begin_layout({size = 65, side = .Top, show_lines = true})
+	begin_layout({size = 65, side = .Top})
 	shrink(15)
 	if index, ok := do_breadcrumb({index = int(state.section.component), options = reflect.enum_field_names(Component)}).index.?;
 	   ok {
@@ -76,34 +80,44 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 
 	#partial switch state.section.component {
 	case .Tables:
-		set_side(.Left)
-
-
+		set_side(.Top)
 		rows_active: [dynamic]bool
 		resize(&rows_active, len(state.entries))
 		begin_table(
 			{
 				columns = {
-					{name = "Active", width = 50},
-					{name = "Name", width = 150},
-					{name = "Wage", width = 100},
+					{name = "Name", width = 100},
+					{name = "Hash", width = 1200},
+					{name = "Public Key", width = 120},
+					{name = "Private Key", width = 120},
+					{name = "Location", width = 100},
 				},
 				row_count = len(state.entries),
-				max_displayed_rows = 3,
+				max_displayed_rows = 15,
 			},
 		)
 		for &entry, e in state.entries {
 			begin_table_row({index = e})
 			set_width_auto()
-			if was_clicked(do_checkbox({state = entry.active})) {
-				entry.active = !entry.active
-			}
 			if result := do_text_input({content = &entry.name}); result.changed {
 				delete(entry.name)
 				entry.name = strings.clone(result.text)
 			}
-			if value, ok := do_box_slider(Slider_Info(f32){value = entry.value}).value.?; ok {
-				entry.value = value
+			if result := do_text_input({content = &entry.hash}); result.changed {
+				delete(entry.hash)
+				entry.hash = strings.clone(result.text)
+			}
+			if result := do_text_input({content = &entry.public_key}); result.changed {
+				delete(entry.public_key)
+				entry.public_key = strings.clone(result.text)
+			}
+			if result := do_text_input({content = &entry.private_key}); result.changed {
+				delete(entry.private_key)
+				entry.private_key = strings.clone(result.text)
+			}
+			if result := do_text_input({content = &entry.location}); result.changed {
+				delete(entry.location)
+				entry.location = strings.clone(result.text)
 			}
 			end_table_row()
 		}
@@ -142,12 +156,18 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 
 	case .Slider:
 		set_side(.Top)
+		do_label({text = "Normal"})
 		state.slider_value =
 			do_slider(Slider_Info(f32){value = state.slider_value}).value.? or_else state.slider_value
+		add_space(10)
+		do_label({text = "Box"})
+		add_space(10)
+		state.slider_value =
+			do_box_slider(Slider_Info(f32){value = state.slider_value}).value.? or_else state.slider_value
 
 	case .Button:
 		set_side(.Top)
-		do_label({text = "Fit to label", font_style = .Bold, font_size = 24})
+		do_label({text = "Fit to label"})
 		add_space(10)
 		if do_layout({size = 30}) {
 			set_width_auto()
@@ -190,7 +210,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 
 	case .Boolean:
 		set_side(.Top)
-		do_label({text = "Checkboxes", font_style = .Bold, font_size = 24})
+		do_label({text = "Checkboxes"})
 		add_space(10)
 		for member, m in Option {
 			push_id(m)
@@ -206,7 +226,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		}
 
 		add_space(10)
-		do_label({text = "Radio Buttons", font_style = .Bold, font_size = 24})
+		do_label({text = "Radio Buttons"})
 		add_space(10)
 		enable_widgets(false)
 		for member, m in Option {
@@ -225,14 +245,17 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 
 	case .Data_Input:
 		set_side(.Top)
-		set_width(200)
-		set_height(120)
-		do_text_input(
-			{content = &state.text_builder, placeholder = "Type something", multiline = true},
-		)
+		set_width(250)
 		add_space(10)
 		set_height_auto()
-		do_text_input({content = &state.text_builder})
+		do_text_input({content = &state.full_name, placeholder = "Full Name", decal = .Check})
+		add_space(10)
+		do_text_input({content = &state.birth_country, placeholder = "Country of birth"})
+		add_space(10)
+		set_height(120)
+		do_text_input(
+			{content = &state.bio, placeholder = "Bio", multiline = true},
+		)
 
 	case .Graph:
 		set_side(.Left)
@@ -331,12 +354,15 @@ main :: proc() {
 	state: State
 
 	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
-	state.component_showcase.entries = {
-		{strings.clone("crank"), true, 1.75},
-		{strings.clone("yank"), false, 2.5},
-		{strings.clone("dank"), false, 4.25},
-		{strings.clone("shrank"), true, 0.5},
-		{strings.clone("stank"), true, 9.25},
+
+	for i in 0..<100 {
+		append(&state.component_showcase.entries, Table_Entry{
+			hash = fmt.aprintf("%x", rand.int31()),
+			name = fmt.aprintf("%x", rand.int31()),
+			public_key = fmt.aprintf("%x", rand.int31()),
+			private_key = fmt.aprintf("%x", rand.int31()),
+			location = fmt.aprintf("%x", rand.int31()),
+		})
 	}
 
 	onyx.init(1600, 900, "demo")

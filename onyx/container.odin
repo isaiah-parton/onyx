@@ -43,7 +43,7 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 	// Minimum size
 	cnt.size = linalg.max(
 		cnt.size,
-		box_size(cnt.box) - cnt.scroll_time.yx * core.style.shape.scrollbar_thickness,
+		box_size(cnt.box),
 	)
 
 	// Mouse wheel input
@@ -73,21 +73,21 @@ end_container :: proc() {
 	cnt.size = layout.content_size + layout.spacing_size
 
 	//TODO: Remove this
-	draw_text(
-		cnt.box.lo,
-		{text = fmt.tprintf("%.1f", box_size(cnt.box)), font = core.style.fonts[.Light], size = 20},
-		{255, 255, 255, 255},
-	)
-	draw_text(
-		cnt.box.lo + {0, 20},
-		{text = fmt.tprintf("%.1f", cnt.size), font = core.style.fonts[.Light], size = 20},
-		{255, 255, 255, 255},
-	)
-	draw_text(
-		cnt.box.lo + {0, 40},
-		{text = fmt.tprintf("%.1f", cnt.scroll), font = core.style.fonts[.Light], size = 20},
-		{255, 255, 255, 255},
-	)
+	// draw_text(
+	// 	cnt.box.lo,
+	// 	{text = fmt.tprintf("%.1f", box_size(cnt.box)), font = core.style.fonts[.Light], size = 20},
+	// 	{255, 255, 255, 255},
+	// )
+	// draw_text(
+	// 	cnt.box.lo + {0, 20},
+	// 	{text = fmt.tprintf("%.1f", cnt.size), font = core.style.fonts[.Light], size = 20},
+	// 	{255, 255, 255, 255},
+	// )
+	// draw_text(
+	// 	cnt.box.lo + {0, 40},
+	// 	{text = fmt.tprintf("%.1f", cnt.scroll), font = core.style.fonts[.Light], size = 20},
+	// 	{255, 255, 255, 255},
+	// )
 
 	// Clamp scroll
 	cnt.desired_scroll = linalg.max(
@@ -109,16 +109,15 @@ end_container :: proc() {
 
 	end_layout()
 
-	inner_box := shrink_box(cnt.box, 2)
 	if cnt.scroll_y {
 		box := get_box_cut_right(
-			inner_box,
+			cnt.box,
 			cnt.scroll_time.y * core.style.shape.scrollbar_thickness,
 		)
 		if cnt.scroll_x {
 			box.hi.y -= cnt.scroll_time.x * core.style.shape.scrollbar_thickness
 		}
-		if pos, ok := do_scrollbar({vertical = true, box = box, pos = cnt.scroll.y, travel = cnt.size.y - box_height(cnt.box), handle_size = box_height(box) * box_height(cnt.box) / cnt.size.y}).pos.?;
+		if pos, ok := do_scrollbar({make_visible = abs(delta_scroll.y) > 0.1, vertical = true, box = box, pos = cnt.scroll.y, travel = cnt.size.y - box_height(cnt.box), handle_size = box_height(box) * box_height(cnt.box) / cnt.size.y}).pos.?;
 		   ok {
 			cnt.scroll.y = pos
 			cnt.desired_scroll.y = pos
@@ -126,13 +125,13 @@ end_container :: proc() {
 	}
 	if cnt.scroll_x {
 		box := get_box_cut_bottom(
-			inner_box,
+			cnt.box,
 			cnt.scroll_time.x * core.style.shape.scrollbar_thickness,
 		)
 		if cnt.scroll_y {
 			box.hi.x -= cnt.scroll_time.y * core.style.shape.scrollbar_thickness
 		}
-		if pos, ok := do_scrollbar({box = box, pos = cnt.scroll.x, travel = cnt.size.x - box_width(cnt.box), handle_size = box_width(box) * box_width(cnt.box) / cnt.size.x}).pos.?;
+		if pos, ok := do_scrollbar({make_visible = abs(delta_scroll.x) > 0.1, box = box, pos = cnt.scroll.x, travel = cnt.size.x - box_width(cnt.box), handle_size = box_width(box) * box_width(cnt.box) / cnt.size.x}).pos.?;
 		   ok {
 			cnt.scroll.x = pos
 			cnt.desired_scroll.x = pos
