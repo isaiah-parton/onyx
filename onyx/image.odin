@@ -14,7 +14,7 @@ Image :: struct {
 }
 
 Texture :: struct {
-	internal: wgpu.Texture,
+	internal:      wgpu.Texture,
 	width, height: int,
 }
 
@@ -79,6 +79,35 @@ draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color)
 	add_indices(tl, br, bl, tl, tr, br)
 
 	set_texture(last_texture)
+}
+
+draw_texture_portion_clipped :: proc(texture: Texture, source, target: Box, tint: Color) {
+	source := source
+	target := target
+	if clip, ok := current_clip().?; ok {
+		left := clip.lo.x - target.lo.x
+		if left > 0 {
+			target.lo.x += left
+			source.lo.x += left
+		}
+		top := clip.lo.y - target.lo.y
+		if top > 0 {
+			target.lo.y += top
+			source.lo.y += top
+		}
+		right := target.hi.x - clip.hi.x
+		if right > 0 {
+			target.hi.x -= right
+			source.hi.x -= right
+		}
+		bottom := target.hi.y - clip.hi.y
+		if bottom > 0 {
+			target.hi.y -= bottom
+			source.hi.y -= bottom
+		}
+		if target.lo.x >= target.hi.x || target.lo.y >= target.hi.y do return
+	}
+	draw_texture_portion(texture, source, target, tint)
 }
 
 set_texture :: proc(texture: wgpu.Texture) {

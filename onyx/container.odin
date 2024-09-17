@@ -55,11 +55,9 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 		cnt.desired_scroll -= delta_scroll * 100
 	}
 
-	append_draw_call(current_layer().?.index)
 	push_clip(cnt.box)
+	append_draw_call(current_layer().?.index)
 	push_stack(&core.container_stack, cnt)
-
-	draw_rounded_box_stroke(cnt.box, core.style.shape.rounding, 1, core.style.color.substance)
 
 	layout_pos := cnt.box.lo - linalg.floor(cnt.scroll)
 	layout_size := linalg.max(cnt.size, info.size)
@@ -75,21 +73,21 @@ end_container :: proc() {
 	cnt.size = layout.content_size + layout.spacing_size
 
 	//TODO: Remove this
-	// draw_text(
-	// 	cnt.box.lo,
-	// 	{text = fmt.tprintf("%.1f", box_size(cnt.box)), font = core.style.fonts[.Light], size = 20},
-	// 	{255, 255, 255, 255},
-	// )
-	// draw_text(
-	// 	cnt.box.lo + {0, 20},
-	// 	{text = fmt.tprintf("%.1f", cnt.size), font = core.style.fonts[.Light], size = 20},
-	// 	{255, 255, 255, 255},
-	// )
-	// draw_text(
-	// 	cnt.box.lo + {0, 40},
-	// 	{text = fmt.tprintf("%.1f", cnt.scroll), font = core.style.fonts[.Light], size = 20},
-	// 	{255, 255, 255, 255},
-	// )
+	draw_text(
+		cnt.box.lo,
+		{text = fmt.tprintf("%.1f", box_size(cnt.box)), font = core.style.fonts[.Light], size = 20},
+		{255, 255, 255, 255},
+	)
+	draw_text(
+		cnt.box.lo + {0, 20},
+		{text = fmt.tprintf("%.1f", cnt.size), font = core.style.fonts[.Light], size = 20},
+		{255, 255, 255, 255},
+	)
+	draw_text(
+		cnt.box.lo + {0, 40},
+		{text = fmt.tprintf("%.1f", cnt.scroll), font = core.style.fonts[.Light], size = 20},
+		{255, 255, 255, 255},
+	)
 
 	// Clamp scroll
 	cnt.desired_scroll = linalg.max(
@@ -143,6 +141,7 @@ end_container :: proc() {
 
 	pop_clip()
 	pop_stack(&core.container_stack)
+	append_draw_call(current_layer().?.index)
 }
 
 current_container :: proc() -> Maybe(^Container) {
@@ -154,20 +153,10 @@ current_container :: proc() -> Maybe(^Container) {
 
 push_clip :: proc(box: Box) {
 	push_stack(&core.clip_stack, box)
-
-	append_draw_call(current_layer().?.index)
-	if core.current_draw_call != nil {
-		core.current_draw_call.clip_box = box
-		return
-	}
 }
 
 pop_clip :: proc() {
 	pop_stack(&core.clip_stack)
-
-	if layer, ok := current_layer().?; ok {
-		append_draw_call(current_layer().?.index)
-	}
 }
 
 current_clip :: proc() -> Maybe(Box) {

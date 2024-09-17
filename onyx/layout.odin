@@ -10,34 +10,6 @@ Layout_Info :: struct {
 	show_lines: bool,
 }
 
-// Simple FIFO element organizer
-Queue :: struct($T: typeid, $N: int) {
-	items:  [N]T,
-	offset: int,
-	len:    int,
-}
-queue_append_elem :: proc(queue: ^Queue($T, $N), item: T) {
-	if queue.len >= N {
-		return
-	}
-	queue.items[queue.len] = item
-	queue.len += 1
-}
-queue_append_elems :: proc(queue: ^Queue($T, $N), items: ..T) {
-	if queue.len >= N {
-		return
-	}
-	queue.len += copy(queue.items[queue.len:], ..items)
-}
-queue_pop_front :: proc(queue: ^Queue($T, $N)) -> T {
-	queue.offset = min(queue.len - 1, queue.offset - 1)
-	return queue.items[queue.offset - 1]
-}
-queue_append :: proc {
-	queue_append_elem,
-	queue_append_elems,
-}
-
 // Layout
 // Next size = `content_sizes[content_index]`
 Layout :: struct {
@@ -65,7 +37,7 @@ queue_layout_size :: proc(layout: ^Layout, size: f32) {
 	layout.queue_len += 1
 }
 
-next_queued_layout_size :: proc(layout: ^Layout) -> Maybe([2]f32) {
+next_queued_layout_size :: proc(layout: ^Layout) -> Maybe(f32) {
 	if layout.queue_offset < layout.queue_len {
 		result := layout.size_queue[layout.queue_offset]
 		layout.queue_offset += 1
@@ -152,7 +124,11 @@ layout_box :: proc() -> Box {
 cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -> Box {
 	side := side.? or_else layout.next_cut_side
 	size := size.? or_else layout.next_size
-	box := cut_box(&layout.box, side, size[int(side) / 2])
+	box := cut_box(
+		&layout.box,
+		side,
+		next_queued_layout_size(layout).? or_else size[int(side) / 2],
+	)
 	return box
 }
 
@@ -165,11 +141,14 @@ next_widget_box :: proc(info: Generic_Widget_Info) -> Box {
 	layout := current_layout().?
 	// Decide the size of the box
 	size := linalg.min(
-		next_queued_layout_size(layout).? or_else (info.desired_size if info.fixed_size else linalg.max(layout.next_size, info.desired_size)),
+		(info.desired_size if info.fixed_size else linalg.max(layout.next_size, info.desired_size)),
 		layout.box.hi - layout.box.lo,
 	)
 	// Cut the initial box
 	box := cut_layout(layout, nil, size)
+	if layout.queue_offset > 0 {
+		size = box_size(box)
+	}
 	// Account for alignment if the content is smaller than the cut box
 	if int(layout.next_cut_side) > 1 {
 		if size.x < box_width(box) {

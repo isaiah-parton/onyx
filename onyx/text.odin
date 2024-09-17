@@ -254,7 +254,7 @@ draw_text_highlight :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 	for line, l in job.lines {
 		if line.highlight[0] < line.highlight[1] {
 			line_top: f32 = job.line_height * f32(l)
-			draw_box_fill(
+			draw_box_fill_clipped(
 				{
 					pos + {line.highlight[0] - 1, line_top},
 					pos + {line.highlight[1] + 1, line_top + job.line_height},
@@ -270,7 +270,7 @@ draw_text_glyphs :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 	for glyph in job.glyphs {
 		if glyph.codepoint == 0 || glyph.source == {} do continue
 		glyph_pos := pos + glyph.pos + glyph.offset
-		draw_texture_portion(
+		draw_texture_portion_clipped(
 			core.font_atlas.texture,
 			glyph.source,
 			{glyph_pos, glyph_pos + (glyph.source.hi - glyph.source.lo)},
@@ -285,7 +285,7 @@ draw_text_cursor :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 	}
 	glyph := job.glyphs[job.cursor_glyph]
 	glyph_pos := pos + glyph.pos
-	draw_box_fill({glyph_pos + {-1, -2}, glyph_pos + {1, job.line_height + 2}}, color)
+	draw_box_fill_clipped({glyph_pos + {-1, -2}, glyph_pos + {1, job.line_height + 2}}, color)
 }
 
 destroy_font :: proc(font: ^Font) {
@@ -474,9 +474,9 @@ get_font_size :: proc(font: ^Font, size: f32) -> (data: ^Font_Size, ok: bool) {
 		// Compute vertical metrics
 		ascent, descent, line_gap: i32
 		ttf.GetFontVMetrics(&font.data, &ascent, &descent, &line_gap)
-		data.ascent = f32(f32(ascent) * data.scale)
-		data.descent = f32(f32(descent) * data.scale)
-		data.line_gap = f32(f32(line_gap) * data.scale)
+		data.ascent = f32(ascent) * data.scale
+		data.descent = f32(descent) * data.scale
+		data.line_gap = f32(line_gap) * data.scale
 
 		ok = true
 	}

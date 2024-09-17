@@ -197,8 +197,8 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	}
 
 	// Set vertex z position
-	// append_draw_call(current_layer().?.index)
 	push_clip(layer.box)
+	append_draw_call(current_layer().?.index)
 	set_global_alpha(layer.opacity)
 
 	// Transform matrix

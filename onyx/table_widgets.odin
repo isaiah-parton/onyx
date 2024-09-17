@@ -48,7 +48,7 @@ make_table :: proc(info: Table_Info, loc := #caller_location) -> Table_Info {
 		make_text_job(
 			{
 				text = column.name,
-				font = core.style.fonts[.Regular],
+				font = core.style.fonts[.Medium],
 				size = core.style.button_text_size,
 				align_h = .Middle,
 				align_v = .Middle,
@@ -60,7 +60,7 @@ make_table :: proc(info: Table_Info, loc := #caller_location) -> Table_Info {
 	}
 	info.__widths_len = len(info.columns)
 	info.desired_size.y =
-		core.style.shape.table_row_height * f32(min(info.row_count, info.max_displayed_rows))
+		core.style.shape.table_row_height * f32(min(info.row_count, info.max_displayed_rows) + 1)
 	return info
 }
 
@@ -84,7 +84,7 @@ begin_table :: proc(info: Table_Info, loc := #caller_location) -> (ok: bool) {
 		widget := begin_widget({id = hash(c + 1)}) or_continue
 		defer end_widget()
 		button_behavior(widget)
-		draw_text_glyphs(column.__label_text_job, box_center(widget.box), core.style.color.content)
+		draw_text_glyphs(column.__label_text_job, box_center(widget.box), fade(core.style.color.content, 0.5))
 		if c > 0 {
 			draw_box_fill(get_box_cut_left(widget.box, 1), core.style.color.substance)
 		}
@@ -92,7 +92,7 @@ begin_table :: proc(info: Table_Info, loc := #caller_location) -> (ok: bool) {
 	pop_id()
 
 	end_layout()
-	begin_container({id = info.id.?, box = layout_box()}) or_return
+	begin_container({id = info.id.?, box = layout_box(), size = {0, f32(info.row_count) * core.style.shape.table_row_height}}) or_return
 	current_layout().?.table_info = info
 
 	ok = true
@@ -102,6 +102,7 @@ begin_table :: proc(info: Table_Info, loc := #caller_location) -> (ok: bool) {
 // End the current table
 end_table :: proc() {
 	end_container()
+	draw_rounded_box_stroke(current_layout().?.original_box, core.style.shape.rounding, 1, core.style.color.substance)
 	end_layout()
 	end_widget()
 }

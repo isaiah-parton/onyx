@@ -364,6 +364,15 @@ draw_box_fill :: proc(box: Box, color: Color) {
 	tr := add_vertex({box.hi.x, box.lo.y})
 	add_indices(tl, br, bl, tl, tr, br)
 }
+draw_box_fill_clipped :: proc(box: Box, color: Color) {
+	box := box
+	if clip, ok := current_clip().?; ok {
+		box.lo = linalg.max(box.lo, clip.lo)
+		box.hi = linalg.min(box.hi, clip.hi)
+		if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
+	}
+	draw_box_fill(box, color)
+}
 draw_box_stroke :: proc(box: Box, thickness: f32, color: Color) {
 	draw_box_fill({box.lo, {box.hi.x, box.lo.y + thickness}}, color)
 	draw_box_fill({{box.lo.x, box.hi.y - thickness}, box.hi}, color)

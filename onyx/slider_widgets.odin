@@ -35,7 +35,7 @@ add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 	widget.box.hi.y -= h / 4
 
 	radius := box_height(widget.box) / 2
-	time := f32(info.value - info.lo) / f32(info.hi - info.lo)
+	time := clamp(f32(info.value - info.lo) / f32(info.hi - info.lo), 0, 1)
 	range_width := box_width(widget.box) - radius * 2
 
 	knob_center := widget.box.lo + radius + {time * range_width, 0}
@@ -69,4 +69,36 @@ add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 
 do_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Result(T) {
 	return add_slider(make_slider(info, loc))
+}
+
+
+make_box_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T) {
+	info := info
+	info.id = hash(loc)
+	info.hi = max(info.hi, info.lo + 1)
+	return info
+}
+
+add_box_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
+	widget, ok := begin_widget(info)
+	if !ok do return
+	result.self = widget
+	defer end_widget()
+	widget.draggable = true
+	button_behavior(widget)
+	if widget.visible {
+		draw_box_fill(widget.box, core.style.color.substance)
+		time := clamp(f32(info.value - info.lo) / f32(info.hi - info.lo), 0, 1)
+		draw_box_fill({widget.box.lo, {widget.box.lo.x + box_width(widget.box) * time, widget.box.hi.y}}, core.style.color.accent)
+	}
+	if .Pressed in widget.state {
+		new_time := clamp((core.mouse_pos.x - widget.box.lo.x) / box_width(widget.box), 0, 1)
+		result.value = info.lo + T(new_time * f32(info.hi - info.lo))
+		core.draw_next_frame = true
+	}
+	return
+}
+
+do_box_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> (result: Slider_Result(T)) {
+	return add_box_slider(make_box_slider(info, loc))
 }

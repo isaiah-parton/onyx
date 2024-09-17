@@ -30,10 +30,12 @@ Text_Input_Widget_Kind :: struct {
 	builder:   strings.Builder,
 	anchor:    int,
 	icon_time: f32,
+	offset:    [2]f32,
 }
 
 Text_Input_Result :: struct {
 	using _:            Generic_Widget_Result,
+	text:               string,
 	changed, submitted: bool,
 }
 
@@ -167,7 +169,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		hidden = info.hidden,
 	}
 
-	text_origin: [2]f32 = {widget.box.lo.x + 5, 0}
+	text_origin := [2]f32{widget.box.lo.x + 5, 0} - kind.offset
 
 	// Offset text origin based on font size
 	if font, ok := &core.fonts[text_info.font].?; ok {
@@ -175,9 +177,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			if info.multiline {
 				text_origin.y = widget.box.lo.y + (font_size.ascent - font_size.descent) / 2
 			} else {
-				text_origin.y =
-					(widget.box.hi.y + widget.box.lo.y) / 2 -
-					(font_size.ascent - font_size.descent) / 2
+				text_origin.y = (widget.box.hi.y + widget.box.lo.y) / 2 - (font_size.ascent - font_size.descent) / 2
 			}
 		}
 	}
@@ -191,7 +191,14 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	}
 
 	// Make text job
-	if text_job, ok := make_text_job(text_info, e, core.mouse_pos - text_origin); ok {
+	if text_job, ok := make_text_job(text_info, e, core.mouse_pos - (text_origin - kind.offset)); ok {
+
+		if result.changed {
+			if text_job.glyphs[text_job.cursor_glyph].pos {
+
+			}
+		}
+
 		if widget.visible || .Focused in widget.state {
 			// Draw body
 			draw_rounded_box_fill(widget.box, core.style.rounding, core.style.color.background)
@@ -235,24 +242,11 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 				}
 			}
 
-			draw_rounded_box_stroke(
-				widget.box,
-				core.style.rounding,
-				1 + widget.focus_time,
-				interpolate_colors(
-					widget.focus_time,
-					core.style.color.substance,
-					core.style.color.accent,
-				),
-			)
+			draw_rounded_box_stroke(widget.box, core.style.rounding, 1 + widget.focus_time, interpolate_colors(widget.focus_time, core.style.color.substance, core.style.color.accent))
 
 			// Draw disabled overlay
 			if widget.disable_time > 0 {
-				draw_rounded_box_fill(
-					widget.box,
-					core.style.rounding,
-					fade(core.style.color.background, widget.disable_time * 0.5),
-				)
+				draw_rounded_box_fill(widget.box, core.style.rounding, fade(core.style.color.background, widget.disable_time * 0.5))
 			}
 		}
 
@@ -270,17 +264,12 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 				}
 			}
 			switch widget.click_count {
-
 			case 2:
 				if text_job.hovered_rune < kind.anchor {
 					if text_info.text[text_job.hovered_rune] == ' ' {
 						e.selection[0] = text_job.hovered_rune
 					} else {
-						e.selection[0] = max(
-							0,
-							strings.last_index_any(text_info.text[:text_job.hovered_rune], " \n") +
-							1,
-						)
+						e.selection[0] = max(0, strings.last_index_any(text_info.text[:text_job.hovered_rune], " \n") + 1)
 					}
 					e.selection[1] = strings.index_any(text_info.text[kind.anchor:], " \n")
 					if e.selection[1] == -1 {
@@ -289,18 +278,11 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 						e.selection[1] += kind.anchor
 					}
 				} else {
-					e.selection[1] = max(
-						0,
-						strings.last_index_any(text_info.text[:kind.anchor], " \n") + 1,
-					)
-					if (text_job.hovered_rune > 0 &&
-						   text_info.text[text_job.hovered_rune - 1] == ' ') {
+					e.selection[1] = max(0, strings.last_index_any(text_info.text[:kind.anchor], " \n") + 1)
+					if (text_job.hovered_rune > 0 && text_info.text[text_job.hovered_rune - 1] == ' ') {
 						e.selection[0] = 0
 					} else {
-						e.selection[0] = strings.index_any(
-							text_info.text[text_job.hovered_rune:],
-							" \n",
-						)
+						e.selection[0] = strings.index_any(text_info.text[text_job.hovered_rune:], " \n")
 					}
 					if e.selection[0] == -1 {
 						e.selection[0] = len(text_info.text) - text_job.hovered_rune
@@ -315,6 +297,10 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 		if last_selection != e.selection {
 			core.draw_next_frame = true
 		}
+	}
+
+	if result.changed {
+		result.text = strings.to_string(builder^)
 	}
 
 	end_widget()

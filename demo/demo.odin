@@ -43,7 +43,7 @@ Component_Showcase :: struct {
 	option:       Option,
 	date_range:   [2]Maybe(onyx.Date),
 	month_offset: int,
-	entries:      []Struct,
+	entries:      []Table_Entry,
 }
 
 State :: struct {
@@ -51,12 +51,11 @@ State :: struct {
 	images:             [4]onyx.Image,
 }
 
-Struct :: struct {
+Table_Entry :: struct {
 	name:   string,
 	active: bool,
 	value:  f32,
 }
-
 
 do_component_showcase :: proc(state: ^Component_Showcase) {
 	using onyx
@@ -95,11 +94,15 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		)
 		for &entry, e in state.entries {
 			begin_table_row({index = e})
+			set_width_auto()
 			if was_clicked(do_checkbox({state = entry.active})) {
 				entry.active = !entry.active
 			}
-			do_text_input({content = &entry.name})
-			if value, ok := do_slider(Slider_Info(f32){value = entry.value}).value.?; ok {
+			if result := do_text_input({content = &entry.name}); result.changed {
+				delete(entry.name)
+				entry.name = strings.clone(result.text)
+			}
+			if value, ok := do_box_slider(Slider_Info(f32){value = entry.value}).value.?; ok {
 				entry.value = value
 			}
 			end_table_row()
@@ -329,11 +332,11 @@ main :: proc() {
 
 	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
 	state.component_showcase.entries = {
-		{"crank", true, 1.75},
-		{"yank", false, 2.5},
-		{"dank", false, 4.25},
-		{"shrank", true, 0.5},
-		{"stank", true, 9.25},
+		{strings.clone("crank"), true, 1.75},
+		{strings.clone("yank"), false, 2.5},
+		{strings.clone("dank"), false, 4.25},
+		{strings.clone("shrank"), true, 0.5},
+		{strings.clone("stank"), true, 9.25},
 	}
 
 	onyx.init(1600, 900, "demo")
