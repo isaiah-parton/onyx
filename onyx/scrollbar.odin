@@ -29,6 +29,8 @@ add_scrollbar :: proc(info: Scrollbar_Info) -> (result: Scrollbar_Result) {
 
 	widget.draggable = true
 
+	// Virtually swizzle coordinates
+	// TODO: Remove this and actually swizzle them for better readability
 	i, j := int(info.vertical), 1 - int(info.vertical)
 
 	handle_size := min(info.handle_size, (widget.box.hi[i] - widget.box.lo[i]))

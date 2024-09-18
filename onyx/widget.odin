@@ -1,34 +1,37 @@
 package onyx
-
+// Widgets are things you click on to do stuff.
+// Each has it's own allocator based on `core.scratch_allocator` for retained data
+import "base:intrinsics"
+import "base:runtime"
 import "core:fmt"
-import "core:time"
-
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 import "core:mem"
-
-import "base:intrinsics"
-import "base:runtime"
+import "core:time"
 
 DOUBLE_CLICK_TIME :: time.Millisecond * 450
-
+// The internal widget structure
 Widget :: struct {
 	id:                                           Id,
 	box:                                          Box,
 	layer:                                        ^Layer,
-	visible, disabled, draggable, is_field, dead: bool,
+	visible, disabled, draggable, dead: bool,
+	// TODO: Replace this with chaining
+	is_field: bool,
 	last_state, next_state, state:                Widget_State,
 	focus_time, hover_time, disable_time:         f32,
+	// Click information
 	click_count:                                  int,
 	click_time:                                   time.Time,
 	click_button:                                 Mouse_Button,
 	allocator:                                    runtime.Allocator,
-	variant:                                      Widget_Kind,
 	desired_size:                                 [2]f32,
+	// Stores the number of the last frame on which this widget was updated
 	frames:                                       int,
+	variant:                                      Widget_Kind,
 }
-
+// Widget variants
 Widget_Kind :: union {
 	Graph_Widget_Kind,
 	Menu_Widget_Kind,
@@ -38,7 +41,6 @@ Widget_Kind :: union {
 	Generic_Boolean_Widget_Kind,
 	Date_Picker_Widget_Kind,
 }
-
 // Interaction state
 Widget_Status :: enum {
 	Hovered,
@@ -48,22 +50,20 @@ Widget_Status :: enum {
 	Clicked,
 	Open,
 }
-
 Widget_State :: bit_set[Widget_Status;u8]
-
+// A generic descriptor for all widgets
 Generic_Widget_Info :: struct {
 	id:            Maybe(Id),
 	box:           Maybe(Box),
 	fixed_size:    bool,
-	required_size: [2]f32,
+	// required_size: [2]f32,
 	desired_size:  [2]f32,
 	disabled:      bool,
 }
-
+// A generic result type for all widgets
 Generic_Widget_Result :: struct {
 	self: Maybe(^Widget),
 }
-
 // Animation
 animate :: proc(value, duration: f32, condition: bool) -> f32 {
 	value := value
@@ -81,7 +81,7 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 	return value
 }
 
-// [SECTION] Results
+// Generic result handlers
 
 was_clicked :: proc(
 	result: Generic_Widget_Result,
@@ -89,19 +89,22 @@ was_clicked :: proc(
 	times: int = 1,
 ) -> bool {
 	widget := result.self.? or_return
-	return .Clicked in widget.state && widget.click_button == button && widget.click_count >= times
+	return(
+		.Clicked in widget.state &&
+		widget.click_button == button &&
+		widget.click_count >= times \
+	)
 }
-
 is_hovered :: proc(result: Generic_Widget_Result) -> bool {
 	widget := result.self.? or_return
 	return .Hovered in widget.state
 }
-
 was_changed :: proc(result: Generic_Widget_Result) -> bool {
 	widget := result.self.? or_return
 	return .Changed in widget.state
 }
 
+// Set a widget's `variant` to type `T` and return a pointer to it
 widget_kind :: proc(widget: ^Widget, $T: typeid) -> ^T {
 	if variant, ok := &widget.variant.(T); ok {
 		return variant
@@ -148,38 +151,52 @@ current_widget :: proc() -> Maybe(^Widget) {
 	}
 	return nil
 }
-
-begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
+// Begins a new widget.
+// This proc is way too long!
+begin_widget :: proc(
+	info: Generic_Widget_Info,
+) -> (
+	widget: ^Widget,
+	ok: bool,
+) {
+	// An ID is required for widget lookup or creation
 	id := info.id.? or_return
+	// Look up a widget with that ID
 	widget, ok = core.widget_map[id]
-	if !ok {
-		for i in 0 ..< MAX_WIDGETS {
-			if core.widgets[i] == nil {
-				core.widgets[i] = Widget {
+	if ok {
+		// Check for duplicate IDs
+		if widget.frames == core.frames {
+			fmt.printf(
+				"More than one widget with the ID '%v' were called in the same frame\n",
+				widget.id,
+			)
+			return nil, false
+		}
+		widget.frames = core.frames
+	} else {
+		// Create it if it doesn't exist
+		for &slot in core.widgets {
+			if slot == nil {
+				slot = Widget {
 					id        = id,
 					allocator = mem.scratch_allocator(&core.scratch_allocator),
 				}
-				widget = &core.widgets[i].?
+				widget = &slot.?
+				// Add the new widget to the lookup map
 				core.widget_map[id] = widget
-
+				// A new widget was added and might be visible, so draw this frame
 				core.draw_this_frame = true
-
+				// The widget was successfully created so
 				ok = true
 				break
 			}
 		}
 	}
+	// Check to make sure there was a spot for the new widget
+	if !ok do return
 
-	if widget == nil do return
-
-	if widget.frames == core.frames {
-		fmt.printf(
-			"More than one widget with the same ID '%v' were called in the same frame\n",
-			widget.id,
-		)
-		return nil, false
-	}
-	widget.frames = core.frames
+	// Push to the stack
+	ok = push_stack(&core.widget_stack, widget)
 
 	// Widget must have a valid layer
 	widget.layer = current_layer().? or_return
@@ -191,14 +208,15 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 	widget.dead = false
 
 	// Set visible flag
-	widget.visible = core.visible && get_clip(current_clip().?, widget.box) != .Full
+	widget.visible =
+		core.visible && get_clip(current_clip().?, widget.box) != .Full
 
 	// Reset state
 	widget.last_state = widget.state
 	widget.state -= {.Clicked, .Focused, .Changed}
 
 	// Disabled?
-	widget.disabled = true if core.disable_widgets else info.disabled
+	widget.disabled = core.disable_widgets || info.disabled
 	widget.disable_time = animate(widget.disable_time, 0.25, widget.disabled)
 
 	// Compute next frame's layout
@@ -208,7 +226,8 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 	if layout.next_size.x == 0 || layout.next_size.x != box_width(layout.box) {
 		widget.desired_size.x = max(info.desired_size.x, layout.next_size.x)
 	}
-	if layout.next_size.y == 0 || layout.next_size.y != box_height(layout.box) {
+	if layout.next_size.y == 0 ||
+	   layout.next_size.y != box_height(layout.box) {
 		widget.desired_size.y = max(info.desired_size.y, layout.next_size.y)
 	}
 
@@ -231,23 +250,22 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 			widget.click_button = core.mouse_button
 			widget.click_time = time.now()
 			widget.state += {.Pressed}
+			// Set the globally dragged widget
 			if widget.draggable do core.dragged_widget = widget.id
 		}
-	} else if core.dragged_widget != widget.id {
+	} else if core.dragged_widget != widget.id /* Keep hover and press state if dragged */ {
 		widget.state -= {.Pressed, .Hovered}
 		widget.click_count = 0
 	}
 	// Mouse press
 	if widget.state >= {.Pressed} {
-		// Just released buttons
+		// Check for released buttons
 		released_buttons := core.last_mouse_bits - core.mouse_bits
-		if released_buttons != {} {
-			for button in Mouse_Button {
-				if button == widget.click_button {
-					widget.state += {.Clicked}
-					widget.state -= {.Pressed}
-					break
-				}
+		for button in released_buttons {
+			if button == widget.click_button {
+				widget.state += {.Clicked}
+				widget.state -= {.Pressed}
+				break
 			}
 		}
 	}
@@ -258,18 +276,21 @@ begin_widget :: proc(info: Generic_Widget_Info) -> (widget: ^Widget, ok: bool) {
 	// Reset next state
 	widget.state += widget.next_state
 	widget.next_state = {}
-	// Push to the stack
-	ok = push_stack(&core.widget_stack, widget)
 	return
 }
-
+// Ends the current widget
 end_widget :: proc() {
-	widget := current_widget().?
-	layout := current_layout().?
-	add_layout_content_size(layout, box_size(widget.box) if layout.fixed else widget.desired_size)
-	pop_stack(&core.widget_stack)
+	if widget, ok := current_widget().?; ok {
+		if layout, ok := current_layout().?; ok {
+			add_layout_content_size(
+				layout,
+				box_size(widget.box) if layout.fixed else widget.desired_size,
+			)
+		}
+		pop_stack(&core.widget_stack)
+	}
 }
-
+// Try make this widget hovered
 hover_widget :: proc(widget: ^Widget) {
 	// Disabled?
 	if widget.disabled do return
@@ -280,7 +301,7 @@ hover_widget :: proc(widget: ^Widget) {
 	// Ok hover
 	core.next_hovered_widget = widget.id
 }
-
+// Try make this widget focused
 focus_widget :: proc(widget: ^Widget) {
 	core.focused_widget = widget.id
 }

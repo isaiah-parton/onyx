@@ -1,5 +1,7 @@
 package onyx
 
+// Some generic behaviors for widgets
+
 button_behavior :: proc(widget: ^Widget) {
 	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
 	if .Hovered in widget.state {
