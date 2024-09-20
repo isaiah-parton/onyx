@@ -1,5 +1,7 @@
 package onyx
 
+import "core:fmt"
+
 Tabs_Info :: struct {
 	using _: Generic_Widget_Info,
 	index:   int,

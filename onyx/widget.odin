@@ -186,7 +186,7 @@ begin_widget :: proc(
 			if slot == nil {
 				slot = Widget {
 					id        = id,
-					allocator = runtime.default_allocator(), //mem.dynamic_arena_allocator(&core.arena),
+					allocator = mem.arena_allocator(&core.arena),
 				}
 				widget = &slot.?
 				// Add the new widget to the lookup map

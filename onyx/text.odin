@@ -138,6 +138,11 @@ make_text_job :: proc(
 
 	at_end: bool
 
+	// Check glyph limit
+	if len(core.glyphs) >= 2000 {
+		clear(&core.glyphs)
+	}
+
 	for {
 		if !iterate_text(&iter) {
 			at_end = true

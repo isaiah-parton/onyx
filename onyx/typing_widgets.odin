@@ -35,7 +35,6 @@ Text_Input_Widget_Kind :: struct {
 
 Text_Input_Result :: struct {
 	using _:            Generic_Widget_Result,
-	text:               string,
 	changed, submitted: bool,
 }
 
@@ -65,9 +64,11 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	// Use given string builder or provision one
 	builder, has_builder := info.content.(^strings.Builder)
 	if !has_builder {
-		kind.builder = strings.builder_make(widget.allocator)
+		if strings.builder_cap(kind.builder) == 0 {
+			// kind.builder.buf.allocator = widget.allocator
+			strings.write_string(&kind.builder, info.content.(^string)^)
+		}
 		builder = &kind.builder
-		strings.write_string(builder, info.content.(^string)^)
 	}
 
 	widget.focus_time = animate(widget.focus_time, 0.15, .Focused in widget.state)
@@ -184,6 +185,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 
 	// Initialize editor state when just focused
 	if .Focused in (widget.state - widget.last_state) {
+		fmt.println(builder.buf[:])
 		make_text_editor(e, widget.allocator, widget.allocator)
 		begin(e, 0, builder)
 		e.set_clipboard = set_clipboard_string
@@ -324,7 +326,12 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	}
 
 	if result.changed {
-		result.text = strings.to_string(builder^)
+		if content, ok := info.content.(^string); ok {
+			assert(content != nil)
+			assert(builder != nil)
+			delete(content^)
+			content^ = strings.clone(strings.to_string(builder^))
+		}
 	}
 
 	end_widget()

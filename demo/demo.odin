@@ -96,38 +96,18 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				max_displayed_rows = 15,
 			},
 		); ok {
-			for row in table.first..<table.last {
-				entry := &state.entries[row]
-				begin_table_row({index = row})
+			for index in table.first ..< table.last {
+				entry := &state.entries[index]
+				begin_table_row(table, {index = index})
 				set_width_auto()
-				if result := do_text_input({content = &entry.name});
-				   result.changed {
-					delete(entry.name)
-					entry.name = strings.clone(result.text)
-				}
-				if result := do_text_input({content = &entry.hash});
-				   result.changed {
-					delete(entry.hash)
-					entry.hash = strings.clone(result.text)
-				}
-				if result := do_text_input({content = &entry.public_key});
-				   result.changed {
-					delete(entry.public_key)
-					entry.public_key = strings.clone(result.text)
-				}
-				if result := do_text_input({content = &entry.private_key});
-				   result.changed {
-					delete(entry.private_key)
-					entry.private_key = strings.clone(result.text)
-				}
-				if result := do_text_input({content = &entry.location});
-				   result.changed {
-					delete(entry.location)
-					entry.location = strings.clone(result.text)
-				}
+				do_text_input({content = &entry.name})
+				do_text_input({content = &entry.hash})
+				do_text_input({content = &entry.public_key})
+				do_text_input({content = &entry.private_key})
+				do_text_input({content = &entry.location})
 				end_table_row()
 			}
-			end_table()
+			end_table(table)
 		}
 
 	case .Scroll_Zone:

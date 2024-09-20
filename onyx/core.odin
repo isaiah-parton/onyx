@@ -15,7 +15,7 @@ import "core:time"
 
 import "vendor:wgpu"
 
-MAX_IDS :: 10
+MAX_IDS :: 32
 MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
 MAX_LAYOUTS :: 100
@@ -152,7 +152,8 @@ Core :: struct {
 	cursors:                                                  #sparse[Mouse_Cursor]glfw.CursorHandle,
 
 	// Allocators
-	arena: mem.Dynamic_Arena,
+	arena: mem.Arena,
+	arena_data: []u8,
 }
 
 view_box :: proc() -> Box {
@@ -181,7 +182,8 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.draw_next_frame = true
 	core.start_time = time.now()
 
-	mem.dynamic_arena_init(&core.arena)
+	core.arena_data = make([]u8, mem.Megabyte)
+	mem.arena_init(&core.arena, core.arena_data)
 
 	// Initialize glfw
 	glfw.Init()
@@ -304,35 +306,6 @@ new_frame :: proc() {
 		core.draw_next_frame = true
 	}
 
-	// Tab/shift-tab selection
-	if key_pressed(.Tab) {
-		// Create a temporary list
-		widget_list: [dynamic]^Widget
-		defer delete(widget_list)
-		// Append eligible widgets
-		for id, &widget in core.widget_map {
-			if widget.is_field {
-				append(&widget_list, widget)
-			}
-		}
-		// Sort them
-		sort_proc :: proc(i, j: ^Widget) -> bool {
-			return i.box.lo.y < j.box.lo.y || i.box.lo.x < j.box.lo.x
-		}
-		if key_down(.Left_Shift) {
-			slice.reverse_sort_by(widget_list[:], sort_proc)
-		} else {
-			slice.sort_by(widget_list[:], sort_proc)
-		}
-		// Find the currently focused widget and focus the next widget in the list
-		for widget, w in widget_list {
-			if widget.id == core.focused_widget {
-				core.focused_widget = widget_list[(w + 1) % len(widget_list)].id
-				break
-			}
-		}
-	}
-
 	// Process widgets
 	process_widgets()
 
@@ -398,7 +371,7 @@ render :: proc() {
 	for id, widget in core.widget_map {
 		if widget.dead {
 			if err := free_all(widget.allocator); err != .None {
-				fmt.printf("[core] Error freeing widget data: %v\n", err)
+				fmt.printfln("[core] Error freeing widget data: %v", err)
 			}
 			delete_key(&core.widget_map, id)
 			(transmute(^Maybe(Widget))widget)^ = nil
@@ -423,7 +396,7 @@ render :: proc() {
 		t := time.now()
 		update_atlas(&core.font_atlas, &core.gfx)
 		when ODIN_DEBUG {
-			fmt.printf("Updated font atlas in %v\n", time.since(t))
+			// fmt.printfln("Updated font atlas in %.3fms", time.duration_milliseconds(time.since(t)))
 		}
 		core.font_atlas.modified = false
 	}
@@ -489,7 +462,7 @@ uninit :: proc() {
 	delete(core.lines)
 	delete(core.runes)
 
-	mem.dynamic_arena_destroy(&core.arena)
+	delete(core.arena_data)
 
 	// Destroy atlas
 	destroy_atlas(&core.font_atlas)

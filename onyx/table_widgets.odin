@@ -1,10 +1,31 @@
 package onyx
 // Tables behave like a spreadsheet, need I say more?
+// Yes.
+// 	Copying and pasting in a table make use of CSV.
+// 	Tables retain their data for the lifetime of the program.
 import "core:fmt"
 import "core:math"
+import "core:strings"
+
+Type_Text :: struct {}
+Type_Number :: struct {
+	precision: u8,
+}
+Type_Date :: struct {}
+Type_Time :: struct {}
+Type_Enum :: struct {}
+
+Table_Column_Type :: union #no_nil {
+	Type_Text,
+	Type_Number,
+	Type_Date,
+	Type_Time,
+	Type_Enum,
+}
 // Column formating info
 Table_Column_Info :: struct {
 	name:             string,
+	type:             Table_Column_Type,
 	width:            f32,
 	align:            Horizontal_Text_Align,
 	__label_text_job: Text_Job,
@@ -24,44 +45,56 @@ Table_Info :: struct {
 	__widths_len:       int,
 }
 
-Table_Result :: struct {
-	first, last: int,
-}
-
 Table_Widget_Kind :: struct {
 	selection: [2][2]u64,
 }
 
-Table_Row :: struct {
-	values: [][dynamic]u8,
-}
-
-Table_Data :: struct {
-	rows: [dynamic]Table_Row,
+Table :: struct {
+	using info: Table_Info,
+	first, last: int,
 }
 
 // Begins a new row in the current table
-begin_table_row :: proc(info: Table_Row_Info) {
+begin_table_row :: proc(table: Table, info: Table_Row_Info) {
+	table := table
 	push_id(info.index + 1)
+	begin_layout({side = .Top, size = core.style.table_row_height})
 	layout := current_layout().?
-	table_info := layout.table_info.?
-	box := Box{
-		{layout.bounds.lo.x, layout.bounds.lo.y + f32(info.index + 1) * core.style.table_row_height},
-		{layout.bounds.hi.x, layout.bounds.lo.y + f32(info.index + 2) * core.style.table_row_height}
-	}
-	begin_layout({box = box})
-	set_side(.Left)
-	new_layout := current_layout().?
-	new_layout.fixed = true
-	new_layout.queue_len += copy(
-		new_layout.size_queue[:],
-		table_info.__widths[:table_info.__widths_len],
+	layout.next_cut_side = .Left
+	layout.fixed = true
+	layout.queue_len += copy(
+		layout.size_queue[:],
+		table.info.__widths[:table.info.__widths_len],
 	)
 }
 
 end_table_row :: proc() {
 	end_layout()
 	pop_id()
+}
+// Pass cell variables in rows, each variable will be assertively type checked with the column type
+table_row :: proc(table: Table, index: int, values: ..any) {
+	for value, v in values {
+		column := &table.info.columns[v]
+		table_cell(v, index, value, column.type)
+	}
+}
+
+table_cell :: proc(column, row: int, value: any, type: Table_Column_Type) {
+	#partial switch type in type {
+	case Type_Text:
+		switch value.id {
+		case string:
+			do_text_input({content = (^string)(value.data)})
+		}
+	case Type_Number:
+		switch value.id {
+		case i8, i16, i32, i64, i128, u8, u16, u32, u64, u128:
+
+		case f16, f32, f64:
+
+		}
+	}
 }
 // Make a new table
 // 	This proc looks at the provided columns and decides the desired size of the table
@@ -90,49 +123,42 @@ make_table :: proc(info: Table_Info, loc := #caller_location) -> Table_Info {
 	return info
 }
 // Begin a table
-begin_table :: proc(
-	info: Table_Info,
-	loc := #caller_location,
-) -> (
-	result: Table_Result,
-	ok: bool,
-) {
+begin_table :: proc(info: Table_Info, loc := #caller_location) -> (self: Table, ok: bool) {
 	info := make_table(info, loc)
 	widget := begin_widget(info) or_return
 
 	container := begin_container(
 		{
-			id = info.id.?,
+			id  = info.id.?,
 			box = widget.box,
-			size = {0, f32(info.row_count - 1) * core.style.table_row_height},
+			size = {
+				1 = core.style.table_row_height * f32(info.row_count + 1),
+			}
 		},
 	) or_return
-	container.layout.table_info = info
-	// Set first and last rows to be displayed
-	result.first = int(container.scroll.y / core.style.table_row_height)
-	result.last =
-		min(result.first +
-		int(box_height(container.box) / core.style.table_row_height), info.row_count)
+
+	self.info = info
+	self.first = int(container.scroll.y / core.style.table_row_height)
+	self.last = self.first + int(box_height(container.box) / core.style.table_row_height)
 	// Add space for the header
-	add_space(f32(info.row_count - 1) * core.style.table_row_height)
+	add_space(core.style.table_row_height * f32(self.first + 1))
 	// Season the hashing context
 	push_id(info.id.?)
 	ok = true
 	return
 }
 // End the current table
-end_table :: proc() {
-	table_info := current_layout().?.table_info.?
-	container_layout := current_layout().?
+end_table :: proc(table: Table) {
+	table := table
 	container := current_container().?
-	box := container_layout.bounds
+	box := container.layout.bounds
 
 	// Selection highlight
 
 
 	// Vertical dividing lines
 	offset := f32(0)
-	for i in 0 ..< table_info.__widths_len {
+	for i in 0 ..< table.info.__widths_len {
 		if i > 0 {
 			draw_box_fill(
 				{
@@ -142,14 +168,14 @@ end_table :: proc() {
 				core.style.color.substance,
 			)
 		}
-		offset += table_info.__widths[i]
+		offset += table.info.__widths[i]
 	}
 
 	// Header
 	header_box := get_box_cut_top(
 		{
-			{container_layout.bounds.lo.x, container.box.lo.y},
-			{container_layout.bounds.hi.x, container.box.hi.y},
+			{container.layout.bounds.lo.x, container.box.lo.y},
+			{container.layout.bounds.hi.x, container.box.hi.y},
 		},
 		core.style.table_row_height,
 	)
@@ -162,15 +188,14 @@ end_table :: proc() {
 	begin_layout({box = header_box})
 	// Set layout sizes
 	layout := current_layout().?
-	set_side(.Left)
+	layout.next_cut_side = .Left
 	layout.fixed = true
 	layout.isolated = true
 	layout.queue_len += copy(
 		layout.size_queue[:],
-		table_info.__widths[:table_info.__widths_len],
+		table.info.__widths[:table.info.__widths_len],
 	)
-	// set_height_fill()
-	for &column, c in table_info.columns {
+	for &column, c in table.info.columns {
 		widget := begin_widget({id = hash(c + 1)}) or_continue
 		defer end_widget()
 		button_behavior(widget)
@@ -189,27 +214,26 @@ end_table :: proc() {
 	end_layout()
 	end_container()
 
-	pop_id()
-
 	// Table outline
 	draw_rounded_box_stroke(
 		current_widget().?.box,
-		core.style.shape.rounding,
+		core.style.rounding,
 		1,
 		core.style.color.substance,
 	)
 
 	end_widget()
+	pop_id()
 }
 
 @(deferred_out = __do_table)
-do_table :: proc(info: Table_Info, loc := #caller_location) -> (self: Table_Result, ok: bool) {
+do_table :: proc(info: Table_Info, loc := #caller_location) -> (self: Table, ok: bool) {
 	return begin_table(info, loc)
 }
 
 @(private)
-__do_table :: proc(_: Table_Result, ok: bool) {
+__do_table :: proc(self: Table, ok: bool) {
 	if ok {
-		end_table()
+		end_table(self)
 	}
 }

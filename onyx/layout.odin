@@ -45,9 +45,6 @@ Layout :: struct {
 	fixed:         bool,
 	// Isolated from previous layout?
 	isolated:      bool,
-	// Attachments
-	// TODO: Do this better!
-	table_info:    Maybe(Table_Info),
 }
 // Queue the next size to be cut from this layout
 queue_layout_size :: proc(layout: ^Layout, size: f32) {

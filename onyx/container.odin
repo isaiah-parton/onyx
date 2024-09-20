@@ -76,7 +76,7 @@ end_container :: proc() {
 
 	self := current_container().?
 	layout := current_layout().?
-	self.size = layout.content_size + layout.spacing_size
+	self.size = linalg.max(layout.content_size + layout.spacing_size, self.size)
 
 	//TODO: Remove this
 	// draw_text(
