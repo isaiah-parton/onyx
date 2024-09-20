@@ -2,7 +2,7 @@
 	{
 		"label": "Run",
 		"command": "odin",
-		"args": ["run", ".", "-define:WGPU_SHARED=true"],
+		"args": ["run", ".", "-debug", "-define:WGPU_SHARED=true"],
 		"cwd": "$ZED_WORKTREE_ROOT/demo",
 		"use_new_terminal": false,
 		"reveal": "always",

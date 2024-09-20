@@ -20,88 +20,94 @@ Container :: struct {
 	size:                     [2]f32,
 	box:                      Box,
 	dead:                     bool,
+	// Transient
+	layout: 									^Layout,
 }
 
-begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
+begin_container :: proc(info: Container_Info, loc := #caller_location) -> (self: ^Container, ok: bool) {
 	id := info.id if info.id != 0 else hash(loc)
-	cnt, ok := core.container_map[id]
+	self, ok = core.container_map[id]
 	if !ok {
-		cnt = new(Container)
-		core.container_map[id] = cnt
+		self = new(Container)
+		core.container_map[id] = self
+		ok = true
 	}
 
-	cnt.id = id
-	cnt.dead = false
-	cnt.size = linalg.max(cnt.size, info.size)
-	cnt.box = info.box.? or_else next_widget_box({})
+	self.id = id
+	self.dead = false
+	self.size = linalg.max(self.size, info.size)
+	self.box = info.box.? or_else next_widget_box({})
 
-	cnt.active = core.active_container == cnt.id
-	if point_in_box(core.mouse_pos, cnt.box) && core.hovered_layer == current_layer().?.id {
+	self.active = core.active_container == self.id
+	if point_in_box(core.mouse_pos, self.box) && core.hovered_layer == current_layer().?.id {
 		core.next_active_container = id
 	}
 
 	// Minimum size
-	cnt.size = linalg.max(
-		cnt.size,
-		box_size(cnt.box),
+	self.size = linalg.max(
+		self.size,
+		box_size(self.box),
 	)
 
 	// Mouse wheel input
-	if cnt.active {
+	if self.active {
 		delta_scroll := core.mouse_scroll
 		if key_down(.Left_Shift) || key_down(.Right_Shift) {
 			delta_scroll.xy = delta_scroll.yx
 		}
-		cnt.desired_scroll -= delta_scroll * 100
+		self.desired_scroll -= delta_scroll * 100
 	}
 
-	push_clip(cnt.box)
+	push_clip(self.box)
 	append_draw_call(current_layer().?.index)
-	push_stack(&core.container_stack, cnt)
+	push_stack(&core.container_stack, self)
 
-	layout_pos := cnt.box.lo - linalg.floor(cnt.scroll)
-	layout_size := linalg.max(cnt.size, info.size)
-	begin_layout({box = Box{layout_pos, layout_pos + layout_size}})
+	layout_pos := self.box.lo - linalg.floor(self.scroll)
+	layout_size := linalg.max(self.size, info.size)
+	begin_layout({box = Box{layout_pos, layout_pos + layout_size}, isolated = true})
+	self.layout = current_layout().?
+	self.layout.fixed = true
+	self.layout.next_cut_side = .Top
 
-	return true
+	return
 }
 
 end_container :: proc() {
 
-	cnt := current_container().?
+	self := current_container().?
 	layout := current_layout().?
-	cnt.size = layout.content_size + layout.spacing_size
+	self.size = layout.content_size + layout.spacing_size
 
 	//TODO: Remove this
 	// draw_text(
-	// 	cnt.box.lo,
-	// 	{text = fmt.tprintf("%.1f", box_size(cnt.box)), font = core.style.fonts[.Light], size = 20},
+	// 	self.box.lo,
+	// 	{text = fmt.tprintf("%.1f", box_size(self.box)), font = core.style.fonts[.Light], size = 20},
 	// 	{255, 255, 255, 255},
 	// )
 	// draw_text(
-	// 	cnt.box.lo + {0, 20},
-	// 	{text = fmt.tprintf("%.1f", cnt.size), font = core.style.fonts[.Light], size = 20},
+	// 	self.box.lo + {0, 20},
+	// 	{text = fmt.tprintf("%.1f", self.size), font = core.style.fonts[.Light], size = 20},
 	// 	{255, 255, 255, 255},
 	// )
 	// draw_text(
-	// 	cnt.box.lo + {0, 40},
-	// 	{text = fmt.tprintf("%.1f", cnt.scroll), font = core.style.fonts[.Light], size = 20},
+	// 	self.box.lo + {0, 40},
+	// 	{text = fmt.tprintf("%.1f", self.scroll), font = core.style.fonts[.Light], size = 20},
 	// 	{255, 255, 255, 255},
 	// )
 
 	// Clamp scroll
-	cnt.desired_scroll = linalg.max(
-		linalg.min(cnt.desired_scroll, cnt.size - (cnt.box.hi - cnt.box.lo)),
+	self.desired_scroll = linalg.max(
+		linalg.min(self.desired_scroll, self.size - (self.box.hi - self.box.lo)),
 		0,
 	)
-	delta_scroll := (cnt.desired_scroll - cnt.scroll) * core.delta_time * 15
-	cnt.scroll += delta_scroll
+	delta_scroll := (self.desired_scroll - self.scroll) * core.delta_time * 15
+	self.scroll += delta_scroll
 
-	cnt.scroll_x = cnt.size.x > box_width(cnt.box) && !cnt.no_scroll_x
-	cnt.scroll_y = cnt.size.y > box_height(cnt.box) && !cnt.no_scroll_y
+	self.scroll_x = self.size.x > box_width(self.box) && !self.no_scroll_x
+	self.scroll_y = self.size.y > box_height(self.box) && !self.no_scroll_y
 
-	cnt.scroll_time.x = animate(cnt.scroll_time.x, 0.2, cnt.scroll_x)
-	cnt.scroll_time.y = animate(cnt.scroll_time.y, 0.2, cnt.scroll_y)
+	self.scroll_time.x = animate(self.scroll_time.x, 0.2, self.scroll_x)
+	self.scroll_time.y = animate(self.scroll_time.y, 0.2, self.scroll_y)
 
 	if abs(delta_scroll.x) > 0.1 || abs(delta_scroll.y) > 0.1 {
 		core.draw_next_frame = true
@@ -109,32 +115,32 @@ end_container :: proc() {
 
 	end_layout()
 
-	if cnt.scroll_y {
+	if self.scroll_y {
 		box := get_box_cut_right(
-			cnt.box,
-			cnt.scroll_time.y * core.style.shape.scrollbar_thickness,
+			self.box,
+			self.scroll_time.y * core.style.shape.scrollbar_thickness,
 		)
-		if cnt.scroll_x {
-			box.hi.y -= cnt.scroll_time.x * core.style.shape.scrollbar_thickness
+		if self.scroll_x {
+			box.hi.y -= self.scroll_time.x * core.style.shape.scrollbar_thickness
 		}
-		if pos, ok := do_scrollbar({make_visible = abs(delta_scroll.y) > 0.1, vertical = true, box = box, pos = cnt.scroll.y, travel = cnt.size.y - box_height(cnt.box), handle_size = box_height(box) * box_height(cnt.box) / cnt.size.y}).pos.?;
+		if pos, ok := do_scrollbar({make_visible = abs(delta_scroll.y) > 0.1, vertical = true, box = box, pos = self.scroll.y, travel = self.size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / self.size.y}).pos.?;
 		   ok {
-			cnt.scroll.y = pos
-			cnt.desired_scroll.y = pos
+			self.scroll.y = pos
+			self.desired_scroll.y = pos
 		}
 	}
-	if cnt.scroll_x {
+	if self.scroll_x {
 		box := get_box_cut_bottom(
-			cnt.box,
-			cnt.scroll_time.x * core.style.shape.scrollbar_thickness,
+			self.box,
+			self.scroll_time.x * core.style.shape.scrollbar_thickness,
 		)
-		if cnt.scroll_y {
-			box.hi.x -= cnt.scroll_time.y * core.style.shape.scrollbar_thickness
+		if self.scroll_y {
+			box.hi.x -= self.scroll_time.y * core.style.shape.scrollbar_thickness
 		}
-		if pos, ok := do_scrollbar({make_visible = abs(delta_scroll.x) > 0.1, box = box, pos = cnt.scroll.x, travel = cnt.size.x - box_width(cnt.box), handle_size = box_width(box) * box_width(cnt.box) / cnt.size.x}).pos.?;
+		if pos, ok := do_scrollbar({make_visible = abs(delta_scroll.x) > 0.1, box = box, pos = self.scroll.x, travel = self.size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / self.size.x}).pos.?;
 		   ok {
-			cnt.scroll.x = pos
-			cnt.desired_scroll.x = pos
+			self.scroll.x = pos
+			self.desired_scroll.x = pos
 		}
 	}
 
@@ -166,12 +172,12 @@ current_clip :: proc() -> Maybe(Box) {
 }
 
 @(deferred_out = __do_container)
-do_container :: proc(info: Container_Info, loc := #caller_location) -> (ok: bool) {
+do_container :: proc(info: Container_Info, loc := #caller_location) -> (self: ^Container, ok: bool) {
 	return begin_container(info, loc)
 }
 
 @(private)
-__do_container :: proc(ok: bool) {
+__do_container :: proc(_: ^Container, ok: bool) {
 	if ok {
 		end_container()
 	}

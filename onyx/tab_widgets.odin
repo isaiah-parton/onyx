@@ -24,12 +24,13 @@ make_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> Tabs_Info {
 
 add_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Result) {
 	widget, ok := begin_widget(info)
-	if !ok do return {}
+	if !ok do return
 
 	result.self = widget
 
-	variant := widget_kind(widget, Tabs_Widget_Kind)
-	variant.timers.allocator = widget.allocator
+	kind := widget_kind(widget, Tabs_Widget_Kind)
+	kind.timers.allocator = widget.allocator
+	resize(&kind.timers, len(info.options))
 
 	if point_in_box(core.mouse_pos, widget.box) {
 		hover_widget(widget)
@@ -41,9 +42,10 @@ add_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Resu
 	}
 	option_rounding := core.style.rounding * (box_height(inner_box) / box_height(widget.box))
 	option_size := (inner_box.hi.x - inner_box.lo.x) / f32(len(info.options))
-	resize(&variant.timers, len(info.options))
+
 	for option, o in info.options {
-		hover_time := variant.timers[o]
+		hover_time := kind.timers[o]
+		kind.timers[o] = animate(kind.timers[o], 0.1, info.index == o)
 		option_box := cut_box_left(&inner_box, option_size)
 		if info.index != o {
 			if widget.state >= {.Hovered} && point_in_box(core.mouse_pos, option_box) {
@@ -77,7 +79,6 @@ add_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Resu
 				fade(core.style.color.content, 1 if info.index == o else 0.5),
 			)
 		}
-		variant.timers[o] = animate(variant.timers[o], 0.1, info.index == o)
 	}
 
 	end_widget()

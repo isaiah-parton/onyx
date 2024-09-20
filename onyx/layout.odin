@@ -7,43 +7,47 @@ package onyx
 //
 //  `spacing_size' is the accumulative size of spacing and is separated because it
 // 	is treated differently.
+//
+// 	TODO: Add a separate field for total cut size that disregards desired size
 import "core:math"
 import "core:math/linalg"
 // Info for creating a layout
 Layout_Info :: struct {
 	// If defined, the layout will occupy the given box
-	box:        Maybe(Box),
+	box:      Maybe(Box),
 	// Otherwise, it will be cut from the previous layout with these parameters
-	side:       Maybe(Side),
-	size:       Maybe(f32),
+	side:     Maybe(Side),
+	size:     Maybe(f32),
+	// Isolate this layout?
+	isolated: bool,
 }
 // The internal layout structure
 Layout :: struct {
 	// The bounding box (also the layout's box in its original state)
-	bounds: Box,
+	bounds:        Box,
 	// The current box to cut from
-	box: Box,
+	box:           Box,
 	// Parameters for cutting the layout
-	next_cut_side:     Side,
-	next_align:        Alignment,
-	next_padding:      [2]f32,
-	next_size:         [2]f32,
-	size_queue:        [100]f32,
-	queue_len:         int,
-	queue_offset:      int,
+	next_cut_side: Side,
+	next_align:    Alignment,
+	next_padding:  [2]f32,
+	next_size:     [2]f32,
+	size_queue:    [100]f32,
+	queue_len:     int,
+	queue_offset:  int,
 	// Side from which the layout was cut when created
-	side:              Maybe(Side),
+	side:          Maybe(Side),
 	// Store accumulative size for next frame
-	content_size:      [2]f32,
-	spacing_size:      [2]f32,
+	content_size:  [2]f32,
+	spacing_size:  [2]f32,
 	// When true, only exact sizes are accumulated
 	// instead of desired sizes
-	fixed: bool,
+	fixed:         bool,
 	// Isolated from previous layout?
-	isolated: bool,
+	isolated:      bool,
 	// Attachments
 	// TODO: Do this better!
-	table_info:        Maybe(Table_Info),
+	table_info:    Maybe(Table_Info),
 }
 // Queue the next size to be cut from this layout
 queue_layout_size :: proc(layout: ^Layout, size: f32) {
@@ -74,8 +78,9 @@ begin_layout :: proc(info: Layout_Info) -> bool {
 	size := info.size.? or_else last_layout.next_size[int(side) / 2]
 	box := info.box.? or_else cut_box(&last_layout.box, side, size)
 	layout := Layout {
+		isolated      = info.isolated,
 		box           = box,
-		bounds  = box,
+		bounds        = box,
 		side          = info.side,
 		next_cut_side = .Left if int(side) > 1 else .Top,
 		next_size     = last_layout.next_size,
@@ -96,10 +101,16 @@ end_layout :: proc() {
 		size := layout.content_size + layout.spacing_size
 		if side, ok := layout.side.?; ok {
 			if int(side) > 1 {
-				previous_layout.content_size.x = max(previous_layout.content_size.x, size.x)
+				previous_layout.content_size.x = max(
+					previous_layout.content_size.x,
+					size.x,
+				)
 				previous_layout.content_size.y += size.y
 			} else {
-				previous_layout.content_size.y = max(previous_layout.content_size.y, size.y)
+				previous_layout.content_size.y = max(
+					previous_layout.content_size.y,
+					size.y,
+				)
 				previous_layout.content_size.x += size.x
 			}
 		} else {
@@ -130,7 +141,11 @@ layout_box :: proc() -> Box {
 	return current_layout().?.box
 }
 // Cut this layout with these parameters
-cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -> Box {
+cut_layout :: proc(
+	layout: ^Layout,
+	side: Maybe(Side) = nil,
+	size: Maybe([2]f32) = nil,
+) -> Box {
 	side := side.? or_else layout.next_cut_side
 	size := size.? or_else layout.next_size
 	box := cut_box(
@@ -141,7 +156,10 @@ cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32)
 	return box
 }
 // Calls `cut_layout` on the current layout.  **Assertive**
-cut_current_layout :: proc(side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -> Box {
+cut_current_layout :: proc(
+	side: Maybe(Side) = nil,
+	size: Maybe([2]f32) = nil,
+) -> Box {
 	return cut_layout(current_layout().?, side, size)
 }
 // Get the next widget box

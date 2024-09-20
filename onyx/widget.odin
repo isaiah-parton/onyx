@@ -1,6 +1,9 @@
 package onyx
 // Widgets are things you click on to do stuff.
 // Each has it's own allocator based on `core.scratch_allocator` for retained data
+// 	I have here a dilema:
+// 		Some widgets retain user data throughout their lifetime
+// 		Others retain data throughout the lifetime of the program
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
@@ -13,23 +16,26 @@ import "core:time"
 DOUBLE_CLICK_TIME :: time.Millisecond * 450
 // The internal widget structure
 Widget :: struct {
-	id:                                           Id,
-	box:                                          Box,
-	layer:                                        ^Layer,
-	visible, disabled, draggable, dead: bool,
+	id:                                   Id,
+	box:                                  Box,
+	layer:                                ^Layer,
+	// Interaction options
+	visible, disabled, draggable, dead:   bool,
 	// TODO: Replace this with chaining
-	is_field: bool,
-	last_state, next_state, state:                Widget_State,
-	focus_time, hover_time, disable_time:         f32,
+	is_field:                             bool,
+	// Interaction state
+	last_state, next_state, state:        Widget_State,
+	focus_time, hover_time, disable_time: f32,
 	// Click information
-	click_count:                                  int,
-	click_time:                                   time.Time,
-	click_button:                                 Mouse_Button,
-	allocator:                                    runtime.Allocator,
-	desired_size:                                 [2]f32,
+	click_count:                          int,
+	click_time:                           time.Time,
+	click_button:                         Mouse_Button,
+	desired_size:                         [2]f32,
+	// Allocator for retained data
+	allocator:                            runtime.Allocator,
 	// Stores the number of the last frame on which this widget was updated
-	frames:                                       int,
-	variant:                                      Widget_Kind,
+	frames:                               int,
+	variant:                              Widget_Kind,
 }
 // Widget variants
 Widget_Kind :: union {
@@ -40,6 +46,7 @@ Widget_Kind :: union {
 	Text_Input_Widget_Kind,
 	Generic_Boolean_Widget_Kind,
 	Date_Picker_Widget_Kind,
+	Table_Widget_Kind,
 }
 // Interaction state
 Widget_Status :: enum {
@@ -53,12 +60,12 @@ Widget_Status :: enum {
 Widget_State :: bit_set[Widget_Status;u8]
 // A generic descriptor for all widgets
 Generic_Widget_Info :: struct {
-	id:            Maybe(Id),
-	box:           Maybe(Box),
-	fixed_size:    bool,
+	id:           Maybe(Id),
+	box:          Maybe(Box),
+	fixed_size:   bool,
 	// required_size: [2]f32,
-	desired_size:  [2]f32,
-	disabled:      bool,
+	desired_size: [2]f32,
+	disabled:     bool,
 }
 // A generic result type for all widgets
 Generic_Widget_Result :: struct {
@@ -179,7 +186,7 @@ begin_widget :: proc(
 			if slot == nil {
 				slot = Widget {
 					id        = id,
-					allocator = mem.scratch_allocator(&core.scratch_allocator),
+					allocator = runtime.default_allocator(), //mem.dynamic_arena_allocator(&core.arena),
 				}
 				widget = &slot.?
 				// Add the new widget to the lookup map
@@ -253,7 +260,8 @@ begin_widget :: proc(
 			// Set the globally dragged widget
 			if widget.draggable do core.dragged_widget = widget.id
 		}
-	} else if core.dragged_widget != widget.id /* Keep hover and press state if dragged */ {
+	} else if core.dragged_widget !=
+	   widget.id  /* Keep hover and press state if dragged */{
 		widget.state -= {.Pressed, .Hovered}
 		widget.click_count = 0
 	}

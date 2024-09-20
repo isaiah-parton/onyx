@@ -9,7 +9,7 @@ import "core:reflect"
 import "core:strings"
 import "core:time"
 
-import "extra:onyx/onyx"
+import onyx "../onyx"
 import "vendor:glfw"
 
 Option :: enum {
@@ -34,18 +34,18 @@ Component_Section :: struct {
 }
 
 Component_Showcase :: struct {
-	light_mode:   bool,
-	section:      Component_Section,
-	checkboxes:   [Option]bool,
-	bio: strings.Builder,
-	full_name: strings.Builder,
+	light_mode:    bool,
+	section:       Component_Section,
+	checkboxes:    [Option]bool,
+	bio:           strings.Builder,
+	full_name:     strings.Builder,
 	birth_country: strings.Builder,
-	slider_value: f32,
-	start_time:   time.Time,
-	option:       Option,
-	date_range:   [2]Maybe(onyx.Date),
-	month_offset: int,
-	entries:      [dynamic]Table_Entry,
+	slider_value:  f32,
+	start_time:    time.Time,
+	option:        Option,
+	date_range:    [2]Maybe(onyx.Date),
+	month_offset:  int,
+	entries:       [dynamic]Table_Entry,
 }
 
 State :: struct {
@@ -54,11 +54,11 @@ State :: struct {
 }
 
 Table_Entry :: struct {
-	name:   string,
-	hash: string,
-	public_key: string,
+	name:        string,
+	hash:        string,
+	public_key:  string,
 	private_key: string,
-	location: string,
+	location:    string,
 }
 
 do_component_showcase :: proc(state: ^Component_Showcase) {
@@ -69,7 +69,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	foreground()
 	begin_layout({size = 65, side = .Top})
 	shrink(15)
-	if index, ok := do_breadcrumb({index = int(state.section.component), options = reflect.enum_field_names(Component)}).index.?;
+	if index, ok := do_tabs({index = int(state.section.component), options = reflect.enum_field_names(Component)}).index.?;
 	   ok {
 		state.section.component = Component(index)
 	}
@@ -83,51 +83,58 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_side(.Top)
 		rows_active: [dynamic]bool
 		resize(&rows_active, len(state.entries))
-		begin_table(
+		if table, ok := begin_table(
 			{
 				columns = {
-					{name = "Name", width = 100},
-					{name = "Hash", width = 1200},
-					{name = "Public Key", width = 120},
-					{name = "Private Key", width = 120},
-					{name = "Location", width = 100},
+					{name = "Name"},
+					{name = "Hash"},
+					{name = "Public Key"},
+					{name = "Private Key"},
+					{name = "Location"},
 				},
 				row_count = len(state.entries),
 				max_displayed_rows = 15,
 			},
-		)
-		for &entry, e in state.entries {
-			begin_table_row({index = e})
-			set_width_auto()
-			if result := do_text_input({content = &entry.name}); result.changed {
-				delete(entry.name)
-				entry.name = strings.clone(result.text)
+		); ok {
+			for row in table.first..<table.last {
+				entry := &state.entries[row]
+				begin_table_row({index = row})
+				set_width_auto()
+				if result := do_text_input({content = &entry.name});
+				   result.changed {
+					delete(entry.name)
+					entry.name = strings.clone(result.text)
+				}
+				if result := do_text_input({content = &entry.hash});
+				   result.changed {
+					delete(entry.hash)
+					entry.hash = strings.clone(result.text)
+				}
+				if result := do_text_input({content = &entry.public_key});
+				   result.changed {
+					delete(entry.public_key)
+					entry.public_key = strings.clone(result.text)
+				}
+				if result := do_text_input({content = &entry.private_key});
+				   result.changed {
+					delete(entry.private_key)
+					entry.private_key = strings.clone(result.text)
+				}
+				if result := do_text_input({content = &entry.location});
+				   result.changed {
+					delete(entry.location)
+					entry.location = strings.clone(result.text)
+				}
+				end_table_row()
 			}
-			if result := do_text_input({content = &entry.hash}); result.changed {
-				delete(entry.hash)
-				entry.hash = strings.clone(result.text)
-			}
-			if result := do_text_input({content = &entry.public_key}); result.changed {
-				delete(entry.public_key)
-				entry.public_key = strings.clone(result.text)
-			}
-			if result := do_text_input({content = &entry.private_key}); result.changed {
-				delete(entry.private_key)
-				entry.private_key = strings.clone(result.text)
-			}
-			if result := do_text_input({content = &entry.location}); result.changed {
-				delete(entry.location)
-				entry.location = strings.clone(result.text)
-			}
-			end_table_row()
+			end_table()
 		}
-		end_table()
 
 	case .Scroll_Zone:
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if do_container({size = {0, 2000}}) {
+		if _, ok := do_container({size = {0, 2000}}); ok {
 			set_width_fill()
 			set_height_auto()
 			for i in 0 ..< 50 {
@@ -135,14 +142,16 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					add_space(4)
 				}
 				push_id(i)
-				do_button({text = fmt.tprintf("Button #%i", i + 1), kind = .Ghost})
+				do_button(
+					{text = fmt.tprintf("Button #%i", i + 1), kind = .Ghost},
+				)
 				pop_id()
 			}
 		}
 		add_space(50)
 		set_width(500)
 		set_height(300)
-		if do_container({}) {
+		if _, ok := do_container({}); ok {
 			set_side(.Left)
 			set_height_fill()
 			set_width(200)
@@ -176,7 +185,9 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				if m > 0 {
 					add_space(10)
 				}
-				if was_clicked(do_button({text = tmp_print(member), kind = member})) {
+				if was_clicked(
+					do_button({text = tmp_print(member), kind = member}),
+				) {
 
 				}
 				pop_id()
@@ -190,7 +201,12 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			for option, o in Option {
 				push_id(o)
 				if was_clicked(
-					do_selector_option({text = tmp_print(option), state = state.option == option}),
+					do_selector_option(
+						{
+							text = tmp_print(option),
+							state = state.option == option,
+						},
+					),
 				) {
 					state.option = option
 				}
@@ -201,7 +217,13 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			{selection = state.date_range, month_offset = state.month_offset},
 		)
 		if do_layout(
-			{box = align_inner(layout_box(), calendar.desired_size, {.Middle, .Middle})},
+			{
+				box = align_inner(
+					layout_box(),
+					calendar.desired_size,
+					{.Middle, .Middle},
+				),
+			},
 		) {
 			result := add_calendar(calendar)
 			state.month_offset = result.month_offset
@@ -218,39 +240,51 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				add_space(10)
 			}
 			if was_clicked(
-				do_checkbox({text = tmp_print(member), state = state.checkboxes[member]}),
+				do_checkbox(
+					{
+						text = tmp_print(member),
+						state = state.checkboxes[member],
+					},
+				),
 			) {
 				state.checkboxes[member] = !state.checkboxes[member]
 			}
 			pop_id()
 		}
-
 		add_space(10)
 		do_label({text = "Radio Buttons"})
 		add_space(10)
-		enable_widgets(false)
 		for member, m in Option {
 			push_id(m)
 			if m > 0 {
 				add_space(10)
 			}
 			if was_clicked(
-				do_radio_button({text = tmp_print(member), state = state.option == member}),
+				do_radio_button(
+					{text = tmp_print(member), state = state.option == member},
+				),
 			) {
 				state.option = member
 			}
 			pop_id()
 		}
-		enable_widgets()
 
 	case .Data_Input:
 		set_side(.Top)
 		set_width(250)
 		add_space(10)
 		set_height_auto()
-		do_text_input({content = &state.full_name, placeholder = "Full Name", decal = .Check})
+		do_text_input(
+			{
+				content = &state.full_name,
+				placeholder = "Full Name",
+				decal = .Check,
+			},
+		)
 		add_space(10)
-		do_text_input({content = &state.birth_country, placeholder = "Country of birth"})
+		do_text_input(
+			{content = &state.birth_country, placeholder = "Country of birth"},
+		)
 		add_space(10)
 		set_height(120)
 		do_text_input(
@@ -272,7 +306,10 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					spacing = 10,
 					kind = Bar_Graph{value_labels = true, show_tooltip = true},
 					label_tooltip = true,
-					fields = {{"Field 1", {255, 25, 96, 255}}, {"Field 2", {0, 58, 255, 255}}},
+					fields = {
+						{"Field 1", {255, 25, 96, 255}},
+						{"Field 2", {0, 58, 255, 255}},
+					},
 					entries = {
 						{"Feb 2nd", {1, 5}},
 						{"Feb 3rd", {4, 2}},
@@ -303,7 +340,10 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					spacing = 10,
 					kind = Line_Graph{show_dots = false},
 					label_tooltip = true,
-					fields = {{"Minecraft", {255, 25, 96, 255}}, {"Terraria", {0, 58, 255, 255}}},
+					fields = {
+						{"Minecraft", {255, 25, 96, 255}},
+						{"Terraria", {0, 58, 255, 255}},
+					},
 					entries = {
 						{label = "Jan 5th", values = {1, 5}},
 						{label = "Jan 6th", values = {4, 2}},
@@ -334,13 +374,23 @@ main :: proc() {
 
 		defer {
 			if len(track.allocation_map) > 0 {
-				fmt.eprintf("=== %v allocations not freed: ===\n", len(track.allocation_map))
+				fmt.eprintf(
+					"=== %v allocations not freed: ===\n",
+					len(track.allocation_map),
+				)
 				for _, entry in track.allocation_map {
-					fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
+					fmt.eprintf(
+						"- %v bytes @ %v\n",
+						entry.size,
+						entry.location,
+					)
 				}
 			}
 			if len(track.bad_free_array) > 0 {
-				fmt.eprintf("=== %v incorrect frees: ===\n", len(track.bad_free_array))
+				fmt.eprintf(
+					"=== %v incorrect frees: ===\n",
+					len(track.bad_free_array),
+				)
 				for entry in track.bad_free_array {
 					fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
 				}
@@ -353,16 +403,22 @@ main :: proc() {
 
 	state: State
 
-	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
+	state.component_showcase.date_range = {
+		onyx.Date{2024, 2, 17},
+		onyx.Date{2024, 3, 2},
+	}
 
-	for i in 0..<100 {
-		append(&state.component_showcase.entries, Table_Entry{
-			hash = fmt.aprintf("%x", rand.int31()),
-			name = fmt.aprintf("%x", rand.int31()),
-			public_key = fmt.aprintf("%x", rand.int31()),
-			private_key = fmt.aprintf("%x", rand.int31()),
-			location = fmt.aprintf("%x", rand.int31()),
-		})
+	for i in 0 ..< 100 {
+		append(
+			&state.component_showcase.entries,
+			Table_Entry {
+				hash = fmt.aprintf("%x", rand.int31()),
+				name = fmt.aprintf("%v", i + 1),
+				public_key = fmt.aprintf("%x", rand.int31()),
+				private_key = fmt.aprintf("%x", rand.int31()),
+				location = fmt.aprintf("%x", rand.int31()),
+			},
+		)
 	}
 
 	onyx.init(1600, 900, "demo")

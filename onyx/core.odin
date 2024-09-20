@@ -152,7 +152,7 @@ Core :: struct {
 	cursors:                                                  #sparse[Mouse_Cursor]glfw.CursorHandle,
 
 	// Allocators
-	scratch_allocator:                                        mem.Scratch_Allocator,
+	arena: mem.Dynamic_Arena,
 }
 
 view_box :: proc() -> Box {
@@ -180,6 +180,8 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.last_frame_time = time.now()
 	core.draw_next_frame = true
 	core.start_time = time.now()
+
+	mem.dynamic_arena_init(&core.arena)
 
 	// Initialize glfw
 	glfw.Init()
@@ -340,12 +342,12 @@ new_frame :: proc() {
 render :: proc() {
 	do_debug_layer()
 
-	assert(core.clip_stack.height == 0)
-	assert(core.matrix_stack.height == 0)
-	assert(core.layer_stack.height == 0)
-	assert(core.layout_stack.height == 0)
-	assert(core.container_stack.height == 0)
-	assert(core.widget_stack.height == 0)
+	core.clip_stack.height = 0
+	core.matrix_stack.height = 0
+	core.layer_stack.height = 0
+	core.layout_stack.height = 0
+	core.container_stack.height = 0
+	core.widget_stack.height = 0
 
 	// Update layer ids
 	core.highest_layer_index = 0
@@ -407,12 +409,12 @@ render :: proc() {
 	}
 
 	// Free unused containers
-	for id, cnt in core.container_map {
-		if cnt.dead {
+	for id, container in core.container_map {
+		if container.dead {
 			delete_key(&core.container_map, id)
-			free(cnt)
+			free(container)
 		} else {
-			cnt.dead = true
+			container.dead = true
 		}
 	}
 
@@ -461,15 +463,19 @@ render :: proc() {
 
 uninit :: proc() {
 	// Free all dynamically allocated widget memory
+	delete(core.panel_map)
+
 	for &widget in core.widgets {
 		if widget, ok := widget.?; ok {
 			free_all(widget.allocator)
 		}
 	}
+	delete(core.widget_map)
 
 	for _, &layer in core.layer_map {
 		destroy_layer(layer)
 	}
+	delete(core.layer_map)
 
 	// Free all font data
 	for &font, f in core.fonts {
@@ -478,23 +484,18 @@ uninit :: proc() {
 		}
 	}
 
-	mem.scratch_allocator_destroy(&core.scratch_allocator)
+	// Delete stuff
+	delete(core.glyphs)
+	delete(core.lines)
+	delete(core.runes)
+
+	mem.dynamic_arena_destroy(&core.arena)
 
 	// Destroy atlas
 	destroy_atlas(&core.font_atlas)
 
 	// Free draw call data
 	destroy_draw_list(&core.draw_list)
-
-	// Delete maps
-	delete(core.layer_map)
-	delete(core.widget_map)
-	delete(core.panel_map)
-
-	// Delete stuff
-	delete(core.glyphs)
-	delete(core.lines)
-	delete(core.runes)
 
 	uninit_graphics(&core.gfx)
 }
