@@ -49,4 +49,5 @@ Mouse_Cursor :: enum {
 	Resize_NESW,
 	Resize_NWSE,
 	I_Beam,
+	Loading,
 }

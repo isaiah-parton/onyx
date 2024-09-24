@@ -76,34 +76,56 @@ Core :: struct {
 	frames_so_far, frames_this_second:                        int,
 
 	// Hashing
-	id_stack:                                                 Stack(Id, MAX_IDS),
+	id_stack:                                                 Stack(
+		Id,
+		MAX_IDS,
+	),
 
 	// Widgets
-	widgets:                                                  [MAX_WIDGETS]Maybe(Widget),
+	widgets:                                                  [MAX_WIDGETS]Maybe(
+		Widget,
+	),
 	widget_map:                                               map[Id]^Widget,
-	widget_stack:                                             Stack(^Widget, 10),
+	widget_stack:                                             Stack(
+		^Widget,
+		10,
+	),
 	last_hovered_widget, hovered_widget, next_hovered_widget: Id,
 	last_focused_widget, focused_widget, dragged_widget:      Id,
 	disable_widgets:                                          bool,
 	drag_offset:                                              [2]f32,
 
 	// Layout
-	layout_stack:                                             Stack(Layout, MAX_LAYOUTS),
+	layout_stack:                                             Stack(
+		Layout,
+		MAX_LAYOUTS,
+	),
 
 	// Containers
 	container_map:                                            map[Id]^Container,
-	container_stack:                                          Stack(^Container, 200),
+	container_stack:                                          Stack(
+		^Container,
+		200,
+	),
 	active_container, next_active_container:                  Id,
 
 	// Panels
-	panels:                                                   [MAX_PANELS]Maybe(Panel),
+	panels:                                                   [MAX_PANELS]Maybe(
+		Panel,
+	),
 	panel_map:                                                map[Id]^Panel,
-	panel_stack:                                              Stack(^Panel, MAX_PANELS),
+	panel_stack:                                              Stack(
+		^Panel,
+		MAX_PANELS,
+	),
 
 	// Layers
 	layers:                                                   [MAX_LAYERS]Layer,
 	layer_map:                                                map[Id]^Layer,
-	layer_stack:                                              Stack(^Layer, MAX_LAYERS),
+	layer_stack:                                              Stack(
+		^Layer,
+		MAX_LAYERS,
+	),
 	focused_layer:                                            Id,
 	highest_layer_index:                                      int,
 	last_hovered_layer, hovered_layer, next_hovered_layer:    Id,
@@ -127,12 +149,16 @@ Core :: struct {
 	render_duration:                                          time.Duration,
 
 	// Text
-	fonts:                                                    [MAX_FONTS]Maybe(Font),
+	fonts:                                                    [MAX_FONTS]Maybe(
+		Font,
+	),
 	glyphs:                                                   [dynamic]Text_Job_Glyph,
 	lines:                                                    [dynamic]Text_Job_Line,
 	font_atlas:                                               Atlas,
 	current_font:                                             int,
-	user_images:                                              [100]Maybe(Image),
+	user_images:                                              [100]Maybe(
+		Image,
+	),
 
 	// Drawing
 	draw_this_frame, draw_next_frame:                         bool,
@@ -141,7 +167,10 @@ Core :: struct {
 	current_texture:                                          wgpu.Texture,
 	clip_stack:                                               Stack(Box, 100),
 	path_stack:                                               Stack(Path, 10),
-	matrix_stack:                                             Stack(Matrix, MAX_MATRICES),
+	matrix_stack:                                             Stack(
+		Matrix,
+		MAX_MATRICES,
+	),
 	frames:                                                   int,
 	drawn_frames:                                             int,
 	draw_list:                                                Draw_List,
@@ -150,10 +179,6 @@ Core :: struct {
 	current_draw_call:                                        ^Draw_Call,
 	gfx:                                                      Graphics,
 	cursors:                                                  #sparse[Mouse_Cursor]glfw.CursorHandle,
-
-	// Allocators
-	arena: mem.Arena,
-	arena_data: []u8,
 }
 
 view_box :: proc() -> Box {
@@ -182,50 +207,68 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.draw_next_frame = true
 	core.start_time = time.now()
 
-	core.arena_data = make([]u8, mem.Megabyte)
-	mem.arena_init(&core.arena, core.arena_data)
-
 	// Initialize glfw
 	glfw.Init()
 
 	// Create cursors
 	core.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
-	core.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(glfw.POINTING_HAND_CURSOR)
+	core.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(
+		glfw.POINTING_HAND_CURSOR,
+	)
 	core.cursors[.I_Beam] = glfw.CreateStandardCursor(glfw.IBEAM_CURSOR)
+	core.cursors[.Resize_EW] = glfw.CreateStandardCursor(glfw.RESIZE_EW_CURSOR)
+	core.cursors[.Resize_NS] = glfw.CreateStandardCursor(glfw.RESIZE_NS_CURSOR)
+	core.cursors[.Resize_NESW] = glfw.CreateStandardCursor(glfw.RESIZE_NESW_CURSOR)
+	core.cursors[.Resize_NWSE] = glfw.CreateStandardCursor(glfw.RESIZE_NWSE_CURSOR)
 
 	// Create the main window
 	core.window = glfw.CreateWindow(width, height, title, nil, nil)
 
 	// Set event callbacks
-	glfw.SetScrollCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
-		core.mouse_scroll = {f32(x), f32(y)}
-	})
-	glfw.SetWindowSizeCallback(core.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
-		context = runtime.default_context()
-		core.draw_this_frame = true
-		core.draw_next_frame = true
-		core.view = {f32(width), f32(height)}
-		resize_graphics(&core.gfx, int(width), int(height))
-	})
-	glfw.SetCharCallback(core.window, proc "c" (_: glfw.WindowHandle, char: rune) {
-		context = runtime.default_context()
-		append(&core.runes, char)
-	})
-	glfw.SetKeyCallback(core.window, proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
-		key := max(key, 0)
-		switch action {
-		case glfw.PRESS:
-			core.keys[Keyboard_Key(key)] = true
-		case glfw.RELEASE:
-			core.keys[Keyboard_Key(key)] = false
-		case glfw.REPEAT:
-			core.keys[Keyboard_Key(key)] = true
-			core.last_keys[Keyboard_Key(key)] = false
-		}
-	})
-	glfw.SetCursorPosCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
-		core.mouse_pos = {f32(x), f32(y)}
-	})
+	glfw.SetScrollCallback(
+		core.window,
+		proc "c" (_: glfw.WindowHandle, x, y: f64) {
+			core.mouse_scroll = {f32(x), f32(y)}
+		},
+	)
+	glfw.SetWindowSizeCallback(
+		core.window,
+		proc "c" (_: glfw.WindowHandle, width, height: i32) {
+			context = runtime.default_context()
+			core.draw_this_frame = true
+			core.draw_next_frame = true
+			core.view = {f32(width), f32(height)}
+			resize_graphics(&core.gfx, int(width), int(height))
+		},
+	)
+	glfw.SetCharCallback(
+		core.window,
+		proc "c" (_: glfw.WindowHandle, char: rune) {
+			context = runtime.default_context()
+			append(&core.runes, char)
+		},
+	)
+	glfw.SetKeyCallback(
+		core.window,
+		proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
+			key := max(key, 0)
+			switch action {
+			case glfw.PRESS:
+				core.keys[Keyboard_Key(key)] = true
+			case glfw.RELEASE:
+				core.keys[Keyboard_Key(key)] = false
+			case glfw.REPEAT:
+				core.keys[Keyboard_Key(key)] = true
+				core.last_keys[Keyboard_Key(key)] = false
+			}
+		},
+	)
+	glfw.SetCursorPosCallback(
+		core.window,
+		proc "c" (_: glfw.WindowHandle, x, y: f64) {
+			core.mouse_pos = {f32(x), f32(y)}
+		},
+	)
 	glfw.SetMouseButtonCallback(
 		core.window,
 		proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
@@ -244,7 +287,10 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	// Initalize draw list
 	init_draw_list(&core.draw_list)
 	// Init font atlas
-	atlas_size: int = min(cast(int)core.gfx.device_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
+	atlas_size: int = min(
+		cast(int)core.gfx.device_limits.maxTextureDimension2D,
+		MAX_ATLAS_SIZE,
+	)
 	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
 
 	// Default style
@@ -252,6 +298,7 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.style.shape = default_style_shape()
 }
 
+// Call before each new frame
 new_frame :: proc() {
 	// Timings
 	time.sleep(
@@ -263,10 +310,11 @@ new_frame :: proc() {
 		),
 	)
 	now := time.now()
-	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
+	core.delta_time = f32(
+		time.duration_seconds(time.diff(core.last_frame_time, now)),
+	)
 	core.last_frame_time = now
 	core.frames += 1
-
 	core.frames_so_far += 1
 	if time.since(core.last_second) >= time.Second {
 		core.last_second = time.now()
@@ -290,31 +338,7 @@ new_frame :: proc() {
 		core.draw_this_frame = true
 	}
 
-	// Decide if this frame will be drawn
-	if core.draw_next_frame {
-		core.draw_next_frame = false
-		core.draw_this_frame = true
-	}
-
-	// Decide if the next frame will be drawn
-	if (core.mouse_pos != core.last_mouse_pos ||
-		   core.mouse_bits != core.last_mouse_bits ||
-		   len(core.runes) > 0 ||
-		   core.last_focused_widget != core.focused_widget ||
-		   core.last_hovered_widget != core.hovered_widget) {
-		core.draw_this_frame = true
-		core.draw_next_frame = true
-	}
-
-	// Process widgets
-	process_widgets()
-
-	set_texture(core.font_atlas.texture.internal)
-}
-
-render :: proc() {
-	do_debug_layer()
-
+	// Reset stuff
 	core.clip_stack.height = 0
 	core.matrix_stack.height = 0
 	core.layer_stack.height = 0
@@ -370,8 +394,8 @@ render :: proc() {
 	// Free unused widgets
 	for id, widget in core.widget_map {
 		if widget.dead {
-			if err := free_all(widget.allocator); err != .None {
-				fmt.printfln("[core] Error freeing widget data: %v", err)
+			if widget.on_death != nil {
+				widget.on_death(widget)
 			}
 			delete_key(&core.widget_map, id)
 			(transmute(^Maybe(Widget))widget)^ = nil
@@ -395,11 +419,35 @@ render :: proc() {
 	if core.font_atlas.modified {
 		t := time.now()
 		update_atlas(&core.font_atlas, &core.gfx)
-		when ODIN_DEBUG {
-			// fmt.printfln("Updated font atlas in %.3fms", time.duration_milliseconds(time.since(t)))
-		}
 		core.font_atlas.modified = false
 	}
+
+	// Decide if this frame will be drawn
+	if core.draw_next_frame {
+		core.draw_next_frame = false
+		core.draw_this_frame = true
+	}
+
+	// Decide if the next frame will be drawn
+	if (core.mouse_pos != core.last_mouse_pos ||
+		   core.mouse_bits != core.last_mouse_bits ||
+		   len(core.runes) > 0 ||
+		   core.last_focused_widget != core.focused_widget ||
+		   core.last_hovered_widget != core.hovered_widget) {
+		core.draw_this_frame = true
+		core.draw_next_frame = true
+	}
+
+	// Process widgets
+	process_widgets()
+
+	set_texture(core.font_atlas.texture.internal)
+}
+
+// Render queued draw calls and reset draw state
+render :: proc() {
+	// Render debug info rq
+	do_debug_layer()
 
 	if core.draw_this_frame {
 		start_time := time.now()
@@ -435,41 +483,31 @@ render :: proc() {
 }
 
 uninit :: proc() {
-	// Free all dynamically allocated widget memory
-	delete(core.panel_map)
-
-	for &widget in core.widgets {
-		if widget, ok := widget.?; ok {
-			free_all(widget.allocator)
+	for _, widget in core.widget_map {
+		if widget.on_death != nil {
+			widget.on_death(widget)
 		}
 	}
-	delete(core.widget_map)
 
 	for _, &layer in core.layer_map {
 		destroy_layer(layer)
 	}
-	delete(core.layer_map)
 
-	// Free all font data
 	for &font, f in core.fonts {
 		if font, ok := font.?; ok {
 			destroy_font(&font)
 		}
 	}
 
-	// Delete stuff
+	delete(core.widget_map)
+	delete(core.panel_map)
+	delete(core.layer_map)
 	delete(core.glyphs)
 	delete(core.lines)
 	delete(core.runes)
 
-	delete(core.arena_data)
-
-	// Destroy atlas
 	destroy_atlas(&core.font_atlas)
-
-	// Free draw call data
 	destroy_draw_list(&core.draw_list)
-
 	uninit_graphics(&core.gfx)
 }
 
@@ -497,14 +535,14 @@ mouse_released :: proc(button: Mouse_Button) -> bool {
 	return (core.last_mouse_bits - core.mouse_bits) >= {button}
 }
 
-set_clipboard_string :: proc(_: rawptr, str: string) -> bool {
+__set_clipboard_string :: proc(_: rawptr, str: string) -> bool {
 	cstr := strings.clone_to_cstring(str)
 	defer delete(cstr)
 	glfw.SetClipboardString(core.window, cstr)
 	return true
 }
 
-get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
+__get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
 	str = glfw.GetClipboardString(core.window)
 	ok = len(str) > 0
 	return

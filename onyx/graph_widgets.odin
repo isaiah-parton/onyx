@@ -41,9 +41,7 @@ Graph_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 }
 
 Graph_Widget_Kind :: struct {
-	dot_times: [dynamic]f32,
-	bar_time:  f32,
-	vertices:  [dynamic]Vertex,
+	dot_times: [100]f32,
 }
 
 make_graph :: proc(info: Graph_Info($T), loc := #caller_location) -> Graph_Info(T) {
@@ -64,13 +62,10 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 
 	// Set up variant and allocators
 	variant := widget_kind(widget, Graph_Widget_Kind)
-	variant.dot_times.allocator = widget.allocator
-	variant.vertices.allocator = widget.allocator
 
 	box := widget.box
 
 	widget.hover_time = animate(widget.hover_time, 0.2, .Hovered in widget.state)
-
 
 	tooltip_idx: int
 	tooltip_pos: Maybe([2]f32)
@@ -88,7 +83,6 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 					fade(core.style.color.substance, 0.5),
 				)
 			}
-			resize(&variant.dot_times, len(info.entries))
 
 			spacing: f32 = (box.hi.x - box.lo.x) / f32(len(info.entries) - 1)
 			hn := int(math.round((core.mouse_pos.x - box.lo.x) / spacing))
@@ -316,7 +310,7 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 						draw_text(
 							{(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},
 							{
-								text = tmp_print(entry.values[f]),
+								text = fmt.tprint(entry.values[f]),
 								font = core.style.fonts[.Regular],
 								size = 18,
 								align_h = .Middle,
@@ -375,7 +369,7 @@ add_graph :: proc(info: Graph_Info($T), loc := #caller_location) {
 			draw_text(
 				{tip_box.hi.x, (tip_box.lo.y + tip_box.hi.y) / 2},
 				{
-					text = tmp_printf("%v", info.entries[tooltip_idx].values[f]),
+					text = fmt.tprintf("%v", info.entries[tooltip_idx].values[f]),
 					font = core.style.fonts[.Regular],
 					size = 18,
 					align_h = .Right,

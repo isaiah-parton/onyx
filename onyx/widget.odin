@@ -31,10 +31,9 @@ Widget :: struct {
 	click_time:                           time.Time,
 	click_button:                         Mouse_Button,
 	desired_size:                         [2]f32,
-	// Allocator for retained data
-	allocator:                            runtime.Allocator,
 	// Stores the number of the last frame on which this widget was updated
 	frames:                               int,
+	on_death: proc(_: ^Widget),
 	variant:                              Widget_Kind,
 }
 // Widget variants
@@ -56,16 +55,20 @@ Widget_Status :: enum {
 	Changed,
 	Clicked,
 	Open,
+	Active,
 }
 Widget_State :: bit_set[Widget_Status;u8]
 // A generic descriptor for all widgets
 Generic_Widget_Info :: struct {
 	id:           Maybe(Id),
+	// Optional box to be used instead of cutting from the layout
 	box:          Maybe(Box),
-	fixed_size:   bool,
-	// required_size: [2]f32,
-	desired_size: [2]f32,
 	disabled:     bool,
+	fixed_size:   bool,
+	// Size required by the user
+	// required_size: [2]f32,
+	// Size desired by the widget
+	desired_size: [2]f32,
 }
 // A generic result type for all widgets
 Generic_Widget_Result :: struct {
@@ -186,7 +189,6 @@ begin_widget :: proc(
 			if slot == nil {
 				slot = Widget {
 					id        = id,
-					allocator = mem.arena_allocator(&core.arena),
 				}
 				widget = &slot.?
 				// Add the new widget to the lookup map

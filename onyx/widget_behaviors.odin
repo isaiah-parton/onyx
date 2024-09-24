@@ -12,6 +12,16 @@ button_behavior :: proc(widget: ^Widget) {
 	}
 }
 
+horizontal_slider_behavior :: proc(widget: ^Widget) {
+	widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
+	if .Hovered in widget.state {
+		core.cursor_type = .Resize_EW
+	}
+	if point_in_box(core.mouse_pos, widget.box) {
+		hover_widget(widget)
+	}
+}
+
 menu_behavior :: proc(widget: ^Widget) {
 	kind := widget_kind(widget, Menu_Widget_Kind)
 	if .Open in widget.state {

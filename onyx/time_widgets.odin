@@ -108,7 +108,7 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 		draw_text(
 			box_center(layout_box()),
 			{
-				text = tmp_printf("%s %i", t.Month(info.__month), info.__year),
+				text = fmt.tprintf("%s %i", t.Month(info.__month), info.__year),
 				font = core.style.fonts[.Medium],
 				size = 18,
 				align_h = .Middle,
@@ -214,7 +214,7 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 			draw_text(
 				box_center(widget.box),
 				{
-					text = tmp_print(day),
+					text = fmt.tprint(day),
 					font = core.style.fonts[.Medium if is_month else .Regular],
 					size = 18,
 					align_v = .Middle,

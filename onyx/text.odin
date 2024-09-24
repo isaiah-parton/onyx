@@ -12,6 +12,8 @@ import "core:strings"
 import "core:unicode"
 import "core:unicode/utf8"
 
+import "tedit"
+
 import ttf "vendor:stb/truetype"
 
 FMT_BUFFER_COUNT :: 128
@@ -111,7 +113,7 @@ Text_Job :: struct {
 
 make_text_job :: proc(
 	info: Text_Info,
-	e: ^Text_Editor = nil,
+	e: ^tedit.Text_Editor = nil,
 	mouse_pos: [2]f32 = {},
 ) -> (
 	job: Text_Job,

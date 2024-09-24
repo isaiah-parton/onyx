@@ -190,8 +190,6 @@ add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
 			interpolate_colors(how_on, core.style.color.substance, core.style.color.accent),
 		)
 		draw_arc_fill(lever_center, inner_radius, 0, math.TAU, core.style.color.background)
-
-
 	}
 
 	if .Clicked in widget.state {
@@ -241,6 +239,13 @@ add_radio_button :: proc(info: Radio_Button_Info) -> (result: Generic_Widget_Res
 			icon_box = widget.box
 		}
 		icon_center := box_center(icon_box)
+
+		if widget.hover_time > 0 {
+			draw_box_fill(
+				{{widget.box.lo.x + box_height(widget.box) / 2, widget.box.lo.y}, widget.box.hi},
+				fade(core.style.color.substance, 0.5 * widget.hover_time),
+			)
+		}
 
 		state_time := ease.circular_in_out(kind.state_time)
 		draw_arc_fill(

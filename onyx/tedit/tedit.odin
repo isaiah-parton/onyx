@@ -1,4 +1,4 @@
-package onyx
+package tedit
 
 // Based on "code:text/edit"
 
@@ -54,7 +54,7 @@ Text_Editor :: struct {
 	selection: [2]int,
 	anchor: int,
 
-	line_start, 
+	line_start,
 	line_end: int,
 
 	builder: ^strings.Builder,

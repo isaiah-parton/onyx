@@ -35,7 +35,6 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> (self:
 
 	self.id = id
 	self.dead = false
-	self.size = linalg.max(self.size, info.size)
 	self.box = info.box.? or_else next_widget_box({})
 
 	self.active = core.active_container == self.id
@@ -45,7 +44,7 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> (self:
 
 	// Minimum size
 	self.size = linalg.max(
-		self.size,
+		info.size,
 		box_size(self.box),
 	)
 
@@ -66,7 +65,6 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> (self:
 	layout_size := linalg.max(self.size, info.size)
 	begin_layout({box = Box{layout_pos, layout_pos + layout_size}, isolated = true})
 	self.layout = current_layout().?
-	self.layout.fixed = true
 	self.layout.next_cut_side = .Top
 
 	return
@@ -123,7 +121,7 @@ end_container :: proc() {
 		if self.scroll_x {
 			box.hi.y -= self.scroll_time.x * core.style.shape.scrollbar_thickness
 		}
-		if pos, ok := do_scrollbar({make_visible = abs(delta_scroll.y) > 0.1, vertical = true, box = box, pos = self.scroll.y, travel = self.size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / self.size.y}).pos.?;
+		if pos, ok := do_scrollbar({make_visible = self.active || abs(delta_scroll.y) > 0.1, vertical = true, box = box, pos = self.scroll.y, travel = self.size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / self.size.y}).pos.?;
 		   ok {
 			self.scroll.y = pos
 			self.desired_scroll.y = pos
@@ -137,7 +135,7 @@ end_container :: proc() {
 		if self.scroll_y {
 			box.hi.x -= self.scroll_time.y * core.style.shape.scrollbar_thickness
 		}
-		if pos, ok := do_scrollbar({make_visible = abs(delta_scroll.x) > 0.1, box = box, pos = self.scroll.x, travel = self.size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / self.size.x}).pos.?;
+		if pos, ok := do_scrollbar({make_visible = self.active || abs(delta_scroll.x) > 0.1, box = box, pos = self.scroll.x, travel = self.size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / self.size.x}).pos.?;
 		   ok {
 			self.scroll.x = pos
 			self.desired_scroll.x = pos

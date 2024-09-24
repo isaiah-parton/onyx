@@ -86,7 +86,7 @@ add_box_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 	result.self = widget
 	defer end_widget()
 	widget.draggable = true
-	button_behavior(widget)
+	horizontal_slider_behavior(widget)
 	if widget.visible {
 		draw_box_fill(widget.box, core.style.color.substance)
 		time := clamp(f32(info.value - info.lo) / f32(info.hi - info.lo), 0, 1)

@@ -1,8 +1,5 @@
 package onyx
-// Tables behave like a spreadsheet, need I say more?
-// Yes.
-// 	Copying and pasting in a table make use of CSV.
-// 	Tables retain their data for the lifetime of the program.
+
 import "core:fmt"
 import "core:math"
 import "core:strings"

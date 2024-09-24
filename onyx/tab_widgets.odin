@@ -9,7 +9,7 @@ Tabs_Info :: struct {
 }
 
 Tabs_Widget_Kind :: struct {
-	timers: [dynamic]f32,
+	timers: [10]f32,
 }
 
 Tabs_Result :: struct {
@@ -20,6 +20,7 @@ Tabs_Result :: struct {
 make_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> Tabs_Info {
 	info := info
 	info.id = hash(loc)
+	info.options = info.options[:min(len(info.options), 10)]
 	info.desired_size = {f32(len(info.options)) * 100, 30}
 	return info
 }
@@ -31,8 +32,6 @@ add_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Resu
 	result.self = widget
 
 	kind := widget_kind(widget, Tabs_Widget_Kind)
-	kind.timers.allocator = widget.allocator
-	resize(&kind.timers, len(info.options))
 
 	if point_in_box(core.mouse_pos, widget.box) {
 		hover_widget(widget)

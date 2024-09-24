@@ -131,7 +131,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		add_space(50)
 		set_width(500)
 		set_height(300)
-		if _, ok := do_container({}); ok {
+		if _, ok := do_container({size = {1000, 0}}); ok {
 			set_side(.Left)
 			set_height_fill()
 			set_width(200)
@@ -166,7 +166,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					add_space(10)
 				}
 				if was_clicked(
-					do_button({text = tmp_print(member), kind = member}),
+					do_button({text = fmt.tprint(member), kind = member}),
 				) {
 
 				}
@@ -183,7 +183,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				if was_clicked(
 					do_selector_option(
 						{
-							text = tmp_print(option),
+							text = fmt.tprint(option),
 							state = state.option == option,
 						},
 					),
@@ -222,7 +222,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			if was_clicked(
 				do_checkbox(
 					{
-						text = tmp_print(member),
+						text = fmt.tprint(member),
 						state = state.checkboxes[member],
 					},
 				),
@@ -241,7 +241,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			}
 			if was_clicked(
 				do_radio_button(
-					{text = tmp_print(member), state = state.option == member},
+					{text = fmt.tprint(member), state = state.option == member},
 				),
 			) {
 				state.option = member
