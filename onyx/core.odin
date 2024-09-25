@@ -236,7 +236,9 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	glfw.SetKeyCallback(
 		core.window,
 		proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
-			key := max(key, 0)
+			if key < 0 {
+				return
+			}
 			switch action {
 			case glfw.PRESS:
 				core.keys[Keyboard_Key(key)] = true

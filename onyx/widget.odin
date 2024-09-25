@@ -81,10 +81,12 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 	if condition {
 		if value < 1 {
 			core.draw_this_frame = true
+			core.draw_next_frame = true
 			value = min(1, value + core.delta_time * (1 / duration))
 		}
 	} else if value > 0 {
 		core.draw_this_frame = true
+		core.draw_next_frame = true
 		value = max(0, value - core.delta_time * (1 / duration))
 	}
 

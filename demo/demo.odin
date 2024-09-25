@@ -64,6 +64,11 @@ Table_Entry :: struct {
 do_component_showcase :: proc(state: ^Component_Showcase) {
 	using onyx
 
+	if do_panel({title = "Login"}) {
+		shrink(10)
+		do_button({text = "hi"})
+	}
+
 	layer_box := shrink_box(view_box(), 100)
 	begin_layer({box = layer_box, kind = .Background})
 	foreground()
@@ -193,22 +198,6 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				pop_id()
 			}
 		}
-		calendar := make_calendar(
-			{selection = state.date_range, month_offset = state.month_offset},
-		)
-		if layout(
-			{
-				box = align_inner(
-					layout_box(),
-					calendar.desired_size,
-					{.Middle, .Middle},
-				),
-			},
-		) {
-			result := add_calendar(calendar)
-			state.month_offset = result.month_offset
-			state.date_range = result.selection
-		}
 
 	case .Boolean:
 		set_side(.Top)
@@ -267,7 +256,9 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		)
 		add_space(10)
 		set_height_auto()
-		date_picker({date = &state.date_range[0].?})
+		date_picker({first = &state.date_range[0]})
+		add_space(10)
+		date_picker({first = &state.date_range[0], second = &state.date_range[1]})
 		add_space(10)
 		set_height(120)
 		text_input(

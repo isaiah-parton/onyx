@@ -56,7 +56,8 @@ make_generic_boolean_widget :: proc(
 				info.desired_size.x = max(SIZE, info.__text_job.size.x)
 				info.desired_size.y = SIZE + info.__text_job.size.y
 			} else {
-				info.desired_size.x = SIZE + info.__text_job.size.x + TEXT_PADDING * 2
+				info.desired_size.x =
+					SIZE + info.__text_job.size.x + TEXT_PADDING * 2
 				info.desired_size.y = SIZE
 			}
 		}
@@ -67,7 +68,11 @@ make_generic_boolean_widget :: proc(
 	return info
 }
 
-add_checkbox :: proc(info: Generic_Boolean_Widget_Info) -> (result: Generic_Widget_Result) {
+add_checkbox :: proc(
+	info: Generic_Boolean_Widget_Info,
+) -> (
+	result: Generic_Widget_Result,
+) {
 	widget, ok := begin_widget(info)
 	if !ok do return
 
@@ -84,9 +89,18 @@ add_checkbox :: proc(info: Generic_Boolean_Widget_Info) -> (result: Generic_Widg
 			case .Right:
 				icon_box = {{widget.box.hi.x - SIZE, widget.box.lo.y}, SIZE}
 			case .Top:
-				icon_box = {{box_center_x(widget.box) - SIZE / 2, widget.box.hi.y - SIZE}, SIZE}
+				icon_box = {
+					{
+						box_center_x(widget.box) - SIZE / 2,
+						widget.box.hi.y - SIZE,
+					},
+					SIZE,
+				}
 			case .Bottom:
-				icon_box = {{box_center_x(widget.box) - SIZE / 2, widget.box.lo.y}, SIZE}
+				icon_box = {
+					{box_center_x(widget.box) - SIZE / 2, widget.box.lo.y},
+					SIZE,
+				}
 			}
 			icon_box.lo = linalg.floor(icon_box.lo)
 			icon_box.hi += icon_box.lo
@@ -104,7 +118,10 @@ add_checkbox :: proc(info: Generic_Boolean_Widget_Info) -> (result: Generic_Widg
 		draw_rounded_box_fill(
 			icon_box,
 			core.style.rounding,
-			fade(core.style.color.accent if info.state else core.style.color.substance, opacity),
+			fade(
+				core.style.color.accent if info.state else core.style.color.substance,
+				opacity,
+			),
 		)
 		center := box_center(icon_box)
 		// Paint icon
@@ -112,33 +129,44 @@ add_checkbox :: proc(info: Generic_Boolean_Widget_Info) -> (result: Generic_Widg
 			draw_check(center, SIZE / 4, core.style.color.background)
 		}
 		// Paint text
+		text_pos: [2]f32
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				draw_text_glyphs(
-					info.__text_job,
-					{icon_box.hi.x + TEXT_PADDING, center.y - info.__text_job.size.y / 2},
-					fade(core.style.color.content, opacity),
-				)
+				text_pos = {
+					icon_box.hi.x + TEXT_PADDING,
+					center.y - info.__text_job.size.y / 2,
+				}
 			case .Right:
-				draw_text_glyphs(
-					info.__text_job,
-					{icon_box.lo.x - TEXT_PADDING, center.y - info.__text_job.size.y / 2},
-					fade(core.style.color.content, opacity),
-				)
+				text_pos = {
+					icon_box.lo.x - TEXT_PADDING,
+					center.y - info.__text_job.size.y / 2,
+				}
 			case .Top:
-				draw_text_glyphs(
-					info.__text_job,
-					widget.box.lo,
-					fade(core.style.color.content, opacity),
-				)
+				text_pos = widget.box.lo
 			case .Bottom:
-				draw_text_glyphs(
-					info.__text_job,
-					{widget.box.lo.x, widget.box.hi.y - info.__text_job.size.y},
-					fade(core.style.color.content, opacity),
-				)
+				text_pos = {
+					widget.box.lo.x,
+					widget.box.hi.y - info.__text_job.size.y,
+				}
 			}
+			draw_text_glyphs(
+				info.__text_job,
+				text_pos,
+				fade(core.style.color.content, opacity),
+			)
+			// if widget.hover_time > 0 {
+			// 	draw_box_fill(
+			// 		{
+			// 			{text_pos.x, text_pos.y + info.__text_job.ascent + 1},
+			// 			{
+			// 				text_pos.x + info.__text_job.size.x,
+			// 				text_pos.y + info.__text_job.ascent + 2,
+			// 			},
+			// 		},
+			// 		fade(core.style.color.content, widget.hover_time),
+			// 	)
+			// }
 		}
 	}
 	end_widget()
@@ -152,7 +180,10 @@ do_checkbox :: proc(
 	return add_checkbox(make_generic_boolean_widget(info, loc))
 }
 
-make_toggle_switch :: proc(info: Toggle_Switch_Info, loc := #caller_location) -> Toggle_Switch_Info {
+make_toggle_switch :: proc(
+	info: Toggle_Switch_Info,
+	loc := #caller_location,
+) -> Toggle_Switch_Info {
 	info := info
 	info.id = hash(loc)
 	info.fixed_size = true
@@ -160,7 +191,11 @@ make_toggle_switch :: proc(info: Toggle_Switch_Info, loc := #caller_location) ->
 	return info
 }
 
-add_toggle_switch :: proc(info: Toggle_Switch_Info) -> (result: Toggle_Switch_Result) {
+add_toggle_switch :: proc(
+	info: Toggle_Switch_Info,
+) -> (
+	result: Toggle_Switch_Result,
+) {
 	widget, ok := begin_widget(info)
 	if !ok do return
 
@@ -187,9 +222,19 @@ add_toggle_switch :: proc(info: Toggle_Switch_Info) -> (result: Toggle_Switch_Re
 		draw_rounded_box_fill(
 			widget.box,
 			outer_radius,
-			interpolate_colors(how_on, core.style.color.substance, core.style.color.accent),
+			interpolate_colors(
+				how_on,
+				core.style.color.substance,
+				core.style.color.accent,
+			),
 		)
-		draw_arc_fill(lever_center, inner_radius, 0, math.TAU, core.style.color.background)
+		draw_arc_fill(
+			lever_center,
+			inner_radius,
+			0,
+			math.TAU,
+			core.style.color.background,
+		)
 	}
 
 	if .Clicked in widget.state {
@@ -200,17 +245,27 @@ add_toggle_switch :: proc(info: Toggle_Switch_Info) -> (result: Toggle_Switch_Re
 	return
 }
 
-toggle_switch :: proc(info: Toggle_Switch_Info, loc := #caller_location) -> Toggle_Switch_Result {
+toggle_switch :: proc(
+	info: Toggle_Switch_Info,
+	loc := #caller_location,
+) -> Toggle_Switch_Result {
 	return add_toggle_switch(make_toggle_switch(info, loc))
 }
 
 Radio_Button_Info :: Generic_Boolean_Widget_Info
 
-make_radio_button :: proc(info: Radio_Button_Info, loc := #caller_location) -> Radio_Button_Info {
+make_radio_button :: proc(
+	info: Radio_Button_Info,
+	loc := #caller_location,
+) -> Radio_Button_Info {
 	return make_generic_boolean_widget(info, loc)
 }
 
-add_radio_button :: proc(info: Radio_Button_Info) -> (result: Generic_Widget_Result) {
+add_radio_button :: proc(
+	info: Radio_Button_Info,
+) -> (
+	result: Generic_Widget_Result,
+) {
 	widget, ok := begin_widget(info)
 	if !ok do return
 	result.self = widget
@@ -229,9 +284,18 @@ add_radio_button :: proc(info: Radio_Button_Info) -> (result: Generic_Widget_Res
 			case .Right:
 				icon_box = {{widget.box.hi.x - SIZE, widget.box.lo.y}, SIZE}
 			case .Top:
-				icon_box = {{box_center_x(widget.box) - SIZE / 2, widget.box.hi.y - SIZE}, SIZE}
+				icon_box = {
+					{
+						box_center_x(widget.box) - SIZE / 2,
+						widget.box.hi.y - SIZE,
+					},
+					SIZE,
+				}
 			case .Bottom:
-				icon_box = {{box_center_x(widget.box) - SIZE / 2, widget.box.lo.y}, SIZE}
+				icon_box = {
+					{box_center_x(widget.box) - SIZE / 2, widget.box.lo.y},
+					SIZE,
+				}
 			}
 			icon_box.lo = linalg.floor(icon_box.lo)
 			icon_box.hi += icon_box.lo
@@ -242,7 +306,13 @@ add_radio_button :: proc(info: Radio_Button_Info) -> (result: Generic_Widget_Res
 
 		if widget.hover_time > 0 {
 			draw_box_fill(
-				{{widget.box.lo.x + box_height(widget.box) / 2, widget.box.lo.y}, widget.box.hi},
+				{
+					{
+						widget.box.lo.x + box_height(widget.box) / 2,
+						widget.box.lo.y,
+					},
+					widget.box.hi,
+				},
 				fade(core.style.color.substance, 0.5 * widget.hover_time),
 			)
 		}
@@ -253,7 +323,11 @@ add_radio_button :: proc(info: Radio_Button_Info) -> (result: Generic_Widget_Res
 			SIZE / 2,
 			0,
 			math.TAU,
-			interpolate_colors(state_time, core.style.color.substance, core.style.color.accent),
+			interpolate_colors(
+				state_time,
+				core.style.color.substance,
+				core.style.color.accent,
+			),
 		)
 		if state_time > 0 {
 			draw_arc_fill(
@@ -270,27 +344,43 @@ add_radio_button :: proc(info: Radio_Button_Info) -> (result: Generic_Widget_Res
 			case .Left:
 				draw_text_glyphs(
 					info.__text_job,
-					{icon_box.hi.x + TEXT_PADDING, icon_center.y - info.__text_job.size.y / 2},
+					{
+						icon_box.hi.x + TEXT_PADDING,
+						icon_center.y - info.__text_job.size.y / 2,
+					},
 					core.style.color.content,
 				)
 			case .Right:
 				draw_text_glyphs(
 					info.__text_job,
-					{icon_box.lo.x - TEXT_PADDING, icon_center.y - info.__text_job.size.y / 2},
+					{
+						icon_box.lo.x - TEXT_PADDING,
+						icon_center.y - info.__text_job.size.y / 2,
+					},
 					core.style.color.content,
 				)
 			case .Top:
-				draw_text_glyphs(info.__text_job, widget.box.lo, core.style.color.content)
+				draw_text_glyphs(
+					info.__text_job,
+					widget.box.lo,
+					core.style.color.content,
+				)
 			case .Bottom:
 				draw_text_glyphs(
 					info.__text_job,
-					{widget.box.lo.x, widget.box.hi.y - info.__text_job.size.y},
+					{
+						widget.box.lo.x,
+						widget.box.hi.y - info.__text_job.size.y,
+					},
 					core.style.color.content,
 				)
 			}
 		}
 		if widget.disable_time > 0 {
-			draw_box_fill(widget.box, fade(core.style.color.foreground, widget.disable_time * 0.5))
+			draw_box_fill(
+				widget.box,
+				fade(core.style.color.foreground, widget.disable_time * 0.5),
+			)
 		}
 	}
 

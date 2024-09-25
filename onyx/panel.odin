@@ -89,6 +89,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	panel.layer = current_layer().?
 
 	// Background
+	draw_rounded_box_fill(move_box(panel.box, 4), core.style.rounding, {0, 0, 0, 40})
 	draw_rounded_box_fill(panel.box, core.style.rounding, core.style.color.foreground)
 
 	// The content layout box

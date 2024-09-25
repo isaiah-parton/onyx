@@ -347,11 +347,13 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 					widget.box,
 					core.style.rounding,
 					fade(
-						core.style.color.background,
+						core.style.color.foreground,
 						widget.disable_time * 0.5,
 					),
 				)
 			}
+
+			draw_rounded_box_mask_fill(widget.box, core.style.rounding, core.style.color.foreground)
 		}
 
 		// Mouse selection

@@ -10,7 +10,7 @@ Mouse_Button :: enum {
 
 Mouse_Bits :: bit_set[Mouse_Button]
 
-Keyboard_Key :: enum {
+Keyboard_Key :: enum i32 {
 	Tab           = glfw.KEY_TAB,
 	Space         = glfw.KEY_SPACE,
 	Left_Control  = glfw.KEY_LEFT_CONTROL,

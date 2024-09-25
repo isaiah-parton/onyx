@@ -2,6 +2,8 @@ package onyx
 
 import "core:fmt"
 import "core:math"
+import "core:math/ease"
+import "core:strings"
 import t "core:time"
 import dt "core:time/datetime"
 
@@ -13,7 +15,7 @@ Calendar_Info :: struct {
 	selection:         [2]Maybe(Date),
 	desired_size:      [2]f32,
 	month_offset:      int,
-	allow_range: bool,
+	allow_range:       bool,
 	__calendar_start:  t.Time,
 	__month_start:     t.Time,
 	__size:            f32,
@@ -97,7 +99,8 @@ make_calendar :: proc(
 	)
 	info.__days = int(math.ceil(f32(info.__days) / 7)) * 7
 	weeks := math.ceil(f32(info.__days) / 7)
-	info.desired_size.y += weeks * info.__size + (weeks + 1) * CALENDAR_WEEK_SPACING
+	info.desired_size.y +=
+		weeks * info.__size + (weeks + 1) * CALENDAR_WEEK_SPACING
 
 	return info
 }
@@ -271,7 +274,8 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 					result.selection[0] = date
 					result.month_offset = 0
 				} else {
-					if date == result.selection[0] || date == result.selection[1] {
+					if date == result.selection[0] ||
+					   date == result.selection[1] {
 						result.selection = {nil, nil}
 					} else {
 						if time._nsec <=
@@ -303,21 +307,16 @@ do_calendar :: proc(
 }
 
 Date_Picker_Info :: struct {
-	using _: Generic_Widget_Info,
-	date:    ^Date,
+	using _:       Generic_Widget_Info,
+	first, second: ^Maybe(Date),
 }
 
 Date_Picker_Result :: struct {
 	using _: Generic_Widget_Result,
-	date:    Maybe(Date),
-}
-
-Date_Range_Picker_Info :: struct {
-	using _:     Generic_Widget_Info,
-	from, until: Date,
 }
 
 Date_Picker_Widget_Kind :: struct {
+	using _:      Menu_Widget_Kind,
 	month_offset: int,
 }
 
@@ -336,6 +335,10 @@ add_date_picker :: proc(
 ) -> (
 	result: Date_Picker_Result,
 ) {
+	if info.first == nil {
+		return
+	}
+
 	widget, ok := begin_widget(info)
 	if !ok do return
 	defer end_widget()
@@ -345,6 +348,8 @@ add_date_picker :: proc(
 	button_behavior(widget)
 
 	kind := widget_kind(widget, Date_Picker_Widget_Kind)
+
+	kind.open_time = animate(kind.open_time, 0.2, .Open in widget.state)
 
 	if widget.visible {
 		draw_rounded_box_fill(
@@ -360,15 +365,34 @@ add_date_picker :: proc(
 				core.style.color.substance,
 			)
 		}
+
+		b := strings.builder_make(context.temp_allocator)
+
+		if first, ok := info.first.?; ok {
+			fmt.sbprintf(
+				&b,
+				"{:2i}/{:2i}/{:4i}",
+				first.month,
+				first.day,
+				first.year,
+			)
+		}
+		if info.second != nil {
+			if second, ok := info.second.?; ok {
+				fmt.sbprintf(
+					&b,
+					" - {:2i}/{:2i}/{:4i}",
+					second.month,
+					second.day,
+					second.year,
+				)
+			}
+		}
+
 		draw_text(
 			[2]f32{widget.box.lo.x + 7, box_center_y(widget.box)},
 			{
-				text = fmt.tprintf(
-					"{:2i}/{:2i}/{:4i}",
-					info.date.month,
-					info.date.day,
-					info.date.year,
-				),
+				text = strings.to_string(b),
 				font = core.style.fonts[.Regular],
 				size = core.style.content_text_size,
 				align_v = .Middle,
@@ -378,9 +402,34 @@ add_date_picker :: proc(
 	}
 
 	if .Open in widget.state {
-		calendar_info := make_calendar({id = widget.id, month_offset = kind.month_offset, selection = {info.date^, nil}})
+		calendar_info := make_calendar(
+			{
+				id = widget.id,
+				month_offset = kind.month_offset,
+				selection = {
+					info.first^,
+					info.second^ if info.second != nil else nil,
+				},
+				allow_range = info.second != nil,
+			},
+		)
+
+		layer_box := get_menu_box(
+			widget.box,
+			calendar_info.desired_size + core.style.menu_padding * 2,
+		)
+
+		open_time := ease.quadratic_out(kind.open_time)
+		scale: f32 = 0.85 + 0.15 * open_time
+
 		if layer, ok := layer(
-			{id = widget.id, box = get_menu_box(widget.box, calendar_info.desired_size + core.style.menu_padding * 2)},
+			{
+				id = widget.id,
+				origin = layer_box.lo,
+				box = layer_box,
+				opacity = open_time,
+				scale = [2]f32{scale, scale},
+			},
 		); ok {
 			foreground()
 			shrink(core.style.menu_padding)
@@ -388,10 +437,16 @@ add_date_picker :: proc(
 			set_height_auto()
 			calendar_result := add_calendar(calendar_info)
 			kind.month_offset = calendar_result.month_offset
-			if date, ok := calendar_result.selection[0].?; ok {
-				info.date^ = date
+			info.first^ = calendar_result.selection[0]
+			if info.second != nil {
+				if date, ok := calendar_result.selection[1].?; ok {
+					info.second^ = date
+				} else {
+					info.second^ = calendar_result.selection[0]
+				}
 			}
-			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in widget.state {
+			if layer.state & {.Hovered, .Focused} == {} &&
+			   .Focused not_in widget.state {
 				widget.state -= {.Open}
 			}
 		}

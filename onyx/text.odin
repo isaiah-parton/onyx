@@ -108,6 +108,7 @@ Text_Job :: struct {
 	lines:                                    []Text_Job_Line,
 	line_height:                              f32,
 	size:                                     [2]f32,
+	ascent: f32,
 	cursor_glyph, hovered_line, hovered_rune: int,
 }
 
@@ -134,6 +135,8 @@ make_text_job :: proc(
 
 	hovered_rune: int = -1
 	closest: f32 = math.F32_MAX
+
+	job.ascent = iter.size.ascent
 
 	job.line_height = iter.size.ascent - iter.size.descent + iter.size.line_gap
 	job.hovered_line = max(0, int(mouse_pos.y / job.line_height))
@@ -346,7 +349,9 @@ iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 
 	// Update horizontal offset with last glyph
-	iter.glyph_pos.x += math.floor(iter.glyph.advance + iter.font.spacing)
+	if iter.codepoint != 0 {
+		iter.glyph_pos.x += math.floor(iter.glyph.advance + iter.font.spacing)
+	}
 
 	// Get the next glyph
 	ok = iterate_text_rune(iter)

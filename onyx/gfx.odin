@@ -58,7 +58,11 @@ resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
 	)
 }
 
-init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: int) {
+init_graphics :: proc(
+	gfx: ^Graphics,
+	window: glfw.WindowHandle,
+	sample_count: int,
+) {
 
 	width, height := glfw.GetWindowSize(window)
 	gfx.width, gfx.height = u32(width), u32(height)
@@ -67,7 +71,12 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 	// Create the wgpu instance
 	when ODIN_OS == .Windows {
 		gfx.instance = wgpu.CreateInstance(
-			&{nextInChain = &wgpu.InstanceExtras{sType = .InstanceExtras, backends = {.DX12}}},
+			&{
+				nextInChain = &wgpu.InstanceExtras {
+					sType = .InstanceExtras,
+					backends = {.DX12},
+				},
+			},
 		)
 	} else {
 		gfx.instance = wgpu.CreateInstance()
@@ -153,7 +162,10 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			gfx.device_limits = supported_limits.limits
 		}
 		// Initial surface config
-		surface_capabilities := wgpu.SurfaceGetCapabilities(gfx.surface, gfx.adapter)
+		surface_capabilities := wgpu.SurfaceGetCapabilities(
+			gfx.surface,
+			gfx.adapter,
+		)
 		gfx.surface_config = {
 			usage       = {.RenderAttachment},
 			width       = gfx.width,
@@ -189,11 +201,19 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		)
 		gfx.vertex_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
-			&{label = "VertexBuffer", size = BUFFER_SIZE, usage = {.Vertex, .CopyDst}},
+			&{
+				label = "VertexBuffer",
+				size = BUFFER_SIZE,
+				usage = {.Vertex, .CopyDst},
+			},
 		)
 		gfx.index_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
-			&{label = "IndexBuffer", size = BUFFER_SIZE, usage = {.Index, .CopyDst}},
+			&{
+				label = "IndexBuffer",
+				size = BUFFER_SIZE,
+				usage = {.Index, .CopyDst},
+			},
 		)
 		// Create bind group layouts
 		uniform_bind_group_layout := wgpu.DeviceCreateBindGroupLayout(
@@ -214,7 +234,11 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 				label = "TextureBindGroupLayout",
 				entryCount = 2,
 				entries = transmute([^]wgpu.BindGroupLayoutEntry)&[?]wgpu.BindGroupLayoutEntry {
-					{binding = 0, sampler = {type = .Filtering}, visibility = {.Fragment}},
+					{
+						binding = 0,
+						sampler = {type = .Filtering},
+						visibility = {.Fragment},
+					},
 					{
 						binding = 1,
 						texture = {sampleType = .Float, viewDimension = ._2D},
@@ -261,9 +285,21 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		)
 
 		vertex_attributes := [?]wgpu.VertexAttribute {
-			{format = .Float32x2, offset = u64(offset_of(Vertex, pos)), shaderLocation = 0},
-			{format = .Float32x2, offset = u64(offset_of(Vertex, uv)), shaderLocation = 1},
-			{format = .Unorm8x4, offset = u64(offset_of(Vertex, col)), shaderLocation = 2},
+			{
+				format = .Float32x2,
+				offset = u64(offset_of(Vertex, pos)),
+				shaderLocation = 0,
+			},
+			{
+				format = .Float32x2,
+				offset = u64(offset_of(Vertex, uv)),
+				shaderLocation = 1,
+			},
+			{
+				format = .Unorm8x4,
+				offset = u64(offset_of(Vertex, col)),
+				shaderLocation = 2,
+			},
 		}
 		// Create the pipeline
 		gfx.pipeline = wgpu.DeviceCreateRenderPipeline(
@@ -295,12 +331,19 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 								dstFactor = .OneMinusSrcAlpha,
 								operation = .Add,
 							},
-							alpha = {srcFactor = .One, dstFactor = .One, operation = .Add},
+							alpha = {
+								srcFactor = .One,
+								dstFactor = .One,
+								operation = .Add,
+							},
 						},
 					},
 				},
 				primitive = {topology = .TriangleList},
-				multisample = {count = u32(gfx.sample_count), mask = 0xffffffff},
+				multisample = {
+					count = u32(gfx.sample_count),
+					mask = 0xffffffff,
+				},
 			},
 		)
 	}
@@ -347,9 +390,12 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	}
 
 	// Sort draw calls by index
-	slice.sort_by(core.draw_calls[:core.draw_call_count], proc(i, j: Draw_Call) -> bool {
-		return i.index < j.index
-	})
+	slice.sort_by(
+		core.draw_calls[:core.draw_call_count],
+		proc(i, j: Draw_Call) -> bool {
+			return i.index < j.index
+		},
+	)
 
 	encoder := wgpu.DeviceCreateCommandEncoder(gfx.device)
 	defer wgpu.CommandEncoderRelease(encoder)
@@ -366,7 +412,10 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		return
 	case .OutOfMemory, .DeviceLost:
 		// Fatal error
-		fmt.panicf("[triangle] get_current_texture status=%v", surface_texture.status)
+		fmt.panicf(
+			"[triangle] get_current_texture status=%v",
+			surface_texture.status,
+		)
 	}
 	defer wgpu.TextureRelease(surface_texture.texture)
 
@@ -405,10 +454,24 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		u64(len(draw_list.indices) * size_of(u32)),
 	)
 	wgpu.RenderPassEncoderSetBindGroup(pass, 0, gfx.uniform_bind_group)
-	wgpu.RenderPassEncoderSetViewport(pass, 0, 0, core.view.x, core.view.y, 0, 0)
+	wgpu.RenderPassEncoderSetViewport(
+		pass,
+		0,
+		0,
+		core.view.x,
+		core.view.y,
+		0,
+		0,
+	)
 
 	// Apply projection matrix
-	wgpu.QueueWriteBuffer(gfx.queue, gfx.uniform_buffer, 0, &uniform, size_of(uniform))
+	wgpu.QueueWriteBuffer(
+		gfx.queue,
+		gfx.uniform_buffer,
+		0,
+		&uniform,
+		size_of(uniform),
+	)
 
 	// Render them
 	for &call in core.draw_calls[:core.draw_call_count] {
@@ -452,6 +515,8 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 
 		// Configure render pass
 		wgpu.RenderPassEncoderSetBindGroup(pass, 1, texture_bind_group)
+
+		call.clip_box = clamp_box(call.clip_box, view_box())
 		wgpu.RenderPassEncoderSetScissorRect(
 			pass,
 			u32(call.clip_box.lo.x),

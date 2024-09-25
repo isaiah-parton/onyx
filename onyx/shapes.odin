@@ -385,6 +385,64 @@ draw_box_stroke :: proc(box: Box, thickness: f32, color: Color) {
 		color,
 	)
 }
+
+draw_rounded_box_mask_fill :: proc(box: Box, radius: f32, color: Color) {
+	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
+		return
+	}
+	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
+	if radius <= 0 {
+		return
+	}
+	nsteps := get_arc_steps(radius, math.PI * 0.5)
+
+	set_vertex_color(color)
+	set_vertex_uv({})
+
+	center: [2]f32
+	first_index: u32
+
+	center = box.lo + radius
+	first_index = add_vertex(box.lo)
+	for n in 0 ..= nsteps {
+		a := math.PI + (math.PI * 0.5) * f32(n) / f32(nsteps)
+		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
+		if n < nsteps {
+			add_indices(first_index, index, index + 1)
+		}
+	}
+
+	center = {box.hi.x - radius, box.lo.y + radius}
+	first_index = add_vertex({box.hi.x, box.lo.y})
+	for n in 0 ..= nsteps {
+		a := (math.PI * 1.5) + (math.PI * 0.5) * f32(n) / f32(nsteps)
+		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
+		if n < nsteps {
+			add_indices(first_index, index, index + 1)
+		}
+	}
+
+	center = box.hi - radius
+	first_index = add_vertex(box.hi)
+	for n in 0 ..= nsteps {
+		a := (math.PI * 0.5) * f32(n) / f32(nsteps)
+		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
+		if n < nsteps {
+			add_indices(first_index, index, index + 1)
+		}
+	}
+
+	center = {box.lo.x + radius, box.hi.y - radius}
+	first_index = add_vertex({box.lo.x, box.hi.y})
+	for n in 0 ..= nsteps {
+		a := (math.PI * 0.5) + (math.PI * 0.5) * f32(n) / f32(nsteps)
+		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
+		if n < nsteps {
+			add_indices(first_index, index, index + 1)
+		}
+	}
+}
+
 draw_rounded_box_fill :: proc(box: Box, radius: f32, color: Color) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
@@ -474,7 +532,6 @@ draw_rounded_box_corners_fill :: proc(box: Box, radius: f32, corners: Corners, c
 		)
 	}
 }
-
 
 draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {

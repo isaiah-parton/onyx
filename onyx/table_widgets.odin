@@ -47,7 +47,7 @@ Table_Widget_Kind :: struct {
 }
 
 Table :: struct {
-	using info: Table_Info,
+	using info:  Table_Info,
 	first, last: int,
 }
 
@@ -120,23 +120,33 @@ make_table :: proc(info: Table_Info, loc := #caller_location) -> Table_Info {
 	return info
 }
 // Begin a table
-begin_table :: proc(info: Table_Info, loc := #caller_location) -> (self: Table, ok: bool) {
+begin_table :: proc(
+	info: Table_Info,
+	loc := #caller_location,
+) -> (
+	self: Table,
+	ok: bool,
+) {
 	info := make_table(info, loc)
 	widget := begin_widget(info) or_return
 
 	container := begin_container(
 		{
-			id  = info.id.?,
+			id = info.id.?,
 			box = widget.box,
-			size = {
-				1 = core.style.table_row_height * f32(info.row_count + 1),
-			}
+			size = {1 = core.style.table_row_height * f32(info.row_count + 1)},
 		},
 	) or_return
 
 	self.info = info
 	self.first = int(container.scroll.y / core.style.table_row_height)
-	self.last = min(self.first + int(math.ceil(box_height(container.box) / core.style.table_row_height)), info.row_count)
+	self.last = min(
+		self.first +
+		int(
+			math.ceil(box_height(container.box) / core.style.table_row_height),
+		),
+		info.row_count - 1,
+	)
 	// Add space for the header
 	add_space(core.style.table_row_height * f32(self.first + 1))
 	// Season the hashing context
@@ -212,8 +222,9 @@ end_table :: proc(table: Table) {
 	end_container()
 
 	// Table outline
+	draw_rounded_box_mask_fill(container.box, core.style.rounding, core.style.color.foreground)
 	draw_rounded_box_stroke(
-		current_widget().?.box,
+		container.box,
 		core.style.rounding,
 		1,
 		core.style.color.substance,
@@ -224,7 +235,13 @@ end_table :: proc(table: Table) {
 }
 
 @(deferred_out = __do_table)
-do_table :: proc(info: Table_Info, loc := #caller_location) -> (self: Table, ok: bool) {
+do_table :: proc(
+	info: Table_Info,
+	loc := #caller_location,
+) -> (
+	self: Table,
+	ok: bool,
+) {
 	return begin_table(info, loc)
 }
 
