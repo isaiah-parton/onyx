@@ -140,12 +140,12 @@ create_layer :: proc(id: Id) -> (result: ^Layer, ok: bool) {
 	return
 }
 
-begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
+begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer, ok: bool) {
 	id := info.id if info.id != 0 else hash(loc)
 	kind := info.kind.? or_else .Floating
 
 	// Get a layer with `id` or create one
-	layer, ok := get_layer_by_id(id)
+	layer, ok = get_layer_by_id(id)
 	if !ok {
 		layer = create_layer(id) or_return
 
@@ -165,7 +165,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	}
 
 	if layer.frames == core.frames {
-		return false
+		return
 	}
 	layer.frames = core.frames
 
@@ -210,14 +210,15 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
 	translate_matrix(-info.origin.x, -info.origin.y, 0)
 
 	// Push layout
-	push_layout(
+	ok = push_layout(
 		Layout {
 			box = {linalg.floor(layer.box.lo), linalg.floor(layer.box.hi)},
 			bounds = layer.box,
 			next_cut_side = .Top,
 		},
 	)
-	return true
+
+	return
 }
 
 end_layer :: proc() {
@@ -246,13 +247,13 @@ end_layer :: proc() {
 	}
 }
 
-@(deferred_out = __do_layer)
-do_layer :: proc(info: Layer_Info, loc := #caller_location) -> bool {
+@(deferred_out = __layer)
+layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer, ok: bool) {
 	return begin_layer(info, loc)
 }
 
 @(private)
-__do_layer :: proc(ok: bool) {
+__layer :: proc(_: ^Layer, ok: bool) {
 	if ok {
 		end_layer()
 	}

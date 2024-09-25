@@ -75,6 +75,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	widget.on_death = proc(self: ^Widget) {
 		kind := self.variant.(Text_Input_Widget_Kind)
 		destroy_text_editor(&kind.editor)
+		strings.builder_destroy(&kind.builder)
 	}
 
 	// Use given string builder or provision one
@@ -442,7 +443,7 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 	return
 }
 
-do_text_input :: proc(
+text_input :: proc(
 	info: Text_Input_Info,
 	loc := #caller_location,
 ) -> Text_Input_Result {

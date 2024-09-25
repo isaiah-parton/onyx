@@ -116,12 +116,12 @@ end_layout :: proc() {
 	}
 }
 // Scoped layout proc
-@(deferred_out = __do_layout)
-do_layout :: proc(info: Layout_Info) -> (ok: bool) {
+@(deferred_out = __layout)
+layout :: proc(info: Layout_Info) -> (ok: bool) {
 	return begin_layout(info)
 }
 @(private)
-__do_layout :: proc(ok: bool) {
+__layout :: proc(ok: bool) {
 	if ok {
 		end_layout()
 	}

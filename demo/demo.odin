@@ -67,16 +67,16 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	layer_box := shrink_box(view_box(), 100)
 	begin_layer({box = layer_box, kind = .Background})
 	foreground()
-	begin_layout({size = 65, side = .Top})
-	shrink(15)
-	if index, ok := do_tabs({index = int(state.section.component), options = reflect.enum_field_names(Component)}).index.?;
-	   ok {
-		state.section.component = Component(index)
+	if layout({size = 65, side = .Top}) {
+		shrink(15)
+		if index, ok := do_tabs({index = int(state.section.component), options = reflect.enum_field_names(Component)}).index.?;
+		   ok {
+			state.section.component = Component(index)
+		}
+		set_side(.Right)
+		state.light_mode = toggle_switch({on = state.light_mode}).on
 	}
-	set_side(.Right)
-	state.light_mode = do_switch({on = state.light_mode}).on
-	end_layout()
-	shrink(30)
+	shrink(40)
 
 	#partial switch state.section.component {
 	case .Tables:
@@ -96,15 +96,15 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				max_displayed_rows = 15,
 			},
 		); ok {
-			for index in table.first ..< table.last {
+			for index in table.first ..= table.last {
 				entry := &state.entries[index]
 				begin_table_row(table, {index = index})
 				set_width_auto()
-				do_text_input({content = &entry.name})
-				do_text_input({content = &entry.hash})
-				do_text_input({content = &entry.public_key})
-				do_text_input({content = &entry.private_key})
-				do_text_input({content = &entry.location})
+				text_input({content = &entry.name})
+				text_input({content = &entry.hash})
+				text_input({content = &entry.public_key})
+				text_input({content = &entry.private_key})
+				text_input({content = &entry.location})
 				end_table_row()
 			}
 			end_table(table)
@@ -158,7 +158,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_side(.Top)
 		do_label({text = "Fit to label"})
 		add_space(10)
-		if do_layout({size = 30}) {
+		if layout({size = 30}) {
 			set_width_auto()
 			for member, m in Button_Kind {
 				push_id(m)
@@ -196,7 +196,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		calendar := make_calendar(
 			{selection = state.date_range, month_offset = state.month_offset},
 		)
-		if do_layout(
+		if layout(
 			{
 				box = align_inner(
 					layout_box(),
@@ -254,7 +254,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_width(250)
 		add_space(10)
 		set_height_auto()
-		do_text_input(
+		text_input(
 			{
 				content = &state.full_name,
 				placeholder = "Full Name",
@@ -262,19 +262,22 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			},
 		)
 		add_space(10)
-		do_text_input(
+		text_input(
 			{content = &state.birth_country, placeholder = "Country of birth"},
 		)
 		add_space(10)
+		set_height_auto()
+		date_picker({date = &state.date_range[0].?})
+		add_space(10)
 		set_height(120)
-		do_text_input(
+		text_input(
 			{content = &state.bio, placeholder = "Bio", multiline = true},
 		)
 
 	case .Graph:
 		set_side(.Left)
 		set_width_percent(50)
-		if do_layout({}) {
+		if layout({}) {
 			shrink(30)
 			set_width_fill()
 			set_height_fill()
@@ -308,7 +311,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				},
 			)
 		}
-		if do_layout({}) {
+		if layout({}) {
 			shrink(30)
 			set_width_fill()
 			set_height_fill()

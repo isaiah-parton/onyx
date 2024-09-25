@@ -82,7 +82,7 @@ table_cell :: proc(column, row: int, value: any, type: Table_Column_Type) {
 	case Type_Text:
 		switch value.id {
 		case string:
-			do_text_input({content = (^string)(value.data)})
+			text_input({content = (^string)(value.data)})
 		}
 	case Type_Number:
 		switch value.id {
@@ -136,7 +136,7 @@ begin_table :: proc(info: Table_Info, loc := #caller_location) -> (self: Table, 
 
 	self.info = info
 	self.first = int(container.scroll.y / core.style.table_row_height)
-	self.last = self.first + int(box_height(container.box) / core.style.table_row_height)
+	self.last = min(self.first + int(math.ceil(box_height(container.box) / core.style.table_row_height)), info.row_count)
 	// Add space for the header
 	add_space(core.style.table_row_height * f32(self.first + 1))
 	// Season the hashing context

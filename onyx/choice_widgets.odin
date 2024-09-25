@@ -55,19 +55,14 @@ begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 	menu_behavior(widget)
 
 	if .Open in widget.state {
-		layer_pos := [2]f32{widget.box.lo.x, widget.box.hi.y + core.style.shape.menu_padding}
-		layer_size := kind.size
-		layer_origin := [2]f32{layer_pos.x, layer_pos.y}
+		menu_box := get_menu_box(widget.box, kind.size)
+		layer_origin := menu_box.lo
 
-		switch info.menu_align {
+		#partial switch info.menu_align {
 		case .Far:
-			layer_pos.x = widget.box.hi.x - layer_size.x
-			layer_origin.x += layer_size.x
+			layer_origin.x += box_width(menu_box)
 		case .Middle:
-			layer_pos.x = box_center_x(widget.box) - layer_size.x / 2
-			layer_origin.x += layer_size.x / 2
-		case .Near:
-			layer_pos.x = widget.box.lo.x
+			layer_origin.x += box_width(menu_box) / 2
 		}
 
 		open_time := ease.quadratic_out(kind.open_time)
@@ -76,7 +71,7 @@ begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 		begin_layer(
 			{
 				id = widget.id,
-				box = {layer_pos, layer_pos + layer_size},
+				box = menu_box,
 				origin = layer_origin,
 				scale = [2]f32{scale, scale},
 				opacity = open_time,

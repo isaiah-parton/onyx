@@ -34,3 +34,16 @@ menu_behavior :: proc(widget: ^Widget) {
 	}
 	button_behavior(widget)
 }
+
+get_menu_box :: proc(parent: Box, size: [2]f32, side: Side = .Bottom) -> Box {
+	box: Box
+	margin := core.style.menu_padding
+	#partial switch side {
+	case .Bottom:
+		box = Box{
+			{parent.lo.x, parent.hi.y + margin},
+			{parent.lo.x + size.x, parent.hi.y + margin + size.y},
+		}
+	}
+	return box
+}

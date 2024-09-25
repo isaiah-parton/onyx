@@ -6,12 +6,14 @@ import t "core:time"
 import dt "core:time/datetime"
 
 Date :: dt.Date
+CALENDAR_WEEK_SPACING :: 4
 
 Calendar_Info :: struct {
 	id:                Id,
 	selection:         [2]Maybe(Date),
 	desired_size:      [2]f32,
 	month_offset:      int,
+	allow_range: bool,
 	__calendar_start:  t.Time,
 	__month_start:     t.Time,
 	__size:            f32,
@@ -35,7 +37,10 @@ dates_are_equal :: proc(a, b: Date) -> bool {
 	return a.year == b.year && a.month == b.month && a.day == b.day
 }
 
-make_calendar :: proc(info: Calendar_Info, loc := #caller_location) -> Calendar_Info {
+make_calendar :: proc(
+	info: Calendar_Info,
+	loc := #caller_location,
+) -> Calendar_Info {
 	info := info
 	info.id = hash(loc)
 
@@ -57,29 +62,42 @@ make_calendar :: proc(info: Calendar_Info, loc := #caller_location) -> Calendar_
 	}
 
 	info.__selection_times = {
-		t.datetime_to_time(dt.DateTime{info.selection[0].? or_else Date{}, {}}) or_else t.Time{},
-		t.datetime_to_time(dt.DateTime{info.selection[1].? or_else Date{}, {}}) or_else t.Time{},
+		t.datetime_to_time(
+			dt.DateTime{info.selection[0].? or_else Date{}, {}},
+		) or_else t.Time{},
+		t.datetime_to_time(
+			dt.DateTime{info.selection[1].? or_else Date{}, {}},
+		) or_else t.Time{},
 	}
 
 	// Get the start of the month
 	info.__month_start =
-		t.datetime_to_time(i64(info.__year), i8(info.__month), 1, 0, 0, 0) or_else panic(
-			"invalid date",
-		)
+		t.datetime_to_time(
+			i64(info.__year),
+			i8(info.__month),
+			1,
+			0,
+			0,
+			0,
+		) or_else panic("invalid date")
 
 	// Set the first date on the calendar to be the previous sunday
 	weekday := t.weekday(info.__month_start)
-	info.__calendar_start._nsec = info.__month_start._nsec - i64(weekday) * i64(t.Hour * 24)
+	info.__calendar_start._nsec =
+		info.__month_start._nsec - i64(weekday) * i64(t.Hour * 24)
 
 	// Get number of days in this month
 	days, _ := dt.last_day_of_month(i64(info.__year), i8(info.__month))
 
 	// How many rows?
 	info.__days = int(
-		(info.__month_start._nsec - info.__calendar_start._nsec) / i64(t.Hour * 24) + i64(days),
+		(info.__month_start._nsec - info.__calendar_start._nsec) /
+			i64(t.Hour * 24) +
+		i64(days),
 	)
 	info.__days = int(math.ceil(f32(info.__days) / 7)) * 7
-	info.desired_size.y += f32(info.__days / 7) * info.__size
+	weeks := math.ceil(f32(info.__days) / 7)
+	info.desired_size.y += weeks * info.__size + (weeks + 1) * CALENDAR_WEEK_SPACING
 
 	return info
 }
@@ -96,19 +114,27 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 	set_height(size)
 	set_side(.Top)
 
-	if do_layout({side = .Top, size = size}) {
+	if layout({side = .Top, size = size}) {
 		set_padding(5)
-		if was_clicked(do_button({text = "\uEA64", font_style = .Icon, kind = .Outlined})) {
+		if was_clicked(
+			do_button({text = "\uEA64", font_style = .Icon, kind = .Outlined}),
+		) {
 			result.month_offset -= 1
 		}
 		set_side(.Right)
-		if was_clicked(do_button({text = "\uEA6E", font_style = .Icon, kind = .Outlined})) {
+		if was_clicked(
+			do_button({text = "\uEA6E", font_style = .Icon, kind = .Outlined}),
+		) {
 			result.month_offset += 1
 		}
 		draw_text(
 			box_center(layout_box()),
 			{
-				text = fmt.tprintf("%s %i", t.Month(info.__month), info.__year),
+				text = fmt.tprintf(
+					"%s %i",
+					t.Month(info.__month),
+					info.__year,
+				),
 				font = core.style.fonts[.Medium],
 				size = 18,
 				align_h = .Middle,
@@ -122,7 +148,7 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 		// }
 	}
 
-	add_space(4)
+	add_space(CALENDAR_WEEK_SPACING)
 
 	box := cut_current_layout(.Top, size)
 
@@ -146,14 +172,14 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 
 	time := info.__calendar_start
 
-	add_space(4)
+	add_space(CALENDAR_WEEK_SPACING)
 
 	// Days
 	begin_layout({side = .Top, size = size})
 	for i in 0 ..< info.__days {
 		if (i > 0) && (i % 7 == 0) {
 			end_layout()
-			add_space(4)
+			add_space(CALENDAR_WEEK_SPACING)
 			begin_layout({side = .Top, size = size})
 			set_side(.Left)
 		}
@@ -170,12 +196,15 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 			is_month := i8(month) == i8(info.__month)
 			// Range highlight
 			if time._nsec > info.__selection_times[0]._nsec &&
-			   time._nsec <= info.__selection_times[1]._nsec + i64(t.Hour * 24) {
+			   time._nsec <=
+				   info.__selection_times[1]._nsec + i64(t.Hour * 24) {
 				corners: Corners = {}
-				if time._nsec == info.__selection_times[0]._nsec + i64(t.Hour * 24) {
+				if time._nsec ==
+				   info.__selection_times[0]._nsec + i64(t.Hour * 24) {
 					corners += {.Top_Left, .Bottom_Left}
 				}
-				if time._nsec == info.__selection_times[1]._nsec + i64(t.Hour * 24) {
+				if time._nsec ==
+				   info.__selection_times[1]._nsec + i64(t.Hour * 24) {
 					corners += {.Top_Right, .Bottom_Right}
 				}
 				draw_rounded_box_corners_fill(
@@ -237,21 +266,25 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 		button_behavior(widget)
 
 		if .Clicked in widget.state {
-			if result.selection[0] == nil {
-				result.selection[0] = date
-				result.month_offset = 0
-			} else {
-				if date == result.selection[0] || date == result.selection[1] {
-					result.selection = {nil, nil}
+			if info.allow_range {
+				if result.selection[0] == nil {
+					result.selection[0] = date
+					result.month_offset = 0
 				} else {
-					if time._nsec <=
-					   (t.datetime_to_time(dt.DateTime{result.selection[0].?, {}}) or_else t.Time{})._nsec {
-						result.selection[0] = date
-						result.month_offset = 0
+					if date == result.selection[0] || date == result.selection[1] {
+						result.selection = {nil, nil}
 					} else {
-						result.selection[1] = date
+						if time._nsec <=
+						   (t.datetime_to_time(dt.DateTime{result.selection[0].?, {}}) or_else t.Time{})._nsec {
+							result.selection[0] = date
+							result.month_offset = 0
+						} else {
+							result.selection[1] = date
+						}
 					}
 				}
+			} else {
+				result.selection[0] = date
 			}
 		}
 		end_widget()
@@ -262,10 +295,119 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 	return
 }
 
-do_calendar :: proc(info: Calendar_Info, loc := #caller_location) -> Calendar_Result {
+do_calendar :: proc(
+	info: Calendar_Info,
+	loc := #caller_location,
+) -> Calendar_Result {
 	return add_calendar(make_calendar(info, loc))
+}
+
+Date_Picker_Info :: struct {
+	using _: Generic_Widget_Info,
+	date:    ^Date,
+}
+
+Date_Picker_Result :: struct {
+	using _: Generic_Widget_Result,
+	date:    Maybe(Date),
+}
+
+Date_Range_Picker_Info :: struct {
+	using _:     Generic_Widget_Info,
+	from, until: Date,
 }
 
 Date_Picker_Widget_Kind :: struct {
 	month_offset: int,
+}
+
+make_date_picker :: proc(
+	info: Date_Picker_Info,
+	loc := #caller_location,
+) -> Date_Picker_Info {
+	info := info
+	info.id = hash(loc)
+	info.desired_size = core.style.visual_size
+	return info
+}
+
+add_date_picker :: proc(
+	info: Date_Picker_Info,
+) -> (
+	result: Date_Picker_Result,
+) {
+	widget, ok := begin_widget(info)
+	if !ok do return
+	defer end_widget()
+
+	result.self = widget
+
+	button_behavior(widget)
+
+	kind := widget_kind(widget, Date_Picker_Widget_Kind)
+
+	if widget.visible {
+		draw_rounded_box_fill(
+			widget.box,
+			core.style.rounding,
+			fade(core.style.color.substance, widget.hover_time),
+		)
+		if widget.hover_time < 1 {
+			draw_rounded_box_stroke(
+				widget.box,
+				core.style.rounding,
+				1,
+				core.style.color.substance,
+			)
+		}
+		draw_text(
+			[2]f32{widget.box.lo.x + 7, box_center_y(widget.box)},
+			{
+				text = fmt.tprintf(
+					"{:2i}/{:2i}/{:4i}",
+					info.date.month,
+					info.date.day,
+					info.date.year,
+				),
+				font = core.style.fonts[.Regular],
+				size = core.style.content_text_size,
+				align_v = .Middle,
+			},
+			core.style.color.content,
+		)
+	}
+
+	if .Open in widget.state {
+		calendar_info := make_calendar({id = widget.id, month_offset = kind.month_offset, selection = {info.date^, nil}})
+		if layer, ok := layer(
+			{id = widget.id, box = get_menu_box(widget.box, calendar_info.desired_size + core.style.menu_padding * 2)},
+		); ok {
+			foreground()
+			shrink(core.style.menu_padding)
+			set_width_auto()
+			set_height_auto()
+			calendar_result := add_calendar(calendar_info)
+			kind.month_offset = calendar_result.month_offset
+			if date, ok := calendar_result.selection[0].?; ok {
+				info.date^ = date
+			}
+			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in widget.state {
+				widget.state -= {.Open}
+			}
+		}
+	} else {
+		if .Pressed in (widget.state - widget.last_state) {
+			widget.state += {.Open}
+			kind.month_offset = 0
+		}
+	}
+
+	return
+}
+
+date_picker :: proc(
+	info: Date_Picker_Info,
+	loc := #caller_location,
+) -> Date_Picker_Result {
+	return add_date_picker(make_date_picker(info, loc))
 }

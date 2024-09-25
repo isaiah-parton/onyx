@@ -21,12 +21,12 @@ Generic_Boolean_Widget_Kind :: struct {
 	state_time: f32,
 }
 
-Switch_Info :: struct {
+Toggle_Switch_Info :: struct {
 	using _: Generic_Widget_Info,
 	on:      bool,
 }
 
-Switch_Result :: struct {
+Toggle_Switch_Result :: struct {
 	using _: Generic_Widget_Result,
 	on:      bool,
 }
@@ -152,7 +152,7 @@ do_checkbox :: proc(
 	return add_checkbox(make_generic_boolean_widget(info, loc))
 }
 
-make_switch :: proc(info: Switch_Info, loc := #caller_location) -> Switch_Info {
+make_toggle_switch :: proc(info: Toggle_Switch_Info, loc := #caller_location) -> Toggle_Switch_Info {
 	info := info
 	info.id = hash(loc)
 	info.fixed_size = true
@@ -160,7 +160,7 @@ make_switch :: proc(info: Switch_Info, loc := #caller_location) -> Switch_Info {
 	return info
 }
 
-add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
+add_toggle_switch :: proc(info: Toggle_Switch_Info) -> (result: Toggle_Switch_Result) {
 	widget, ok := begin_widget(info)
 	if !ok do return
 
@@ -200,8 +200,8 @@ add_switch :: proc(info: Switch_Info) -> (result: Switch_Result) {
 	return
 }
 
-do_switch :: proc(info: Switch_Info, loc := #caller_location) -> Switch_Result {
-	return add_switch(make_switch(info, loc))
+toggle_switch :: proc(info: Toggle_Switch_Info, loc := #caller_location) -> Toggle_Switch_Result {
+	return add_toggle_switch(make_toggle_switch(info, loc))
 }
 
 Radio_Button_Info :: Generic_Boolean_Widget_Info

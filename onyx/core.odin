@@ -22,7 +22,6 @@ MAX_LAYOUTS :: 100
 MAX_PANELS :: 100
 DEFAULT_DESIRED_FPS :: 75
 
-
 Stack :: struct($T: typeid, $N: int) {
 	items:  [N]T,
 	height: int,
@@ -64,121 +63,103 @@ Debug_State :: struct {
 	delta_time:                       [dynamic]f32,
 }
 
-
 // The global core data
 Core :: struct {
-	window:                                                   glfw.WindowHandle,
-	window_title:                                             string,
-	debug:                                                    Debug_State,
-	view:                                                     [2]f32,
-	desired_fps:                                              int,
-	last_second:                                              time.Time,
-	frames_so_far, frames_this_second:                        int,
+	window:                glfw.WindowHandle,
+	window_title:          string,
+	debug:                 Debug_State,
+	view:                  [2]f32,
+	desired_fps:           int,
+	last_second:           time.Time,
+	frames_so_far:         int,
+	frames_this_second:    int,
 
 	// Hashing
-	id_stack:                                                 Stack(
-		Id,
-		MAX_IDS,
-	),
+	id_stack:              Stack(Id, MAX_IDS),
 
 	// Widgets
-	widgets:                                                  [MAX_WIDGETS]Maybe(
-		Widget,
-	),
-	widget_map:                                               map[Id]^Widget,
-	widget_stack:                                             Stack(
-		^Widget,
-		10,
-	),
-	last_hovered_widget, hovered_widget, next_hovered_widget: Id,
-	last_focused_widget, focused_widget, dragged_widget:      Id,
-	disable_widgets:                                          bool,
-	drag_offset:                                              [2]f32,
+	widgets:               [MAX_WIDGETS]Maybe(Widget),
+	widget_map:            map[Id]^Widget,
+	widget_stack:          Stack(^Widget, 10),
+	last_hovered_widget:   Id,
+	hovered_widget:        Id,
+	next_hovered_widget:   Id,
+	last_focused_widget:   Id,
+	focused_widget:        Id,
+	dragged_widget:        Id,
+	disable_widgets:       bool,
+	drag_offset:           [2]f32,
 
 	// Layout
-	layout_stack:                                             Stack(
-		Layout,
-		MAX_LAYOUTS,
-	),
+	layout_stack:          Stack(Layout, MAX_LAYOUTS),
 
 	// Containers
-	container_map:                                            map[Id]^Container,
-	container_stack:                                          Stack(
-		^Container,
-		200,
-	),
-	active_container, next_active_container:                  Id,
+	container_map:         map[Id]^Container,
+	container_stack:       Stack(^Container, 200),
+	active_container:      Id,
+	next_active_container: Id,
 
 	// Panels
-	panels:                                                   [MAX_PANELS]Maybe(
-		Panel,
-	),
-	panel_map:                                                map[Id]^Panel,
-	panel_stack:                                              Stack(
-		^Panel,
-		MAX_PANELS,
-	),
+	panels:                [MAX_PANELS]Maybe(Panel),
+	panel_map:             map[Id]^Panel,
+	panel_stack:           Stack(^Panel, MAX_PANELS),
 
 	// Layers
-	layers:                                                   [MAX_LAYERS]Layer,
-	layer_map:                                                map[Id]^Layer,
-	layer_stack:                                              Stack(
-		^Layer,
-		MAX_LAYERS,
-	),
-	focused_layer:                                            Id,
-	highest_layer_index:                                      int,
-	last_hovered_layer, hovered_layer, next_hovered_layer:    Id,
+	layers:                [MAX_LAYERS]Layer,
+	layer_map:             map[Id]^Layer,
+	layer_stack:           Stack(^Layer, MAX_LAYERS),
+	focused_layer:         Id,
+	highest_layer_index:   int,
+	last_hovered_layer:    Id,
+	hovered_layer:         Id,
+	next_hovered_layer:    Id,
 
 	// IO
-	cursor_type:                                              Mouse_Cursor,
-	mouse_button:                                             Mouse_Button,
-	last_mouse_pos, mouse_pos:                                [2]f32,
-	mouse_scroll:                                             [2]f32,
-	mouse_bits, last_mouse_bits:                              Mouse_Bits,
-	keys, last_keys:                                          #sparse[Keyboard_Key]bool,
-	runes:                                                    [dynamic]rune,
-	visible, focused:                                         bool,
+	cursor_type:           Mouse_Cursor,
+	mouse_button:          Mouse_Button,
+	last_mouse_pos:        [2]f32,
+	mouse_pos:             [2]f32,
+	mouse_scroll:          [2]f32,
+	mouse_bits:            Mouse_Bits,
+	last_mouse_bits:       Mouse_Bits,
+	keys, last_keys:       #sparse[Keyboard_Key]bool,
+	runes:                 [dynamic]rune,
+	visible, focused:      bool,
 
 	// Style
-	style:                                                    Style,
+	style:                 Style,
 
 	// Timings
-	delta_time:                                               f32,
-	last_frame_time, start_time:                              time.Time,
-	render_duration:                                          time.Duration,
+	delta_time:            f32,
+	last_frame_time:       time.Time,
+	start_time:            time.Time,
+	render_duration:       time.Duration,
 
 	// Text
-	fonts:                                                    [MAX_FONTS]Maybe(
-		Font,
-	),
-	glyphs:                                                   [dynamic]Text_Job_Glyph,
-	lines:                                                    [dynamic]Text_Job_Line,
-	font_atlas:                                               Atlas,
-	current_font:                                             int,
-	user_images:                                              [100]Maybe(
-		Image,
-	),
+	fonts:                 [MAX_FONTS]Maybe(Font),
+	glyphs:                [dynamic]Text_Job_Glyph,
+	lines:                 [dynamic]Text_Job_Line,
+	font_atlas:            Atlas,
+	current_font:          int,
+	user_images:           [100]Maybe(Image),
 
 	// Drawing
-	draw_this_frame, draw_next_frame:                         bool,
-	vertex_state:                                             Vertex_State,
-	current_matrix:                                           ^Matrix,
-	current_texture:                                          wgpu.Texture,
-	clip_stack:                                               Stack(Box, 100),
-	path_stack:                                               Stack(Path, 10),
-	matrix_stack:                                             Stack(
-		Matrix,
-		MAX_MATRICES,
-	),
-	frames:                                                   int,
-	drawn_frames:                                             int,
-	draw_list:                                                Draw_List,
-	draw_calls:                                               [MAX_DRAW_CALLS]Draw_Call,
-	draw_call_count:                                          int,
-	current_draw_call:                                        ^Draw_Call,
-	gfx:                                                      Graphics,
-	cursors:                                                  #sparse[Mouse_Cursor]glfw.CursorHandle,
+	draw_this_frame:       bool,
+	draw_next_frame:       bool,
+	vertex_state:          Vertex_State,
+	current_matrix:        ^Matrix,
+	current_texture:       wgpu.Texture,
+	clip_stack:            Stack(Box, 100),
+	path_stack:            Stack(Path, 10),
+	matrix_stack:          Stack(Matrix, MAX_MATRICES),
+	frames:                int,
+	drawn_frames:          int,
+	draw_list:             Draw_List,
+	draw_calls:            [MAX_DRAW_CALLS]Draw_Call,
+	draw_call_count:       int,
+	current_draw_call:     ^Draw_Call,
+	gfx:                   Graphics,
+	cursors:               #sparse[Mouse_Cursor]glfw.CursorHandle,
 }
 
 view_box :: proc() -> Box {
@@ -218,8 +199,12 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.cursors[.I_Beam] = glfw.CreateStandardCursor(glfw.IBEAM_CURSOR)
 	core.cursors[.Resize_EW] = glfw.CreateStandardCursor(glfw.RESIZE_EW_CURSOR)
 	core.cursors[.Resize_NS] = glfw.CreateStandardCursor(glfw.RESIZE_NS_CURSOR)
-	core.cursors[.Resize_NESW] = glfw.CreateStandardCursor(glfw.RESIZE_NESW_CURSOR)
-	core.cursors[.Resize_NWSE] = glfw.CreateStandardCursor(glfw.RESIZE_NWSE_CURSOR)
+	core.cursors[.Resize_NESW] = glfw.CreateStandardCursor(
+		glfw.RESIZE_NESW_CURSOR,
+	)
+	core.cursors[.Resize_NWSE] = glfw.CreateStandardCursor(
+		glfw.RESIZE_NWSE_CURSOR,
+	)
 
 	// Create the main window
 	core.window = glfw.CreateWindow(width, height, title, nil, nil)
@@ -415,13 +400,6 @@ new_frame :: proc() {
 		}
 	}
 
-	// Update the atlas if needed
-	if core.font_atlas.modified {
-		t := time.now()
-		update_atlas(&core.font_atlas, &core.gfx)
-		core.font_atlas.modified = false
-	}
-
 	// Decide if this frame will be drawn
 	if core.draw_next_frame {
 		core.draw_next_frame = false
@@ -448,6 +426,13 @@ new_frame :: proc() {
 render :: proc() {
 	// Render debug info rq
 	do_debug_layer()
+
+	// Update the atlas if needed
+	if core.font_atlas.modified {
+		t := time.now()
+		update_atlas(&core.font_atlas, &core.gfx)
+		core.font_atlas.modified = false
+	}
 
 	if core.draw_this_frame {
 		start_time := time.now()
