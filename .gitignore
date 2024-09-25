@@ -1,0 +1,6 @@
+*.exe
+ols.json
+odinfmt.json
+*.sh
+*.pdb
+*.dll
