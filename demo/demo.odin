@@ -66,7 +66,8 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 
 	if do_panel({title = "Login"}) {
 		shrink(10)
-		do_button({text = "hi"})
+		button({text = "Login"})
+		button({text = "Login"})
 	}
 
 	layer_box := shrink_box(view_box(), 100)
@@ -105,11 +106,11 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				entry := &state.entries[index]
 				begin_table_row(table, {index = index})
 				set_width_auto()
-				text_input({content = &entry.name})
-				text_input({content = &entry.hash})
-				text_input({content = &entry.public_key})
-				text_input({content = &entry.private_key})
-				text_input({content = &entry.location})
+				text_input({content = &entry.name, undecorated = true})
+				text_input({content = &entry.hash, undecorated = true})
+				text_input({content = &entry.public_key, undecorated = true})
+				text_input({content = &entry.private_key, undecorated = true})
+				text_input({content = &entry.location, undecorated = true})
 				end_table_row()
 			}
 			end_table(table)
@@ -127,7 +128,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					add_space(4)
 				}
 				push_id(i)
-				do_button(
+				button(
 					{text = fmt.tprintf("Button #%i", i + 1), kind = .Ghost},
 				)
 				pop_id()
@@ -143,7 +144,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			set_padding(10)
 			for i in 0 ..< 5 {
 				push_id(i)
-				do_button({text = fmt.tprint(i + 1), kind = .Outlined})
+				button({text = fmt.tprint(i + 1), kind = .Outlined})
 				pop_id()
 			}
 		}
@@ -171,7 +172,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					add_space(10)
 				}
 				if was_clicked(
-					do_button({text = fmt.tprint(member), kind = member}),
+					button({text = fmt.tprint(member), kind = member}),
 				) {
 
 				}

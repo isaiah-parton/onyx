@@ -93,6 +93,8 @@ end_container :: proc() {
 	// 	{255, 255, 255, 255},
 	// )
 
+
+
 	// Clamp scroll
 	self.desired_scroll = linalg.max(
 		linalg.min(self.desired_scroll, self.size - (self.box.hi - self.box.lo)),
@@ -142,9 +144,19 @@ end_container :: proc() {
 		}
 	}
 
+
 	pop_clip()
 	pop_stack(&core.container_stack)
 	append_draw_call(current_layer().?.index)
+	// Rounded corner mask to fake rounded clipping
+	draw_rounded_box_mask_fill(self.box, core.style.rounding, core.style.color.foreground)
+	// Table outline
+	draw_rounded_box_stroke(
+		self.box,
+		core.style.rounding,
+		1,
+		core.style.color.substance,
+	)
 }
 
 current_container :: proc() -> Maybe(^Container) {

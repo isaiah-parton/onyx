@@ -45,14 +45,14 @@ Text_Info :: struct {
 }
 
 Text_Options :: struct {
-	font:      int, // Font index
-	size:      f32, // Glyph spacing// Font size
-	width:     Maybe(f32), // Maximum line width
-	max_lines: Maybe(int), // Maximum number of lines
-	wrap:      Text_Wrap, // Wrapping type
-	align_h:   Horizontal_Text_Align, // Alignment
+	font:      int,
+	size:      f32,
+	width:     Maybe(f32),
+	max_lines: Maybe(int),
+	wrap:      Text_Wrap,
+	align_h:   Horizontal_Text_Align,
 	align_v:   Vertical_Text_Align,
-	hidden:    bool, // Every glyph appears as a bullet
+	hidden:    bool,
 }
 
 Interactive_Text_Result :: struct {

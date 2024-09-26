@@ -220,16 +220,6 @@ end_table :: proc(table: Table) {
 	}
 	end_layout()
 	end_container()
-
-	// Table outline
-	draw_rounded_box_mask_fill(container.box, core.style.rounding, core.style.color.foreground)
-	draw_rounded_box_stroke(
-		container.box,
-		core.style.rounding,
-		1,
-		core.style.color.substance,
-	)
-
 	end_widget()
 	pop_id()
 }

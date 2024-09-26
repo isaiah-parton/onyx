@@ -8,6 +8,300 @@ import "core:time"
 
 ANGLE_TOLERANCE :: 0.01
 
+CIRCLE_8 := [?][2]f32 {
+	{1.000000, 0.000000},
+	{0.707107, 0.707107},
+	{0.000000, 1.000000},
+	{-0.707107, 0.707107},
+	{-1.000000, 0.000000},
+	{-0.707107, -0.707107},
+	{0.000000, -1.000000},
+	{0.707107, -0.707107},
+	{1.000000, 0.000000},
+}
+
+CIRCLE_16 := [?][2]f32 {
+	{1.000000, 0.000000},
+	{0.923880, 0.382683},
+	{0.707107, 0.707107},
+	{0.382683, 0.923880},
+	{0.000000, 1.000000},
+	{-0.382684, 0.923880},
+	{-0.707107, 0.707107},
+	{-0.923880, 0.382683},
+	{-1.000000, 0.000000},
+	{-0.923880, -0.382683},
+	{-0.707107, -0.707107},
+	{-0.382684, -0.923880},
+	{0.000000, -1.000000},
+	{0.382684, -0.923879},
+	{0.707107, -0.707107},
+	{0.923880, -0.382683},
+	{1.000000, 0.000000},
+}
+
+CIRCLE_32 := [?][2]f32 {
+	{1.000000, 0.000000},
+	{0.980785, 0.195090},
+	{0.923880, 0.382683},
+	{0.831470, 0.555570},
+	{0.707107, 0.707107},
+	{0.555570, 0.831470},
+	{0.382683, 0.923880},
+	{0.195090, 0.980785},
+	{0.000000, 1.000000},
+	{-0.195090, 0.980785},
+	{-0.382683, 0.923880},
+	{-0.555570, 0.831470},
+	{-0.707107, 0.707107},
+	{-0.831470, 0.555570},
+	{-0.923880, 0.382683},
+	{-0.980785, 0.195090},
+	{-1.000000, 0.000000},
+	{-0.980785, -0.195090},
+	{-0.923880, -0.382683},
+	{-0.831470, -0.555570},
+	{-0.707107, -0.707107},
+	{-0.555570, -0.831470},
+	{-0.382683, -0.923880},
+	{-0.195090, -0.980785},
+	{-0.000000, -1.000000},
+	{0.195090, -0.980785},
+	{0.382683, -0.923880},
+	{0.555570, -0.831470},
+	{0.707107, -0.707107},
+	{0.831470, -0.555570},
+	{0.923880, -0.382683},
+	{0.980785, -0.195090},
+	{1.000000, -0.000000},
+}
+
+CIRCLE_64 := [?][2]f32 {
+	{1.000000, 0.000000},
+	{0.995185, 0.098017},
+	{0.980785, 0.195090},
+	{0.956940, 0.290285},
+	{0.923880, 0.382683},
+	{0.881921, 0.471397},
+	{0.831470, 0.555570},
+	{0.773010, 0.634393},
+	{0.707107, 0.707107},
+	{0.634393, 0.773010},
+	{0.555570, 0.831470},
+	{0.471397, 0.881921},
+	{0.382683, 0.923880},
+	{0.290285, 0.956940},
+	{0.195090, 0.980785},
+	{0.098017, 0.995185},
+	{0.000000, 1.000000},
+	{-0.098017, 0.995185},
+	{-0.195090, 0.980785},
+	{-0.290285, 0.956940},
+	{-0.382683, 0.923880},
+	{-0.471397, 0.881921},
+	{-0.555570, 0.831470},
+	{-0.634393, 0.773010},
+	{-0.707107, 0.707107},
+	{-0.773010, 0.634393},
+	{-0.831470, 0.555570},
+	{-0.881921, 0.471397},
+	{-0.923880, 0.382683},
+	{-0.956940, 0.290285},
+	{-0.980785, 0.195090},
+	{-0.995185, 0.098017},
+	{-1.000000, 0.000000},
+	{-0.995185, -0.098017},
+	{-0.980785, -0.195090},
+	{-0.956940, -0.290285},
+	{-0.923880, -0.382683},
+	{-0.881921, -0.471397},
+	{-0.831470, -0.555570},
+	{-0.773010, -0.634393},
+	{-0.707107, -0.707107},
+	{-0.634393, -0.773010},
+	{-0.555570, -0.831470},
+	{-0.471397, -0.881921},
+	{-0.382683, -0.923880},
+	{-0.290285, -0.956940},
+	{-0.195090, -0.980785},
+	{-0.098017, -0.995185},
+	{-0.000000, -1.000000},
+	{0.098017, -0.995185},
+	{0.195090, -0.980785},
+	{0.290285, -0.956940},
+	{0.382683, -0.923880},
+	{0.471397, -0.881921},
+	{0.555570, -0.831470},
+	{0.634393, -0.773010},
+	{0.707107, -0.707107},
+	{0.773010, -0.634393},
+	{0.831470, -0.555570},
+	{0.881921, -0.471397},
+	{0.923880, -0.382683},
+	{0.956940, -0.290285},
+	{0.980785, -0.195090},
+	{0.995185, -0.098017},
+	{1.000000, -0.000000},
+}
+
+CIRCLE_128 := [?][2]f32 {
+	{1.000000, 0.000000},
+	{0.998795, 0.049068},
+	{0.995185, 0.098017},
+	{0.989177, 0.146730},
+	{0.980785, 0.195090},
+	{0.970031, 0.242980},
+	{0.956940, 0.290285},
+	{0.941544, 0.336890},
+	{0.923880, 0.382683},
+	{0.903989, 0.427555},
+	{0.881921, 0.471397},
+	{0.857729, 0.514103},
+	{0.831470, 0.555570},
+	{0.803208, 0.595699},
+	{0.773010, 0.634393},
+	{0.740951, 0.671559},
+	{0.707107, 0.707107},
+	{0.671559, 0.740951},
+	{0.634393, 0.773010},
+	{0.595699, 0.803208},
+	{0.555570, 0.831470},
+	{0.514103, 0.857729},
+	{0.471397, 0.881921},
+	{0.427555, 0.903989},
+	{0.382683, 0.923880},
+	{0.336890, 0.941544},
+	{0.290285, 0.956940},
+	{0.242980, 0.970031},
+	{0.195090, 0.980785},
+	{0.146730, 0.989177},
+	{0.098017, 0.995185},
+	{0.049068, 0.998795},
+	{0.000000, 1.000000},
+	{-0.049068, 0.998795},
+	{-0.098017, 0.995185},
+	{-0.146730, 0.989177},
+	{-0.195090, 0.980785},
+	{-0.242980, 0.970031},
+	{-0.290285, 0.956940},
+	{-0.336890, 0.941544},
+	{-0.382683, 0.923880},
+	{-0.427555, 0.903989},
+	{-0.471397, 0.881921},
+	{-0.514103, 0.857729},
+	{-0.555570, 0.831470},
+	{-0.595699, 0.803208},
+	{-0.634393, 0.773010},
+	{-0.671559, 0.740951},
+	{-0.707107, 0.707107},
+	{-0.740951, 0.671559},
+	{-0.773010, 0.634393},
+	{-0.803208, 0.595699},
+	{-0.831470, 0.555570},
+	{-0.857729, 0.514103},
+	{-0.881921, 0.471397},
+	{-0.903989, 0.427555},
+	{-0.923880, 0.382683},
+	{-0.941544, 0.336890},
+	{-0.956940, 0.290285},
+	{-0.970031, 0.242980},
+	{-0.980785, 0.195090},
+	{-0.989177, 0.146730},
+	{-0.995185, 0.098017},
+	{-0.998795, 0.049068},
+	{-1.000000, 0.000000},
+	{-0.998795, -0.049068},
+	{-0.995185, -0.098017},
+	{-0.989177, -0.146730},
+	{-0.980785, -0.195090},
+	{-0.970031, -0.242980},
+	{-0.956940, -0.290285},
+	{-0.941544, -0.336890},
+	{-0.923880, -0.382683},
+	{-0.903989, -0.427555},
+	{-0.881921, -0.471397},
+	{-0.857729, -0.514103},
+	{-0.831470, -0.555570},
+	{-0.803208, -0.595699},
+	{-0.773010, -0.634393},
+	{-0.740951, -0.671559},
+	{-0.707107, -0.707107},
+	{-0.671559, -0.740951},
+	{-0.634393, -0.773010},
+	{-0.595699, -0.803208},
+	{-0.555570, -0.831470},
+	{-0.514103, -0.857729},
+	{-0.471397, -0.881921},
+	{-0.427555, -0.903989},
+	{-0.382683, -0.923880},
+	{-0.336890, -0.941544},
+	{-0.290285, -0.956940},
+	{-0.242980, -0.970031},
+	{-0.195090, -0.980785},
+	{-0.146730, -0.989177},
+	{-0.098017, -0.995185},
+	{-0.049068, -0.998795},
+	{-0.000000, -1.000000},
+	{0.049068, -0.998795},
+	{0.098017, -0.995185},
+	{0.146730, -0.989177},
+	{0.195090, -0.980785},
+	{0.242980, -0.970031},
+	{0.290285, -0.956940},
+	{0.336890, -0.941544},
+	{0.382683, -0.923880},
+	{0.427555, -0.903989},
+	{0.471397, -0.881921},
+	{0.514103, -0.857729},
+	{0.555570, -0.831470},
+	{0.595699, -0.803208},
+	{0.634393, -0.773010},
+	{0.671559, -0.740951},
+	{0.707107, -0.707107},
+	{0.740951, -0.671559},
+	{0.773010, -0.634393},
+	{0.803208, -0.595699},
+	{0.831470, -0.555570},
+	{0.857729, -0.514103},
+	{0.881921, -0.471397},
+	{0.903989, -0.427555},
+	{0.923880, -0.382683},
+	{0.941544, -0.336890},
+	{0.956940, -0.290285},
+	{0.970031, -0.242980},
+	{0.980785, -0.195090},
+	{0.989177, -0.146730},
+	{0.995185, -0.098017},
+	{0.998795, -0.049068},
+	{1.000000, -0.000000},
+}
+
+get_precomputed_circle_vertices :: proc(radius: f32) -> [][2]f32 {
+	if radius <= 2 {
+		return CIRCLE_8[:]
+	} else if radius <= 5 {
+		return CIRCLE_16[:]
+	} else if radius < 18 {
+		return CIRCLE_32[:]
+	} else if radius < 50 {
+		return CIRCLE_64[:]
+	}
+	return CIRCLE_128[:]
+}
+
+get_rounded_corner_vertices :: proc(radius: f32) -> (corners: [Corner][][2]f32) {
+	vertices := get_precomputed_circle_vertices(radius)
+	n := len(vertices) / 4 + 1
+	corners[.Bottom_Right] = vertices[:n]
+	vertices = vertices[n - 1:]
+	corners[.Bottom_Left] = vertices[:n]
+	vertices = vertices[n - 1:]
+	corners[.Top_Left] = vertices[:n]
+	vertices = vertices[n - 1:]
+	corners[.Top_Right] = vertices[:]
+	return
+}
+
 clear_path :: proc(path: ^Path) {
 	path.count = 0
 }
@@ -41,7 +335,24 @@ bezier :: proc(p0, p1, p2, p3: [2]f32, segments: int) {
 	step: f32 = 1.0 / f32(segments)
 	for t: f32 = step; t <= 1; t += step {
 		times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
-		weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
+		weights: matrix[4, 4]f32 = {
+			1,
+			0,
+			0,
+			0,
+			-3,
+			3,
+			0,
+			0,
+			3,
+			-6,
+			3,
+			0,
+			-1,
+			3,
+			-3,
+			1,
+		}
 		point(
 			{
 				(times * weights * (matrix[4, 1]f32){p0.x, p1.x, p2.x, p3.x})[0][0],
@@ -74,7 +385,11 @@ fill_path :: proc(color: Color) {
 	}
 }
 
-stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Center) {
+stroke_path :: proc(
+	thickness: f32,
+	color: Color,
+	justify: Stroke_Justify = .Center,
+) {
 	path := get_path()
 
 	if path.count < 2 {
@@ -128,12 +443,14 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 		}
 		line := linalg.normalize(p2 - p1)
 		normal := linalg.normalize([2]f32{-line.y, line.x})
-		tangent2 := line if p2 == p3 else linalg.normalize(linalg.normalize(p3 - p2) + line)
+		tangent2 :=
+			line if p2 == p3 else linalg.normalize(linalg.normalize(p3 - p2) + line)
 		miter2: [2]f32 = {-tangent2.y, tangent2.x}
 		dot2 := linalg.dot(normal, miter2)
 		// Start of segment
 		if i == 0 {
-			tangent1 := line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
+			tangent1 :=
+				line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
 			miter1: [2]f32 = {-tangent1.y, tangent1.x}
 			dot1 := linalg.dot(normal, miter1)
 
@@ -172,7 +489,8 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 __join_miter :: proc(p0, p1, p2: [2]f32) -> (dot: f32, miter: [2]f32) {
 	line := linalg.normalize(p2 - p1)
 	normal := linalg.normalize([2]f32{-line.y, line.x})
-	tangent := line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
+	tangent :=
+		line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
 	miter = {-tangent.y, tangent.x}
 	dot = linalg.dot(normal, miter)
 	return
@@ -227,10 +545,32 @@ draw_line :: proc(a, b: [2]f32, thickness: f32, color: Color) {
 	}
 }
 
-draw_bezier_stroke :: proc(p0, p1, p2, p3: [2]f32, segments: int, thickness: f32, color: Color) {
+draw_bezier_stroke :: proc(
+	p0, p1, p2, p3: [2]f32,
+	segments: int,
+	thickness: f32,
+	color: Color,
+) {
 	step: f32 = 1.0 / f32(segments)
 	lp: [2]f32 = p0
-	weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
+	weights: matrix[4, 4]f32 = {
+		1,
+		0,
+		0,
+		0,
+		-3,
+		3,
+		0,
+		0,
+		3,
+		-6,
+		3,
+		0,
+		-1,
+		3,
+		-3,
+		1,
+	}
 	for t: f32 = step; t <= 1.0 + step; t += step {
 		times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
 		p: [2]f32 = {
@@ -243,7 +583,24 @@ draw_bezier_stroke :: proc(p0, p1, p2, p3: [2]f32, segments: int, thickness: f32
 }
 
 get_bezier_point :: proc(p0, p1, p2, p3: [2]f32, t: f32) -> [2]f32 {
-	weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
+	weights: matrix[4, 4]f32 = {
+		1,
+		0,
+		0,
+		0,
+		-3,
+		3,
+		0,
+		0,
+		3,
+		-6,
+		3,
+		0,
+		-1,
+		3,
+		-3,
+		1,
+	}
 	times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
 	return [2]f32 {
 		(times * weights * (matrix[4, 1]f32){p0.x, p1.x, p2.x, p3.x})[0][0],
@@ -302,7 +659,11 @@ draw_ellipse_fill :: proc(center, size: [2]f32, from, to: f32, color: Color) {
 	}
 }
 
-draw_ring_fill :: proc(center: [2]f32, inner, outer, from, to: f32, color: Color) {
+draw_ring_fill :: proc(
+	center: [2]f32,
+	inner, outer, from, to: f32,
+	color: Color,
+) {
 	from, to := from, to
 	if from > to do from, to = to, from
 	da := to - from
@@ -316,8 +677,12 @@ draw_ring_fill :: proc(center: [2]f32, inner, outer, from, to: f32, color: Color
 	last_outer_index := add_vertex(center + {1, 0} * outer)
 	for n in 0 ..= nsteps {
 		angle := from + f32(n) * step
-		inner_index := add_vertex(center + {math.cos(angle), math.sin(angle)} * inner)
-		outer_index := add_vertex(center + {math.cos(angle), math.sin(angle)} * outer)
+		inner_index := add_vertex(
+			center + {math.cos(angle), math.sin(angle)} * inner,
+		)
+		outer_index := add_vertex(
+			center + {math.cos(angle), math.sin(angle)} * outer,
+		)
 		if n > 0 {
 			add_indices(
 				last_inner_index,
@@ -334,7 +699,11 @@ draw_ring_fill :: proc(center: [2]f32, inner, outer, from, to: f32, color: Color
 }
 
 // Draw a stroke along an arc
-draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color: Color) {
+draw_arc_stroke :: proc(
+	center: [2]f32,
+	radius, from, to, thickness: f32,
+	color: Color,
+) {
 	from, to := from, to
 	if from > to do from, to = to, from
 	da := to - from
@@ -350,7 +719,14 @@ draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color:
 		inner := add_vertex(center + norm * (radius - thickness))
 		outer := add_vertex(center + norm * radius)
 		if n > 0 {
-			add_indices(last_outer, outer, last_inner, outer, inner, last_inner)
+			add_indices(
+				last_outer,
+				outer,
+				last_inner,
+				outer,
+				inner,
+				last_inner,
+			)
 		}
 		last_inner, last_outer = inner, outer
 	}
@@ -377,11 +753,17 @@ draw_box_stroke :: proc(box: Box, thickness: f32, color: Color) {
 	draw_box_fill({box.lo, {box.hi.x, box.lo.y + thickness}}, color)
 	draw_box_fill({{box.lo.x, box.hi.y - thickness}, box.hi}, color)
 	draw_box_fill(
-		{{box.lo.x, box.lo.y + thickness}, {box.lo.x + thickness, box.hi.y - thickness}},
+		{
+			{box.lo.x, box.lo.y + thickness},
+			{box.lo.x + thickness, box.hi.y - thickness},
+		},
 		color,
 	)
 	draw_box_fill(
-		{{box.hi.x - thickness, box.lo.y + thickness}, {box.hi.x, box.hi.y - thickness}},
+		{
+			{box.hi.x - thickness, box.lo.y + thickness},
+			{box.hi.x, box.hi.y - thickness},
+		},
 		color,
 	)
 }
@@ -399,46 +781,44 @@ draw_rounded_box_mask_fill :: proc(box: Box, radius: f32, color: Color) {
 	set_vertex_color(color)
 	set_vertex_uv({})
 
+	vertices := get_rounded_corner_vertices(radius)
+
 	center: [2]f32
 	first_index: u32
 
 	center = box.lo + radius
 	first_index = add_vertex(box.lo)
-	for n in 0 ..= nsteps {
-		a := math.PI + (math.PI * 0.5) * f32(n) / f32(nsteps)
-		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
-		if n < nsteps {
-			add_indices(first_index, index, index + 1)
+	for v, n in vertices[.Top_Left] {
+		index := add_vertex(center + v * radius)
+		if n > 0 {
+			add_indices(first_index, index - 1, index)
 		}
 	}
 
 	center = {box.hi.x - radius, box.lo.y + radius}
 	first_index = add_vertex({box.hi.x, box.lo.y})
-	for n in 0 ..= nsteps {
-		a := (math.PI * 1.5) + (math.PI * 0.5) * f32(n) / f32(nsteps)
-		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
-		if n < nsteps {
-			add_indices(first_index, index, index + 1)
+	for v, n in vertices[.Top_Right] {
+		index := add_vertex(center + v * radius)
+		if n > 0 {
+			add_indices(first_index, index - 1, index)
 		}
 	}
 
 	center = box.hi - radius
 	first_index = add_vertex(box.hi)
-	for n in 0 ..= nsteps {
-		a := (math.PI * 0.5) * f32(n) / f32(nsteps)
-		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
-		if n < nsteps {
-			add_indices(first_index, index, index + 1)
+	for v, n in vertices[.Bottom_Right] {
+		index := add_vertex(center + v * radius)
+		if n > 0 {
+			add_indices(first_index, index - 1, index)
 		}
 	}
 
 	center = {box.lo.x + radius, box.hi.y - radius}
 	first_index = add_vertex({box.lo.x, box.hi.y})
-	for n in 0 ..= nsteps {
-		a := (math.PI * 0.5) + (math.PI * 0.5) * f32(n) / f32(nsteps)
-		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
-		if n < nsteps {
-			add_indices(first_index, index, index + 1)
+	for v, n in vertices[.Bottom_Left] {
+		index := add_vertex(center + v * radius)
+		if n > 0 {
+			add_indices(first_index, index - 1, index)
 		}
 	}
 }
@@ -452,32 +832,79 @@ draw_rounded_box_fill :: proc(box: Box, radius: f32, color: Color) {
 		draw_box_fill(box, color)
 		return
 	}
-	draw_arc_fill(box.lo + radius, radius, math.PI, math.PI * 1.5, color)
-	draw_arc_fill(
-		{box.hi.x - radius, box.lo.y + radius},
-		radius,
-		math.PI * 1.5,
-		math.PI * 2,
-		color,
-	)
-	draw_arc_fill(box.hi - radius, radius, 0, math.PI * 0.5, color)
-	draw_arc_fill({box.lo.x + radius, box.hi.y - radius}, radius, math.PI * 0.5, math.PI, color)
+	vertices := get_rounded_corner_vertices(radius)
+
+	center: [2]f32
+	first_index: u32
+
+	set_vertex_uv({})
+	set_vertex_color(color)
+
+	center = box.lo + radius
+	first_index = add_vertex(center)
+	for v, n in vertices[.Top_Left] {
+		index := add_vertex(center + v * radius)
+		if n > 0 {
+			add_indices(first_index, index - 1, index)
+		}
+	}
+
+	center = {box.hi.x - radius, box.lo.y + radius}
+	first_index = add_vertex(center)
+	for v, n in vertices[.Top_Right] {
+		index := add_vertex(center + v * radius)
+		if n > 0 {
+			add_indices(first_index, index - 1, index)
+		}
+	}
+
+	center = box.hi - radius
+	first_index = add_vertex(center)
+	for v, n in vertices[.Bottom_Right] {
+		index := add_vertex(center + v * radius)
+		if n > 0 {
+			add_indices(first_index, index - 1, index)
+		}
+	}
+
+	center = {box.lo.x + radius, box.hi.y - radius}
+	first_index = add_vertex(center)
+	for v, n in vertices[.Bottom_Left] {
+		index := add_vertex(center + v * radius)
+		if n > 0 {
+			add_indices(first_index, index - 1, index)
+		}
+	}
 	if box.hi.x - radius > box.lo.x + radius {
-		draw_box_fill({{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.hi.y}}, color)
+		draw_box_fill(
+			{{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.hi.y}},
+			color,
+		)
 	}
 	if box.hi.y - radius > box.lo.y + radius {
 		draw_box_fill(
-			{{box.lo.x, box.lo.y + radius}, {box.lo.x + radius, box.hi.y - radius}},
+			{
+				{box.lo.x, box.lo.y + radius},
+				{box.lo.x + radius, box.hi.y - radius},
+			},
 			color,
 		)
 		draw_box_fill(
-			{{box.hi.x - radius, box.lo.y + radius}, {box.hi.x, box.hi.y - radius}},
+			{
+				{box.hi.x - radius, box.lo.y + radius},
+				{box.hi.x, box.hi.y - radius},
+			},
 			color,
 		)
 	}
 }
 
-draw_rounded_box_corners_fill :: proc(box: Box, radius: f32, corners: Corners, color: Color) {
+draw_rounded_box_corners_fill :: proc(
+	box: Box,
+	radius: f32,
+	corners: Corners,
+	color: Color,
+) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
@@ -500,7 +927,10 @@ draw_rounded_box_corners_fill :: proc(box: Box, radius: f32, corners: Corners, c
 			color,
 		)
 	} else {
-		draw_box_fill({{box.hi.x - radius, box.lo.y}, {box.hi.x, box.lo.y + radius}}, color)
+		draw_box_fill(
+			{{box.hi.x - radius, box.lo.y}, {box.hi.x, box.lo.y + radius}},
+			color,
+		)
 	}
 	if .Bottom_Right in corners {
 		draw_arc_fill(box.hi - radius, radius, 0, math.PI * 0.5, color)
@@ -516,24 +946,40 @@ draw_rounded_box_corners_fill :: proc(box: Box, radius: f32, corners: Corners, c
 			color,
 		)
 	} else {
-		draw_box_fill({{box.lo.x, box.hi.y - radius}, {box.lo.x + radius, box.hi.y}}, color)
+		draw_box_fill(
+			{{box.lo.x, box.hi.y - radius}, {box.lo.x + radius, box.hi.y}},
+			color,
+		)
 	}
 	if box.hi.x - radius > box.lo.x + radius {
-		draw_box_fill({{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.hi.y}}, color)
+		draw_box_fill(
+			{{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.hi.y}},
+			color,
+		)
 	}
 	if box.hi.y - radius > box.lo.y + radius {
 		draw_box_fill(
-			{{box.lo.x, box.lo.y + radius}, {box.lo.x + radius, box.hi.y - radius}},
+			{
+				{box.lo.x, box.lo.y + radius},
+				{box.lo.x + radius, box.hi.y - radius},
+			},
 			color,
 		)
 		draw_box_fill(
-			{{box.hi.x - radius, box.lo.y + radius}, {box.hi.x, box.hi.y - radius}},
+			{
+				{box.hi.x - radius, box.lo.y + radius},
+				{box.hi.x, box.hi.y - radius},
+			},
 			color,
 		)
 	}
 }
 
-draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) {
+draw_rounded_box_stroke :: proc(
+	box: Box,
+	radius, thickness: f32,
+	color: Color,
+) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
@@ -542,7 +988,14 @@ draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) 
 		draw_box_stroke(box, thickness, color)
 		return
 	}
-	draw_arc_stroke(box.lo + radius, radius, math.PI, math.PI * 1.5, thickness, color)
+	draw_arc_stroke(
+		box.lo + radius,
+		radius,
+		math.PI,
+		math.PI * 1.5,
+		thickness,
+		color,
+	)
 	draw_arc_stroke(
 		{box.hi.x - radius, box.lo.y + radius},
 		radius,
@@ -551,7 +1004,14 @@ draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) 
 		thickness,
 		color,
 	)
-	draw_arc_stroke(box.hi - radius, radius, 0, math.PI * 0.5, thickness, color)
+	draw_arc_stroke(
+		box.hi - radius,
+		radius,
+		0,
+		math.PI * 0.5,
+		thickness,
+		color,
+	)
 	draw_arc_stroke(
 		{box.lo.x + radius, box.hi.y - radius},
 		radius,
@@ -562,21 +1022,33 @@ draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) 
 	)
 	if box.hi.x - radius > box.lo.x + radius {
 		draw_box_fill(
-			{{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.lo.y + thickness}},
+			{
+				{box.lo.x + radius, box.lo.y},
+				{box.hi.x - radius, box.lo.y + thickness},
+			},
 			color,
 		)
 		draw_box_fill(
-			{{box.lo.x + radius, box.hi.y - thickness}, {box.hi.x - radius, box.hi.y}},
+			{
+				{box.lo.x + radius, box.hi.y - thickness},
+				{box.hi.x - radius, box.hi.y},
+			},
 			color,
 		)
 	}
 	if box.hi.y - radius > box.lo.y + radius {
 		draw_box_fill(
-			{{box.lo.x, box.lo.y + radius}, {box.lo.x + thickness, box.hi.y - radius}},
+			{
+				{box.lo.x, box.lo.y + radius},
+				{box.lo.x + thickness, box.hi.y - radius},
+			},
 			color,
 		)
 		draw_box_fill(
-			{{box.hi.x - thickness, box.lo.y + radius}, {box.hi.x, box.hi.y - radius}},
+			{
+				{box.hi.x - thickness, box.lo.y + radius},
+				{box.hi.x, box.hi.y - radius},
+			},
 			color,
 		)
 	}
@@ -585,15 +1057,29 @@ draw_rounded_box_stroke :: proc(box: Box, radius, thickness: f32, color: Color) 
 foreground :: proc() {
 	layout, ok := current_layout().?
 	if !ok do return
-	draw_rounded_box_fill(layout.box, core.style.rounding, core.style.color.foreground)
-	draw_rounded_box_stroke(layout.box, core.style.rounding, 1, core.style.color.substance)
+	draw_rounded_box_fill(
+		layout.box,
+		core.style.rounding,
+		core.style.color.foreground,
+	)
+	draw_rounded_box_stroke(
+		layout.box,
+		core.style.rounding,
+		1,
+		core.style.color.substance,
+	)
 }
 
 // Advanced shapes
 
 draw_spinner :: proc(center: [2]f32, color: Color) {
-	from := f32(time.duration_seconds(time.since(core.start_time)) * 2) * math.PI
-	to := from + 2.5 + math.sin(f32(time.duration_seconds(time.since(core.start_time)) * 3)) * 1
+	from :=
+		f32(time.duration_seconds(time.since(core.start_time)) * 2) * math.PI
+	to :=
+		from +
+		2.5 +
+		math.sin(f32(time.duration_seconds(time.since(core.start_time)) * 3)) *
+			1
 
 	inner := f32(6)
 	outer := f32(10)
@@ -622,7 +1108,10 @@ draw_loader :: proc(pos: [2]f32, scale: f32, color: Color) {
 	time := f32(time.duration_seconds(time.since(core.start_time))) * 4.5
 	radius := scale / 2
 	center := [2]f32{pos.x + math.cos(time) * scale, pos.y}
-	size := [2]f32{radius * (1 + math.abs(math.cos(time + math.PI / 2)) * 0.75), radius}
+	size := [2]f32 {
+		radius * (1 + math.abs(math.cos(time + math.PI / 2)) * 0.75),
+		radius,
+	}
 	draw_rounded_box_fill({center - size, center + size}, scale, color)
 	core.draw_next_frame = true
 }

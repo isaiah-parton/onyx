@@ -120,13 +120,13 @@ add_calendar :: proc(info: Calendar_Info) -> (result: Calendar_Result) {
 	if layout({side = .Top, size = size}) {
 		set_padding(5)
 		if was_clicked(
-			do_button({text = "\uEA64", font_style = .Icon, kind = .Outlined}),
+			button({text = "\uEA64", font_style = .Icon, kind = .Outlined}),
 		) {
 			result.month_offset -= 1
 		}
 		set_side(.Right)
 		if was_clicked(
-			do_button({text = "\uEA6E", font_style = .Icon, kind = .Outlined}),
+			button({text = "\uEA6E", font_style = .Icon, kind = .Outlined}),
 		) {
 			result.month_offset += 1
 		}

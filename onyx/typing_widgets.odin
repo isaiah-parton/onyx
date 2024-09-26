@@ -26,6 +26,7 @@ Text_Input_Info :: struct {
 	numeric, integer:             bool,
 	multiline, read_only, hidden: bool,
 	decal:                        Text_Input_Decal,
+	undecorated: bool,
 }
 
 Text_Input_Widget_Kind :: struct {
@@ -264,11 +265,13 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 
 		if widget.visible {
 			// Draw body
-			draw_rounded_box_fill(
-				widget.box,
-				core.style.rounding,
-				core.style.color.background,
-			)
+			if !info.undecorated {
+				draw_rounded_box_fill(
+					widget.box,
+					core.style.rounding,
+					core.style.color.background,
+				)
+			}
 
 			push_clip(widget.box)
 			// Draw text placeholder
@@ -319,26 +322,28 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 			}
 
 			// Optional outline
-			if info.multiline {
-				draw_rounded_box_stroke(
-					widget.box,
-					core.style.rounding,
-					1 + widget.focus_time,
-					interpolate_colors(
-						widget.focus_time,
-						core.style.color.substance,
-						core.style.color.accent,
-					),
-				)
-			} else {
-				draw_box_fill(
-					get_box_cut_bottom(widget.box, 1 + widget.focus_time),
-					interpolate_colors(
-						widget.focus_time,
-						core.style.color.substance,
-						core.style.color.accent,
-					),
-				)
+			if !info.undecorated {
+				if info.multiline {
+					draw_rounded_box_stroke(
+						widget.box,
+						core.style.rounding,
+						1 + widget.focus_time,
+						interpolate_colors(
+							widget.focus_time,
+							core.style.color.substance,
+							core.style.color.accent,
+						),
+					)
+				} else {
+					draw_box_fill(
+						get_box_cut_bottom(widget.box, 1 + widget.focus_time),
+						interpolate_colors(
+							widget.focus_time,
+							core.style.color.substance,
+							core.style.color.accent,
+						),
+					)
+				}
 			}
 
 			// Draw disabled overlay
@@ -353,7 +358,9 @@ add_text_input :: proc(info: Text_Input_Info) -> (result: Text_Input_Result) {
 				)
 			}
 
-			draw_rounded_box_mask_fill(widget.box, core.style.rounding, core.style.color.foreground)
+			if !info.undecorated {
+				draw_rounded_box_mask_fill(widget.box, core.style.rounding, core.style.color.foreground)
+			}
 		}
 
 		// Mouse selection

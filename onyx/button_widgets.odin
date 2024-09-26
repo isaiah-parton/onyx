@@ -120,6 +120,6 @@ add_button :: proc(info: Button_Info) -> (result: Generic_Widget_Result) {
 	return result
 }
 
-do_button :: proc(info: Button_Info, loc := #caller_location) -> Generic_Widget_Result {
+button :: proc(info: Button_Info, loc := #caller_location) -> Generic_Widget_Result {
 	return add_button(make_button(info, loc))
 }
