@@ -324,6 +324,11 @@ make_text_iterator :: proc(info: Text_Info) -> (iter: Text_Iterator, ok: bool) {
 	return
 }
 
+get_glyph_from_fallback_font :: proc(codepoint: rune, size: f32) -> (glyph: Glyph, ok: bool) {
+	font := &core.fonts[core.style.fonts[.Icon]].?
+	return get_glyph(font, get_font_size(font, size) or_return, codepoint)
+}
+
 iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 	it.last_codepoint = it.codepoint
 	if it.next_index >= len(it.info.text) {
@@ -339,9 +344,9 @@ iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 	// Get current glyph data
 	if it.codepoint == '\n' || it.codepoint == '\r' {
 		it.glyph = {}
-	} else if glyph, ok := get_glyph(it.font, it.size, '•' if it.info.hidden else it.codepoint);
-	   ok {
-		it.glyph = glyph
+	} else {
+		codepoint := '•' if it.info.hidden else it.codepoint
+		it.glyph = get_glyph(it.font, it.size, codepoint) or_else (get_glyph_from_fallback_font(codepoint, it.info.size) or_return)
 	}
 	return true
 }
@@ -350,11 +355,15 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 
 	// Update horizontal offset with last glyph
 	if iter.codepoint != 0 {
-		iter.glyph_pos.x += math.floor(iter.glyph.advance + iter.font.spacing)
+		iter.glyph_pos.x += math.floor(iter.glyph.advance)
 	}
 
 	// Get the next glyph
 	ok = iterate_text_rune(iter)
+
+	if ok {
+		iter.glyph_pos.x += iter.font.spacing
+	}
 
 	// Space needed to fit this glyph/word
 	space: f32 = iter.glyph.advance
@@ -503,6 +512,9 @@ get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (glyph: Gly
 	if !ok {
 		// Get codepoint index
 		index := ttf.FindGlyphIndex(&font.data, codepoint)
+		if index == 0 {
+			return
+		}
 		// Get metrics
 		advance, left_side_bearing: i32
 		ttf.GetGlyphHMetrics(&font.data, index, &advance, &left_side_bearing)

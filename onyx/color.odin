@@ -7,10 +7,10 @@ Color :: [4]u8
 
 color_from_hex :: proc(hex: u32) -> Color {
 	return Color {
-		u8(0xff & (hex >> 6)),
-		u8(0xff & (hex >> 4)),
-		u8(0xff & (hex >> 2)),
 		u8(0xff & hex),
+		u8(0xff & (hex >> 2)),
+		u8(0xff & (hex >> 4)),
+		u8(0xff & (hex >> 6)),
 	}
 }
 

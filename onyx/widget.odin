@@ -163,6 +163,34 @@ current_widget :: proc() -> Maybe(^Widget) {
 	}
 	return nil
 }
+
+create_widget :: proc(id: Id) -> (widget: ^Widget, ok: bool) {
+	for &slot in core.widgets {
+		if slot == nil {
+			slot = Widget {
+				id        = id,
+			}
+			widget = &slot.?
+			// Add the new widget to the lookup map
+			core.widget_map[id] = widget
+			// A new widget was added and might be visible, so draw this frame
+			core.draw_this_frame = true
+			// The widget was successfully created so
+			ok = true
+			break
+		}
+	}
+	return
+}
+
+get_widget :: proc(id: Id) -> (widget: ^Widget, ok: bool) {
+	widget, ok = core.widget_map[id]
+	if !ok {
+		widget, ok = create_widget(id)
+	}
+	return
+}
+
 // Begins a new widget.
 // This proc is way too long!
 begin_widget :: proc(
@@ -187,21 +215,7 @@ begin_widget :: proc(
 		widget.frames = core.frames
 	} else {
 		// Create it if it doesn't exist
-		for &slot in core.widgets {
-			if slot == nil {
-				slot = Widget {
-					id        = id,
-				}
-				widget = &slot.?
-				// Add the new widget to the lookup map
-				core.widget_map[id] = widget
-				// A new widget was added and might be visible, so draw this frame
-				core.draw_this_frame = true
-				// The widget was successfully created so
-				ok = true
-				break
-			}
-		}
+		widget, ok = create_widget(id)
 	}
 	// Check to make sure there was a spot for the new widget
 	if !ok do return

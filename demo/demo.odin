@@ -8,6 +8,7 @@ import "core:mem"
 import "core:reflect"
 import "core:strings"
 import "core:time"
+import "core:os"
 
 import onyx "../onyx"
 import "vendor:glfw"
@@ -93,7 +94,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			{
 				columns = {
 					{name = "Name"},
-					{name = "Hash"},
+					{name = "Hash", width = 200, sorted = .Ascending},
 					{name = "Public Key"},
 					{name = "Private Key"},
 					{name = "Location"},

@@ -19,12 +19,18 @@ Table_Column_Type :: union #no_nil {
 	Type_Time,
 	Type_Enum,
 }
+
+Sort_Order :: enum {
+	Ascending,
+	Descending,
+}
 // Column formating info
 Table_Column_Info :: struct {
 	name:             string,
 	type:             Table_Column_Type,
 	width:            f32,
 	align:            Horizontal_Text_Align,
+	sorted:           Maybe(Sort_Order),
 	__label_text_job: Text_Job,
 }
 // Info needed to display a table row
@@ -51,6 +57,10 @@ Table :: struct {
 	first, last: int,
 }
 
+Table_Result :: struct {
+	column_clicked: Maybe(int),
+}
+
 // Begins a new row in the current table
 begin_table_row :: proc(table: Table, info: Table_Row_Info) {
 	table := table
@@ -63,12 +73,17 @@ begin_table_row :: proc(table: Table, info: Table_Row_Info) {
 		layout.size_queue[:],
 		table.info.__widths[:table.info.__widths_len],
 	)
+
+	if info.index % 2 == 1 {
+		draw_box_fill(layout.bounds, fade(core.style.color.substance, 0.5))
+	}
 }
 
 end_table_row :: proc() {
 	end_layout()
 	pop_id()
 }
+
 // Pass cell variables in rows, each variable will be assertively type checked with the column type
 table_row :: proc(table: Table, index: int, values: ..any) {
 	for value, v in values {
@@ -99,10 +114,19 @@ make_table :: proc(info: Table_Info, loc := #caller_location) -> Table_Info {
 	info := info
 	info.id = hash(loc)
 	for &column, c in info.columns {
+		text: string
+		switch column.sorted {
+		case nil:
+			text = column.name
+		case .Ascending:
+			text = fmt.tprintf("%s \uEA78", column.name)
+		case .Descending:
+			text = fmt.tprintf("%s \uEA4E", column.name)
+		}
 		column.__label_text_job =
 		make_text_job(
 			{
-				text = column.name,
+				text = text,
 				font = core.style.fonts[.Medium],
 				size = core.style.button_text_size,
 				align_h = .Middle,
@@ -160,9 +184,6 @@ end_table :: proc(table: Table) {
 	container := current_container().?
 	box := container.layout.bounds
 
-	// Selection highlight
-
-
 	// Vertical dividing lines
 	offset := f32(0)
 	for i in 0 ..< table.info.__widths_len {
@@ -187,7 +208,14 @@ end_table :: proc(table: Table) {
 		core.style.table_row_height,
 	)
 	// Background and lower border
-	draw_box_fill(header_box, core.style.color.foreground)
+	draw_box_fill(
+		header_box,
+		alpha_blend_colors(
+			core.style.color.foreground,
+			core.style.color.substance,
+			0.5,
+		),
+	)
 	draw_box_fill(
 		get_box_cut_bottom(header_box, 1),
 		core.style.color.substance,
@@ -206,6 +234,19 @@ end_table :: proc(table: Table) {
 		widget := begin_widget({id = hash(c + 1)}) or_continue
 		defer end_widget()
 		button_behavior(widget)
+
+		text_box := expand_box(
+			{
+				box_center(widget.box) - column.__label_text_job.size / 2,
+				box_center(widget.box) + column.__label_text_job.size / 2,
+			},
+			3,
+		)
+		draw_rounded_box_fill(
+			text_box,
+			core.style.rounding,
+			fade(core.style.color.substance, widget.hover_time),
+		)
 		draw_text_glyphs(
 			column.__label_text_job,
 			box_center(widget.box),

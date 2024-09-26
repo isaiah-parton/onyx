@@ -15,6 +15,7 @@ Panel :: struct {
 	min_size:             [2]f32,
 	moving:               bool,
 	resizing:             bool,
+	dismissed: bool,
 	resize_offset:        [2]f32,
 	can_move, can_resize: bool,
 	dead:                 bool,
@@ -50,6 +51,9 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 	// Push to stack
 	push_stack(&core.panel_stack, panel)
+
+	push_id(id)
+	defer pop_id()
 
 	if panel.moving == true {
 		if mouse_released(.Left) {
@@ -108,51 +112,19 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 	// The content layout box
 	inner_box := panel.box
-
+	// Panel outline
+	draw_rounded_box_stroke(
+		panel.box,
+		core.style.rounding,
+		1,
+		core.style.color.substance,
+	)
 	TITLE_HEIGHT :: 28
 	if info.title != "" {
 		panel.min_size.y += TITLE_HEIGHT
 		title_box := cut_box_top(&inner_box, TITLE_HEIGHT)
 
-		fill_color := fade(core.style.color.substance, 0.5)
-		draw_arc_fill(
-			title_box.lo + core.style.rounding,
-			core.style.rounding,
-			math.PI,
-			math.PI * 1.5,
-			fill_color,
-		)
-		draw_arc_fill(
-			{
-				title_box.hi.x - core.style.rounding,
-				title_box.lo.y + core.style.rounding,
-			},
-			core.style.rounding,
-			-math.PI * 0.5,
-			0,
-			fill_color,
-		)
-		draw_box_fill(
-			{
-				{title_box.lo.x + core.style.rounding, title_box.lo.y},
-				{
-					title_box.hi.x - core.style.rounding,
-					title_box.lo.y + core.style.rounding,
-				},
-			},
-			fill_color,
-		)
-		draw_box_fill(
-			{
-				{title_box.lo.x, title_box.lo.y + core.style.rounding},
-				title_box.hi,
-			},
-			fill_color,
-		)
-		draw_box_fill(
-			{{title_box.lo.x, title_box.hi.y - 1}, title_box.hi},
-			core.style.color.substance,
-		)
+		draw_rounded_box_corners_fill(title_box, core.style.rounding, {.Top_Left, .Top_Right}, fade(core.style.color.substance, 0.5))
 
 		draw_text(
 			{title_box.lo.x + 5, (title_box.hi.y + title_box.lo.y) / 2},
@@ -164,21 +136,48 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 			},
 			core.style.color.content,
 		)
+
+		if widget, ok := begin_widget(
+			{
+				id = hash("dismiss"),
+				box = cut_box_right(&title_box, box_height(title_box))
+			},
+		); ok {
+			defer end_widget()
+
+			button_behavior(widget)
+
+			draw_rounded_box_corners_fill(
+				widget.box,
+				core.style.rounding,
+				{.Top_Right},
+				fade({200, 50, 50, 255}, widget.hover_time),
+			)
+
+			// Resize icon
+			origin := box_center(widget.box)
+			scale := box_height(widget.box) * 0.2
+			icon_color := alpha_blend_colors(
+				core.style.color.foreground,
+				core.style.color.content,
+				0.5 + 0.5 * widget.hover_time,
+			)
+			draw_line(origin - scale, origin + scale, 2, icon_color)
+			draw_line(origin + {-scale, scale}, origin + {scale, -scale}, 2, icon_color)
+
+			if .Pressed in (widget.state - widget.last_state) {
+				panel.dismissed = true
+			}
+		}
 	}
 
-	// Panel outline
-	draw_rounded_box_stroke(
-		panel.box,
-		core.style.rounding,
-		1,
-		core.style.color.substance,
-	)
+
 
 	// Resizing
 	if panel.can_resize {
 		if widget, ok := begin_widget(
 			{
-				id = panel.layer.id,
+				id = hash("resize"),
 				box = Box {
 					panel.box.hi - core.style.visual_size.y,
 					panel.box.hi,
