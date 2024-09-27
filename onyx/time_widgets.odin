@@ -25,7 +25,7 @@ Calendar_Info :: struct {
 }
 
 Calendar_Result :: struct {
-	using _:      Generic_Widget_Result,
+	using _:      Widget_Result,
 	selection:    [2]Maybe(Date),
 	month_offset: int,
 }
@@ -307,12 +307,12 @@ do_calendar :: proc(
 }
 
 Date_Picker_Info :: struct {
-	using _:       Generic_Widget_Info,
+	using _:       Widget_Info,
 	first, second: ^Maybe(Date),
 }
 
 Date_Picker_Result :: struct {
-	using _: Generic_Widget_Result,
+	using _: Widget_Result,
 }
 
 Date_Picker_Widget_Kind :: struct {

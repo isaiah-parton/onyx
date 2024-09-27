@@ -17,7 +17,7 @@ Text_Input_Decal :: enum {
 }
 
 Text_Input_Info :: struct {
-	using _:                      Generic_Widget_Info,
+	using _:                      Widget_Info,
 	content:                      union {
 		^strings.Builder,
 		^string,
@@ -38,7 +38,7 @@ Text_Input_Widget_Kind :: struct {
 }
 
 Text_Input_Result :: struct {
-	using _:            Generic_Widget_Result,
+	using _:            Widget_Result,
 	changed, submitted: bool,
 }
 

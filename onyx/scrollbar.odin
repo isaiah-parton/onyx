@@ -3,7 +3,7 @@ package onyx
 import "core:math/linalg"
 
 Scrollbar_Info :: struct {
-	using _:     Generic_Widget_Info,
+	using _:     Widget_Info,
 	vertical:    bool,
 	pos:         f32,
 	travel:      f32,
@@ -12,7 +12,7 @@ Scrollbar_Info :: struct {
 }
 
 Scrollbar_Result :: struct {
-	using _: Generic_Widget_Result,
+	using _: Widget_Result,
 	pos:     Maybe(f32),
 }
 

@@ -5,48 +5,59 @@ import "core:math/ease"
 import "core:math/linalg"
 import "core:time"
 
-Button_Kind :: enum {
+Button_Style :: enum {
 	Primary,
 	Secondary,
 	Outlined,
 	Ghost,
 }
-
+// Everything needed to construct a new button
 Button_Info :: struct {
-	using _:    Generic_Widget_Info,
+	// `Widget_Info.self` points to the internal generic `Widget`
+	using _:    Widget_Info,
 	text:       string,
 	is_loading: bool,
-	kind:       Button_Kind,
+	style:      Button_Style,
 	font_style: Maybe(Font_Style),
 	font_size:  Maybe(f32),
 	color:      Maybe(Color),
-	__text_job: Text_Job,
+}
+// A constructed button with it's relevant retained data
+Button :: struct {
+	// Still contains a pointer to the internal generic `Widget`
+	using info: Button_Info,
+	hover_time: f32,
+	text_job: 	Text_Job,
+}
+// r e s u l t
+Button_Result :: struct {
+	clicked: bool,
 }
 
-make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
-	info := info
-	info.id = hash(loc)
-	text_info := Text_Info {
-		text    = info.text,
-		size    = info.font_size.? or_else core.style.button_text_size,
-		font    = core.style.fonts[info.font_style.? or_else .Medium],
+// Prepare a widget
+make_button :: proc(info: Button_Info, loc := #caller_location) -> (button: Button, ok: bool) {
+	// `info` is now owned by `button`
+	button.info = info
+	// This life is beautifully ugly at times
+	button.self = make_widget(button) or_return
+	button.text_job, _ = make_text_job({
+		text    = button.text,
+		size    = button.font_size.? or_else core.style.button_text_size,
+		font    = core.style.fonts[button.font_style.? or_else .Medium],
 		align_v = .Middle,
 		align_h = .Middle,
-	}
-	info.__text_job, _ = make_text_job(text_info)
-	info.desired_size = info.__text_job.size + {18, 6}
-	return info
+	})
+	button.desired_size = button.text_job.size + {18, 6}
+	return
 }
 
-add_button :: proc(info: Button_Info) -> (result: Generic_Widget_Result) {
-	widget, ok := begin_widget(info)
-	if !ok do return
+// Now 'add' the button (display and get interaction)
+add_button :: proc(button: Button) {
+	begin_widget(button)
 
-	result.self = widget
+	button_behavior(widget.self)
 
-	button_behavior(widget)
-
-	if widget.visible {
+	if widget.self.visible {
 		text_color: Color
 
 		switch info.kind {
@@ -120,6 +131,6 @@ add_button :: proc(info: Button_Info) -> (result: Generic_Widget_Result) {
 	return result
 }
 
-button :: proc(info: Button_Info, loc := #caller_location) -> Generic_Widget_Result {
+button :: proc(info: Button_Info, loc := #caller_location) -> Button_Result {
 	return add_button(make_button(info, loc))
 }

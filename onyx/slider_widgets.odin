@@ -4,32 +4,33 @@ import "base:intrinsics"
 import "core:math"
 import "core:math/linalg"
 
-Slider_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
-	using _:       Generic_Widget_Info,
-	value, lo, hi: T,
+Slider_Info :: struct {
+	using _:       Widget_Info,
+	value: ^f64,
+	lo, hi: f64,
 }
 
-Slider_Result :: struct($T: typeid) {
-	using _: Generic_Widget_Result,
-	value:   Maybe(T),
+Slider :: struct {
+	using info: Slider_Info,
 }
 
-make_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T) {
-	info := info
-	info.id = hash(loc)
-	info.desired_size = core.style.visual_size
-	info.hi = max(info.hi, info.lo + 1)
-	return info
+Slider_Result :: Widget_Result
+
+make_slider :: proc(info: Slider_Info, loc := #caller_location) -> (slider: Slider, ok: bool) {
+	if info.value == nil do return
+	ok = true
+	slider.info := info
+	slider.id = hash(loc)
+	slider.desired_size = core.style.visual_size
+	slider.hi = max(slider.hi, slider.lo + 1)
+	slider.sticky = true
+	return
 }
 
-add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
-	widget, ok := begin_widget(info)
-	if !ok do return
+add_slider :: proc(slider: Slider) -> (result: Slider_Result, ok: bool) {
+	begin_widget(slider)
 
-	widget.draggable = true
-	result.self = widget
-
-	h := box_height(widget.box)
+	h := box_height(slider.self.box)
 
 	widget.box.lo.y += h / 4
 	widget.box.hi.y -= h / 4
@@ -58,8 +59,12 @@ add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 	}
 
 	if .Pressed in widget.state {
+
 		new_time := clamp((core.mouse_pos.x - widget.box.lo.x - radius) / range_width, 0, 1)
-		result.value = info.lo + T(new_time * f32(info.hi - info.lo))
+
+		assert(slider.value != nil)
+		slider.value^ = info.lo + (new_time * (info.hi - info.lo))
+
 		core.draw_next_frame = true
 	}
 
@@ -67,39 +72,33 @@ add_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
 	return
 }
 
-do_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Result(T) {
-	return add_slider(make_slider(info, loc))
+slider :: proc(info: Slider_Info, loc := #caller_location) -> (result: Slider_Result, ok: bool) {
+	return add_slider(make_slider(info, loc) or_return)
 }
 
-
-make_box_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T) {
-	info := info
-	info.id = hash(loc)
-	info.hi = max(info.hi, info.lo + 1)
-	info.desired_size = core.style.visual_size
-	return info
-}
-
-add_box_slider :: proc(info: Slider_Info($T)) -> (result: Slider_Result(T)) {
-	widget, ok := begin_widget(info)
-	if !ok do return
-	result.self = widget
+add_box_slider :: proc(slider: Slider) -> (result: Slider_Result) {
+	begin_widget(slider)
 	defer end_widget()
-	widget.draggable = true
-	horizontal_slider_behavior(widget)
-	if widget.visible {
-		draw_box_fill(widget.box, core.style.color.substance)
+
+	horizontal_slider_behavior(slider)
+
+	if slider.visible {
+		draw_box_fill(slider.box, core.style.color.substance)
 		time := clamp(f32(info.value - info.lo) / f32(info.hi - info.lo), 0, 1)
-		draw_box_fill({widget.box.lo, {widget.box.lo.x + box_width(widget.box) * time, widget.box.hi.y}}, core.style.color.accent)
+		draw_box_fill({slider.box.lo, {slider.box.lo.x + box_width(slider.box) * time, slider.box.hi.y}}, core.style.color.accent)
 	}
-	if .Pressed in widget.state {
-		new_time := clamp((core.mouse_pos.x - widget.box.lo.x) / box_width(widget.box), 0, 1)
-		result.value = info.lo + T(new_time * f32(info.hi - info.lo))
+	if .Pressed in slider.state {
+
+		time := clamp((core.mouse_pos.x - slider.box.lo.x) / box_width(slider.box), 0, 1)
+
+		assert(slider.value != nil)
+		slider.value^ = info.lo + (time * f32(info.hi - info.lo))
+
 		core.draw_next_frame = true
 	}
 	return
 }
 
-do_box_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> (result: Slider_Result(T)) {
-	return add_box_slider(make_box_slider(info, loc))
+box_slider :: proc(info: Slider_Info, loc := #caller_location) -> (result: Slider_Result, ok: bool) {
+	return add_box_slider(make_slider(info, loc) or_return)
 }

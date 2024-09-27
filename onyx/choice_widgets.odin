@@ -5,7 +5,7 @@ import "core:math/ease"
 import "core:math/linalg"
 
 Selector_Info :: struct {
-	using _:    Generic_Widget_Info,
+	using _:    Widget_Info,
 	text:       string,
 	menu_align: Alignment,
 	__text_job: Text_Job,
@@ -117,7 +117,7 @@ Selector_Option_Kind :: enum {
 }
 
 Selector_Option_Info :: struct {
-	using _:    Generic_Widget_Info,
+	using _:    Widget_Info,
 	text:       string,
 	state:      bool,
 	kind:       Selector_Option_Kind,
@@ -142,7 +142,7 @@ make_selector_option :: proc(
 	return info
 }
 
-add_selector_option :: proc(info: Selector_Option_Info) -> (result: Generic_Widget_Result) {
+add_selector_option :: proc(info: Selector_Option_Info) -> (result: Widget_Result) {
 	widget, ok := begin_widget(info)
 	if !ok do return
 
@@ -183,6 +183,6 @@ add_selector_option :: proc(info: Selector_Option_Info) -> (result: Generic_Widg
 do_selector_option :: proc(
 	info: Selector_Option_Info,
 	loc := #caller_location,
-) -> Generic_Widget_Result {
+) -> Widget_Result {
 	return add_selector_option(make_selector_option(info, loc))
 }

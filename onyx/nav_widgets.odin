@@ -7,7 +7,7 @@ import "core:math/linalg"
 import "core:reflect"
 
 Breadcrumb_Info :: struct {
-	using _:     Generic_Widget_Info,
+	using _:     Widget_Info,
 	index:       int,
 	options:     []string,
 	is_tail:     bool,
@@ -16,7 +16,7 @@ Breadcrumb_Info :: struct {
 }
 
 Breadcrumb_Result :: struct {
-	using _: Generic_Widget_Result,
+	using _: Widget_Result,
 	index:   Maybe(int),
 }
 

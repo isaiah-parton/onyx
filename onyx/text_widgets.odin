@@ -1,7 +1,7 @@
 package onyx
 
 Label_Info :: struct {
-	using _:    Generic_Widget_Info,
+	using _:    Widget_Info,
 	text:       string,
 	font_style: Maybe(Font_Style),
 	font_size:  Maybe(f32),

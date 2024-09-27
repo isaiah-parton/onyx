@@ -41,7 +41,7 @@ Component_Showcase :: struct {
 	bio:           strings.Builder,
 	full_name:     strings.Builder,
 	birth_country: strings.Builder,
-	slider_value:  f32,
+	slider_value:  f64,
 	start_time:    time.Time,
 	option:        Option,
 	date_range:    [2]Maybe(onyx.Date),
@@ -76,12 +76,9 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	foreground()
 	if layout({size = 65, side = .Top}) {
 		shrink(15)
-		if index, ok := do_tabs({index = int(state.section.component), options = reflect.enum_field_names(Component)}).index.?;
-		   ok {
-			state.section.component = Component(index)
-		}
+		tabs({index = (^int)(&state.section.component), options = reflect.enum_field_names(Component)})
 		set_side(.Right)
-		state.light_mode = toggle_switch({on = state.light_mode}).on
+		toggle_switch({state = &state.light_mode})
 	}
 	shrink(40)
 
@@ -90,7 +87,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_side(.Top)
 		rows_active: [dynamic]bool
 		resize(&rows_active, len(state.entries))
-		if table, ok := begin_table(
+		if table(
 			{
 				columns = {
 					{name = "Name"},
@@ -102,10 +99,11 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				row_count = len(state.entries),
 				max_displayed_rows = 15,
 			},
-		); ok {
+		) {
+			table := &current_widget().?.table
 			for index in table.first ..= table.last {
 				entry := &state.entries[index]
-				begin_table_row(table, {index = index})
+				begin_table_row({index = index})
 				set_width_auto()
 				text_input({content = &entry.name, undecorated = true})
 				text_input({content = &entry.hash, undecorated = true})
@@ -114,7 +112,6 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				text_input({content = &entry.location, undecorated = true})
 				end_table_row()
 			}
-			end_table(table)
 		}
 
 	case .Scroll_Zone:
@@ -130,7 +127,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				}
 				push_id(i)
 				button(
-					{text = fmt.tprintf("Button #%i", i + 1), kind = .Ghost},
+					{text = fmt.tprintf("Button #%i", i + 1), style = .Ghost},
 				)
 				pop_id()
 			}
@@ -145,7 +142,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			set_padding(10)
 			for i in 0 ..< 5 {
 				push_id(i)
-				button({text = fmt.tprint(i + 1), kind = .Outlined})
+				button({text = fmt.tprint(i + 1), style = .Outlined})
 				pop_id()
 			}
 		}
@@ -153,13 +150,11 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	case .Slider:
 		set_side(.Top)
 		do_label({text = "Normal"})
-		state.slider_value =
-			do_slider(Slider_Info(f32){value = state.slider_value}).value.? or_else state.slider_value
+			slider({value = &state.slider_value})
 		add_space(10)
 		do_label({text = "Box"})
 		add_space(10)
-		state.slider_value =
-			do_box_slider(Slider_Info(f32){value = state.slider_value}).value.? or_else state.slider_value
+			box_slider({value = &state.slider_value})
 
 	case .Button:
 		set_side(.Top)
@@ -173,7 +168,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					add_space(10)
 				}
 				if was_clicked(
-					button({text = fmt.tprint(member), kind = member}),
+					button({text = fmt.tprint(member), style = member}),
 				) {
 
 				}
@@ -280,7 +275,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					hi = 30,
 					increment = 5,
 					spacing = 10,
-					kind = Bar_Graph{value_labels = true, show_tooltip = true},
+					style = Bar_Graph{value_labels = true, show_tooltip = true},
 					label_tooltip = true,
 					fields = {
 						{"Field 1", {255, 25, 96, 255}},
@@ -314,7 +309,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 					hi = 30,
 					increment = 5,
 					spacing = 10,
-					kind = Line_Graph{show_dots = false},
+					style = Line_Graph{show_dots = false},
 					label_tooltip = true,
 					fields = {
 						{"Minecraft", {255, 25, 96, 255}},

@@ -58,6 +58,12 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 // @(private)
 core: Core
 
+@init
+print_type_sizes :: proc() {
+	fmt.println(size_of(Widget) * MAX_WIDGETS)
+	fmt.println(size_of(Core))
+}
+
 Debug_State :: struct {
 	enabled, widgets, panels, layers: bool,
 	delta_time:                       [dynamic]f32,

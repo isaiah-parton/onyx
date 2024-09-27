@@ -161,7 +161,7 @@ cut_current_layout :: proc(
 }
 // Get the next widget box
 // TODO: Rename this as it isn't used exclusively for singular widgets
-next_widget_box :: proc(info: Generic_Widget_Info) -> Box {
+next_widget_box :: proc(info: Widget_Info) -> Box {
 	// First assert that a layout exists
 	layout := current_layout().?
 	// Decide the size of the box
