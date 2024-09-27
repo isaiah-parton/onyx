@@ -55,6 +55,8 @@ import "core:time"
 DOUBLE_CLICK_TIME :: time.Millisecond * 450
 // The internal widget structure
 Widget :: struct {
+	// This must be the first field
+	using variant:                       Widget_Variant,
 	id:                            Id,
 	box:                           Box,
 	layer:                         ^Layer,
@@ -62,6 +64,7 @@ Widget :: struct {
 	visible:                       bool,
 	disabled:                      bool,
 	dead:                          bool,
+	desired_size: [2]f32,
 	on_death:                      proc(_: ^Widget),
 	// Interaction state
 	last_state, next_state, state: Widget_State,
@@ -69,17 +72,14 @@ Widget :: struct {
 	click_count:                   int,
 	click_time:                    time.Time,
 	click_button:                  Mouse_Button,
-	desired_size:                  [2]f32,
 	// Stores the number of the last frame on which this widget was updated
 	frame:                         int,
-	// I know this is unsafe, but unless something else goes wrong, only one of these fields
-	// will be used throughout a widget's lifetime
-	using _:                       struct #raw_union {
-		button:  Button,
-		graph:   Graph_Widget,
-		boolean: Boolean_Widget,
-		table:   Table,
-	},
+}
+Widget_Variant :: struct #raw_union {
+	button:  Button,
+	graph:   Graph,
+	boolean: Boolean_Widget,
+	table:   Table,
 }
 // Interaction state
 Widget_Status :: enum {
@@ -94,18 +94,12 @@ Widget_Status :: enum {
 Widget_State :: bit_set[Widget_Status;u8]
 // A generic descriptor for all widgets
 Widget_Info :: struct {
-	// bruh moment (yes every widget points to itself) (This is insanely useful)
-	self:         ^Widget,
-	// hash moment
+	self: ^Widget,
 	id:           Maybe(Id),
-	// Optional box to be used instead of cutting from the layout
 	box:          Maybe(Box),
 	disabled:     bool,
-	sticky:	bool,
+	sticky:       bool,
 	fixed_size:   bool,
-	// Size required by the user
-	// required_size: [2]f32,
-	// Size desired by the widget
 	desired_size: [2]f32,
 }
 // A generic result type for all widgets
@@ -195,8 +189,9 @@ current_widget :: proc() -> Maybe(^Widget) {
 }
 // This fetches or reserves a widget given the `Id` from `info`
 // Also checks for duplicate ids
-make_widget :: proc(info: Widget_Info) -> (widget: ^Widget, ok: bool) {
-	widget = core.widget_map[id].? or_else create_widget(info.id.?) or_return
+make_widget :: proc(id: Id) -> (widget: ^Widget, ok: bool) {
+	widget =
+		core.widget_map[id].? or_else create_widget(id) or_return
 
 	ok = widget != nil
 	if !ok do return
@@ -276,7 +271,8 @@ begin_widget :: proc(info: Widget_Info) -> bool {
 
 	// Set visible flag
 	widget.visible =
-		core.visible && get_clip(current_clip().? or_return, widget.box) != .Full
+		core.visible &&
+		get_clip(current_clip().? or_return, widget.box) != .Full
 
 	// Reset state
 	widget.last_state = widget.state
@@ -371,12 +367,12 @@ end_widget :: proc() {
 	}
 }
 
-@(deferred_out=__widget)
+@(deferred_out = __widget)
 widget :: proc(info: Widget_Info) -> bool {
 	return begin_widget(info)
 }
 
-@private
+@(private)
 __widget :: proc(ok: bool) {
 	if ok {
 		end_widget()

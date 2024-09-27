@@ -36,54 +36,53 @@ Button_Result :: struct {
 
 // Prepare a widget
 make_button :: proc(info: Button_Info, loc := #caller_location) -> (button: Button, ok: bool) {
-	// `info` is now owned by `button`
 	button.info = info
-	// This life is beautifully ugly at times
-	button.self = make_widget(button) or_return
-	button.text_job, _ = make_text_job({
+	button.text_job = make_text_job({
 		text    = button.text,
 		size    = button.font_size.? or_else core.style.button_text_size,
 		font    = core.style.fonts[button.font_style.? or_else .Medium],
 		align_v = .Middle,
 		align_h = .Middle,
-	})
+	}) or_return
 	button.desired_size = button.text_job.size + {18, 6}
+	button.self = make_widget(button.id.? or_else hash(loc)) or_return
 	return
 }
 
 // Now 'add' the button (display and get interaction)
-add_button :: proc(button: Button) {
+add_button :: proc(using button: Button) {
+	self.button = button
 	begin_widget(button)
 
-	button_behavior(widget.self)
+	button_behavior(self)
 
-	if widget.self.visible {
+	if self.visible {
 		text_color: Color
 
-		switch info.kind {
+		switch button.style {
 		case .Outlined:
 			draw_rounded_box_fill(
-				widget.box,
+				self.box,
 				core.style.rounding,
-				fade(info.color.? or_else core.style.color.substance, widget.hover_time),
+				fade(button.color.? or_else core.style.color.substance, button.self.hover_time),
 			)
-			if widget.hover_time < 1 {
+			if button.hover_time < 1 {
 				draw_rounded_box_stroke(
-					widget.box,
+					self.box,
 					core.style.rounding,
 					1,
-					info.color.? or_else core.style.color.substance,
+					button.color.? or_else core.style.color.substance,
 				)
 			}
 			text_color = core.style.color.content
 
 		case .Secondary:
 			draw_rounded_box_fill(
-				widget.box,
+				button.self.box,
 				core.style.rounding,
 				interpolate_colors(
-					widget.hover_time * 0.25,
-					info.color.? or_else core.style.color.substance,
+					button.self.hover_time * 0.25,
+					button.color.? or_else core.style.color.substance,
 					core.style.color.foreground,
 				),
 			)
@@ -91,11 +90,11 @@ add_button :: proc(button: Button) {
 
 		case .Primary:
 			draw_rounded_box_fill(
-				widget.box,
+				button.self.box,
 				core.style.rounding,
 				interpolate_colors(
-					widget.hover_time * 0.25,
-					info.color.? or_else core.style.color.accent,
+					button.hover_time * 0.25,
+					button.color.? or_else core.style.color.accent,
 					core.style.color.foreground,
 				),
 			)
@@ -103,27 +102,27 @@ add_button :: proc(button: Button) {
 
 		case .Ghost:
 			draw_rounded_box_fill(
-				widget.box,
+				button.self.box,
 				core.style.rounding,
-				fade(info.color.? or_else core.style.color.substance, widget.hover_time),
+				fade(button.color.? or_else core.style.color.substance, button.hover_time),
 			)
 			text_color = core.style.color.content
 		}
 
-		if !info.is_loading {
-			draw_text_glyphs(info.__text_job, box_center(widget.box), text_color)
+		if !button.is_loading {
+			draw_text_glyphs(button.__text_job, box_center(button.self.box), text_color)
 		}
 
-		if widget.disable_time > 0 {
-			draw_rounded_box_fill(
-				widget.box,
-				core.style.rounding,
-				fade(core.style.color.background, widget.disable_time * 0.5),
-			)
-		}
+		// if button.self.disable_time > 0 {
+		// 	draw_rounded_box_fill(
+		// 		button.self.box,
+		// 		core.style.rounding,
+		// 		fade(core.style.color.background, button.self.disable_time * 0.5),
+		// 	)
+		// }
 
-		if info.is_loading {
-			draw_loader(box_center(widget.box), 10, text_color)
+		if button.is_loading {
+			draw_loader(box_center(button.self.box), 10, text_color)
 		}
 	}
 

@@ -150,11 +150,11 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 	case .Slider:
 		set_side(.Top)
 		do_label({text = "Normal"})
-			slider({value = &state.slider_value})
+		slider({value = &state.slider_value})
 		add_space(10)
 		do_label({text = "Box"})
 		add_space(10)
-			box_slider({value = &state.slider_value})
+		box_slider({value = &state.slider_value})
 
 	case .Button:
 		set_side(.Top)
@@ -162,7 +162,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		add_space(10)
 		if layout({size = 30}) {
 			set_width_auto()
-			for member, m in Button_Kind {
+			for member, m in Button_Style {
 				push_id(m)
 				if m > 0 {
 					add_space(10)
@@ -206,7 +206,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				add_space(10)
 			}
 			if was_clicked(
-				do_checkbox(
+				checkbox(
 					{
 						text = fmt.tprint(member),
 						state = state.checkboxes[member],
@@ -226,7 +226,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				add_space(10)
 			}
 			if was_clicked(
-				do_radio_button(
+				radio_button(
 					{text = fmt.tprint(member), state = state.option == member},
 				),
 			) {
@@ -269,8 +269,8 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			shrink(30)
 			set_width_fill()
 			set_height_fill()
-			do_graph(
-				Graph_Info(int) {
+			graph(
+				{
 					lo = 0,
 					hi = 30,
 					increment = 5,
@@ -303,8 +303,8 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			shrink(30)
 			set_width_fill()
 			set_height_fill()
-			do_graph(
-				Graph_Info(int) {
+			graph(
+				{
 					lo = 0,
 					hi = 30,
 					increment = 5,
