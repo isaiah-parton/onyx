@@ -137,35 +137,36 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 			core.style.color.content,
 		)
 
-		if widget, ok := begin_widget(
-			{
-				id = hash("dismiss"),
-				box = cut_box_right(&title_box, box_height(title_box))
-			},
-		); ok {
+		dismiss_button := Widget_Info{
+			id = hash("dismiss"),
+			box = cut_box_right(&title_box, box_height(title_box))
+		}
+		if begin_widget(&dismiss_button) {
 			defer end_widget()
 
-			button_behavior(widget)
+			self := dismiss_button.self
+
+			button_behavior(self)
 
 			draw_rounded_box_corners_fill(
-				widget.box,
+				self.box,
 				core.style.rounding,
 				{.Top_Right},
-				fade({200, 50, 50, 255}, widget.hover_time),
+				fade({200, 50, 50, 255}, self.hover_time),
 			)
 
 			// Resize icon
-			origin := box_center(widget.box)
-			scale := box_height(widget.box) * 0.2
+			origin := box_center(self.box)
+			scale := box_height(self.box) * 0.2
 			icon_color := alpha_blend_colors(
 				core.style.color.foreground,
 				core.style.color.content,
-				0.5 + 0.5 * widget.hover_time,
+				0.5 + 0.5 * self.hover_time,
 			)
 			draw_line(origin - scale, origin + scale, 2, icon_color)
 			draw_line(origin + {-scale, scale}, origin + {scale, -scale}, 2, icon_color)
 
-			if .Pressed in (widget.state - widget.last_state) {
+			if .Pressed in (self.state - self.last_state) {
 				panel.dismissed = true
 			}
 		}
@@ -175,33 +176,34 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 	// Resizing
 	if panel.can_resize {
-		if widget, ok := begin_widget(
-			{
-				id = hash("resize"),
-				box = Box {
-					panel.box.hi - core.style.visual_size.y,
-					panel.box.hi,
-				},
+		resize_button := Widget_Info{
+			id = hash("resize"),
+			box = Box {
+				panel.box.hi - core.style.visual_size.y,
+				panel.box.hi,
 			},
-		); ok {
+		}
+		if begin_widget(&resize_button) {
 			defer end_widget()
 
-			button_behavior(widget)
+			self := resize_button.self
+
+			button_behavior(self)
 
 			draw_rounded_box_corners_fill(
-				widget.box,
+				self.box,
 				core.style.rounding,
 				{.Bottom_Right},
-				fade(core.style.color.substance, 0.5 * widget.hover_time),
+				fade(core.style.color.substance, 0.5 * self.hover_time),
 			)
 
 			// Resize icon
-			origin := box_center(widget.box)
-			scale := box_height(widget.box) * 0.2
+			origin := box_center(self.box)
+			scale := box_height(self.box) * 0.2
 			icon_color := alpha_blend_colors(
 				core.style.color.foreground,
 				core.style.color.content,
-				0.5 + 0.5 * widget.hover_time,
+				0.5 + 0.5 * self.hover_time,
 			)
 			begin_path()
 			point(origin + {-0.3, -1} * scale)
@@ -217,7 +219,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 			end_path()
 			draw_line(origin - scale, origin + scale, 2, icon_color)
 
-			if .Pressed in (widget.state - widget.last_state) {
+			if .Pressed in (self.state - self.last_state) {
 				panel.resizing = true
 				panel.resize_offset = panel.box.hi - core.mouse_pos
 			}

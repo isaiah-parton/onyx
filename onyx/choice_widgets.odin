@@ -16,9 +16,9 @@ Menu_Widget_Kind :: struct {
 	open_time: f32,
 }
 
-make_selector :: proc(info: Selector_Info, loc := #caller_location) -> Selector_Info {
-	info := info
+init_selector :: proc(info: ^Selector_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
+	info.self = get_widget(info.id.?) or_return
 	text_info := Text_Info {
 		text    = info.text,
 		size    = core.style.button_text_size,
@@ -28,22 +28,23 @@ make_selector :: proc(info: Selector_Info, loc := #caller_location) -> Selector_
 	}
 	info.__text_job, _ = make_text_job(text_info)
 	info.desired_size = info.__text_job.size + {40, 10}
-	return info
+	return true
 }
 
-begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
-	widget := begin_widget(info) or_return
-	kind := widget_kind(widget, Menu_Widget_Kind)
-	if widget.visible {
+begin_selector :: proc(using info: ^Selector_Info, loc := #caller_location) -> bool {
+	begin_widget(info) or_return
+
+	kind := widget_kind(self, Menu_Widget_Kind)
+	if self.visible {
 		draw_rounded_box_fill(
-			widget.box,
+			self.box,
 			core.style.rounding,
-			fade(core.style.color.substance, widget.hover_time),
+			fade(core.style.color.substance, self.hover_time),
 		)
-		if widget.hover_time < 1 {
-			draw_rounded_box_stroke(widget.box, core.style.rounding, 1, core.style.color.substance)
+		if self.hover_time < 1 {
+			draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 		}
-		text_pos := box_center(widget.box) + [2]f32{-10, 0}
+		text_pos := box_center(self.box) + [2]f32{-10, 0}
 		draw_text_glyphs(info.__text_job, text_pos, core.style.color.content)
 		draw_arrow(
 			{text_pos.x + info.__text_job.size.x / 2 + 10, text_pos.y},
@@ -52,10 +53,10 @@ begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 		)
 	}
 
-	menu_behavior(widget)
+	menu_behavior(self)
 
-	if .Open in widget.state {
-		menu_box := get_menu_box(widget.box, kind.size)
+	if .Open in self.state {
+		menu_box := get_menu_box(self.box, kind.size)
 		layer_origin := menu_box.lo
 
 		#partial switch info.menu_align {
@@ -70,7 +71,7 @@ begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 
 		begin_layer(
 			{
-				id = widget.id,
+				id = self.id,
 				box = menu_box,
 				origin = layer_origin,
 				scale = [2]f32{scale, scale},
@@ -83,31 +84,33 @@ begin_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 	}
 
 
-	return .Open in widget.state
+	return .Open in self.state
 }
 
 end_selector :: proc() {
-	widget := current_widget().?
-	if .Open in widget.state {
+	self := current_widget().?
+	if .Open in self.state {
 		layout := current_layout().?
-		kind := widget_kind(widget, Menu_Widget_Kind)
+		kind := widget_kind(self, Menu_Widget_Kind)
 		kind.size = layout.content_size + layout.spacing_size
 		layer := current_layer().?
-		if .Hovered not_in layer.state && .Focused not_in widget.state {
-			widget.state -= {.Open}
+		if .Hovered not_in layer.state && .Focused not_in self.state {
+			self.state -= {.Open}
 		}
 		end_layer()
 	}
 	end_widget()
 }
 
-@(deferred_out = __do_selector)
-do_selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
-	return begin_selector(make_selector(info, loc))
+@(deferred_out = __selector)
+selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
+	info := info
+	init_selector(&info, loc)
+	return begin_selector(&info)
 }
 
 @(private)
-__do_selector :: proc(ok: bool) {
+__selector :: proc(ok: bool) {
 	end_selector()
 }
 
@@ -124,12 +127,13 @@ Selector_Option_Info :: struct {
 	__text_job: Text_Job,
 }
 
-make_selector_option :: proc(
-	info: Selector_Option_Info,
+init_selector_option :: proc(
+	info: ^Selector_Option_Info,
 	loc := #caller_location,
-) -> Selector_Option_Info {
+) -> bool {
 	info := info
 	info.id = hash(loc)
+	info.self = get_widget(info.id.?) or_return
 	text_info := Text_Info {
 		text    = info.text,
 		size    = core.style.button_text_size,
@@ -139,30 +143,28 @@ make_selector_option :: proc(
 	info.__text_job, _ = make_text_job(text_info)
 	info.desired_size = info.__text_job.size + {20, 10}
 	info.desired_size.x += info.desired_size.y
-	return info
+	return true
 }
 
-add_selector_option :: proc(info: Selector_Option_Info) -> (result: Widget_Result) {
-	widget, ok := begin_widget(info)
-	if !ok do return
+add_selector_option :: proc(using info: ^Selector_Option_Info) -> bool {
+	begin_widget(info) or_return
+	defer end_widget()
 
-	result.self = widget
+	button_behavior(self)
 
-	button_behavior(widget)
-
-	if widget.visible {
+	if self.visible {
 		draw_rounded_box_fill(
-			widget.box,
+			self.box,
 			core.style.rounding,
-			fade(core.style.color.substance, widget.hover_time),
+			fade(core.style.color.substance, self.hover_time),
 		)
 		if info.state {
 			switch info.kind {
 			case .Check:
-				draw_check(widget.box.lo + box_height(widget.box) / 2, 5, core.style.color.content)
+				draw_check(self.box.lo + box_height(self.box) / 2, 5, core.style.color.content)
 			case .Dot:
 				draw_arc_fill(
-					widget.box.lo + box_height(widget.box) / 2,
+					self.box.lo + box_height(self.box) / 2,
 					5,
 					0,
 					math.TAU,
@@ -172,17 +174,19 @@ add_selector_option :: proc(info: Selector_Option_Info) -> (result: Widget_Resul
 		}
 		draw_text_glyphs(
 			info.__text_job,
-			{widget.box.lo.x + box_height(widget.box), box_center_y(widget.box)},
+			{self.box.lo.x + box_height(self.box), box_center_y(self.box)},
 			core.style.color.content,
 		)
 	}
-	end_widget()
-	return
+	return true
 }
 
-do_selector_option :: proc(
+selector_option :: proc(
 	info: Selector_Option_Info,
 	loc := #caller_location,
-) -> Widget_Result {
-	return add_selector_option(make_selector_option(info, loc))
+) -> Selector_Option_Info {
+	info := info
+	init_selector_option(&info, loc)
+	add_selector_option(&info)
+	return info
 }

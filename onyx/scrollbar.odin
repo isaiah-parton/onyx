@@ -4,29 +4,30 @@ import "core:math/linalg"
 
 Scrollbar_Info :: struct {
 	using _:     Widget_Info,
-	pos:         ^f32,
+	vertical:    bool,
+	pos:         f32,
 	travel:      f32,
 	handle_size: f32,
-	vertical:    bool,
 	make_visible: bool,
 }
 
-Scrollbar_Result :: Widget_Result
+Scrollbar_Result :: struct {
+	using _: Widget_Result,
+	pos:     Maybe(f32),
+}
 
-make_scrollbar :: proc(info: Scrollbar_Info, loc := #caller_location) -> (scrollbar: Scrollbar_Info, ok: bool) {
+make_scrollbar :: proc(info: Scrollbar_Info, loc := #caller_location) -> Scrollbar_Info {
 	info := info
 	info.id = hash(loc)
 	info.desired_size[1 - int(info.vertical)] = core.style.shape.scrollbar_thickness
-	info.self = make_widget(info.id.?)
-	info.self.sticky = true
 	return info
 }
 
-add_scrollbar :: proc(info: Scrollbar_Info) -> (result: Scrollbar_Result, ok: bool) {
+add_scrollbar :: proc(info: ^Scrollbar_Info) -> bool{
 	begin_widget(info) or_return
 	defer end_widget()
 
-	style := core.style
+	widget.draggable = true
 
 	// Virtually swizzle coordinates
 	// TODO: Remove this and actually swizzle them for better readability
@@ -53,19 +54,21 @@ add_scrollbar :: proc(info: Scrollbar_Info) -> (result: Scrollbar_Result, ok: bo
 	widget.focus_time = animate(widget.focus_time, 0.15, info.make_visible || .Hovered in widget.state)
 
 	if widget.visible {
-		draw_box_stroke(box, 1, fade(style.color.substance, widget.focus_time))
-		draw_box_fill(box, fade(style.color.substance, 0.5 * widget.focus_time))
-		draw_box_fill(handle_box, fade(style.color.content, 0.5 * widget.focus_time))
+		draw_box_stroke(box, 1, fade(core.style.color.substance, widget.focus_time))
+		draw_box_fill(box, fade(core.style.color.substance, 0.5 * widget.focus_time))
+		draw_box_fill(handle_box, fade(core.style.color.content, 0.5 * widget.focus_time))
 	}
 
 	if .Pressed in widget.state {
 		if .Pressed not_in widget.last_state {
 			core.drag_offset = core.mouse_pos - handle_box.lo
 		}
-		info.pos^ =
+		result.pos =
 			clamp(((core.mouse_pos[i] - core.drag_offset[i]) - box.lo[i]) / travel, 0, 1) *
 			info.travel
 	}
+
+	end_widget()
 	return
 }
 

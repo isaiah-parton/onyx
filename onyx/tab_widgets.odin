@@ -4,29 +4,34 @@ import "core:fmt"
 
 Tabs_Info :: struct {
 	using _: Widget_Info,
-	index:   ^int,
+	index:   int,
 	options: []string,
 }
 
-Tabs :: struct {
-	using info: Tabs_Info,
+Tabs_Widget_Kind :: struct {
 	timers: [10]f32,
 }
 
 Tabs_Result :: struct {
 	using _: Widget_Result,
+	index:   Maybe(int),
 }
 
-make_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (tabs: Tabs, ok: bool) {
-	tabs.info = info
-	tabs.id = hash(loc)
-	tabs.options = tabs.options[:min(len(tabs.options), 10)]
-	tabs.desired_size = {f32(len(tabs.options)) * 100, 30}
+make_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> Tabs_Info {
+	info := info
+	info.id = hash(loc)
+	info.options = info.options[:min(len(info.options), 10)]
+	info.desired_size = {f32(len(info.options)) * 100, 30}
 	return info
 }
 
-add_tabs :: proc(tabs: Tabs) -> (result: Tabs_Result, ok: bool) #optional_ok {
-	begin_widget(tabs) or_return
+add_tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Result) {
+	begin_widget(info) or_return
+	defer end_widget()
+
+	result.self = widget
+
+	kind := widget_kind(widget, Tabs_Widget_Kind)
 
 	if point_in_box(core.mouse_pos, widget.box) {
 		hover_widget(widget)
@@ -40,7 +45,8 @@ add_tabs :: proc(tabs: Tabs) -> (result: Tabs_Result, ok: bool) #optional_ok {
 	option_size := (inner_box.hi.x - inner_box.lo.x) / f32(len(info.options))
 
 	for option, o in info.options {
-		tabs.timers[o] = animate(tabs.timers[o], 0.1, info.index == o)
+		hover_time := kind.timers[o]
+		kind.timers[o] = animate(kind.timers[o], 0.1, info.index == o)
 		option_box := cut_box_left(&inner_box, option_size)
 		if info.index != o {
 			if widget.state >= {.Hovered} && point_in_box(core.mouse_pos, option_box) {
@@ -54,13 +60,13 @@ add_tabs :: proc(tabs: Tabs) -> (result: Tabs_Result, ok: bool) #optional_ok {
 			draw_rounded_box_fill(
 				option_box,
 				option_rounding,
-				fade(core.style.color.foreground, tabs.timers[o]),
+				fade(core.style.color.foreground, hover_time),
 			)
 			draw_rounded_box_stroke(
 				option_box,
 				option_rounding,
 				1,
-				fade(core.style.color.content, tabs.timers[o]),
+				fade(core.style.color.content, hover_time),
 			)
 			draw_text(
 				box_center(option_box),
@@ -80,6 +86,6 @@ add_tabs :: proc(tabs: Tabs) -> (result: Tabs_Result, ok: bool) #optional_ok {
 	return
 }
 
-tabs :: proc(info: Tabs_Info, loc := #caller_location) -> (result: Tabs_Result, ok: bool) {
-	return add_tabs(make_tabs(info, loc) or_return)
+tabs :: proc(info: Tabs_Info, loc := #caller_location) -> Tabs_Result {
+	return add_tabs(make_tabs(info, loc))
 }

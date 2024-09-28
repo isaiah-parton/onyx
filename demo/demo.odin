@@ -62,14 +62,8 @@ Table_Entry :: struct {
 	location:    string,
 }
 
-do_component_showcase :: proc(state: ^Component_Showcase) {
+component_showcase :: proc(state: ^Component_Showcase) {
 	using onyx
-
-	if do_panel({title = "Login"}) {
-		shrink(10)
-		button({text = "Login"})
-		button({text = "Login"})
-	}
 
 	layer_box := shrink_box(view_box(), 100)
 	begin_layer({box = layer_box, kind = .Background})
@@ -87,7 +81,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		set_side(.Top)
 		rows_active: [dynamic]bool
 		resize(&rows_active, len(state.entries))
-		if table(
+		if table, ok := begin_table(
 			{
 				columns = {
 					{name = "Name"},
@@ -99,11 +93,10 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				row_count = len(state.entries),
 				max_displayed_rows = 15,
 			},
-		) {
-			table := &current_widget().?.table
+		); ok {
 			for index in table.first ..= table.last {
 				entry := &state.entries[index]
-				begin_table_row({index = index})
+				begin_table_row(table, {index = index})
 				set_width_auto()
 				text_input({content = &entry.name, undecorated = true})
 				text_input({content = &entry.hash, undecorated = true})
@@ -112,13 +105,14 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				text_input({content = &entry.location, undecorated = true})
 				end_table_row()
 			}
+			end_table(table)
 		}
 
 	case .Scroll_Zone:
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if _, ok := do_container({size = {0, 2000}}); ok {
+		if _, ok := container({size = {0, 2000}}); ok {
 			set_width_fill()
 			set_height_auto()
 			for i in 0 ..< 50 {
@@ -127,7 +121,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				}
 				push_id(i)
 				button(
-					{text = fmt.tprintf("Button #%i", i + 1), style = .Ghost},
+					{text = fmt.tprintf("Button #%i", i + 1), kind = .Ghost},
 				)
 				pop_id()
 			}
@@ -135,30 +129,30 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 		add_space(50)
 		set_width(500)
 		set_height(300)
-		if _, ok := do_container({size = {1000, 0}}); ok {
+		if _, ok := container({size = {1000, 0}}); ok {
 			set_side(.Left)
 			set_height_fill()
 			set_width(200)
 			set_padding(10)
 			for i in 0 ..< 5 {
 				push_id(i)
-				button({text = fmt.tprint(i + 1), style = .Outlined})
+				button({text = fmt.tprint(i + 1), kind = .Outlined})
 				pop_id()
 			}
 		}
 
 	case .Slider:
 		set_side(.Top)
-		do_label({text = "Normal"})
+		label({text = "Normal"})
 		slider({value = &state.slider_value})
 		add_space(10)
-		do_label({text = "Box"})
+		label({text = "Box"})
 		add_space(10)
 		box_slider({value = &state.slider_value})
 
 	case .Button:
 		set_side(.Top)
-		do_label({text = "Fit to label"})
+		label({text = "Fit to label"})
 		add_space(10)
 		if layout({size = 30}) {
 			set_width_auto()
@@ -167,29 +161,23 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 				if m > 0 {
 					add_space(10)
 				}
-				if was_clicked(
-					button({text = fmt.tprint(member), style = member}),
-				) {
-
-				}
+				button({text = fmt.tprint(member), style = member})
 				pop_id()
 			}
 		}
 		add_space(10)
-		if do_selector({text = "Combo"}) {
+		if selector({text = "Combo"}) {
 			shrink(3)
 			set_side(.Top)
 			set_width_fill()
 			for option, o in Option {
 				push_id(o)
-				if was_clicked(
-					do_selector_option(
+				if selector_option(
 						{
 							text = fmt.tprint(option),
 							state = state.option == option,
 						},
-					),
-				) {
+					).disabled {
 					state.option = option
 				}
 				pop_id()
@@ -198,7 +186,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 
 	case .Boolean:
 		set_side(.Top)
-		do_label({text = "Checkboxes"})
+		label({text = "Checkboxes"})
 		add_space(10)
 		for member, m in Option {
 			push_id(m)
@@ -218,7 +206,7 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			pop_id()
 		}
 		add_space(10)
-		do_label({text = "Radio Buttons"})
+		label({text = "Radio Buttons"})
 		add_space(10)
 		for member, m in Option {
 			push_id(m)
@@ -270,12 +258,12 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			set_width_fill()
 			set_height_fill()
 			graph(
-				{
+				Graph_Info(int) {
 					lo = 0,
 					hi = 30,
 					increment = 5,
 					spacing = 10,
-					style = Bar_Graph{value_labels = true, show_tooltip = true},
+					kind = Bar_Graph{value_labels = true, show_tooltip = true},
 					label_tooltip = true,
 					fields = {
 						{"Field 1", {255, 25, 96, 255}},
@@ -304,12 +292,12 @@ do_component_showcase :: proc(state: ^Component_Showcase) {
 			set_width_fill()
 			set_height_fill()
 			graph(
-				{
+				Graph_Info(int) {
 					lo = 0,
 					hi = 30,
 					increment = 5,
 					spacing = 10,
-					style = Line_Graph{show_dots = false},
+					kind = Line_Graph{show_dots = false},
 					label_tooltip = true,
 					fields = {
 						{"Minecraft", {255, 25, 96, 255}},
@@ -401,7 +389,7 @@ main :: proc() {
 
 	for !glfw.WindowShouldClose(onyx.core.window) {
 		onyx.new_frame()
-		do_component_showcase(&state.component_showcase)
+		component_showcase(&state.component_showcase)
 		onyx.render()
 	}
 

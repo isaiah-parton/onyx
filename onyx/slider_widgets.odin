@@ -10,47 +10,48 @@ Slider_Info :: struct {
 	lo, hi: f64,
 }
 
-Slider :: struct {
-	using info: Slider_Info,
+init_slider :: proc(info: ^Slider_Info, loc := #caller_location) -> bool {
+	info.id = hash(loc)
+	info.self = get_widget(info.id) or_return
+	info.sticky = true
+	info.desired_size = core.style.visual_size
+	info.hi = max(info.hi, info.lo + 1)
+	return info
 }
 
-Slider_Result :: Widget_Result
+add_slider :: proc(info: ^Slider_Info) -> bool {
+	begin_widget(info) or_return
+	defer end_widget()
 
-make_slider :: proc(info: Slider_Info, loc := #caller_location) -> (slider: Slider, ok: bool) {
-	if info.value == nil do return
-	ok = true
-	slider.info := info
-	slider.id = hash(loc)
-	slider.desired_size = core.style.visual_size
-	slider.hi = max(slider.hi, slider.lo + 1)
-	slider.sticky = true
-	return
-}
+	if self.visible {
+		draw_rounded_box_fill(self.box, radius, core.style.color.substance)
+	}
 
-add_slider :: proc(slider: Slider) -> (result: Slider_Result, ok: bool) {
-	begin_widget(slider)
+	if value == nil {
+		// Draw nil text
+		return
+	}
 
-	h := box_height(slider.self.box)
+	h := box_height(self.box)
 
-	widget.box.lo.y += h / 4
-	widget.box.hi.y -= h / 4
+	self.box.lo.y += h / 4
+	self.box.hi.y -= h / 4
 
-	radius := box_height(widget.box) / 2
-	time := clamp(f32(info.value - info.lo) / f32(info.hi - info.lo), 0, 1)
-	range_width := box_width(widget.box) - radius * 2
+	radius := box_height(self.box) / 2
+	time := clamp(f32(value - lo) / f32(hi - lo), 0, 1)
+	range_width := box_width(self.box) - radius * 2
 
-	knob_center := widget.box.lo + radius + {time * range_width, 0}
+	knob_center := self.box.lo + radius + {time * range_width, 0}
 	knob_radius := h / 2
 
-	if point_in_box(core.mouse_pos, widget.box) ||
+	if point_in_box(core.mouse_pos, self.box) ||
 	   linalg.distance(knob_center, core.mouse_pos) <= knob_radius {
 		hover_widget(widget)
 	}
 
-	if widget.visible {
-		draw_rounded_box_fill(widget.box, radius, core.style.color.substance)
+	if self.visible {
 		draw_rounded_box_fill(
-			{widget.box.lo, {widget.box.lo.x + box_width(widget.box) * time, widget.box.hi.y}},
+			{self.box.lo, {self.box.lo.x + box_width(self.box) * time, self.box.hi.y}},
 			radius,
 			core.style.color.accent,
 		)
@@ -58,47 +59,40 @@ add_slider :: proc(slider: Slider) -> (result: Slider_Result, ok: bool) {
 		draw_arc_stroke(knob_center, knob_radius, 0, math.TAU, 1.5, core.style.color.accent)
 	}
 
-	if .Pressed in widget.state {
-
-		new_time := clamp((core.mouse_pos.x - widget.box.lo.x - radius) / range_width, 0, 1)
-
-		assert(slider.value != nil)
-		slider.value^ = info.lo + (new_time * (info.hi - info.lo))
-
+	if (.Pressed in self.state) && value != nil {
+		new_time := clamp((core.mouse_pos.x - self.box.lo.x - radius) / range_width, 0, 1)
+		value^ = info.lo + (new_time * f32(info.hi - info.lo))
 		core.draw_next_frame = true
 	}
 
-	end_widget()
-	return
+	return true
 }
 
-slider :: proc(info: Slider_Info, loc := #caller_location) -> (result: Slider_Result, ok: bool) {
-	return add_slider(make_slider(info, loc) or_return)
+slider :: proc(info: Slider_Info, loc := #caller_location) {
+	return add_slider(make_slider(info, loc))
 }
 
-add_box_slider :: proc(slider: Slider) -> (result: Slider_Result) {
-	begin_widget(slider)
+add_box_slider :: proc(using info: ^Slider_Info) -> bool {
+	begin_widget(info) or_return
 	defer end_widget()
 
-	horizontal_slider_behavior(slider)
-
-	if slider.visible {
-		draw_box_fill(slider.box, core.style.color.substance)
+	horizontal_slider_behavior(self)
+	if self.visible {
+		draw_box_fill(self.box, core.style.color.substance)
 		time := clamp(f32(info.value - info.lo) / f32(info.hi - info.lo), 0, 1)
-		draw_box_fill({slider.box.lo, {slider.box.lo.x + box_width(slider.box) * time, slider.box.hi.y}}, core.style.color.accent)
+		draw_box_fill({self.box.lo, {self.box.lo.x + box_width(self.box) * time, self.box.hi.y}}, core.style.color.accent)
 	}
-	if .Pressed in slider.state {
-
-		time := clamp((core.mouse_pos.x - slider.box.lo.x) / box_width(slider.box), 0, 1)
-
-		assert(slider.value != nil)
-		slider.value^ = info.lo + (time * f32(info.hi - info.lo))
-
+	if .Pressed in self.state {
+		new_time := clamp((core.mouse_pos.x - self.box.lo.x) / box_width(self.box), 0, 1)
+		value^ = info.lo + (new_time * f32(info.hi - info.lo))
 		core.draw_next_frame = true
 	}
 	return
 }
 
-box_slider :: proc(info: Slider_Info, loc := #caller_location) -> (result: Slider_Result, ok: bool) {
-	return add_box_slider(make_slider(info, loc) or_return)
+box_slider :: proc(info: Slider_Info, loc := #caller_location) -> Slider_Info {
+	info := info
+	init_slider(&info, loc)
+	add_slider(&info)
+	return info
 }
