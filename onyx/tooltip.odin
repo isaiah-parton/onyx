@@ -18,13 +18,19 @@ Tooltip_Widget_Kind :: struct {
 	exists: bool,
 }
 
-begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
-	widget, ok := begin_widget({id = hash(loc)})
-	if !ok do return false
+begin_tooltip :: proc(using info: Tooltip_Info, loc := #caller_location) -> bool {
+	info := info
+	widget_info := Widget_Info {
+		id = hash(loc),
+	}
+	begin_widget(&widget_info) or_return
+	defer end_widget()
 
-	variant := widget_kind(widget, Tooltip_Widget_Kind)
+	variant := widget_kind(widget_info.self, Tooltip_Widget_Kind)
 
-	bounds := info.bounds if info.bounds != {} else view_box()
+	if bounds == {} {
+		info.bounds = view_box()
+	}
 	origin: [2]f32 = (info.pos.? or_else core.mouse_pos) + TOOLTIP_OFFSET
 	if origin.x + info.size.x > bounds.hi.x {
 		origin.x -= info.size.x + TOOLTIP_OFFSET * 2
@@ -72,13 +78,13 @@ end_tooltip :: proc() {
 	end_layer()
 }
 
-@(deferred_out = __do_tooltip)
-do_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> (ok: bool) {
+@(deferred_out = __tooltip)
+tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 	return begin_tooltip(info, loc)
 }
 
 @(private)
-__do_tooltip :: proc(ok: bool) {
+__tooltip :: proc(ok: bool) {
 	if ok {
 		end_tooltip()
 	}

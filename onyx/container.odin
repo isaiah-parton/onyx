@@ -21,12 +21,12 @@ Container :: struct {
 	box:                      Box,
 	dead:                     bool,
 	// Transient
-	layout: 									^Layout,
+	layout:                   ^Layout,
 }
 
-begin_container :: proc(info: Container_Info, loc := #caller_location) -> (self: ^Container, ok: bool) {
+begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 	id := info.id if info.id != 0 else hash(loc)
-	self, ok = core.container_map[id]
+	self, ok := core.container_map[id]
 	if !ok {
 		self = new(Container)
 		core.container_map[id] = self
@@ -43,10 +43,7 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> (self:
 	}
 
 	// Minimum size
-	self.size = linalg.max(
-		info.size,
-		box_size(self.box),
-	)
+	self.size = linalg.max(info.size, box_size(self.box))
 
 	// Mouse wheel input
 	if self.active {
@@ -59,15 +56,15 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> (self:
 
 	push_clip(self.box)
 	append_draw_call(current_layer().?.index)
-	push_stack(&core.container_stack, self)
+	push_stack(&core.container_stack, self) or_return
 
 	layout_pos := self.box.lo - linalg.floor(self.scroll)
 	layout_size := linalg.max(self.size, info.size)
-	begin_layout({box = Box{layout_pos, layout_pos + layout_size}, isolated = true})
+	begin_layout({box = Box{layout_pos, layout_pos + layout_size}, isolated = true}) or_return
 	self.layout = current_layout().?
 	self.layout.next_cut_side = .Top
 
-	return
+	return true
 }
 
 end_container :: proc() {
@@ -92,7 +89,6 @@ end_container :: proc() {
 	// 	{text = fmt.tprintf("%.1f", self.scroll), font = core.style.fonts[.Light], size = 20},
 	// 	{255, 255, 255, 255},
 	// )
-
 
 
 	// Clamp scroll
@@ -123,10 +119,9 @@ end_container :: proc() {
 		if self.scroll_x {
 			box.hi.y -= self.scroll_time.x * core.style.shape.scrollbar_thickness
 		}
-		if pos, ok := do_scrollbar({make_visible = self.active || abs(delta_scroll.y) > 0.1, vertical = true, box = box, pos = self.scroll.y, travel = self.size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / self.size.y}).pos.?;
-		   ok {
-			self.scroll.y = pos
-			self.desired_scroll.y = pos
+		if scrollbar({make_visible = self.active || abs(delta_scroll.y) > 0.1, vertical = true, box = box, pos = &self.scroll.y, travel = self.size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / self.size.y}).self.state >=
+		   {.Pressed} {
+			self.desired_scroll.y = self.scroll.y
 		}
 	}
 	if self.scroll_x {
@@ -137,10 +132,9 @@ end_container :: proc() {
 		if self.scroll_y {
 			box.hi.x -= self.scroll_time.y * core.style.shape.scrollbar_thickness
 		}
-		if pos, ok := do_scrollbar({make_visible = self.active || abs(delta_scroll.x) > 0.1, box = box, pos = self.scroll.x, travel = self.size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / self.size.x}).pos.?;
-		   ok {
-			self.scroll.x = pos
-			self.desired_scroll.x = pos
+		if scrollbar({make_visible = self.active || abs(delta_scroll.x) > 0.1, box = box, pos = &self.scroll.x, travel = self.size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / self.size.x}).self.state >=
+		   {.Pressed} {
+			self.desired_scroll.x = self.scroll.x
 		}
 	}
 
@@ -151,12 +145,7 @@ end_container :: proc() {
 	// Rounded corner mask to fake rounded clipping
 	draw_rounded_box_mask_fill(self.box, core.style.rounding, core.style.color.foreground)
 	// Table outline
-	draw_rounded_box_stroke(
-		self.box,
-		core.style.rounding,
-		1,
-		core.style.color.substance,
-	)
+	draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 }
 
 current_container :: proc() -> Maybe(^Container) {
@@ -181,13 +170,13 @@ current_clip :: proc() -> Maybe(Box) {
 	return nil
 }
 
-@(deferred_out = __do_container)
-do_container :: proc(info: Container_Info, loc := #caller_location) -> (self: ^Container, ok: bool) {
+@(deferred_out = __container)
+container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 	return begin_container(info, loc)
 }
 
 @(private)
-__do_container :: proc(_: ^Container, ok: bool) {
+__container :: proc(ok: bool) {
 	if ok {
 		end_container()
 	}

@@ -3,75 +3,74 @@ package onyx
 import "core:math/linalg"
 
 Scrollbar_Info :: struct {
-	using _:     Widget_Info,
-	vertical:    bool,
-	pos:         f32,
-	travel:      f32,
-	handle_size: f32,
+	using _:      Widget_Info,
+	vertical:     bool,
+	pos:          ^f32,
+	travel:       f32,
+	handle_size:  f32,
 	make_visible: bool,
 }
 
-Scrollbar_Result :: struct {
-	using _: Widget_Result,
-	pos:     Maybe(f32),
-}
-
-make_scrollbar :: proc(info: Scrollbar_Info, loc := #caller_location) -> Scrollbar_Info {
-	info := info
+init_scrollbar :: proc(info: ^Scrollbar_Info, loc := #caller_location) -> bool {
+	if info.pos == nil {
+		return false
+	}
 	info.id = hash(loc)
+	info.self = get_widget(info.id.?) or_return
+	info.sticky = true
 	info.desired_size[1 - int(info.vertical)] = core.style.shape.scrollbar_thickness
-	return info
+	return true
 }
 
-add_scrollbar :: proc(info: ^Scrollbar_Info) -> bool{
+add_scrollbar :: proc(using info: ^Scrollbar_Info) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
-
-	widget.draggable = true
 
 	// Virtually swizzle coordinates
 	// TODO: Remove this and actually swizzle them for better readability
 	i, j := int(info.vertical), 1 - int(info.vertical)
 
-	box := widget.box
+	_box := self.box
 
-	box.lo[j] += (box.hi[j] - box.lo[j]) * (0.5 * (1 - widget.hover_time))
+	_box.lo[j] += (_box.hi[j] - _box.lo[j]) * (0.5 * (1 - self.hover_time))
 
-	handle_size := min(info.handle_size, (box.hi[i] - box.lo[i]))
-	travel := (box.hi[i] - box.lo[i]) - handle_size
+	_handle_size := min(handle_size, (_box.hi[i] - _box.lo[i]))
+	_travel := (_box.hi[i] - _box.lo[i]) - handle_size
 
 	handle_box := Box{}
-	handle_box.lo[i] = box.lo[i] + clamp(info.pos / info.travel, 0, 1) * travel
-	handle_box.hi[i] = handle_box.lo[i] + handle_size
+	handle_box.lo[i] = _box.lo[i] + clamp(info.pos^ / info.travel, 0, 1) * _travel
+	handle_box.hi[i] = handle_box.lo[i] + _handle_size
 
-	handle_box.lo[j] = box.lo[j]
-	handle_box.hi[j] = box.hi[j]
+	handle_box.lo[j] = _box.lo[j]
+	handle_box.hi[j] = _box.hi[j]
 
-	if point_in_box(core.mouse_pos, widget.box) {
-		hover_widget(widget)
+	if point_in_box(core.mouse_pos, self.box) {
+		hover_widget(self)
 	}
-	widget.hover_time = animate(widget.hover_time, 0.15, .Hovered in widget.state)
-	widget.focus_time = animate(widget.focus_time, 0.15, info.make_visible || .Hovered in widget.state)
+	self.hover_time = animate(self.hover_time, 0.15, .Hovered in self.state)
+	self.focus_time = animate(self.focus_time, 0.15, make_visible || .Hovered in self.state)
 
-	if widget.visible {
-		draw_box_stroke(box, 1, fade(core.style.color.substance, widget.focus_time))
-		draw_box_fill(box, fade(core.style.color.substance, 0.5 * widget.focus_time))
-		draw_box_fill(handle_box, fade(core.style.color.content, 0.5 * widget.focus_time))
+	if self.visible {
+		draw_box_stroke(_box, 1, fade(core.style.color.substance, self.focus_time))
+		draw_box_fill(_box, fade(core.style.color.substance, 0.5 * self.focus_time))
+		draw_box_fill(handle_box, fade(core.style.color.content, 0.5 * self.focus_time))
 	}
 
-	if .Pressed in widget.state {
-		if .Pressed not_in widget.last_state {
+	if .Pressed in self.state {
+		if .Pressed not_in self.last_state {
 			core.drag_offset = core.mouse_pos - handle_box.lo
 		}
-		result.pos =
-			clamp(((core.mouse_pos[i] - core.drag_offset[i]) - box.lo[i]) / travel, 0, 1) *
-			info.travel
+		pos^ =
+			clamp(((core.mouse_pos[i] - core.drag_offset[i]) - _box.lo[i]) / _travel, 0, 1) *
+			travel
 	}
 
-	end_widget()
-	return
+	return true
 }
 
-do_scrollbar :: proc(info: Scrollbar_Info, loc := #caller_location) -> Scrollbar_Result {
-	return add_scrollbar(make_scrollbar(info, loc))
+scrollbar :: proc(info: Scrollbar_Info, loc := #caller_location) -> Scrollbar_Info {
+	info := info
+	init_scrollbar(&info, loc)
+	add_scrollbar(&info)
+	return info
 }

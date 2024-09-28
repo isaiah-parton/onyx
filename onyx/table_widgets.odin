@@ -1,5 +1,6 @@
 package onyx
 
+import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:strings"
@@ -26,12 +27,11 @@ Sort_Order :: enum {
 }
 // Column formating info
 Table_Column_Info :: struct {
-	name:             string,
-	type:             Table_Column_Type,
-	width:            f32,
-	align:            Horizontal_Text_Align,
-	sorted:           Maybe(Sort_Order),
-	__label_text_job: Text_Job,
+	name:           string,
+	type:           Table_Column_Type,
+	width:          f32,
+	align:          Horizontal_Text_Align,
+	label_text_job: Text_Job,
 }
 // Info needed to display a table row
 Table_Row_Info :: struct {
@@ -41,38 +41,29 @@ Table_Row_Info :: struct {
 
 Table_Info :: struct {
 	using _:            Widget_Info,
+	sort_order:         ^Sort_Order,
+	sorted_column:      ^int,
 	columns:            []Table_Column_Info,
 	row_count:          int,
 	max_displayed_rows: int,
-	__widths:           [24]f32,
-	__widths_len:       int,
+	widths:             [24]f32,
+	widths_len:         int,
+	first, last:        int,
+	sorted:             bool,
 }
 
 Table_Widget_Kind :: struct {
 	selection: [2][2]u64,
 }
 
-Table :: struct {
-	using info:  Table_Info,
-	first, last: int,
-}
-
-Table_Result :: struct {
-	column_clicked: Maybe(int),
-}
-
 // Begins a new row in the current table
-begin_table_row :: proc(table: Table, info: Table_Row_Info) {
-	table := table
+begin_table_row :: proc(table_info: ^Table_Info, info: Table_Row_Info) {
 	push_id(info.index + 1)
 	begin_layout({side = .Top, size = core.style.table_row_height})
 	layout := current_layout().?
 	layout.next_cut_side = .Left
 	layout.fixed = true
-	layout.queue_len += copy(
-		layout.size_queue[:],
-		table.info.__widths[:table.info.__widths_len],
-	)
+	layout.queue_len += copy(layout.size_queue[:], table_info.widths[:table_info.widths_len])
 
 	if info.index % 2 == 1 {
 		draw_box_fill(layout.bounds, fade(core.style.color.substance, 0.5))
@@ -85,9 +76,9 @@ end_table_row :: proc() {
 }
 
 // Pass cell variables in rows, each variable will be assertively type checked with the column type
-table_row :: proc(table: Table, index: int, values: ..any) {
+table_row :: proc(table_info: ^Table_Info, index: int, values: ..any) {
 	for value, v in values {
-		column := &table.info.columns[v]
+		column := &table_info.columns[v]
 		table_cell(v, index, value, column.type)
 	}
 }
@@ -110,20 +101,22 @@ table_cell :: proc(column, row: int, value: any, type: Table_Column_Type) {
 }
 // Make a new table
 // 	This proc looks at the provided columns and decides the desired size of the table
-make_table :: proc(info: Table_Info, loc := #caller_location) -> Table_Info {
-	info := info
+init_table :: proc(info: ^Table_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
+	info.self = get_widget(info.id.?) or_return
 	for &column, c in info.columns {
-		text: string
-		switch column.sorted {
-		case nil:
-			text = column.name
-		case .Ascending:
-			text = fmt.tprintf("%s \uEA78", column.name)
-		case .Descending:
-			text = fmt.tprintf("%s \uEA4E", column.name)
+		text: string = column.name
+		if info.sorted_column != nil && info.sorted_column^ == c {
+			if info.sort_order != nil {
+				switch info.sort_order^ {
+				case .Ascending:
+					text = fmt.tprintf("%s \uEA78", column.name)
+				case .Descending:
+					text = fmt.tprintf("%s \uEA4E", column.name)
+				}
+			}
 		}
-		column.__label_text_job =
+		column.label_text_job =
 		make_text_job(
 			{
 				text = text,
@@ -133,70 +126,56 @@ make_table :: proc(info: Table_Info, loc := #caller_location) -> Table_Info {
 				align_v = .Middle,
 			},
 		) or_continue
-		column.width = max(column.width, column.__label_text_job.size.x + 20)
-		info.__widths[c] = column.width
+		column.width = max(column.width, column.label_text_job.size.x + 20)
+		info.widths[c] = column.width
 		info.desired_size.x += column.width
 	}
-	info.__widths_len = len(info.columns)
+	info.widths_len = len(info.columns)
 	info.desired_size.y =
-		core.style.shape.table_row_height *
-		f32(min(info.row_count, info.max_displayed_rows))
-	return info
+		core.style.shape.table_row_height * f32(min(info.row_count, info.max_displayed_rows))
+	return true
 }
 // Begin a table
-begin_table :: proc(
-	info: Table_Info,
-	loc := #caller_location,
-) -> (
-	self: Table,
-	ok: bool,
-) {
-	info := make_table(info, loc)
-	widget := begin_widget(info) or_return
+begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
+	init_table(info, loc) or_return
+	begin_widget(info) or_return
 
-	container := begin_container(
+	begin_container(
 		{
 			id = info.id.?,
-			box = widget.box,
+			box = self.box,
 			size = {1 = core.style.table_row_height * f32(info.row_count + 1)},
 		},
 	) or_return
 
-	self.info = info
-	self.first = int(container.scroll.y / core.style.table_row_height)
-	self.last = min(
-		self.first +
-		int(
-			math.ceil(box_height(container.box) / core.style.table_row_height),
-		),
+	container := current_container().? or_return
+
+	first = int(container.scroll.y / core.style.table_row_height)
+	last = min(
+		first + int(math.ceil(box_height(self.box) / core.style.table_row_height)),
 		info.row_count - 1,
 	)
 	// Add space for the header
-	add_space(core.style.table_row_height * f32(self.first + 1))
+	add_space(core.style.table_row_height * f32(first + 1))
 	// Season the hashing context
 	push_id(info.id.?)
-	ok = true
-	return
+	return true
 }
 // End the current table
-end_table :: proc(table: Table) {
-	table := table
+end_table :: proc(info: ^Table_Info) {
 	container := current_container().?
 	box := container.layout.bounds
 
 	// Vertical dividing lines
 	offset := f32(0)
-	for i in 0 ..< table.info.__widths_len {
+	for i in 0 ..< info.widths_len {
 		if i > 0 {
 			draw_box_fill(
-				{
-					{box.lo.x + offset, box.lo.y},
-					{box.lo.x + offset + 1, box.hi.y},
-				},
+				{{box.lo.x + offset, box.lo.y}, {box.lo.x + offset + 1, box.hi.y}},
 				core.style.color.substance,
 			)
 		}
-		offset += table.info.__widths[i]
+		offset += info.widths[i]
 	}
 
 	// Header
@@ -210,53 +189,55 @@ end_table :: proc(table: Table) {
 	// Background and lower border
 	draw_box_fill(
 		header_box,
-		alpha_blend_colors(
-			core.style.color.foreground,
-			core.style.color.substance,
-			0.5,
-		),
+		alpha_blend_colors(core.style.color.foreground, core.style.color.substance, 0.5),
 	)
-	draw_box_fill(
-		get_box_cut_bottom(header_box, 1),
-		core.style.color.substance,
-	)
+	draw_box_fill(get_box_cut_bottom(header_box, 1), core.style.color.substance)
 	begin_layout({box = header_box})
 	// Set layout sizes
 	layout := current_layout().?
 	layout.next_cut_side = .Left
 	layout.fixed = true
 	layout.isolated = true
-	layout.queue_len += copy(
-		layout.size_queue[:],
-		table.info.__widths[:table.info.__widths_len],
-	)
-	for &column, c in table.info.columns {
-		widget := begin_widget({id = hash(c + 1)}) or_continue
+	layout.queue_len += copy(layout.size_queue[:], info.widths[:info.widths_len])
+	for &column, c in info.columns {
+		using widget_info := Widget_Info {
+			id = hash(c + 1),
+		}
+		begin_widget(&widget_info) or_continue
 		defer end_widget()
-		button_behavior(widget)
+
+		button_behavior(self)
 
 		text_box := expand_box(
 			{
-				box_center(widget.box) - column.__label_text_job.size / 2,
-				box_center(widget.box) + column.__label_text_job.size / 2,
+				box_center(self.box) - column.label_text_job.size / 2,
+				box_center(self.box) + column.label_text_job.size / 2,
 			},
 			3,
 		)
 		draw_rounded_box_fill(
 			text_box,
 			core.style.rounding,
-			fade(core.style.color.substance, widget.hover_time),
+			fade(core.style.color.substance, self.hover_time),
 		)
 		draw_text_glyphs(
-			column.__label_text_job,
-			box_center(widget.box),
+			column.label_text_job,
+			box_center(self.box),
 			fade(core.style.color.content, 0.5),
 		)
 		if c > 0 {
-			draw_box_fill(
-				get_box_cut_left(widget.box, 1),
-				core.style.color.substance,
-			)
+			draw_box_fill(get_box_cut_left(self.box, 1), core.style.color.substance)
+		}
+
+		if self.state >= {.Clicked} {
+			if info.sorted_column != nil && info.sort_order != nil {
+				if info.sorted_column^ == c {
+					info.sort_order^ = Sort_Order((int(info.sort_order^) + 1) % len(Sort_Order))
+				} else {
+					info.sorted_column^ = c
+				}
+				info.sorted = true
+			}
 		}
 	}
 	end_layout()
@@ -265,20 +246,14 @@ end_table :: proc(table: Table) {
 	pop_id()
 }
 
-@(deferred_out = __do_table)
-do_table :: proc(
-	info: Table_Info,
-	loc := #caller_location,
-) -> (
-	self: Table,
-	ok: bool,
-) {
+@(deferred_in_out = __table)
+table :: proc(info: ^Table_Info, loc := #caller_location) -> bool {
 	return begin_table(info, loc)
 }
 
 @(private)
-__do_table :: proc(self: Table, ok: bool) {
+__table :: proc(info: ^Table_Info, _: runtime.Source_Code_Location, ok: bool) {
 	if ok {
-		end_table(self)
+		end_table(info)
 	}
 }

@@ -1,5 +1,6 @@
 package onyx
 
+import "core:fmt"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
@@ -10,11 +11,11 @@ SIZE :: 20
 TEXT_PADDING :: 5
 
 Boolean_Widget_Info :: struct {
-	using _: Widget_Info,
-	state:         bool,
-	text:          string,
-	text_side:     Maybe(Side),
-	text_job:    	Text_Job,
+	using _:   Widget_Info,
+	state:     ^bool,
+	text:      string,
+	text_side: Maybe(Side),
+	text_job:  Text_Job,
 }
 
 Boolean_Widget_Kind :: struct {
@@ -28,14 +29,11 @@ boolean_widget_behavior :: proc(
 	info: Boolean_Widget_Info,
 ) -> ^Boolean_Widget_Kind {
 	kind := widget_kind(widget, Boolean_Widget_Kind)
-	kind.state_time = animate(kind.state_time, 0.15, info.state)
+	kind.state_time = animate(kind.state_time, 0.15, info.state^)
 	return kind
 }
 
-init_boolean_widget :: proc(
-	info: ^Boolean_Widget_Info,
-	loc := #caller_location,
-) -> bool {
+init_boolean_widget :: proc(info: ^Boolean_Widget_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
 	info.self = get_widget(info.id.?) or_return
 	info.text_side = info.text_side.? or_else .Left
@@ -48,8 +46,7 @@ init_boolean_widget :: proc(
 				info.desired_size.x = max(SIZE, info.text_job.size.x)
 				info.desired_size.y = SIZE + info.text_job.size.y
 			} else {
-				info.desired_size.x =
-					SIZE + info.text_job.size.x + TEXT_PADDING * 2
+				info.desired_size.x = SIZE + info.text_job.size.x + TEXT_PADDING * 2
 				info.desired_size.y = SIZE
 			}
 		}
@@ -60,9 +57,7 @@ init_boolean_widget :: proc(
 	return true
 }
 
-add_checkbox :: proc(
-	using info: ^Boolean_Widget_Info,
-) -> bool {
+add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
 
@@ -77,18 +72,9 @@ add_checkbox :: proc(
 			case .Right:
 				icon_box = {{self.box.hi.x - SIZE, self.box.lo.y}, SIZE}
 			case .Top:
-				icon_box = {
-					{
-						box_center_x(self.box) - SIZE / 2,
-						self.box.hi.y - SIZE,
-					},
-					SIZE,
-				}
+				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.hi.y - SIZE}, SIZE}
 			case .Bottom:
-				icon_box = {
-					{box_center_x(self.box) - SIZE / 2, self.box.lo.y},
-					SIZE,
-				}
+				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.lo.y}, SIZE}
 			}
 			icon_box.lo = linalg.floor(icon_box.lo)
 			icon_box.hi += icon_box.lo
@@ -106,14 +92,11 @@ add_checkbox :: proc(
 		draw_rounded_box_fill(
 			icon_box,
 			core.style.rounding,
-			fade(
-				core.style.color.accent if info.state else core.style.color.substance,
-				opacity,
-			),
+			fade(core.style.color.accent if state^ else core.style.color.substance, opacity),
 		)
 		center := box_center(icon_box)
 		// Paint icon
-		if info.state {
+		if state^ {
 			draw_check(center, SIZE / 4, core.style.color.background)
 		}
 		// Paint text
@@ -121,28 +104,15 @@ add_checkbox :: proc(
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				text_pos = {
-					icon_box.hi.x + TEXT_PADDING,
-					center.y - info.text_job.size.y / 2,
-				}
+				text_pos = {icon_box.hi.x + TEXT_PADDING, center.y - info.text_job.size.y / 2}
 			case .Right:
-				text_pos = {
-					icon_box.lo.x - TEXT_PADDING,
-					center.y - info.text_job.size.y / 2,
-				}
+				text_pos = {icon_box.lo.x - TEXT_PADDING, center.y - info.text_job.size.y / 2}
 			case .Top:
 				text_pos = self.box.lo
 			case .Bottom:
-				text_pos = {
-					self.box.lo.x,
-					self.box.hi.y - info.text_job.size.y,
-				}
+				text_pos = {self.box.lo.x, self.box.hi.y - info.text_job.size.y}
 			}
-			draw_text_glyphs(
-				info.text_job,
-				text_pos,
-				fade(core.style.color.content, opacity),
-			)
+			draw_text_glyphs(info.text_job, text_pos, fade(core.style.color.content, opacity))
 			// if self.hover_time > 0 {
 			// 	draw_box_fill(
 			// 		{
@@ -157,13 +127,15 @@ add_checkbox :: proc(
 			// }
 		}
 	}
+
+	if .Clicked in self.state {
+		state^ = !state^
+	}
+
 	return true
 }
 
-checkbox :: proc(
-	info: Boolean_Widget_Info,
-	loc := #caller_location,
-) -> Boolean_Widget_Info {
+checkbox :: proc(info: Boolean_Widget_Info, loc := #caller_location) -> Boolean_Widget_Info {
 	info := info
 	init_boolean_widget(&info, loc)
 	add_checkbox(&info)
@@ -172,13 +144,10 @@ checkbox :: proc(
 
 Toggle_Switch_Info :: struct {
 	using _: Widget_Info,
-	state:      ^bool,
+	state:   ^bool,
 }
 
-init_toggle_switch :: proc(
-	info: ^Toggle_Switch_Info,
-	loc := #caller_location,
-) -> bool {
+init_toggle_switch :: proc(info: ^Toggle_Switch_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
 	info.self = get_widget(info.id.?) or_return
 	info.fixed_size = true
@@ -186,9 +155,7 @@ init_toggle_switch :: proc(
 	return true
 }
 
-add_toggle_switch :: proc(
-	using info: ^Toggle_Switch_Info,
-) -> bool {
+add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
 
@@ -213,19 +180,9 @@ add_toggle_switch :: proc(
 		draw_rounded_box_fill(
 			self.box,
 			outer_radius,
-			interpolate_colors(
-				how_on,
-				core.style.color.substance,
-				core.style.color.accent,
-			),
+			interpolate_colors(how_on, core.style.color.substance, core.style.color.accent),
 		)
-		draw_arc_fill(
-			lever_center,
-			inner_radius,
-			0,
-			math.TAU,
-			core.style.color.background,
-		)
+		draw_arc_fill(lever_center, inner_radius, 0, math.TAU, core.style.color.background)
 	}
 
 	if .Clicked in self.state {
@@ -235,10 +192,7 @@ add_toggle_switch :: proc(
 	return true
 }
 
-toggle_switch :: proc(
-	info: Toggle_Switch_Info,
-	loc := #caller_location,
-) -> Toggle_Switch_Info {
+toggle_switch :: proc(info: Toggle_Switch_Info, loc := #caller_location) -> Toggle_Switch_Info {
 	info := info
 	init_toggle_switch(&info, loc)
 	add_toggle_switch(&info)
@@ -247,14 +201,12 @@ toggle_switch :: proc(
 
 Radio_Button_Info :: Boolean_Widget_Info
 
-add_radio_button :: proc(
-	using info: ^Radio_Button_Info,
-) -> bool {
+add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
 
 	kind := widget_kind(self, Boolean_Widget_Kind)
-	kind.state_time = animate(kind.state_time, 0.15, info.state)
+	kind.state_time = animate(kind.state_time, 0.15, info.state^)
 
 	button_behavior(self)
 
@@ -267,18 +219,9 @@ add_radio_button :: proc(
 			case .Right:
 				icon_box = {{self.box.hi.x - SIZE, self.box.lo.y}, SIZE}
 			case .Top:
-				icon_box = {
-					{
-						box_center_x(self.box) - SIZE / 2,
-						self.box.hi.y - SIZE,
-					},
-					SIZE,
-				}
+				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.hi.y - SIZE}, SIZE}
 			case .Bottom:
-				icon_box = {
-					{box_center_x(self.box) - SIZE / 2, self.box.lo.y},
-					SIZE,
-				}
+				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.lo.y}, SIZE}
 			}
 			icon_box.lo = linalg.floor(icon_box.lo)
 			icon_box.hi += icon_box.lo
@@ -289,13 +232,7 @@ add_radio_button :: proc(
 
 		if self.hover_time > 0 {
 			draw_box_fill(
-				{
-					{
-						self.box.lo.x + box_height(self.box) / 2,
-						self.box.lo.y,
-					},
-					self.box.hi,
-				},
+				{{self.box.lo.x + box_height(self.box) / 2, self.box.lo.y}, self.box.hi},
 				fade(core.style.color.substance, 0.5 * self.hover_time),
 			)
 		}
@@ -306,11 +243,7 @@ add_radio_button :: proc(
 			SIZE / 2,
 			0,
 			math.TAU,
-			interpolate_colors(
-				state_time,
-				core.style.color.substance,
-				core.style.color.accent,
-			),
+			interpolate_colors(state_time, core.style.color.substance, core.style.color.accent),
 		)
 		if state_time > 0 {
 			draw_arc_fill(
@@ -327,53 +260,34 @@ add_radio_button :: proc(
 			case .Left:
 				draw_text_glyphs(
 					info.text_job,
-					{
-						icon_box.hi.x + TEXT_PADDING,
-						icon_center.y - info.text_job.size.y / 2,
-					},
+					{icon_box.hi.x + TEXT_PADDING, icon_center.y - info.text_job.size.y / 2},
 					core.style.color.content,
 				)
 			case .Right:
 				draw_text_glyphs(
 					info.text_job,
-					{
-						icon_box.lo.x - TEXT_PADDING,
-						icon_center.y - info.text_job.size.y / 2,
-					},
+					{icon_box.lo.x - TEXT_PADDING, icon_center.y - info.text_job.size.y / 2},
 					core.style.color.content,
 				)
 			case .Top:
-				draw_text_glyphs(
-					info.text_job,
-					self.box.lo,
-					core.style.color.content,
-				)
+				draw_text_glyphs(info.text_job, self.box.lo, core.style.color.content)
 			case .Bottom:
 				draw_text_glyphs(
 					info.text_job,
-					{
-						self.box.lo.x,
-						self.box.hi.y - info.text_job.size.y,
-					},
+					{self.box.lo.x, self.box.hi.y - info.text_job.size.y},
 					core.style.color.content,
 				)
 			}
 		}
 		if self.disable_time > 0 {
-			draw_box_fill(
-				self.box,
-				fade(core.style.color.foreground, self.disable_time * 0.5),
-			)
+			draw_box_fill(self.box, fade(core.style.color.foreground, self.disable_time * 0.5))
 		}
 	}
 
 	return true
 }
 
-radio_button :: proc(
-	info: Radio_Button_Info,
-	loc := #caller_location,
-) -> Radio_Button_Info {
+radio_button :: proc(info: Radio_Button_Info, loc := #caller_location) -> Radio_Button_Info {
 	info := info
 	init_boolean_widget(&info, loc)
 	add_radio_button(&info)

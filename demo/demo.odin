@@ -5,10 +5,11 @@ import "core:fmt"
 import "core:math"
 import "core:math/rand"
 import "core:mem"
+import "core:os"
 import "core:reflect"
+import "core:slice"
 import "core:strings"
 import "core:time"
-import "core:os"
 
 import onyx "../onyx"
 import "vendor:glfw"
@@ -38,21 +39,25 @@ Component_Showcase :: struct {
 	light_mode:    bool,
 	section:       Component_Section,
 	checkboxes:    [Option]bool,
-	bio:           strings.Builder,
-	full_name:     strings.Builder,
-	birth_country: strings.Builder,
+	bio:           string,
+	full_name:     string,
+	birth_country: string,
 	slider_value:  f64,
 	start_time:    time.Time,
 	option:        Option,
 	date_range:    [2]Maybe(onyx.Date),
 	month_offset:  int,
 	entries:       [dynamic]Table_Entry,
+	sort_order:    onyx.Sort_Order,
+	sorted_column: int,
 }
 
 State :: struct {
 	component_showcase: Component_Showcase,
 	images:             [4]onyx.Image,
 }
+
+state: State
 
 Table_Entry :: struct {
 	name:        string,
@@ -70,7 +75,12 @@ component_showcase :: proc(state: ^Component_Showcase) {
 	foreground()
 	if layout({size = 65, side = .Top}) {
 		shrink(15)
-		tabs({index = (^int)(&state.section.component), options = reflect.enum_field_names(Component)})
+		tabs(
+			{
+				index = (^int)(&state.section.component),
+				options = reflect.enum_field_names(Component),
+			},
+		)
 		set_side(.Right)
 		toggle_switch({state = &state.light_mode})
 	}
@@ -81,22 +91,25 @@ component_showcase :: proc(state: ^Component_Showcase) {
 		set_side(.Top)
 		rows_active: [dynamic]bool
 		resize(&rows_active, len(state.entries))
-		if table, ok := begin_table(
-			{
-				columns = {
-					{name = "Name"},
-					{name = "Hash", width = 200, sorted = .Ascending},
-					{name = "Public Key"},
-					{name = "Private Key"},
-					{name = "Location"},
-				},
-				row_count = len(state.entries),
-				max_displayed_rows = 15,
+
+		table := Table_Info {
+			sorted_column      = &state.sorted_column,
+			sort_order         = &state.sort_order,
+			columns            = {
+				{name = "Name"},
+				{name = "Hash", width = 200},
+				{name = "Public Key"},
+				{name = "Private Key"},
+				{name = "Location"},
 			},
-		); ok {
+			row_count          = len(state.entries),
+			max_displayed_rows = 15,
+		}
+		if begin_table(&table) {
+			defer end_table(&table)
 			for index in table.first ..= table.last {
 				entry := &state.entries[index]
-				begin_table_row(table, {index = index})
+				begin_table_row(&table, {index = index})
 				set_width_auto()
 				text_input({content = &entry.name, undecorated = true})
 				text_input({content = &entry.hash, undecorated = true})
@@ -105,14 +118,29 @@ component_showcase :: proc(state: ^Component_Showcase) {
 				text_input({content = &entry.location, undecorated = true})
 				end_table_row()
 			}
-			end_table(table)
+		}
+		if table.sorted {
+			sort_proc :: proc(i, j: Table_Entry) -> bool {
+				i := i
+				j := j
+				offset :=
+					reflect.struct_field_at(Table_Entry, state.component_showcase.sorted_column).offset
+				return (^string)(uintptr(&i) + offset)^ < (^string)(uintptr(&j) + offset)^
+			}
+			switch state.sort_order {
+			case .Ascending:
+				slice.sort_by(state.entries[:], sort_proc)
+			case .Descending:
+				slice.reverse_sort_by(state.entries[:], sort_proc)
+			}
+			core.draw_next_frame = true
 		}
 
 	case .Scroll_Zone:
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if _, ok := container({size = {0, 2000}}); ok {
+		if container({size = {0, 2000}}) {
 			set_width_fill()
 			set_height_auto()
 			for i in 0 ..< 50 {
@@ -120,23 +148,21 @@ component_showcase :: proc(state: ^Component_Showcase) {
 					add_space(4)
 				}
 				push_id(i)
-				button(
-					{text = fmt.tprintf("Button #%i", i + 1), kind = .Ghost},
-				)
+				button({text = fmt.tprintf("Button #%i", i + 1), style = .Ghost})
 				pop_id()
 			}
 		}
 		add_space(50)
 		set_width(500)
 		set_height(300)
-		if _, ok := container({size = {1000, 0}}); ok {
+		if container({size = {1000, 0}}) {
 			set_side(.Left)
 			set_height_fill()
 			set_width(200)
 			set_padding(10)
 			for i in 0 ..< 5 {
 				push_id(i)
-				button({text = fmt.tprint(i + 1), kind = .Outlined})
+				button({text = fmt.tprint(i + 1), style = .Outlined})
 				pop_id()
 			}
 		}
@@ -172,12 +198,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			set_width_fill()
 			for option, o in Option {
 				push_id(o)
-				if selector_option(
-						{
-							text = fmt.tprint(option),
-							state = state.option == option,
-						},
-					).disabled {
+				if selector_option({text = fmt.tprint(option), state = state.option == option}).disabled {
 					state.option = option
 				}
 				pop_id()
@@ -193,16 +214,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			if m > 0 {
 				add_space(10)
 			}
-			if was_clicked(
-				checkbox(
-					{
-						text = fmt.tprint(member),
-						state = state.checkboxes[member],
-					},
-				),
-			) {
-				state.checkboxes[member] = !state.checkboxes[member]
-			}
+			checkbox({text = fmt.tprint(member), state = &state.checkboxes[member]})
 			pop_id()
 		}
 		add_space(10)
@@ -213,11 +225,9 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			if m > 0 {
 				add_space(10)
 			}
-			if was_clicked(
-				radio_button(
-					{text = fmt.tprint(member), state = state.option == member},
-				),
-			) {
+			yes := state.option == member
+			radio_button({text = fmt.tprint(member), state = &yes})
+			if yes {
 				state.option = member
 			}
 			pop_id()
@@ -228,17 +238,9 @@ component_showcase :: proc(state: ^Component_Showcase) {
 		set_width(250)
 		add_space(10)
 		set_height_auto()
-		text_input(
-			{
-				content = &state.full_name,
-				placeholder = "Full Name",
-				decal = .Check,
-			},
-		)
+		text_input({content = &state.full_name, placeholder = "Full Name", decal = .Check})
 		add_space(10)
-		text_input(
-			{content = &state.birth_country, placeholder = "Country of birth"},
-		)
+		text_input({content = &state.birth_country, placeholder = "Country of birth"})
 		add_space(10)
 		set_height_auto()
 		date_picker({first = &state.date_range[0]})
@@ -246,9 +248,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 		date_picker({first = &state.date_range[0], second = &state.date_range[1]})
 		add_space(10)
 		set_height(120)
-		text_input(
-			{content = &state.bio, placeholder = "Bio", multiline = true},
-		)
+		text_input({content = &state.bio, placeholder = "Bio", multiline = true})
 
 	case .Graph:
 		set_side(.Left)
@@ -258,17 +258,14 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			set_width_fill()
 			set_height_fill()
 			graph(
-				Graph_Info(int) {
+				{
 					lo = 0,
 					hi = 30,
 					increment = 5,
 					spacing = 10,
 					kind = Bar_Graph{value_labels = true, show_tooltip = true},
 					label_tooltip = true,
-					fields = {
-						{"Field 1", {255, 25, 96, 255}},
-						{"Field 2", {0, 58, 255, 255}},
-					},
+					fields = {{"Field 1", {255, 25, 96, 255}}, {"Field 2", {0, 58, 255, 255}}},
 					entries = {
 						{"Feb 2nd", {1, 5}},
 						{"Feb 3rd", {4, 2}},
@@ -292,17 +289,14 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			set_width_fill()
 			set_height_fill()
 			graph(
-				Graph_Info(int) {
+				{
 					lo = 0,
 					hi = 30,
 					increment = 5,
 					spacing = 10,
 					kind = Line_Graph{show_dots = false},
 					label_tooltip = true,
-					fields = {
-						{"Minecraft", {255, 25, 96, 255}},
-						{"Terraria", {0, 58, 255, 255}},
-					},
+					fields = {{"Minecraft", {255, 25, 96, 255}}, {"Terraria", {0, 58, 255, 255}}},
 					entries = {
 						{label = "Jan 5th", values = {1, 5}},
 						{label = "Jan 6th", values = {4, 2}},
@@ -333,23 +327,13 @@ main :: proc() {
 
 		defer {
 			if len(track.allocation_map) > 0 {
-				fmt.eprintf(
-					"=== %v allocations not freed: ===\n",
-					len(track.allocation_map),
-				)
+				fmt.eprintf("=== %v allocations not freed: ===\n", len(track.allocation_map))
 				for _, entry in track.allocation_map {
-					fmt.eprintf(
-						"- %v bytes @ %v\n",
-						entry.size,
-						entry.location,
-					)
+					fmt.eprintf("- %v bytes @ %v\n", entry.size, entry.location)
 				}
 			}
 			if len(track.bad_free_array) > 0 {
-				fmt.eprintf(
-					"=== %v incorrect frees: ===\n",
-					len(track.bad_free_array),
-				)
+				fmt.eprintf("=== %v incorrect frees: ===\n", len(track.bad_free_array))
 				for entry in track.bad_free_array {
 					fmt.eprintf("- %p @ %v\n", entry.memory, entry.location)
 				}
@@ -360,12 +344,8 @@ main :: proc() {
 		allocator = runtime.default_allocator()
 	}
 
-	state: State
 
-	state.component_showcase.date_range = {
-		onyx.Date{2024, 2, 17},
-		onyx.Date{2024, 3, 2},
-	}
+	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
 
 	for i in 0 ..< 100 {
 		append(

@@ -28,13 +28,15 @@ init_button :: proc(info: ^Button_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
 	info.id = hash(loc)
 	info.self = get_widget(info.id.?) or_return
-	info.text_job, _ = make_text_job({
-		text    = info.text,
-		size    = info.font_size.? or_else core.style.button_text_size,
-		font    = core.style.fonts[info.font_style.? or_else .Medium],
-		align_v = .Middle,
-		align_h = .Middle,
-	})
+	info.text_job, _ = make_text_job(
+		{
+			text = info.text,
+			size = info.font_size.? or_else core.style.button_text_size,
+			font = core.style.fonts[info.font_style.? or_else .Medium],
+			align_v = .Middle,
+			align_h = .Middle,
+		},
+	)
 	info.desired_size = info.text_job.size + {18, 6}
 	return true
 }
@@ -48,22 +50,19 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 	if self.visible {
 		text_color: Color
 
-		switch info.style {
+		switch style {
 		case .Outlined:
 			draw_rounded_box_fill(
 				self.box,
 				core.style.rounding,
-				fade(
-					info.color.? or_else core.style.color.substance,
-					self.hover_time,
-				),
+				fade(color.? or_else core.style.color.substance, self.hover_time),
 			)
 			if self.hover_time < 1 {
 				draw_rounded_box_stroke(
 					self.box,
 					core.style.rounding,
 					1,
-					info.color.? or_else core.style.color.substance,
+					color.? or_else core.style.color.substance,
 				)
 			}
 			text_color = core.style.color.content
@@ -74,7 +73,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 				core.style.rounding,
 				interpolate_colors(
 					self.hover_time * 0.25,
-					info.color.? or_else core.style.color.substance,
+					color.? or_else core.style.color.substance,
 					core.style.color.foreground,
 				),
 			)
@@ -86,7 +85,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 				core.style.rounding,
 				interpolate_colors(
 					self.hover_time * 0.25,
-					info.color.? or_else core.style.color.accent,
+					color.? or_else core.style.color.accent,
 					core.style.color.foreground,
 				),
 			)
@@ -96,20 +95,13 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			draw_rounded_box_fill(
 				self.box,
 				core.style.rounding,
-				fade(
-					info.color.? or_else core.style.color.substance,
-					self.hover_time,
-				),
+				fade(color.? or_else core.style.color.substance, self.hover_time),
 			)
 			text_color = core.style.color.content
 		}
 
-		if !info.is_loading {
-			draw_text_glyphs(
-				info.text_job,
-				box_center(self.box),
-				text_color,
-			)
+		if !is_loading {
+			draw_text_glyphs(text_job, box_center(self.box), text_color)
 		}
 
 		if self.disable_time > 0 {
@@ -120,7 +112,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			)
 		}
 
-		if info.is_loading {
+		if is_loading {
 			draw_loader(box_center(self.box), 10, text_color)
 		}
 	}

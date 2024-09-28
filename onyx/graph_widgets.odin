@@ -41,99 +41,68 @@ Graph_Info :: struct {
 	label_tooltip:     bool,
 }
 
-Graph :: struct {
-	using info: Graph_Info,
+Graph_Widget_Kind :: struct {
 	dot_times: [100]f32,
 }
 
-make_graph :: proc(
-	info: Graph_Info,
-	loc := #caller_location,
-) -> (graph: Graph, ok: bool = true) {
-	if len(graph.entries) == 0 do return
-	graph.info = info
-	graph.self = make_widget(graph) or_return
-	graph.spacing = max(graph.spacing, 10)
-	graph.desired_size = {
-		graph.spacing * f32(len(graph.entries)),
-		f32(graph.hi - graph.lo) * 2,
-	}
-	return
+init_graph :: proc(info: ^Graph_Info, loc := #caller_location) -> bool {
+	if len(info.entries) == 0 do return false
+	info.id = hash(loc)
+	info.self = get_widget(info.id.?) or_return
+	info.spacing = max(info.spacing, 10)
+	info.desired_size = {info.spacing * f32(len(info.entries)), f32(info.hi - info.lo) * 2}
+	return true
 }
 
-add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
-	begin_widget(graph) or_return
-	self := graph.self
+add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
+	begin_widget(info) or_return
+	defer end_widget()
 
-	box := self.box
+	inner_box := self.box
 
-	self.graph.hover_time = animate(
-		self.graph.hover_time,
-		0.2,
-		.Hovered in self.state,
-	)
+	self.hover_time = animate(self.hover_time, 0.2, .Hovered in self.state)
 
 	tooltip_idx: int
 	tooltip_pos: Maybe([2]f32)
-
-	switch kind in graph.kind {
+	variant := widget_kind(self, Graph_Widget_Kind)
+	switch kind in kind {
 
 	case Line_Graph:
 		if self.visible {
-			for v := graph.lo; v <= graph.hi; v += graph.increment {
+			for v := lo; v <= hi; v += increment {
 				p := math.floor(
-					box.hi.y +
-					(box.lo.y - box.hi.y) * (f32(v) / f32(graph.hi - info.lo)),
+					inner_box.hi.y + (inner_box.lo.y - inner_box.hi.y) * (f32(v) / f32(hi - lo)),
 				)
 				draw_box_fill(
-					{{box.lo.x, p}, {box.hi.x, p + 1}},
+					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
 					fade(core.style.color.substance, 0.5),
 				)
 			}
 
-			spacing: f32 = (box.hi.x - box.lo.x) / f32(len(graph.entries) - 1)
-			hn := int(math.round((core.mouse_pos.x - box.lo.x) / spacing))
-			tooltip_idx = clamp(hn, 0, len(graph.entries) - 1)
+			spacing: f32 = (inner_box.hi.x - inner_box.lo.x) / f32(len(entries) - 1)
+			hn := int(math.round((core.mouse_pos.x - inner_box.lo.x) / spacing))
+			tooltip_idx = clamp(hn, 0, len(entries) - 1)
 			tooltip_pos = [2]f32 {
-				box.lo.x +
-				math.round((core.mouse_pos.x - box.lo.x) / spacing) * spacing,
+				inner_box.lo.x +
+				math.round((core.mouse_pos.x - inner_box.lo.x) / spacing) * spacing,
 				core.mouse_pos.y,
 			}
 
-			for &field, f in graph.fields {
+			for &field, f in fields {
 				begin_path()
-				for &entry, e in graph.entries {
+				for &entry, e in entries {
 					point(
 						{
-							box.lo.x +
-							(f32(e) / f32(len(graph.entries) - 1)) *
-								(box.hi.x - box.lo.x),
-							box.hi.y +
-							(f32(entry.values[f] - graph.lo) /
-									f32(graph.hi - graph.lo)) *
-								(box.lo.y - box.hi.y),
+							inner_box.lo.x +
+							(f32(e) / f32(len(entries) - 1)) * (inner_box.hi.x - inner_box.lo.x),
+							inner_box.hi.y +
+							(f32(entry.values[f] - lo) / f32(hi - lo)) *
+								(inner_box.lo.y - inner_box.hi.y),
 						},
 					)
 				}
 				path := get_path()
-				weights: matrix[4, 4]f32 = {
-					1,
-					0,
-					0,
-					0,
-					-3,
-					3,
-					0,
-					0,
-					3,
-					-6,
-					3,
-					0,
-					-1,
-					3,
-					-3,
-					1,
-				}
+				weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
 				for i in 0 ..< path.count - 1 {
 					// Points
 					p0 := path.points[max(i - 1, 0)]
@@ -159,14 +128,11 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 						}
 						set_vertex_uv({})
 						set_vertex_color(
-							fade(
-								field.color,
-								(box.hi.y - p.y) / box_height(box),
-							),
+							fade(field.color, (inner_box.hi.y - p.y) / box_height(inner_box)),
 						)
 						nti := add_vertex(p)
 						set_vertex_color({})
-						nbi := add_vertex({p.x, box.hi.y})
+						nbi := add_vertex({p.x, inner_box.hi.y})
 						if n > 0 {
 							add_indices(ti, nti, bi, nti, nbi, bi)
 							draw_line(lp, p, 2, field.color)
@@ -179,52 +145,34 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 				end_path()
 			}
 
-			if .Hovered in widget.state && hn >= 0 && hn < len(graph.entries) {
+			if .Hovered in self.state && hn >= 0 && hn < len(entries) {
 				p :=
-					box.lo.x +
-					(f32(hn) / f32(len(graph.entries) - 1)) *
-						(box.hi.x - box.lo.x)
+					inner_box.lo.x +
+					(f32(hn) / f32(len(entries) - 1)) * (inner_box.hi.x - inner_box.lo.x)
 				draw_box_fill(
-					{{p, box.lo.y}, {p + 1, box.hi.y}},
+					{{p, inner_box.lo.y}, {p + 1, inner_box.hi.y}},
 					core.style.color.content,
 				)
 			}
 
-			for &field, f in graph.fields {
+			for &field, f in fields {
 				lp: [2]f32
-				for &entry, e in graph.entries {
-					point_time: f32 = f32(e) / f32(len(graph.entries) - 1)
+				for &entry, e in entries {
+					point_time: f32 = f32(e) / f32(len(entries) - 1)
 					p: [2]f32 = {
-						box.lo.x + point_time * (box.hi.x - box.lo.x),
-						box.hi.y +
-						(f32(entry.values[f] - graph.lo) /
-								f32(graph.hi - graph.lo)) *
-							(box.lo.y - box.hi.y),
+						inner_box.lo.x + point_time * (inner_box.hi.x - inner_box.lo.x),
+						inner_box.hi.y +
+						(f32(entry.values[f] - lo) / f32(hi - lo)) *
+							(inner_box.lo.y - inner_box.hi.y),
 					}
 					dot_time := variant.dot_times[e]
-					dot_time = animate(
-						dot_time,
-						0.15,
-						hn == e && .Hovered in widget.state,
-					)
+					dot_time = animate(dot_time, 0.15, hn == e && .Hovered in self.state)
 					if kind.show_dots {
 						draw_arc_fill(p, 4.5, 0, math.TAU, field.color)
 					}
 					if dot_time > 0 {
-						draw_arc_fill(
-							p,
-							8 * dot_time,
-							0,
-							math.TAU,
-							field.color,
-						)
-						draw_arc_fill(
-							p,
-							6 * dot_time,
-							0,
-							math.TAU,
-							core.style.color.foreground,
-						)
+						draw_arc_fill(p, 8 * dot_time, 0, math.TAU, field.color)
+						draw_arc_fill(p, 6 * dot_time, 0, math.TAU, core.style.color.foreground)
 					}
 					variant.dot_times[e] = dot_time
 					lp = p
@@ -234,21 +182,18 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 
 	case Bar_Graph:
 		PADDING :: 5
-		block_size: f32 = (box.hi.x - box.lo.x) / f32(len(graph.entries))
+		block_size: f32 = (inner_box.hi.x - inner_box.lo.x) / f32(len(entries))
 		tooltip_idx = clamp(
-			int((core.mouse_pos.x - widget.box.lo.x) / block_size),
+			int((core.mouse_pos.x - self.box.lo.x) / block_size),
 			0,
-			len(graph.entries) - 1,
+			len(entries) - 1,
 		)
 
-		if .Hovered in widget.state {
+		if .Hovered in self.state {
 			draw_box_fill(
 				{
-					{box.lo.x + f32(tooltip_idx) * block_size, box.lo.y},
-					{
-						box.lo.x + f32(tooltip_idx) * block_size + block_size,
-						box.hi.y,
-					},
+					{inner_box.lo.x + f32(tooltip_idx) * block_size, inner_box.lo.y},
+					{inner_box.lo.x + f32(tooltip_idx) * block_size + block_size, inner_box.hi.y},
 				},
 				fade(core.style.color.substance, 0.5),
 			)
@@ -256,25 +201,22 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 
 		if kind.stacked {
 
-			for v := graph.lo;
-			v <= graph.hi;
-			v += graph.increment / T(len(graph.fields)) {
+			for v := lo; v <= hi; v += increment / f64(len(fields)) {
 				p := math.floor(
-					box.hi.y +
-					(box.lo.y - box.hi.y) * (f32(v) / f32(graph.hi - graph.lo)),
+					inner_box.hi.y + (inner_box.lo.y - inner_box.hi.y) * (f32(v) / f32(hi - lo)),
 				)
 				draw_box_fill(
-					{{box.lo.x, p}, {box.hi.x, p + 1}},
+					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
 					fade(core.style.color.substance, 0.5),
 				)
 			}
 
-			for &entry, e in graph.entries {
+			for &entry, e in entries {
 
-				offset: f32 = box.lo.x + block_size * f32(e)
+				offset: f32 = inner_box.lo.x + block_size * f32(e)
 				block: Box = {
-					{offset + PADDING, box.lo.y},
-					{offset + block_size - PADDING, box.hi.y},
+					{offset + PADDING, inner_box.lo.y},
+					{offset + block_size - PADDING, inner_box.hi.y},
 				}
 
 				if kind.entry_labels && len(entry.label) > 0 {
@@ -293,19 +235,18 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 
 				height: f32 = 0
 
-				#reverse for &field, f in graph.fields {
+				#reverse for &field, f in fields {
 					if entry.values[f] == 0 {
 						continue
 					}
 					field_height :=
-						(f32(entry.values[f]) /
-							f32(graph.hi * len(graph.fields))) *
-						(box.hi.y - box.lo.y)
+						(f32(entry.values[f]) / f32(hi * f64(len(fields)))) *
+						(inner_box.hi.y - inner_box.lo.y)
 					corners: Corners
 					if f == 0 {
 						corners += {.Top_Left, .Top_Right}
 					}
-					if f == len(graph.fields) - 1 {
+					if f == len(fields) - 1 {
 						corners += {.Bottom_Left, .Bottom_Right}
 					}
 					draw_rounded_box_corners_fill(
@@ -322,26 +263,25 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 			}
 		} else {
 			// Draw incremental lines
-			for v := graph.lo; v <= graph.hi; v += graph.increment {
+			for v := lo; v <= hi; v += increment {
 				p := math.floor(
-					box.hi.y +
-					(box.lo.y - box.hi.y) * (f32(v) / f32(graph.hi - graph.lo)),
+					inner_box.hi.y + (inner_box.lo.y - inner_box.hi.y) * (f32(v) / f32(hi - lo)),
 				)
 				draw_box_fill(
-					{{box.lo.x, p}, {box.hi.x, p + 1}},
+					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
 					fade(core.style.color.substance, 0.5),
 				)
 			}
 
 			// For each entry
-			for &entry, e in graph.entries {
+			for &entry, e in entries {
 				// Cut a box for this block
-				block := cut_box_left(&box, block_size)
-				if len(graph.fields) > 1 {
+				block := cut_box_left(&inner_box, block_size)
+				if len(fields) > 1 {
 					block.lo.x += PADDING
 					block.hi.x -= PADDING
 				}
-				bar_size := (block.hi.x - block.lo.x) / f32(len(graph.fields))
+				bar_size := (block.hi.x - block.lo.x) / f32(len(fields))
 
 				// Draw entry label if enabled
 				if kind.entry_labels && len(entry.label) > 0 {
@@ -359,23 +299,15 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 				}
 
 				// Draw a bar for each field
-				for &field, f in graph.fields {
+				for &field, f in fields {
 					bar := cut_box_left(&block, bar_size)
 					// bar.lo.x += 1
 					// bar.hi.x -= 1
-					bar.lo.y =
-						bar.hi.y -
-						(f32(entry.values[f]) / f32(graph.hi)) *
-							(bar.hi.y - bar.lo.y)
+					bar.lo.y = bar.hi.y - (f32(entry.values[f]) / f32(hi)) * (bar.hi.y - bar.lo.y)
 					corners: Corners = {}
 					if f == 0 do corners += {.Top_Left, .Bottom_Left}
-					if f == len(graph.fields) - 1 do corners += {.Top_Right, .Bottom_Right}
-					draw_rounded_box_corners_fill(
-						bar,
-						core.style.rounding,
-						corners,
-						field.color,
-					)
+					if f == len(fields) - 1 do corners += {.Top_Right, .Bottom_Right}
+					draw_rounded_box_corners_fill(bar, core.style.rounding, corners, field.color)
 					if kind.value_labels {
 						draw_text(
 							{(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},
@@ -386,10 +318,7 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 								align_h = .Middle,
 								align_v = .Bottom,
 							},
-							fade(
-								core.style.color.content,
-								0.5 if entry.values[f] == 0 else 1.0,
-							),
+							fade(core.style.color.content, 0.5 if entry.values[f] == 0 else 1.0),
 						)
 					}
 				}
@@ -397,27 +326,27 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 		}
 	}
 
-	if .Hovered in widget.state {
-		tooltip_size: [2]f32 = {150, f32(len(graph.fields)) * 26 + 6}
-		if graph.label_tooltip {
+	if .Hovered in self.state {
+		tooltip_size: [2]f32 = {150, f32(len(fields)) * 26 + 6}
+		if label_tooltip {
 			tooltip_size += 26
 		}
 		// Tooltip
 		begin_tooltip(
 			{
 				pos = tooltip_pos,
-				bounds = widget.box,
+				bounds = self.box,
 				size = tooltip_size,
-				time = ease.cubic_in_out(widget.hover_time),
+				time = ease.cubic_in_out(self.hover_time),
 			},
 		)
 		shrink(3)
-		if graph.label_tooltip {
+		if label_tooltip {
 			box := cut_current_layout(.Top, [2]f32{0, 26})
 			draw_text(
 				box.lo + [2]f32{5, 13},
 				{
-					text = graph.entries[tooltip_idx].label,
+					text = entries[tooltip_idx].label,
 					font = core.style.fonts[.Medium],
 					size = 18,
 					align_v = .Middle,
@@ -425,15 +354,9 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 				core.style.color.content,
 			)
 		}
-		for &field, f in graph.fields {
-			tip_box := shrink_box(
-				cut_box(&current_layout().?.box, .Top, 26),
-				3,
-			)
-			blip_box := shrink_box(
-				cut_box_left(&tip_box, box_height(tip_box)),
-				4,
-			)
+		for &field, f in fields {
+			tip_box := shrink_box(cut_box(&current_layout().?.box, .Top, 26), 3)
+			blip_box := shrink_box(cut_box_left(&tip_box, box_height(tip_box)), 4)
 			draw_box_fill(blip_box, field.color)
 			draw_text(
 				{tip_box.lo.x, (tip_box.lo.y + tip_box.hi.y) / 2},
@@ -448,10 +371,7 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 			draw_text(
 				{tip_box.hi.x, (tip_box.lo.y + tip_box.hi.y) / 2},
 				{
-					text = fmt.tprintf(
-						"%v",
-						graph.entries[tooltip_idx].values[f],
-					),
+					text = fmt.tprintf("%v", entries[tooltip_idx].values[f]),
 					font = core.style.fonts[.Regular],
 					size = 18,
 					align_h = .Right,
@@ -463,14 +383,16 @@ add_graph :: proc(graph: Graph, loc := #caller_location) -> bool {
 		end_tooltip()
 	}
 
-	if point_in_box(core.mouse_pos, widget.box) {
-		hover_widget(widget)
+	if point_in_box(core.mouse_pos, self.box) {
+		hover_widget(self)
 	}
 
-	end_widget()
-	return
+	return true
 }
 
-do_graph :: proc(info: Graph_Info, loc := #caller_location) {
-	add_graph(make_graph(info, loc))
+graph :: proc(info: Graph_Info, loc := #caller_location) -> Graph_Info {
+	info := info
+	init_graph(&info, loc)
+	add_graph(&info)
+	return info
 }

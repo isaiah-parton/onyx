@@ -16,30 +16,31 @@ import "core:time"
 DOUBLE_CLICK_TIME :: time.Millisecond * 450
 // The internal widget structure
 Widget :: struct {
-	id:                                   Id,
-	box:                                  Box,
-	layer:                                ^Layer,
+	id:                                              Id,
+	box:                                             Box,
+	layer:                                           ^Layer,
 	// Interaction options
-	visible, disabled, draggable, dead:   bool,
+	visible, disabled, dead:                         bool,
 	// TODO: Replace this with chaining
-	is_field:                             bool,
+	is_field:                                        bool,
 	// Interaction state
-	last_state, next_state, state:        Widget_State,
-	focus_time, hover_time, disable_time: f32,
+	last_state, next_state, state:                   Widget_State,
+	focus_time, hover_time, open_time, disable_time: f32,
 	// Click information
-	click_count:                          int,
-	click_time:                           time.Time,
-	click_button:                         Mouse_Button,
-	desired_size:                         [2]f32,
+	click_count:                                     int,
+	click_time:                                      time.Time,
+	click_button:                                    Mouse_Button,
+	desired_size:                                    [2]f32,
 	// Stores the number of the last frame on which this widget was updated
-	frames:                               int,
-	on_death:                             proc(_: ^Widget),
-	variant:                              Widget_Kind,
+	frames:                                          int,
+	on_death:                                        proc(_: ^Widget),
+	variant:                                         Widget_Kind,
 }
 // Widget variants
 Widget_Kind :: union {
-	Graph_Widget_Kind,
+	// Graph_Widget_Kind,
 	Menu_Widget_Kind,
+	Graph_Widget_Kind,
 	Tooltip_Widget_Kind,
 	Tabs_Widget_Kind,
 	Text_Input_Widget_Kind,
@@ -65,6 +66,7 @@ Widget_Info :: struct {
 	// Optional box to be used instead of cutting from the layout
 	box:          Maybe(Box),
 	disabled:     bool,
+	sticky:       bool,
 	fixed_size:   bool,
 	// Size required by the user
 	// required_size: [2]f32,
@@ -96,17 +98,9 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 
 // Generic result handlers
 
-was_clicked :: proc(
-	result: Widget_Result,
-	button: Mouse_Button = .Left,
-	times: int = 1,
-) -> bool {
+was_clicked :: proc(result: Widget_Result, button: Mouse_Button = .Left, times: int = 1) -> bool {
 	widget := result.self.? or_return
-	return(
-		.Clicked in widget.state &&
-		widget.click_button == button &&
-		widget.click_count >= times \
-	)
+	return .Clicked in widget.state && widget.click_button == button && widget.click_count >= times
 }
 is_hovered :: proc(result: Widget_Result) -> bool {
 	widget := result.self.? or_return
@@ -196,7 +190,11 @@ get_widget :: proc(id: Id) -> (widget: ^Widget, ok: bool) {
 // This proc is way too long!
 begin_widget :: proc(info: ^Widget_Info) -> bool {
 	assert(info != nil)
-	assert(info.self != nil)
+
+	if info.self == nil {
+		info.self = get_widget(info.id.? or_return) or_return
+	}
+
 	// An ID is required for widget lookup or creation
 	id := info.id.? or_return
 	// Look up a widget with that ID
@@ -215,8 +213,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	widget.dead = false
 
 	// Set visible flag
-	widget.visible =
-		core.visible && get_clip(current_clip().?, widget.box) != .Full
+	widget.visible = core.visible && get_clip(current_clip().?, widget.box) != .Full
 
 	// Reset state
 	widget.last_state = widget.state
@@ -233,8 +230,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	if layout.next_size.x == 0 || layout.next_size.x != box_width(layout.box) {
 		widget.desired_size.x = max(info.desired_size.x, layout.next_size.x)
 	}
-	if layout.next_size.y == 0 ||
-	   layout.next_size.y != box_height(layout.box) {
+	if layout.next_size.y == 0 || layout.next_size.y != box_height(layout.box) {
 		widget.desired_size.y = max(info.desired_size.y, layout.next_size.y)
 	}
 
@@ -258,10 +254,9 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 			widget.click_time = time.now()
 			widget.state += {.Pressed}
 			// Set the globally dragged widget
-			if widget.draggable do core.dragged_widget = widget.id
+			if info.sticky do core.dragged_widget = widget.id
 		}
-	} else if core.dragged_widget !=
-	   widget.id  /* Keep hover and press state if dragged */{
+	} else if core.dragged_widget != widget.id  /* Keep hover and press state if dragged */{
 		widget.state -= {.Pressed, .Hovered}
 		widget.click_count = 0
 	}
@@ -284,7 +279,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	// Reset next state
 	widget.state += widget.next_state
 	widget.next_state = {}
-	return
+	return true
 }
 // Ends the current widget
 end_widget :: proc() {

@@ -9,10 +9,11 @@ Label_Info :: struct {
 	copied_to_clipboard: bool,
 }
 
-init_label :: proc(info: ^Label_Info, loc := #caller_location) -> Label_Info {
+init_label :: proc(info: ^Label_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
 	info.id = hash(loc)
-	info.__text_job, _ = make_text_job(
+	info.self = get_widget(info.id.?) or_return
+	info.text_job, _ = make_text_job(
 		{
 			text = info.text,
 			size = info.font_size.? or_else core.style.header_text_size,
@@ -22,30 +23,25 @@ init_label :: proc(info: ^Label_Info, loc := #caller_location) -> Label_Info {
 		},
 	)
 	info.fixed_size = true
-	info.desired_size = info.__text_job.size
-	return info
+	info.desired_size = info.text_job.size
+	return true
 }
 
-add_label :: proc(info: ^Label_Info) {
+add_label :: proc(using info: ^Label_Info) -> bool {
 	assert(info != nil)
-	widget, ok := begin_widget(&info); if !ok do return
+	begin_widget(info) or_return
 	defer end_widget()
 
-	if widget.visible {
-		draw_text_glyphs(
-			info.__text_job,
-			widget.box.lo,
-			core.style.color.content,
-		)
+	if self.visible {
+		draw_text_glyphs(text_job, self.box.lo, core.style.color.content)
 	}
+
+	return true
 }
 
-label :: proc(
-	info: Label_Info,
-	loc := #caller_location,
-) -> Label_Info {
+label :: proc(info: Label_Info, loc := #caller_location) -> Label_Info {
 	info := info
 	init_label(&info, loc)
-	add_label(&label)
+	add_label(&info)
 	return info
 }
