@@ -768,7 +768,7 @@ draw_box_stroke :: proc(box: Box, thickness: f32, color: Color) {
 	)
 }
 
-draw_rounded_box_mask_fill :: proc(box: Box, radius: f32, color: Color) {
+draw_rounded_box_mask :: proc(box: Box, radius: f32, color: Color) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}

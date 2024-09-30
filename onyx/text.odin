@@ -114,7 +114,7 @@ Text_Job :: struct {
 
 make_text_job :: proc(
 	info: Text_Info,
-	e: ^tedit.Text_Editor = nil,
+	e: ^tedit.Editor = nil,
 	mouse_pos: [2]f32 = {},
 ) -> (
 	job: Text_Job,

@@ -60,7 +60,7 @@ State :: struct {
 state: State
 
 Table_Entry :: struct {
-	name:        string,
+	id:        u64,
 	hash:        string,
 	public_key:  string,
 	private_key: string,
@@ -111,11 +111,11 @@ component_showcase :: proc(state: ^Component_Showcase) {
 				entry := &state.entries[index]
 				begin_table_row(&table, {index = index})
 				set_width_auto()
-				text_input({content = &entry.name, undecorated = true})
-				text_input({content = &entry.hash, undecorated = true})
-				text_input({content = &entry.public_key, undecorated = true})
-				text_input({content = &entry.private_key, undecorated = true})
-				text_input({content = &entry.location, undecorated = true})
+				number_input(Number_Input_Info(u64){value = &entry.id, undecorated = true})
+				string_input({value = &entry.hash, undecorated = true})
+				string_input({value = &entry.public_key, undecorated = true})
+				string_input({value = &entry.private_key, undecorated = true})
+				string_input({value = &entry.location, undecorated = true})
 				end_table_row()
 			}
 		}
@@ -123,9 +123,15 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			sort_proc :: proc(i, j: Table_Entry) -> bool {
 				i := i
 				j := j
-				offset :=
-					reflect.struct_field_at(Table_Entry, state.component_showcase.sorted_column).offset
-				return (^string)(uintptr(&i) + offset)^ < (^string)(uintptr(&j) + offset)^
+				field := reflect.struct_field_at(Table_Entry, state.component_showcase.sorted_column)
+				switch field.type.id {
+				case string:
+					return (^string)(uintptr(&i) + field.offset)^ < (^string)(uintptr(&j) + field.offset)^
+				case u64, u32:
+					return (^u64)(uintptr(&i) + field.offset)^ < (^u64)(uintptr(&j) + field.offset)^
+				case:
+					return false
+				}
 			}
 			switch state.sort_order {
 			case .Ascending:
@@ -238,9 +244,9 @@ component_showcase :: proc(state: ^Component_Showcase) {
 		set_width(250)
 		add_space(10)
 		set_height_auto()
-		text_input({content = &state.full_name, placeholder = "Full Name", decal = .Check})
+		string_input({value = &state.full_name, placeholder = "Full Name", decal = .Check})
 		add_space(10)
-		text_input({content = &state.birth_country, placeholder = "Country of birth"})
+		string_input({value = &state.birth_country, placeholder = "Country of birth"})
 		add_space(10)
 		set_height_auto()
 		date_picker({first = &state.date_range[0]})
@@ -248,7 +254,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 		date_picker({first = &state.date_range[0], second = &state.date_range[1]})
 		add_space(10)
 		set_height(120)
-		text_input({content = &state.bio, placeholder = "Bio", multiline = true})
+		string_input({value = &state.bio, placeholder = "Bio", multiline = true})
 
 	case .Graph:
 		set_side(.Left)
@@ -352,7 +358,7 @@ main :: proc() {
 			&state.component_showcase.entries,
 			Table_Entry {
 				hash = fmt.aprintf("%x", rand.int31()),
-				name = fmt.aprintf("%v", i + 1),
+				id = u64(rand.int_max(999)),
 				public_key = fmt.aprintf("%x", rand.int31()),
 				private_key = fmt.aprintf("%x", rand.int31()),
 				location = fmt.aprintf("%x", rand.int31()),

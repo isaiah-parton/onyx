@@ -1,89 +1,105 @@
 package onyx
 
+import "base:intrinsics"
+import "base:runtime"
 import "core:fmt"
 import "core:math/linalg"
 import "core:mem"
 import "core:slice"
 import "core:strings"
+import "core:strconv"
 import "core:time"
-import "core:unicode"
 
 import "tedit"
 
-Text_Input_Decal :: enum {
+Input_Decal :: enum {
 	None,
 	Check,
 	Loader,
 }
 
-Text_Input_Info :: struct {
+Input_Info :: struct {
 	using _:                      Widget_Info,
-	content:                      ^strings.Builder,
+	builder:                      ^strings.Builder,
+	text:                         string,
 	placeholder:                  string,
-	numeric, integer:             bool,
 	multiline, read_only, hidden: bool,
-	decal:                        Text_Input_Decal,
+	decal:                        Input_Decal,
 	undecorated:                  bool,
 	changed, submitted:           bool,
 }
 
-Text_Input_Widget_Kind :: struct {
-	editor:    tedit.Text_Editor,
+Input_Widget_Kind :: struct {
+	editor:    tedit.Editor,
 	builder:   strings.Builder,
 	anchor:    int,
 	icon_time: f32,
 	offset:    [2]f32,
 }
 
-init_text_input :: proc(info: ^Text_Input_Info, loc := #caller_location) -> bool {
-	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
-	info.sticky = true
-	info.desired_size = core.style.visual_size
-	return true
+String_Input_Info :: struct {
+	using _: Input_Info,
+	value:   ^string,
 }
 
-add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
-	using tedit
-
-	// A text input without content will not be displayed
-	if info.content == nil {
-		return false
-	}
-
-	begin_widget(info) or_return
-	defer end_widget()
-
-	if self.visible && !undecorated {
-		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.background)
-	}
-
-	if content == nil {
-		return false
-	}
-
-	kind := widget_kind(self, Text_Input_Widget_Kind)
-	e := &kind.editor
-
-	// Cleanup procedure
-	self.on_death = proc(self: ^Widget) {
-		kind := self.variant.(Text_Input_Widget_Kind)
-		destroy_text_editor(&kind.editor)
-		strings.builder_destroy(&kind.builder)
-	}
-
+init_input :: proc(using info: ^Input_Info, loc := #caller_location) -> bool {
+	id = hash(loc)
+	self = get_widget(id.?) or_return
+	sticky = true
+	desired_size = core.style.visual_size
 	if .Active in self.state {
-		if .Active not_in self.last_state {
-			strings.builder_reset(&kind.builder)
-			strings.write_string(&kind.builder, info.content^)
-		}
-		if (core.focused_widget != core.last_focused_widget) && !key_down(.Left_Control) {
+		if (core.focused_widget != core.last_focused_widget) &&
+		   !key_down(.Left_Control) {
 			self.state -= {.Active}
 		}
 	} else {
 		if .Pressed in (self.state - self.last_state) {
 			self.state += {.Active}
 		}
+	}
+	// Deactivate if escape is pressed otherwise treat deactivation as submition
+	if key_pressed(.Escape) {
+		self.state -= {.Active}
+	} else if .Active in (self.last_state - self.state) {
+		submitted = true
+	}
+	return true
+}
+
+add_input :: proc(using info: ^Input_Info) -> bool {
+	using tedit
+
+	begin_widget(info) or_return
+	defer end_widget()
+
+	if self.visible && !undecorated {
+		draw_rounded_box_fill(
+			self.box,
+			core.style.rounding,
+			core.style.color.background,
+		)
+	}
+
+	if builder == nil {
+		return false
+	}
+
+	// Cleanup procedure
+	self.on_death = proc(self: ^Widget) {
+		kind := self.variant.(Input_Widget_Kind)
+		destroy_editor(&kind.editor)
+		strings.builder_destroy(&kind.builder)
+	}
+
+	// Get the text editor
+	kind := widget_kind(self, Input_Widget_Kind)
+	e := &kind.editor
+
+	if e.builder == nil {
+		make_editor(e, context.allocator, context.allocator)
+		begin(e, 0, builder)
+		e.set_clipboard = __set_clipboard_string
+		e.get_clipboard = __get_clipboard_string
 	}
 
 	// Animations
@@ -117,12 +133,12 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 		if !read_only && len(core.runes) > 0 {
 			// Determine filter string
 			allowed: string
-			if info.numeric {
-				allowed = "0123456789."
-				if info.integer || strings.contains_rune(content^, '.') {
-					allowed = allowed[:len(allowed) - 1]
-				}
-			}
+			// if info.numeric {
+			// 	allowed = "0123456789."
+			// 	if info.integer || strings.contains_rune(strings.to_string(builder^), '.') {
+			// 		allowed = allowed[:len(allowed) - 1]
+			// 	}
+			// }
 			// Input filtered runes
 			for char, c in core.runes {
 				if len(allowed) > 0 && !strings.contains_rune(allowed, char) do continue
@@ -172,15 +188,19 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 			cmd = .None
 		}
 		if cmd != .None {
-			text_editor_execute(e, cmd)
+			editor_execute(e, cmd)
 			changed = true
 			core.draw_this_frame = true
 		}
 	}
 
+	if .Active in self.state || submitted {
+		text = strings.to_string(builder^)
+	}
+
 	// Initial text info
 	text_info: Text_Info = {
-		text   = strings.to_string(kind.builder) if .Active in self.state else info.content^,
+		text   = text,
 		font   = core.style.fonts[.Medium],
 		size   = core.style.content_text_size,
 		hidden = info.hidden,
@@ -192,7 +212,8 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 	if font, ok := &core.fonts[text_info.font].?; ok {
 		if font_size, ok := get_font_size(font, text_info.size); ok {
 			if info.multiline {
-				text_origin.y = self.box.lo.y + (font_size.ascent - font_size.descent) / 2
+				text_origin.y =
+					self.box.lo.y + (font_size.ascent - font_size.descent) / 2
 			} else {
 				text_origin.y =
 					(self.box.hi.y + self.box.lo.y) / 2 -
@@ -201,23 +222,21 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 		}
 	}
 
-	// Initialize editor state when just focused
-	if .Active in (self.state - self.last_state) {
-		make_text_editor(e, context.allocator, context.allocator)
-		begin(e, 0, &kind.builder)
-		e.set_clipboard = __set_clipboard_string
-		e.get_clipboard = __get_clipboard_string
-	}
-
 	// Make text job
-	if text_job, ok := make_text_job(text_info, e, core.mouse_pos - (text_origin - kind.offset));
-	   ok {
+	if text_job, ok := make_text_job(
+		text_info,
+		e,
+		core.mouse_pos - (text_origin - kind.offset),
+	); ok {
 		// Resolve view offset so the cursor is always shown
-		if .Active in self.last_state {
+		if .Active in self.last_state && text_job.cursor_glyph >= 0 {
 			glyph := text_job.glyphs[text_job.cursor_glyph]
 			glyph_pos := (text_origin - kind.offset) + glyph.pos
 			// The cursor's own bounding box
-			cursor_box := Box{glyph_pos + {-1, -2}, glyph_pos + {1, text_job.line_height + 2}}
+			cursor_box := Box {
+				glyph_pos + {-1, -2},
+				glyph_pos + {1, text_job.line_height + 2},
+			}
 			// The box we want the cursor to stay in
 			inner_box := shrink_box(self.box, 4)
 			// Move view offset
@@ -248,13 +267,21 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 			}
 			// First draw the highlighting behind the text
 			if .Active in self.last_state {
-				draw_text_highlight(text_job, text_origin, fade(core.style.color.accent, 0.5))
+				draw_text_highlight(
+					text_job,
+					text_origin,
+					fade(core.style.color.accent, 0.5),
+				)
 			}
 			// Then draw the text
 			draw_text_glyphs(text_job, text_origin, core.style.color.content)
 			// Draw the cursor in front of the text
 			if .Active in self.last_state {
-				draw_text_cursor(text_job, text_origin, core.style.color.accent)
+				draw_text_cursor(
+					text_job,
+					text_origin,
+					core.style.color.accent,
+				)
 			}
 			pop_clip()
 
@@ -313,7 +340,7 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 			}
 
 			if !info.undecorated {
-				draw_rounded_box_mask_fill(
+				draw_rounded_box_mask(
 					self.box,
 					core.style.rounding,
 					core.style.color.foreground,
@@ -323,15 +350,18 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 
 		// Mouse selection
 		last_selection := e.selection
-		if .Pressed in self.state && text_job.hovered_rune != -1 {
+		if .Pressed in self.state && text_job.hovered_rune >= 0 {
 			if .Pressed not_in self.last_state {
 				// Set click anchor
 				kind.anchor = text_job.hovered_rune
 				// Initial selection
 				if self.click_count == 3 {
-					text_editor_execute(e, .Select_All)
+					editor_execute(e, .Select_All)
 				} else {
-					e.selection = {text_job.hovered_rune, text_job.hovered_rune}
+					e.selection = {
+						text_job.hovered_rune,
+						text_job.hovered_rune,
+					}
 				}
 			}
 			switch self.click_count {
@@ -342,11 +372,17 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 					} else {
 						e.selection[0] = max(
 							0,
-							strings.last_index_any(text_info.text[:text_job.hovered_rune], " \n") +
+							strings.last_index_any(
+								text_info.text[:text_job.hovered_rune],
+								" \n",
+							) +
 							1,
 						)
 					}
-					e.selection[1] = strings.index_any(text_info.text[kind.anchor:], " \n")
+					e.selection[1] = strings.index_any(
+						text_info.text[kind.anchor:],
+						" \n",
+					)
 					if e.selection[1] == -1 {
 						e.selection[1] = len(text_info.text)
 					} else {
@@ -355,7 +391,11 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 				} else {
 					e.selection[1] = max(
 						0,
-						strings.last_index_any(text_info.text[:kind.anchor], " \n") + 1,
+						strings.last_index_any(
+							text_info.text[:kind.anchor],
+							" \n",
+						) +
+						1,
 					)
 					if (text_job.hovered_rune > 0 &&
 						   text_info.text[text_job.hovered_rune - 1] == ' ') {
@@ -367,7 +407,8 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 						)
 					}
 					if e.selection[0] == -1 {
-						e.selection[0] = len(text_info.text) - text_job.hovered_rune
+						e.selection[0] =
+							len(text_info.text) - text_job.hovered_rune
 					}
 					e.selection[0] += text_job.hovered_rune
 				}
@@ -381,16 +422,94 @@ add_text_input :: proc(using info: ^Text_Input_Info) -> bool {
 		}
 	}
 
-	if changed {
-		delete(content^)
-		content^ = strings.clone(strings.to_string(kind.builder))
+	// Deactivate when submitted
+	if submitted {
+		self.state -= {.Active}
+	}
+
+	return true
+}
+
+init_string_input :: proc(
+	using info: ^String_Input_Info,
+	loc := #caller_location,
+) -> bool {
+	if value == nil {
+		return false
+	}
+	init_input(info, loc) or_return
+	if builder == nil {
+		builder = &widget_kind(self, Input_Widget_Kind).builder
+	}
+	if .Active in (self.state - self.last_state) {
+		strings.builder_reset(builder)
+		strings.write_string(builder, value^)
+	}
+	text = value^
+	return true
+}
+
+add_string_input :: proc(using info: ^String_Input_Info) -> bool {
+	add_input(info) or_return
+	if submitted {
+		delete(value^)
+		value^ = strings.clone(strings.to_string(builder^))
 	}
 	return true
 }
 
-text_input :: proc(info: Text_Input_Info, loc := #caller_location) -> Text_Input_Info {
+string_input :: proc(
+	info: String_Input_Info,
+	loc := #caller_location,
+) -> Input_Info {
 	info := info
-	init_text_input(&info, loc)
-	add_text_input(&info)
+	if init_string_input(&info, loc) {
+		add_string_input(&info)
+	}
+	return info
+}
+
+Number_Input_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
+	using _: Input_Info,
+	value: ^T,
+	lo, hi: T,
+	increment: Maybe(T),
+	format: Maybe(string),
+}
+
+init_number_input :: proc(using info: ^Number_Input_Info($T), loc := #caller_location) -> bool {
+	init_input(info, loc) or_return
+	if value == nil {
+		return false
+	}
+	if builder == nil {
+		builder = &widget_kind(self, Input_Widget_Kind).builder
+	}
+	if .Active in (self.state - self.last_state) {
+		strings.builder_reset(builder)
+		fmt.sbprintf(builder, format.? or_else "{:v}", value^)
+	}
+	if .Active not_in self.state {
+		text = fmt.tprintf(format.? or_else "{:v}", value^)
+	}
+	return true
+}
+
+add_number_input :: proc(using info: ^Number_Input_Info($T)) -> bool {
+	add_input(info) or_return
+	if submitted {
+		switch typeid_of(T) {
+		case u64:
+			value^ = strconv.parse_u64(strings.to_string(builder^)) or_return
+		}
+	}
+	return true
+}
+
+number_input :: proc(info: Number_Input_Info($T), loc := #caller_location) -> Number_Input_Info(T) {
+	info := info
+	if init_number_input(&info, loc) {
+		add_number_input(&info)
+	}
 	return info
 }

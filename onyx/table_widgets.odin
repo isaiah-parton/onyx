@@ -88,7 +88,7 @@ table_cell :: proc(column, row: int, value: any, type: Table_Column_Type) {
 	case Type_Text:
 		switch value.id {
 		case string:
-			text_input({content = (^string)(value.data)})
+			string_input({value = (^string)(value.data)})
 		}
 	case Type_Number:
 		switch value.id {

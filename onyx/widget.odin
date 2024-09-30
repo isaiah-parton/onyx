@@ -35,15 +35,24 @@ Widget :: struct {
 	frames:                                          int,
 	on_death:                                        proc(_: ^Widget),
 	variant:                                         Widget_Kind,
+	// using variant: struct #raw_union {
+	// 	menu: Menu_Widget_Kind,
+	// 	graph: Graph_Widget_Kind,
+	// 	tooltip: Tooltip_Widget_Kind,
+	// 	tabs: Tabs_Widget_Kind,
+	// 	input: Input_Widget_Kind,
+	// 	boolean: Boolean_Widget_Kind,
+	// 	date: Date_Picker_Widget_Kind,
+	// 	table: Table_Widget_Kind,
+	// },
 }
 // Widget variants
 Widget_Kind :: union {
-	// Graph_Widget_Kind,
 	Menu_Widget_Kind,
 	Graph_Widget_Kind,
 	Tooltip_Widget_Kind,
 	Tabs_Widget_Kind,
-	Text_Input_Widget_Kind,
+	Input_Widget_Kind,
 	Boolean_Widget_Kind,
 	Date_Picker_Widget_Kind,
 	Table_Widget_Kind,
@@ -197,6 +206,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 
 	// An ID is required for widget lookup or creation
 	id := info.id.? or_return
+
 	// Look up a widget with that ID
 	widget := info.self
 

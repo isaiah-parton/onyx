@@ -58,12 +58,6 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 // @(private)
 core: Core
 
-@init
-print_type_sizes :: proc() {
-	fmt.println(size_of(Widget) * MAX_WIDGETS)
-	fmt.println(size_of(Core))
-}
-
 Debug_State :: struct {
 	enabled, widgets, panels, layers: bool,
 	delta_time:                       [dynamic]f32,
@@ -72,7 +66,6 @@ Debug_State :: struct {
 // The global core data
 Core :: struct {
 	window:                glfw.WindowHandle,
-	window_title:          string,
 	debug:                 Debug_State,
 	view:                  [2]f32,
 	desired_fps:           int,
