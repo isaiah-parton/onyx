@@ -1,5 +1,7 @@
 package onyx
 
+import "base:intrinsics"
+import "core:fmt"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
@@ -8,7 +10,7 @@ Selector_Info :: struct {
 	using _:    Widget_Info,
 	text:       string,
 	menu_align: Alignment,
-	__text_job: Text_Job,
+	text_job: Text_Job,
 }
 
 Menu_Widget_Kind :: struct {
@@ -16,22 +18,22 @@ Menu_Widget_Kind :: struct {
 	open_time: f32,
 }
 
-init_selector :: proc(info: ^Selector_Info, loc := #caller_location) -> bool {
-	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
+init_selector :: proc(using info: ^Selector_Info, loc := #caller_location) -> bool {
+	id = hash(loc)
+	self = get_widget(id.?) or_return
 	text_info := Text_Info {
-		text    = info.text,
+		text    = text,
 		size    = core.style.button_text_size,
 		font    = core.style.fonts[.Medium],
 		align_v = .Middle,
 		align_h = .Middle,
 	}
-	info.__text_job, _ = make_text_job(text_info)
-	info.desired_size = info.__text_job.size + {40, 10}
+	text_job, _ = make_text_job(text_info)
+	desired_size = text_job.size + {40, 10}
 	return true
 }
 
-begin_selector :: proc(using info: ^Selector_Info, loc := #caller_location) -> bool {
+begin_selector :: proc(using info: ^Selector_Info) -> bool {
 	begin_widget(info) or_return
 
 	kind := widget_kind(self, Menu_Widget_Kind)
@@ -45,9 +47,9 @@ begin_selector :: proc(using info: ^Selector_Info, loc := #caller_location) -> b
 			draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 		}
 		text_pos := box_center(self.box) + [2]f32{-10, 0}
-		draw_text_glyphs(info.__text_job, text_pos, core.style.color.content)
+		draw_text_glyphs(text_job, text_pos, core.style.color.content)
 		draw_arrow(
-			{text_pos.x + info.__text_job.size.x / 2 + 10, text_pos.y},
+			{text_pos.x + info.text_job.size.x / 2 + 10, text_pos.y},
 			5,
 			core.style.color.content,
 		)
@@ -66,7 +68,7 @@ begin_selector :: proc(using info: ^Selector_Info, loc := #caller_location) -> b
 			layer_origin.x += box_width(menu_box) / 2
 		}
 
-		open_time := ease.quadratic_out(kind.open_time)
+		open_time := ease.quadratic_out(self.open_time)
 		scale: f32 = 0.7 + 0.3 * open_time
 
 		begin_layer(
@@ -83,12 +85,11 @@ begin_selector :: proc(using info: ^Selector_Info, loc := #caller_location) -> b
 		set_height_auto()
 	}
 
-
 	return .Open in self.state
 }
 
-end_selector :: proc() {
-	self := current_widget().?
+end_selector :: proc() -> bool {
+	self := current_widget().? or_return
 	if .Open in self.state {
 		layout := current_layout().?
 		kind := widget_kind(self, Menu_Widget_Kind)
@@ -100,17 +101,18 @@ end_selector :: proc() {
 		end_layer()
 	}
 	end_widget()
+	return true
 }
 
-@(deferred_out = __selector)
+@(deferred_none = __selector)
 selector :: proc(info: Selector_Info, loc := #caller_location) -> bool {
 	info := info
-	init_selector(&info, loc)
+	init_selector(&info, loc) or_return
 	return begin_selector(&info)
 }
 
 @(private)
-__selector :: proc(ok: bool) {
+__selector :: proc() {
 	end_selector()
 }
 
@@ -124,25 +126,24 @@ Selector_Option_Info :: struct {
 	text:       string,
 	state:      bool,
 	kind:       Selector_Option_Kind,
-	__text_job: Text_Job,
+	text_job: 	Text_Job,
+	clicked: bool,
 }
 
 init_selector_option :: proc(
-	info: ^Selector_Option_Info,
+	using info: ^Selector_Option_Info,
 	loc := #caller_location,
 ) -> bool {
-	info := info
-	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
-	text_info := Text_Info {
-		text    = info.text,
+	id = hash(loc)
+	self = get_widget(id.?) or_return
+	text_job, _ = make_text_job({
+		text    = text,
 		size    = core.style.button_text_size,
 		font    = core.style.fonts[.Medium],
 		align_v = .Middle,
-	}
-	info.__text_job, _ = make_text_job(text_info)
-	info.desired_size = info.__text_job.size + {20, 10}
-	info.desired_size.x += info.desired_size.y
+	})
+	desired_size = text_job.size + {20, 10}
+	desired_size.x += desired_size.y
 	return true
 }
 
@@ -173,11 +174,13 @@ add_selector_option :: proc(using info: ^Selector_Option_Info) -> bool {
 			}
 		}
 		draw_text_glyphs(
-			info.__text_job,
+			info.text_job,
 			{self.box.lo.x + box_height(self.box), box_center_y(self.box)},
 			core.style.color.content,
 		)
 	}
+
+	clicked = .Clicked in self.state
 	return true
 }
 
@@ -189,4 +192,23 @@ selector_option :: proc(
 	init_selector_option(&info, loc)
 	add_selector_option(&info)
 	return info
+}
+
+enum_selector :: proc(value: ^$T, loc := #caller_location) where intrinsics.type_is_enum(T) {
+	if value == nil do return
+	info := Selector_Info{text = fmt.tprint(value^)}
+	init_selector(&info, loc)
+	if begin_selector(&info) {
+		shrink(3)
+		set_side(.Top)
+		set_width_fill()
+		for member, m in T {
+			push_id(m)
+			if selector_option({text = fmt.tprint(member), state = value^ == member}).clicked {
+				value^ = member
+			}
+			pop_id()
+		}
+	}
+	end_selector()
 }

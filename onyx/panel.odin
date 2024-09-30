@@ -100,9 +100,9 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 	// Background
 	draw_rounded_box_fill(
-		move_box(panel.box, 4),
+		move_box(panel.box, 5),
 		core.style.rounding,
-		{0, 0, 0, 40},
+		{0, 0, 0, 70},
 	)
 	draw_rounded_box_fill(
 		panel.box,
@@ -320,13 +320,13 @@ end_panel :: proc() {
 	pop_stack(&core.panel_stack)
 }
 
-@(deferred_out = __do_panel)
-do_panel :: proc(info: Panel_Info, loc := #caller_location) -> (ok: bool) {
+@(deferred_out = __panel)
+panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	return begin_panel(info, loc)
 }
 
 @(private)
-__do_panel :: proc(ok: bool) {
+__panel :: proc(ok: bool) {
 	if ok {
 		end_panel()
 	}

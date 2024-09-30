@@ -86,6 +86,12 @@ component_showcase :: proc(state: ^Component_Showcase) {
 	}
 	shrink(40)
 
+	if panel({title = "panle"}) {
+		shrink(10)
+		set_height_auto()
+		date_picker({first = &state.date_range[0]})
+	}
+
 	#partial switch state.section.component {
 	case .Tables:
 		set_side(.Top)
@@ -198,18 +204,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			}
 		}
 		add_space(10)
-		if selector({text = "Combo"}) {
-			shrink(3)
-			set_side(.Top)
-			set_width_fill()
-			for option, o in Option {
-				push_id(o)
-				if selector_option({text = fmt.tprint(option), state = state.option == option}).disabled {
-					state.option = option
-				}
-				pop_id()
-			}
-		}
+		enum_selector(&state.option)
 
 	case .Boolean:
 		set_side(.Top)

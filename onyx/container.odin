@@ -32,10 +32,14 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 		core.container_map[id] = self
 		ok = true
 	}
+	if !ok do return false
+	assert(self != nil)
+
+	widget_info := Widget_Info{}
 
 	self.id = id
 	self.dead = false
-	self.box = info.box.? or_else next_widget_box({})
+	self.box = info.box.? or_else next_widget_box(&widget_info)
 
 	self.active = core.active_container == self.id
 	if point_in_box(core.mouse_pos, self.box) && core.hovered_layer == current_layer().?.id {
@@ -53,7 +57,6 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 		}
 		self.desired_scroll -= delta_scroll * 100
 	}
-
 	push_clip(self.box)
 	append_draw_call(current_layer().?.index)
 	push_stack(&core.container_stack, self) or_return
@@ -68,7 +71,6 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 }
 
 end_container :: proc() {
-
 	self := current_container().?
 	layout := current_layout().?
 	self.size = linalg.max(layout.content_size + layout.spacing_size, self.size)
@@ -138,14 +140,14 @@ end_container :: proc() {
 		}
 	}
 
-
-	pop_clip()
-	pop_stack(&core.container_stack)
 	append_draw_call(current_layer().?.index)
 	// Rounded corner mask to fake rounded clipping
 	draw_rounded_box_mask(self.box, core.style.rounding, core.style.color.foreground)
 	// Table outline
 	draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
+
+	pop_clip()
+	pop_stack(&core.container_stack)
 }
 
 current_container :: proc() -> Maybe(^Container) {
