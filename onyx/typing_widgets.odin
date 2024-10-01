@@ -26,7 +26,7 @@ Input_Info :: struct {
 	multiline, read_only, hidden: bool,
 	decal:                        Input_Decal,
 	undecorated:                  bool,
-	changed, submitted:           bool,
+	changed, submitted, enter:           bool,
 }
 
 Input_Widget_Kind :: struct {
@@ -43,10 +43,14 @@ String_Input_Info :: struct {
 }
 
 init_input :: proc(using info: ^Input_Info, loc := #caller_location) -> bool {
-	id = hash(loc)
+	if builder == nil {
+		return false
+	}
+id = hash(loc)
 	self = get_widget(id.?) or_return
 	sticky = true
 	desired_size = core.style.visual_size
+	text = strings.to_string(builder^)
 	if .Active in self.state {
 		if (core.focused_widget != core.last_focused_widget) &&
 		   !key_down(.Left_Control) {
@@ -154,9 +158,11 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 			if multiline {
 				if control_down {
 					submitted = true
+					enter = true
 				}
 			} else {
 				submitted = true
+				enter = true
 			}
 		}
 		if key_pressed(.Left) {
@@ -428,6 +434,14 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	}
 
 	return true
+}
+
+input :: proc(info: Input_Info, loc := #caller_location) -> Input_Info {
+	info := info
+	if init_input(&info, loc) {
+		add_input(&info)
+	}
+	return info
 }
 
 init_string_input :: proc(

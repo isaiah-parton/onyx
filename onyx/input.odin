@@ -39,6 +39,7 @@ Keyboard_Key :: enum i32 {
 	Y             = glfw.KEY_Y,
 	Home          = glfw.KEY_HOME,
 	End           = glfw.KEY_END,
+	F = glfw.KEY_F,
 }
 
 Mouse_Cursor :: enum {
