@@ -35,11 +35,9 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 	if !ok do return false
 	assert(self != nil)
 
-	widget_info := Widget_Info{}
-
 	self.id = id
 	self.dead = false
-	self.box = info.box.? or_else next_widget_box(&widget_info)
+	self.box = info.box.? or_else next_widget_box(nil)
 
 	self.active = core.active_container == self.id
 	if point_in_box(core.mouse_pos, self.box) && core.hovered_layer == current_layer().?.id {

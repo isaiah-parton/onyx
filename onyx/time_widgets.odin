@@ -19,14 +19,9 @@ Calendar_Info :: struct {
 	month_start:     t.Time,
 	size:            f32,
 	days:            int,
-	year, month:     int,
+	year:            int,
+	month:           int,
 	selection_times: [2]t.Time,
-}
-
-Calendar_Result :: struct {
-	using _:      Widget_Result,
-	selection:    [2]Maybe(Date),
-	month_offset: int,
 }
 
 todays_date :: proc() -> Date {
@@ -38,50 +33,48 @@ dates_are_equal :: proc(a, b: Date) -> bool {
 	return a.year == b.year && a.month == b.month && a.day == b.day
 }
 
-init_calendar :: proc(info: ^Calendar_Info, loc := #caller_location) -> bool {
-	info.id = hash(loc)
-	info.desired_size.x = 280
-	info.size = info.desired_size.x / 7
-	info.desired_size.y = info.size * 2
+init_calendar :: proc(using info: ^Calendar_Info, loc := #caller_location) -> bool {
+	id = hash(loc)
+	desired_size.x = 280
+	size = desired_size.x / 7
+	desired_size.y = size * 2
 
-	date := info.selection[0].? or_else todays_date()
+	date := selection[0].? or_else todays_date()
 
-	info.month = int(date.month) + info.month_offset
-	info.year = int(date.year)
-	for info.month < 1 {
-		info.year -= 1
-		info.month += 12
+	month = int(date.month) + month_offset
+	year = int(date.year)
+	for month < 1 {
+		year -= 1
+		month += 12
 	}
-	for info.month > 12 {
-		info.year += 1
-		info.month -= 12
+	for month > 12 {
+		year += 1
+		month -= 12
 	}
 
-	info.selection_times = {
-		t.datetime_to_time(dt.DateTime{info.selection[0].? or_else Date{}, {}}) or_else t.Time{},
-		t.datetime_to_time(dt.DateTime{info.selection[1].? or_else Date{}, {}}) or_else t.Time{},
+	selection_times = {
+		t.datetime_to_time(dt.DateTime{selection[0].? or_else Date{}, {}}) or_else t.Time{},
+		t.datetime_to_time(dt.DateTime{selection[1].? or_else Date{}, {}}) or_else t.Time{},
 	}
 
 	// Get the start of the month
-	info.month_start =
-		t.datetime_to_time(i64(info.year), i8(info.month), 1, 0, 0, 0) or_else panic(
-			"invalid date",
-		)
+	month_start =
+		t.datetime_to_time(i64(year), i8(month), 1, 0, 0, 0) or_else panic("invalid date")
 
 	// Set the first date on the calendar to be the previous sunday
-	weekday := t.weekday(info.month_start)
-	info.calendar_start._nsec = info.month_start._nsec - i64(weekday) * i64(t.Hour * 24)
+	weekday := t.weekday(month_start)
+	calendar_start._nsec = month_start._nsec - i64(weekday) * i64(t.Hour * 24)
 
 	// Get number of days in this month
-	days, _ := dt.last_day_of_month(i64(info.year), i8(info.month))
+	if _days, err := dt.last_day_of_month(i64(year), i8(month)); err == nil {
+		days = int(_days)
+	}
 
 	// How many rows?
-	info.days = int(
-		(info.month_start._nsec - info.calendar_start._nsec) / i64(t.Hour * 24) + i64(days),
-	)
-	info.days = int(math.ceil(f32(info.days) / 7)) * 7
-	weeks := math.ceil(f32(info.days) / 7)
-	info.desired_size.y += weeks * info.size + (weeks + 1) * CALENDAR_WEEK_SPACING
+	days = int((month_start._nsec - calendar_start._nsec) / i64(t.Hour * 24) + i64(days))
+	days = int(math.ceil(f32(days) / 7)) * 7
+	weeks := math.ceil(f32(days) / 7)
+	desired_size.y += weeks * size + (weeks + 1) * CALENDAR_WEEK_SPACING
 
 	return true
 }
@@ -240,7 +233,6 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 			if info.allow_range {
 				if selection[0] == nil {
 					selection[0] = date
-					month_offset = 0
 				} else {
 					if date == selection[0] || date == selection[1] {
 						selection = {nil, nil}
@@ -248,7 +240,6 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 						if time._nsec <=
 						   (t.datetime_to_time(dt.DateTime{selection[0].?, {}}) or_else t.Time{})._nsec {
 							selection[0] = date
-							month_offset = 0
 						} else {
 							selection[1] = date
 						}
@@ -257,6 +248,7 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 			} else {
 				selection[0] = date
 			}
+			month_offset = 0
 		}
 		end_widget()
 	}
@@ -283,7 +275,6 @@ Date_Picker_Result :: struct {
 }
 
 Date_Picker_Widget_Kind :: struct {
-	using _:      Menu_Widget_Kind,
 	month_offset: int,
 }
 
@@ -305,7 +296,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 	button_behavior(self)
 
 	kind := widget_kind(self, Date_Picker_Widget_Kind)
-	kind.open_time = animate(kind.open_time, 0.2, .Open in self.state)
+	self.open_time = animate(self.open_time, 0.2, .Open in self.state)
 
 	if self.visible {
 		draw_rounded_box_fill(
@@ -354,7 +345,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 			calendar_info.desired_size + core.style.menu_padding * 2,
 		)
 
-		open_time := ease.quadratic_out(kind.open_time)
+		open_time := ease.quadratic_out(self.open_time)
 		scale: f32 = 0.85 + 0.15 * open_time
 
 		if layer, ok := layer(

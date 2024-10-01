@@ -117,7 +117,8 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 		}
 	}
 
-	end_widget()
+	clicked = .Clicked in self.state
+
 	return true
 }
 

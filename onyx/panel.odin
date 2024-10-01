@@ -15,7 +15,7 @@ Panel :: struct {
 	min_size:             [2]f32,
 	moving:               bool,
 	resizing:             bool,
-	dismissed: bool,
+	dismissed:            bool,
 	resize_offset:        [2]f32,
 	can_move, can_resize: bool,
 	dead:                 bool,
@@ -72,24 +72,11 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 			panel.resizing = false
 		}
 		min_size := linalg.max(MIN_SIZE, panel.min_size)
-		panel.box.hi = linalg.max(
-			panel.box.lo + min_size,
-			core.mouse_pos + panel.resize_offset,
-		)
-		// min_size := linalg.max(MIN_SIZE, panel.min_size)
-		// #partial switch resize {
-		// case .Left:
-		// 	panel.box.lo.x = min(core.mouse_pos.x, panel.box.hi.x - min_size.x)
-		// case .Right:
-		// 	panel.box.hi.x = max(core.mouse_pos.x, panel.box.lo.x + min_size.x)
-		// case .Top:
-		// 	panel.box.lo.y = min(core.mouse_pos.y, panel.box.hi.y - min_size.y)
-		// case .Bottom:
-		// 	panel.box.hi.y = max(core.mouse_pos.y, panel.box.lo.y + min_size.y)
-		// }
-	} else {
-		panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + panel.min_size)
+		panel.box.hi = core.mouse_pos + panel.resize_offset
 	}
+	panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + panel.min_size)
+
+	panel.box = {linalg.floor(panel.box.lo), linalg.floor(panel.box.hi)}
 
 	// Reset min_size to be calculated again
 	panel.min_size = {}
@@ -99,47 +86,33 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	panel.layer = current_layer().?
 
 	// Background
-	draw_rounded_box_fill(
-		move_box(panel.box, 5),
-		core.style.rounding,
-		{0, 0, 0, 70},
-	)
-	draw_rounded_box_fill(
-		panel.box,
-		core.style.rounding,
-		core.style.color.foreground,
-	)
+	draw_rounded_box_fill(move_box(panel.box, 5), core.style.rounding, {0, 0, 0, 70})
+	draw_rounded_box_fill(panel.box, core.style.rounding, core.style.color.foreground)
 
 	// The content layout box
 	inner_box := panel.box
-	// Panel outline
-	draw_rounded_box_stroke(
-		panel.box,
-		core.style.rounding,
-		1,
-		core.style.color.substance,
-	)
+
 	TITLE_HEIGHT :: 28
 	if info.title != "" {
 		panel.min_size.y += TITLE_HEIGHT
 		title_box := cut_box_top(&inner_box, TITLE_HEIGHT)
 
-		draw_rounded_box_corners_fill(title_box, core.style.rounding, {.Top_Left, .Top_Right}, fade(core.style.color.substance, 0.5))
+		draw_rounded_box_corners_fill(
+			title_box,
+			core.style.rounding,
+			{.Top_Left, .Top_Right},
+			fade(core.style.color.substance, 0.5),
+		)
 
 		draw_text(
 			{title_box.lo.x + 5, (title_box.hi.y + title_box.lo.y) / 2},
-			{
-				text = info.title,
-				font = core.style.fonts[.Regular],
-				size = 20,
-				align_v = .Middle,
-			},
+			{text = info.title, font = core.style.fonts[.Regular], size = 20, align_v = .Middle},
 			core.style.color.content,
 		)
 
-		dismiss_button := Widget_Info{
-			id = hash("dismiss"),
-			box = cut_box_right(&title_box, box_height(title_box))
+		dismiss_button := Widget_Info {
+			id  = hash("dismiss"),
+			box = cut_box_right(&title_box, box_height(title_box)),
 		}
 		if begin_widget(&dismiss_button) {
 			defer end_widget()
@@ -172,16 +145,11 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		}
 	}
 
-
-
 	// Resizing
 	if panel.can_resize {
-		resize_button := Widget_Info{
-			id = hash("resize"),
-			box = Box {
-				panel.box.hi - core.style.visual_size.y,
-				panel.box.hi,
-			},
+		resize_button := Widget_Info {
+			id  = hash("resize"),
+			box = Box{panel.box.hi - core.style.visual_size.y, panel.box.hi},
 		}
 		if begin_widget(&resize_button) {
 			defer end_widget()
@@ -313,8 +281,17 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 }
 
 end_panel :: proc() {
+	panel := current_panel()
+	// Panel outline
+	draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)
+	draw_rounded_box_stroke(
+		expand_box(panel.box, 1),
+		core.style.rounding * 1.25,
+		1,
+		core.style.color.background,
+	)
 	layout := current_layout().?
-	current_panel().min_size += layout.content_size + layout.spacing_size
+	panel.min_size += layout.content_size + layout.spacing_size
 	pop_layout()
 	end_layer()
 	pop_stack(&core.panel_stack)

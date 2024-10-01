@@ -98,16 +98,10 @@ end_layout :: proc() {
 		size := layout.content_size + layout.spacing_size
 		if side, ok := layout.side.?; ok {
 			if int(side) > 1 {
-				previous_layout.content_size.x = max(
-					previous_layout.content_size.x,
-					size.x,
-				)
+				previous_layout.content_size.x = max(previous_layout.content_size.x, size.x)
 				previous_layout.content_size.y += size.y
 			} else {
-				previous_layout.content_size.y = max(
-					previous_layout.content_size.y,
-					size.y,
-				)
+				previous_layout.content_size.y = max(previous_layout.content_size.y, size.y)
 				previous_layout.content_size.x += size.x
 			}
 		} else {
@@ -138,11 +132,7 @@ layout_box :: proc() -> Box {
 	return current_layout().?.box
 }
 // Cut this layout with these parameters
-cut_layout :: proc(
-	layout: ^Layout,
-	side: Maybe(Side) = nil,
-	size: Maybe([2]f32) = nil,
-) -> Box {
+cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -> Box {
 	side := side.? or_else layout.next_cut_side
 	size := size.? or_else layout.next_size
 	box := cut_box(
@@ -153,23 +143,24 @@ cut_layout :: proc(
 	return box
 }
 // Calls `cut_layout` on the current layout.  **Assertive**
-cut_current_layout :: proc(
-	side: Maybe(Side) = nil,
-	size: Maybe([2]f32) = nil,
-) -> Box {
+cut_current_layout :: proc(side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -> Box {
 	return cut_layout(current_layout().?, side, size)
 }
 // Get the next widget box
 // TODO: Rename this as it isn't used exclusively for singular widgets
 next_widget_box :: proc(info: ^Widget_Info) -> Box {
-	assert(info != nil)
 	// First assert that a layout exists
 	layout := current_layout().?
 	// Decide the size of the box
-	size := linalg.min(
-		(info.desired_size if info.fixed_size else linalg.max(layout.next_size, info.desired_size)),
-		layout.box.hi - layout.box.lo,
-	)
+	size: [2]f32
+	if info != nil {
+		size = linalg.min(
+			info.desired_size if info.fixed_size else linalg.max(layout.next_size, info.desired_size),
+			layout.box.hi - layout.box.lo,
+		)
+	} else {
+		size = linalg.min(layout.next_size, layout.box.hi - layout.box.lo)
+	}
 	// Cut the initial box
 	box := cut_layout(layout, nil, size)
 	if layout.queue_offset > 0 {
