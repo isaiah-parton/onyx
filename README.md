@@ -7,9 +7,13 @@ I'm currently finalizing the layout functionality before I move ahead with more 
 ## Here's the gist of how it works:
 
 Layer -> Something you render to, it has a z-index for ordered rendering and it's own root layout.
+
 Layout -> A box from which you cut other boxes for more layouts, widgets, etc...
+
 Container -> A scrollable area
+
 Widget -> Something you click on (sometimes not, example: calendars)
+
 Panel -> A decorated layer you can drag around and resize.
 
 ## How can I center something?
