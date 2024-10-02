@@ -76,6 +76,9 @@ Core :: struct {
 	// Hashing
 	id_stack:              Stack(Id, MAX_IDS),
 
+	// Popups
+	// popup_map: map[Id]^Popup,
+
 	// Widgets
 	widgets:               [MAX_WIDGETS]Maybe(Widget),
 	widget_map:            map[Id]^Widget,
@@ -177,7 +180,11 @@ view_height :: proc() -> f32 {
 	return core.view.y
 }
 
-init :: proc(width, height: i32, title: cstring = nil) {
+init :: proc(window: glfw.WindowHandle) -> bool {
+	if window == nil do return false
+
+	core.window = window
+	width, height := glfw.GetWindowSize(core.window)
 
 	// Set view parameters
 	core.visible = true
@@ -186,9 +193,6 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.last_frame_time = time.now()
 	core.draw_next_frame = true
 	core.start_time = time.now()
-
-	// Initialize glfw
-	glfw.Init()
 
 	// Create cursors
 	core.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
@@ -204,9 +208,6 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	core.cursors[.Resize_NWSE] = glfw.CreateStandardCursor(
 		glfw.RESIZE_NWSE_CURSOR,
 	)
-
-	// Create the main window
-	core.window = glfw.CreateWindow(width, height, title, nil, nil)
 
 	// Set event callbacks
 	glfw.SetScrollCallback(
@@ -282,6 +283,8 @@ init :: proc(width, height: i32, title: cstring = nil) {
 	// Default style
 	core.style.color = dark_color_scheme()
 	core.style.shape = default_style_shape()
+
+	return true
 }
 
 // Call before each new frame
@@ -426,7 +429,9 @@ new_frame :: proc() {
 // Render queued draw calls and reset draw state
 render :: proc() {
 	// Render debug info rq
-	do_debug_layer()
+	if core.debug.enabled {
+		do_debug_layer()
+	}
 
 	// Update the atlas if needed
 	if core.font_atlas.modified {

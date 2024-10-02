@@ -12,12 +12,12 @@ Label_Info :: struct {
 init_label :: proc(info: ^Label_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
 	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
+	info.self = get_widget(info.id) or_return
 	info.text_job, _ = make_text_job(
 		{
 			text = info.text,
-			size = info.font_size.? or_else core.style.header_text_size,
-			font = core.style.fonts[info.font_style.? or_else .Bold],
+			size = info.font_size.? or_else core.style.content_text_size,
+			font = core.style.fonts[info.font_style.? or_else .Regular],
 			align_h = .Left,
 			align_v = .Top,
 		},

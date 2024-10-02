@@ -103,7 +103,7 @@ table_cell :: proc(column, row: int, value: any, type: Table_Column_Type) {
 // 	This proc looks at the provided columns and decides the desired size of the table
 init_table :: proc(info: ^Table_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
+	info.self = get_widget(info.id) or_return
 	for &column, c in info.columns {
 		text: string = column.name
 		if info.sorted_column != nil && info.sorted_column^ == c {
@@ -142,7 +142,7 @@ begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 
 	begin_container(
 		{
-			id = info.id.?,
+			id = info.id,
 			box = self.box,
 			size = {1 = core.style.table_row_height * f32(info.row_count + 1)},
 		},
@@ -158,7 +158,7 @@ begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 	// Add space for the header
 	add_space(core.style.table_row_height * f32(first + 1))
 	// Season the hashing context
-	push_id(info.id.?)
+	push_id(info.id)
 	return true
 }
 // End the current table

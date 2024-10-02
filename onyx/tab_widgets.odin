@@ -14,7 +14,7 @@ Tabs_Widget_Kind :: struct {
 
 init_tabs :: proc(info: ^Tabs_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
+	info.self = get_widget(info.id) or_return
 	info.options = info.options[:min(len(info.options), 10)]
 	info.desired_size = {f32(len(info.options)) * 100, 30}
 	return true

@@ -145,6 +145,30 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		}
 	}
 
+
+
+	// Title bar
+	if info.title != "" {
+		title_box := get_box_cut_top(panel.box, TITLE_HEIGHT)
+		// Dragging
+		if panel.can_move &&
+		   panel.resizing == false &&
+		   .Hovered in panel.layer.state &&
+		   point_in_box(core.mouse_pos, title_box) {
+			if mouse_pressed(.Left) {
+				panel.moving = true
+				panel.move_offset = core.mouse_pos - panel.box.lo
+			}
+		}
+	}
+
+	push_layout(Layout{box = inner_box, next_cut_side = .Top})
+
+	return true
+}
+
+end_panel :: proc() {
+	panel := current_panel()
 	// Resizing
 	if panel.can_resize {
 		resize_button := Widget_Info {
@@ -259,36 +283,13 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		// }
 		// pop_id()
 	}
-
-	// Title bar
-	if info.title != "" {
-		title_box := get_box_cut_top(panel.box, TITLE_HEIGHT)
-		// Dragging
-		if panel.can_move &&
-		   panel.resizing == false &&
-		   .Hovered in panel.layer.state &&
-		   point_in_box(core.mouse_pos, title_box) {
-			if mouse_pressed(.Left) {
-				panel.moving = true
-				panel.move_offset = core.mouse_pos - panel.box.lo
-			}
-		}
-	}
-
-	push_layout(Layout{box = inner_box, next_cut_side = .Top})
-
-	return true
-}
-
-end_panel :: proc() {
-	panel := current_panel()
 	// Panel outline
 	draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)
 	draw_rounded_box_stroke(
 		expand_box(panel.box, 1),
 		core.style.rounding * 1.25,
 		1,
-		core.style.color.background,
+		core.style.color.foreground,
 	)
 	layout := current_layout().?
 	panel.min_size += layout.content_size + layout.spacing_size

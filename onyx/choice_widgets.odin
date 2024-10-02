@@ -20,7 +20,7 @@ Menu_Widget_Kind :: struct {
 
 init_selector :: proc(using info: ^Selector_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
-	self = get_widget(id.?) or_return
+	self = get_widget(id) or_return
 	text_info := Text_Info {
 		text    = text,
 		size    = core.style.button_text_size,
@@ -135,7 +135,7 @@ init_selector_option :: proc(
 	loc := #caller_location,
 ) -> bool {
 	id = hash(loc)
-	self = get_widget(id.?) or_return
+	self = get_widget(id) or_return
 	text_job, _ = make_text_job({
 		text    = text,
 		size    = core.style.button_text_size,

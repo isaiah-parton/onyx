@@ -71,7 +71,7 @@ Widget_State :: bit_set[Widget_Status;u8]
 // A generic descriptor for all widgets
 Widget_Info :: struct {
 	self:         ^Widget,
-	id:           Maybe(Id),
+	id:           Id,
 	// Optional box to be used instead of cutting from the layout
 	box:          Maybe(Box),
 	disabled:     bool,
@@ -81,10 +81,6 @@ Widget_Info :: struct {
 	// required_size: [2]f32,
 	// Size desired by the widget
 	desired_size: [2]f32,
-}
-// A generic result type for all widgets
-Widget_Result :: struct {
-	self: Maybe(^Widget),
 }
 // Animation
 animate :: proc(value, duration: f32, condition: bool) -> f32 {
@@ -103,21 +99,6 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 	}
 
 	return value
-}
-
-// Generic result handlers
-
-was_clicked :: proc(result: Widget_Result, button: Mouse_Button = .Left, times: int = 1) -> bool {
-	widget := result.self.? or_return
-	return .Clicked in widget.state && widget.click_button == button && widget.click_count >= times
-}
-is_hovered :: proc(result: Widget_Result) -> bool {
-	widget := result.self.? or_return
-	return .Hovered in widget.state
-}
-was_changed :: proc(result: Widget_Result) -> bool {
-	widget := result.self.? or_return
-	return .Changed in widget.state
 }
 
 // Set a widget's `variant` to type `T` and return a pointer to it
@@ -201,11 +182,8 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	assert(info != nil)
 
 	if info.self == nil {
-		info.self = get_widget(info.id.? or_return) or_return
+		info.self = get_widget(info.id) or_return
 	}
-
-	// An ID is required for widget lookup or creation
-	id := info.id.? or_return
 
 	// Look up a widget with that ID
 	widget := info.self

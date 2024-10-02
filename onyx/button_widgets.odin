@@ -27,7 +27,7 @@ Button_Info :: struct {
 init_button :: proc(info: ^Button_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
 	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
+	info.self = get_widget(info.id) or_return
 	info.text_job, _ = make_text_job(
 		{
 			text = info.text,
@@ -55,7 +55,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			draw_rounded_box_fill(
 				self.box,
 				core.style.rounding,
-				fade(color.? or_else core.style.color.substance, self.hover_time),
+				fade(color.? or_else core.style.color.substance, self.hover_time * 0.5),
 			)
 			if self.hover_time < 1 {
 				draw_rounded_box_stroke(

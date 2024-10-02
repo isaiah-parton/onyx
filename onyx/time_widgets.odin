@@ -80,7 +80,7 @@ init_calendar :: proc(using info: ^Calendar_Info, loc := #caller_location) -> bo
 }
 
 add_calendar :: proc(using info: ^Calendar_Info) -> bool {
-	push_id(id.?)
+	push_id(id)
 	begin_layout({box = next_widget_box(info)})
 
 	set_width(size)
@@ -271,17 +271,13 @@ Date_Picker_Info :: struct {
 	first, second: ^Maybe(Date),
 }
 
-Date_Picker_Result :: struct {
-	using _: Widget_Result,
-}
-
 Date_Picker_Widget_Kind :: struct {
 	month_offset: int,
 }
 
 init_date_picker :: proc(info: ^Date_Picker_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
+	info.self = get_widget(info.id) or_return
 	info.desired_size = core.style.visual_size
 	return true
 }

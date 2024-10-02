@@ -3,6 +3,7 @@ package onyx
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
+import "core:math"
 import "core:math/linalg"
 import "core:mem"
 import "core:slice"
@@ -23,6 +24,7 @@ Input_Info :: struct {
 	builder:                      ^strings.Builder,
 	text:                         string,
 	placeholder:                  string,
+	shake:                        f32,
 	multiline, read_only, hidden: bool,
 	decal:                        Input_Decal,
 	undecorated:                  bool,
@@ -44,7 +46,7 @@ String_Input_Info :: struct {
 
 init_input :: proc(using info: ^Input_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
-	self = get_widget(id.?) or_return
+	self = get_widget(id) or_return
 	sticky = true
 	desired_size = core.style.visual_size
 	if builder != nil {
@@ -73,6 +75,19 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 
 	begin_widget(info) or_return
 	defer end_widget()
+
+	if info.shake > 0 {
+		core.draw_next_frame = true
+	}
+	self.box = move_box(
+		self.box,
+		{
+			info.shake *
+			cast(f32)math.sin(time.duration_seconds(time.since(core.start_time)) * 50) *
+			5,
+			0,
+		},
+	)
 
 	if self.visible && !undecorated {
 		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.background)

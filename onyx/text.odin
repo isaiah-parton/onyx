@@ -355,13 +355,13 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 
 	// Update horizontal offset with last glyph
 	if iter.codepoint != 0 {
-		iter.glyph_pos.x += math.floor(iter.glyph.advance)
+		iter.glyph_pos.x += iter.glyph.advance
 	}
 
 	// Get the next glyph
 	ok = iterate_text_rune(iter)
 
-	if ok {
+	if ok && iter.last_codepoint != 0 {
 		iter.glyph_pos.x += iter.font.spacing
 	}
 
@@ -425,7 +425,10 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 		}
 		iter.glyph_pos.y += iter.size.ascent - iter.size.descent + iter.size.line_gap
 	}
-	iter.line_size.x += math.floor(iter.glyph.advance + iter.font.spacing)
+	iter.line_size.x += iter.glyph.advance
+	if iter.last_codepoint != 0 {
+		iter.line_size.x += iter.font.spacing
+	}
 
 	return
 }

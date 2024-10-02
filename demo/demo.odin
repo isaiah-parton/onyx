@@ -82,7 +82,13 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			},
 		)
 		set_side(.Right)
-		toggle_switch({state = &state.light_mode})
+		if toggle_switch({state = &state.light_mode, text = "\uf1bc" if state.light_mode else "\uef72", text_side = .Left}).toggled {
+			if state.light_mode {
+				core.style.color = light_color_scheme()
+			} else {
+				core.style.color = dark_color_scheme()
+			}
+		}
 	}
 	shrink(40)
 
@@ -354,7 +360,6 @@ main :: proc() {
 		allocator = runtime.default_allocator()
 	}
 
-
 	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
 
 	for i in 0 ..< 100 {
@@ -370,12 +375,15 @@ main :: proc() {
 		)
 	}
 
-	onyx.init(1600, 900, "demo")
-	onyx.set_style_font(.Medium, "fonts/Geist-Medium.ttf")
-	onyx.set_style_font(.Bold, "fonts/Geist-Bold.ttf")
-	onyx.set_style_font(.Light, "fonts/Geist-Light.ttf")
-	onyx.set_style_font(.Regular, "fonts/Geist-Regular.ttf")
-	onyx.set_style_font(.Icon, "fonts/remixicon.ttf")
+	glfw.Init()
+	window := glfw.CreateWindow(1600, 900, "demo", nil, nil)
+
+	onyx.init(window)
+	onyx.load_font_style(.Bold, "fonts/Geist-Bold.ttf")
+	onyx.load_font_style(.Medium, "fonts/Geist-Medium.ttf")
+	onyx.load_font_style(.Light, "fonts/Geist-Light.ttf")
+	onyx.load_font_style(.Regular, "fonts/Geist-Regular.ttf")
+	onyx.load_font_style(.Icon, "fonts/remixicon.ttf")
 
 	for !glfw.WindowShouldClose(onyx.core.window) {
 		onyx.new_frame()

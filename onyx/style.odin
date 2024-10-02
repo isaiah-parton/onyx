@@ -5,11 +5,15 @@ Color_Scheme :: struct {
 }
 
 Font_Style :: enum {
+	// This style is used as a fallback font
+	// Every glyph not found in the defined font for a text job will be checked against it
+	Icon,
+	// 4 normal font weights
 	Light,
 	Regular,
 	Medium,
 	Bold,
-	Icon,
+	// Monospace for code
 	Monospace,
 }
 
@@ -20,7 +24,7 @@ Style :: struct {
 }
 
 Style_Shape :: struct {
-	visual_size: [2]f32,
+	visual_size:                                                          [2]f32,
 	header_text_size, button_text_size, tab_text_size, content_text_size: f32,
 	text_input_height, button_height:                                     f32,
 	tooltip_rounding, tooltip_padding, panel_padding, rounding:           f32,
@@ -50,6 +54,17 @@ default_style_shape :: proc() -> Style_Shape {
 
 light_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
+		background = {165, 169, 169, 255},
+		foreground = {255, 255, 255, 255},
+		substance = {162, 167, 167, 255},
+		accent = {59, 130, 246, 255},
+		accent_content = {25, 25, 25, 255},
+		content = {25, 25, 25, 255},
+	}
+}
+
+dark_color_scheme :: proc() -> Color_Scheme {
+	return Color_Scheme {
 		background = {0, 0, 0, 255},
 		foreground = {25, 25, 32, 255},
 		substance = {65, 65, 75, 255},
@@ -59,18 +74,7 @@ light_color_scheme :: proc() -> Color_Scheme {
 	}
 }
 
-dark_color_scheme :: proc() -> Color_Scheme {
-	return Color_Scheme {
-		background = {0, 0, 0, 255},
-		foreground = {15, 16, 17, 255},
-		substance = {40, 42, 45, 255},
-		accent = {234, 88, 12, 255},
-		accent_content = {255, 255, 255, 255},
-		content = {255, 255, 255, 255},
-	}
-}
-
-set_style_font :: proc(style: Font_Style, path: string) -> bool {
+load_font_style :: proc(style: Font_Style, path: string) -> bool {
 	core.style.fonts[style] = load_font(path) or_return
 	return true
 }

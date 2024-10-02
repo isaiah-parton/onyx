@@ -16,13 +16,12 @@ Boolean_Widget_Info :: struct {
 	text:      string,
 	text_side: Maybe(Side),
 	text_job:  Text_Job,
+	toggled: bool,
 }
 
 Boolean_Widget_Kind :: struct {
 	state_time: f32,
 }
-
-Checkbox_Result :: Widget_Result
 
 boolean_widget_behavior :: proc(
 	widget: ^Widget,
@@ -35,7 +34,7 @@ boolean_widget_behavior :: proc(
 
 init_boolean_widget :: proc(info: ^Boolean_Widget_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
+	info.self = get_widget(info.id) or_return
 	info.text_side = info.text_side.? or_else .Left
 	if len(info.text) > 0 {
 		if text_job, ok := make_text_job(
@@ -130,6 +129,7 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 
 	if .Clicked in self.state {
 		state^ = !state^
+		toggled = true
 	}
 
 	return true
@@ -142,16 +142,20 @@ checkbox :: proc(info: Boolean_Widget_Info, loc := #caller_location) -> Boolean_
 	return info
 }
 
-Toggle_Switch_Info :: struct {
-	using _: Widget_Info,
-	state:   ^bool,
-}
+Toggle_Switch_Info :: Boolean_Widget_Info
 
-init_toggle_switch :: proc(info: ^Toggle_Switch_Info, loc := #caller_location) -> bool {
-	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
-	info.fixed_size = true
-	info.desired_size = {40, 20}
+init_toggle_switch :: proc(using info: ^Toggle_Switch_Info, loc := #caller_location) -> bool {
+	text_side = text_side.? or_else .Right
+	desired_size = [2]f32{2, 1} * core.style.visual_size.y * 0.75
+	if len(text) > 0 {
+		text_job = make_text_job(
+			{font = core.style.fonts[.Regular], size = 18, text = text},
+		) or_return
+		desired_size.x += text_job.size.x + TEXT_PADDING
+	}
+	fixed_size = true
+	id = hash(loc)
+	self = get_widget(id) or_return
 	return true
 }
 
@@ -168,7 +172,14 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 
 	if self.visible {
 		outer_radius := box_height(self.box) / 2
-		inner_box := shrink_box(self.box, 2)
+		switch_box: Box = self.box
+		switch text_side {
+		case .Left:
+			switch_box = get_box_cut_right(self.box, box_height(switch_box) * 2)
+		case .Right:
+			switch_box = get_box_cut_left(self.box, box_height(switch_box) * 2)
+		}
+		inner_box := shrink_box(switch_box, 2)
 		inner_radius := box_height(inner_box) / 2
 		lever_center: [2]f32 = {
 			inner_box.lo.x +
@@ -178,15 +189,31 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 		}
 
 		draw_rounded_box_fill(
-			self.box,
+			switch_box,
 			outer_radius,
 			interpolate_colors(how_on, core.style.color.substance, core.style.color.accent),
 		)
-		draw_arc_fill(lever_center, inner_radius, 0, math.TAU, core.style.color.background)
+		draw_arc_fill(lever_center, inner_radius, 0, math.TAU, core.style.color.content)
+
+		switch text_side {
+		case .Left:
+			draw_text_glyphs(
+				text_job,
+				{self.box.lo.x, box_center_y(self.box) - text_job.size.y / 2},
+				core.style.color.content,
+			)
+		case .Right:
+			draw_text_glyphs(
+				text_job,
+				{self.box.hi.x - text_job.size.x, box_center_y(self.box) - text_job.size.y / 2},
+				core.style.color.content,
+			)
+		}
 	}
 
 	if .Clicked in self.state {
 		state^ = !state^
+		toggled = true
 	}
 
 	return true
@@ -282,6 +309,10 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 		if self.disable_time > 0 {
 			draw_box_fill(self.box, fade(core.style.color.foreground, self.disable_time * 0.5))
 		}
+	}
+
+	if .Clicked in self.state {
+		toggled = true
 	}
 
 	return true

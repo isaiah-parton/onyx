@@ -12,7 +12,7 @@ Slider_Info :: struct {
 
 init_slider :: proc(info: ^Slider_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
-	info.self = get_widget(info.id.?) or_return
+	info.self = get_widget(info.id) or_return
 	info.sticky = true
 	info.desired_size = core.style.visual_size
 	info.hi = max(info.hi, info.lo + 1)
