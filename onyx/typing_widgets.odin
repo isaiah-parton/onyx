@@ -6,8 +6,8 @@ import "core:fmt"
 import "core:math/linalg"
 import "core:mem"
 import "core:slice"
-import "core:strings"
 import "core:strconv"
+import "core:strings"
 import "core:time"
 
 import "tedit"
@@ -26,7 +26,7 @@ Input_Info :: struct {
 	multiline, read_only, hidden: bool,
 	decal:                        Input_Decal,
 	undecorated:                  bool,
-	changed, submitted, enter:           bool,
+	changed, submitted, enter:    bool,
 }
 
 Input_Widget_Kind :: struct {
@@ -43,17 +43,15 @@ String_Input_Info :: struct {
 }
 
 init_input :: proc(using info: ^Input_Info, loc := #caller_location) -> bool {
-	if builder == nil {
-		return false
-	}
-id = hash(loc)
+	id = hash(loc)
 	self = get_widget(id.?) or_return
 	sticky = true
 	desired_size = core.style.visual_size
-	text = strings.to_string(builder^)
+	if builder != nil {
+		text = strings.to_string(builder^)
+	}
 	if .Active in self.state {
-		if (core.focused_widget != core.last_focused_widget) &&
-		   !key_down(.Left_Control) {
+		if (core.focused_widget != core.last_focused_widget) && !key_down(.Left_Control) {
 			self.state -= {.Active}
 		}
 	} else {
@@ -77,11 +75,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	defer end_widget()
 
 	if self.visible && !undecorated {
-		draw_rounded_box_fill(
-			self.box,
-			core.style.rounding,
-			core.style.color.background,
-		)
+		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.background)
 	}
 
 	if builder == nil {
@@ -218,8 +212,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	if font, ok := &core.fonts[text_info.font].?; ok {
 		if font_size, ok := get_font_size(font, text_info.size); ok {
 			if info.multiline {
-				text_origin.y =
-					self.box.lo.y + (font_size.ascent - font_size.descent) / 2
+				text_origin.y = self.box.lo.y + (font_size.ascent - font_size.descent) / 2
 			} else {
 				text_origin.y =
 					(self.box.hi.y + self.box.lo.y) / 2 -
@@ -229,20 +222,14 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	}
 
 	// Make text job
-	if text_job, ok := make_text_job(
-		text_info,
-		e,
-		core.mouse_pos - (text_origin - kind.offset),
-	); ok {
+	if text_job, ok := make_text_job(text_info, e, core.mouse_pos - (text_origin - kind.offset));
+	   ok {
 		// Resolve view offset so the cursor is always shown
 		if .Active in self.last_state && text_job.cursor_glyph >= 0 {
 			glyph := text_job.glyphs[text_job.cursor_glyph]
 			glyph_pos := (text_origin - kind.offset) + glyph.pos
 			// The cursor's own bounding box
-			cursor_box := Box {
-				glyph_pos + {-1, -2},
-				glyph_pos + {1, text_job.line_height + 2},
-			}
+			cursor_box := Box{glyph_pos + {-1, -2}, glyph_pos + {1, text_job.line_height + 2}}
 			// The box we want the cursor to stay in
 			inner_box := shrink_box(self.box, 4)
 			// Move view offset
@@ -273,21 +260,13 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 			}
 			// First draw the highlighting behind the text
 			if .Active in self.last_state {
-				draw_text_highlight(
-					text_job,
-					text_origin,
-					fade(core.style.color.accent, 0.5),
-				)
+				draw_text_highlight(text_job, text_origin, fade(core.style.color.accent, 0.5))
 			}
 			// Then draw the text
 			draw_text_glyphs(text_job, text_origin, core.style.color.content)
 			// Draw the cursor in front of the text
 			if .Active in self.last_state {
-				draw_text_cursor(
-					text_job,
-					text_origin,
-					core.style.color.accent,
-				)
+				draw_text_cursor(text_job, text_origin, core.style.color.accent)
 			}
 			pop_clip()
 
@@ -346,11 +325,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 			}
 
 			if !info.undecorated {
-				draw_rounded_box_mask(
-					self.box,
-					core.style.rounding,
-					core.style.color.foreground,
-				)
+				draw_rounded_box_mask(self.box, core.style.rounding, core.style.color.foreground)
 			}
 		}
 
@@ -364,10 +339,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				if self.click_count == 3 {
 					editor_execute(e, .Select_All)
 				} else {
-					e.selection = {
-						text_job.hovered_rune,
-						text_job.hovered_rune,
-					}
+					e.selection = {text_job.hovered_rune, text_job.hovered_rune}
 				}
 			}
 			switch self.click_count {
@@ -378,17 +350,11 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 					} else {
 						e.selection[0] = max(
 							0,
-							strings.last_index_any(
-								text_info.text[:text_job.hovered_rune],
-								" \n",
-							) +
+							strings.last_index_any(text_info.text[:text_job.hovered_rune], " \n") +
 							1,
 						)
 					}
-					e.selection[1] = strings.index_any(
-						text_info.text[kind.anchor:],
-						" \n",
-					)
+					e.selection[1] = strings.index_any(text_info.text[kind.anchor:], " \n")
 					if e.selection[1] == -1 {
 						e.selection[1] = len(text_info.text)
 					} else {
@@ -397,11 +363,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				} else {
 					e.selection[1] = max(
 						0,
-						strings.last_index_any(
-							text_info.text[:kind.anchor],
-							" \n",
-						) +
-						1,
+						strings.last_index_any(text_info.text[:kind.anchor], " \n") + 1,
 					)
 					if (text_job.hovered_rune > 0 &&
 						   text_info.text[text_job.hovered_rune - 1] == ' ') {
@@ -413,8 +375,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 						)
 					}
 					if e.selection[0] == -1 {
-						e.selection[0] =
-							len(text_info.text) - text_job.hovered_rune
+						e.selection[0] = len(text_info.text) - text_job.hovered_rune
 					}
 					e.selection[0] += text_job.hovered_rune
 				}
@@ -438,16 +399,13 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 
 input :: proc(info: Input_Info, loc := #caller_location) -> Input_Info {
 	info := info
-	if init_input(&info, loc) {
+	if info.builder != nil && init_input(&info, loc) {
 		add_input(&info)
 	}
 	return info
 }
 
-init_string_input :: proc(
-	using info: ^String_Input_Info,
-	loc := #caller_location,
-) -> bool {
+init_string_input :: proc(using info: ^String_Input_Info, loc := #caller_location) -> bool {
 	if value == nil {
 		return false
 	}
@@ -472,10 +430,7 @@ add_string_input :: proc(using info: ^String_Input_Info) -> bool {
 	return true
 }
 
-string_input :: proc(
-	info: String_Input_Info,
-	loc := #caller_location,
-) -> Input_Info {
+string_input :: proc(info: String_Input_Info, loc := #caller_location) -> Input_Info {
 	info := info
 	if init_string_input(&info, loc) {
 		add_string_input(&info)
@@ -484,11 +439,11 @@ string_input :: proc(
 }
 
 Number_Input_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
-	using _: Input_Info,
-	value: ^T,
-	lo, hi: T,
+	using _:   Input_Info,
+	value:     ^T,
+	lo, hi:    T,
 	increment: Maybe(T),
-	format: Maybe(string),
+	format:    Maybe(string),
 }
 
 init_number_input :: proc(using info: ^Number_Input_Info($T), loc := #caller_location) -> bool {
@@ -520,7 +475,10 @@ add_number_input :: proc(using info: ^Number_Input_Info($T)) -> bool {
 	return true
 }
 
-number_input :: proc(info: Number_Input_Info($T), loc := #caller_location) -> Number_Input_Info(T) {
+number_input :: proc(
+	info: Number_Input_Info($T),
+	loc := #caller_location,
+) -> Number_Input_Info(T) {
 	info := info
 	if init_number_input(&info, loc) {
 		add_number_input(&info)

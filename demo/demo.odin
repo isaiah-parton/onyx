@@ -60,7 +60,7 @@ State :: struct {
 state: State
 
 Table_Entry :: struct {
-	id:        u64,
+	id:          u64,
 	hash:        string,
 	public_key:  string,
 	private_key: string,
@@ -86,7 +86,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 	}
 	shrink(40)
 
-	if panel({title = "panle"}) {
+	if panel({title = "panel"}) {
 		shrink(10)
 		set_height_auto()
 		date_picker({first = &state.date_range[0]})
@@ -129,12 +129,21 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			sort_proc :: proc(i, j: Table_Entry) -> bool {
 				i := i
 				j := j
-				field := reflect.struct_field_at(Table_Entry, state.component_showcase.sorted_column)
+				field := reflect.struct_field_at(
+					Table_Entry,
+					state.component_showcase.sorted_column,
+				)
 				switch field.type.id {
 				case string:
-					return (^string)(uintptr(&i) + field.offset)^ < (^string)(uintptr(&j) + field.offset)^
+					return(
+						(^string)(uintptr(&i) + field.offset)^ <
+						(^string)(uintptr(&j) + field.offset)^ \
+					)
 				case u64, u32:
-					return (^u64)(uintptr(&i) + field.offset)^ < (^u64)(uintptr(&j) + field.offset)^
+					return(
+						(^u64)(uintptr(&i) + field.offset)^ <
+						(^u64)(uintptr(&j) + field.offset)^ \
+					)
 				case:
 					return false
 				}

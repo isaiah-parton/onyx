@@ -260,8 +260,9 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 
 calendar :: proc(info: Calendar_Info, loc := #caller_location) -> Calendar_Info {
 	info := info
-	init_calendar(&info, loc)
-	add_calendar(&info)
+	if init_calendar(&info, loc) {
+		add_calendar(&info)
+	}
 	return info
 }
 
