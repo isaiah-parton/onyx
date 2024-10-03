@@ -50,6 +50,7 @@ Component_Showcase :: struct {
 	entries:       [dynamic]Table_Entry,
 	sort_order:    onyx.Sort_Order,
 	sorted_column: int,
+	hsva: [4]f32,
 }
 
 State :: struct {
@@ -70,8 +71,9 @@ Table_Entry :: struct {
 component_showcase :: proc(state: ^Component_Showcase) {
 	using onyx
 
-	layer_box := shrink_box(view_box(), 100)
-	begin_layer({box = layer_box, kind = .Background})
+	begin_layer({box = view_box(), kind = .Background})
+	draw_box_fill(current_layout().?.box, core.style.color.background)
+	shrink(100)
 	foreground()
 	if layout({size = 65, side = .Top}) {
 		shrink(15)
@@ -100,7 +102,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 
 	#partial switch state.section.component {
 	case .Tables:
-		set_side(.Top)
+		set_side(.Left)
 		rows_active: [dynamic]bool
 		resize(&rows_active, len(state.entries))
 
@@ -162,6 +164,12 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			}
 			core.draw_next_frame = true
 		}
+		set_side(.Top)
+		color_wheel({hsva = &state.hsva})
+		slider(Slider_Info(f32){value = &state.hsva.x, hi = 360})
+		slider(Slider_Info(f32){value = &state.hsva.y})
+		slider(Slider_Info(f32){value = &state.hsva.z})
+		slider(Slider_Info(f32){value = &state.hsva.a})
 
 	case .Scroll_Zone:
 		set_side(.Left)
@@ -197,11 +205,11 @@ component_showcase :: proc(state: ^Component_Showcase) {
 	case .Slider:
 		set_side(.Top)
 		label({text = "Normal"})
-		slider({value = &state.slider_value})
+		slider(Slider_Info(f64){value = &state.slider_value})
 		add_space(10)
 		label({text = "Box"})
 		add_space(10)
-		box_slider({value = &state.slider_value})
+		box_slider(Slider_Info(f64){value = &state.slider_value})
 
 	case .Button:
 		set_side(.Top)

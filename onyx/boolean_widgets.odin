@@ -137,8 +137,9 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 
 checkbox :: proc(info: Boolean_Widget_Info, loc := #caller_location) -> Boolean_Widget_Info {
 	info := info
-	init_boolean_widget(&info, loc)
-	add_checkbox(&info)
+	if init_boolean_widget(&info, loc) {
+		add_checkbox(&info)
+	}
 	return info
 }
 
@@ -221,8 +222,9 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 
 toggle_switch :: proc(info: Toggle_Switch_Info, loc := #caller_location) -> Toggle_Switch_Info {
 	info := info
-	init_toggle_switch(&info, loc)
-	add_toggle_switch(&info)
+	if init_toggle_switch(&info, loc) {
+		add_toggle_switch(&info)
+	}
 	return info
 }
 
@@ -320,7 +322,8 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 
 radio_button :: proc(info: Radio_Button_Info, loc := #caller_location) -> Radio_Button_Info {
 	info := info
-	init_boolean_widget(&info, loc)
-	add_radio_button(&info)
+	if init_boolean_widget(&info, loc) {
+		add_radio_button(&info)
+	}
 	return info
 }

@@ -272,6 +272,9 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 // Ends the current widget
 end_widget :: proc() {
 	if widget, ok := current_widget().?; ok {
+		if core.debug.enabled {
+			draw_box_stroke(widget.box, 1, {0, 255, 0, 255})
+		}
 		if layout, ok := current_layout().?; ok {
 			add_layout_content_size(
 				layout,

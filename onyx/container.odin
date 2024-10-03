@@ -138,7 +138,6 @@ end_container :: proc() {
 		}
 	}
 
-	append_draw_call(current_layer().?.index)
 	// Rounded corner mask to fake rounded clipping
 	draw_rounded_box_mask(self.box, core.style.rounding, core.style.color.foreground)
 	// Table outline
@@ -146,6 +145,7 @@ end_container :: proc() {
 
 	pop_clip()
 	pop_stack(&core.container_stack)
+	append_draw_call(current_layer().?.index)
 }
 
 current_container :: proc() -> Maybe(^Container) {

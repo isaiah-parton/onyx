@@ -4,13 +4,13 @@ import "base:intrinsics"
 import "core:math"
 import "core:math/linalg"
 
-Slider_Info :: struct {
+Slider_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	using _: Widget_Info,
-	value:   ^f64,
-	lo, hi:  f64,
+	value:   ^T,
+	lo, hi:  T,
 }
 
-init_slider :: proc(info: ^Slider_Info, loc := #caller_location) -> bool {
+init_slider :: proc(info: ^Slider_Info($T), loc := #caller_location) -> bool {
 	info.id = hash(loc)
 	info.self = get_widget(info.id) or_return
 	info.sticky = true
@@ -19,7 +19,7 @@ init_slider :: proc(info: ^Slider_Info, loc := #caller_location) -> bool {
 	return true
 }
 
-add_slider :: proc(using info: ^Slider_Info) -> bool {
+add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
 
@@ -62,21 +62,21 @@ add_slider :: proc(using info: ^Slider_Info) -> bool {
 
 	if (.Pressed in self.state) && value != nil {
 		new_time := clamp((core.mouse_pos.x - _box.lo.x - radius) / range_width, 0, 1)
-		value^ = lo + f64(new_time) * (hi - lo)
+		value^ = lo + T(new_time) * (hi - lo)
 		core.draw_next_frame = true
 	}
 
 	return true
 }
 
-slider :: proc(info: Slider_Info, loc := #caller_location) -> Slider_Info {
+slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T) {
 	info := info
 	init_slider(&info, loc)
 	add_slider(&info)
 	return info
 }
 
-add_box_slider :: proc(using info: ^Slider_Info) -> bool {
+add_box_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
 
@@ -97,7 +97,7 @@ add_box_slider :: proc(using info: ^Slider_Info) -> bool {
 	return true
 }
 
-box_slider :: proc(info: Slider_Info, loc := #caller_location) -> Slider_Info {
+box_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T) {
 	info := info
 	init_slider(&info, loc)
 	add_box_slider(&info)

@@ -57,14 +57,12 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 				core.style.rounding,
 				fade(color.? or_else core.style.color.substance, self.hover_time * 0.5),
 			)
-			if self.hover_time < 1 {
-				draw_rounded_box_stroke(
-					self.box,
-					core.style.rounding,
-					1,
-					color.? or_else core.style.color.substance,
-				)
-			}
+			draw_rounded_box_stroke(
+				self.box,
+				core.style.rounding,
+				1,
+				color.? or_else core.style.color.substance,
+			)
 			text_color = core.style.color.content
 
 		case .Secondary:
@@ -95,7 +93,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			draw_rounded_box_fill(
 				self.box,
 				core.style.rounding,
-				fade(color.? or_else core.style.color.substance, self.hover_time),
+				fade(color.? or_else core.style.color.substance, self.hover_time * 0.5),
 			)
 			text_color = core.style.color.content
 		}

@@ -145,8 +145,6 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		}
 	}
 
-
-
 	// Title bar
 	if info.title != "" {
 		title_box := get_box_cut_top(panel.box, TITLE_HEIGHT)

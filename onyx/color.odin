@@ -14,9 +14,69 @@ color_from_hex :: proc(hex: u32) -> Color {
 	}
 }
 
+hsva_from_color :: proc(color: Color) -> (hsva: [4]f32) {
+	rgba: [4]f32 = {f32(color.r), f32(color.g), f32(color.b), f32(color.a)} / 255
+
+	low := min(rgba.r, rgba.g, rgba.b)
+	high := max(rgba.r, rgba.g, rgba.b)
+	hsva.w = rgba.a
+
+	hsva.z = high
+	delta := high - low
+
+	if delta < 0.00001 {
+		return
+	}
+
+	if high > 0 {
+		hsva.y = delta / high
+	} else {
+		return
+	}
+
+	if rgba.r >= high {
+		hsva.x = (rgba.g - rgba.b) / delta
+	} else {
+		if rgba.g >= high {
+			hsva.x = 2.0 + (rgba.b - rgba.r) / delta
+		} else {
+			hsva.x = 4.0 + (rgba.r - rgba.g) / delta
+		}
+	}
+
+	hsva.x *= 60
+
+	if hsva.x < 0 {
+		hsva.x += 360
+	}
+
+	return
+}
+color_from_hsva :: proc(hsva: [4]f32) -> Color {
+  r, g, b, k, t: f32
+
+  k = math.mod(5.0 + hsva.x / 60.0, 6)
+  t = 4.0 - k
+  k = clamp(min(t, k), 0, 1)
+  r = hsva.z - hsva.z * hsva.y * k
+
+  k = math.mod(3.0 + hsva.x / 60.0, 6)
+  t = 4.0 - k
+  k = clamp(min(t, k), 0, 1)
+  g = hsva.z - hsva.z * hsva.y * k
+
+  k = math.mod(1.0 + hsva.x / 60.0, 6)
+  t = 4.0 - k
+  k = clamp(min(t, k), 0, 1)
+  b = hsva.z - hsva.z * hsva.y * k
+
+  return {u8(r * 255.0), u8(g * 255.0), u8(b * 255.0), u8(hsva.a * 255.0)}
+}
+
 color_from :: proc {
 	color_from_hex,
 	color_from_hsl,
+	color_from_hsva,
 }
 
 interpolate_colors :: proc(time: f32, colors: ..Color) -> Color {

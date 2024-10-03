@@ -54,7 +54,7 @@ default_style_shape :: proc() -> Style_Shape {
 
 light_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
-		background = {165, 169, 169, 255},
+		background = {255, 255, 255, 255},
 		foreground = {255, 255, 255, 255},
 		substance = {162, 167, 167, 255},
 		accent = {59, 130, 246, 255},

@@ -307,27 +307,16 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 
 			// Optional outline
 			if !undecorated {
-				if multiline {
-					draw_rounded_box_stroke(
-						self.box,
-						core.style.rounding,
-						1 + self.focus_time,
-						interpolate_colors(
-							self.focus_time,
-							core.style.color.substance,
-							core.style.color.accent,
-						),
-					)
-				} else {
-					draw_box_fill(
-						get_box_cut_bottom(self.box, 1 + self.focus_time),
-						interpolate_colors(
-							self.focus_time,
-							core.style.color.substance,
-							core.style.color.accent,
-						),
-					)
-				}
+				draw_rounded_box_stroke(
+					self.box,
+					core.style.rounding,
+					1 + self.focus_time,
+					interpolate_colors(
+						self.focus_time,
+						core.style.color.substance,
+						core.style.color.accent,
+					),
+				)
 			}
 
 			// Draw disabled overlay
