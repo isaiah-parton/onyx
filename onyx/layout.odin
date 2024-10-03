@@ -70,19 +70,21 @@ pop_layout :: proc() {
 }
 // Begin a layout
 begin_layout :: proc(info: Layout_Info) -> bool {
-	last_layout := current_layout().?
-	side := info.side.? or_else last_layout.next_cut_side
-	size := info.size.? or_else last_layout.next_size[int(side) / 2]
-	box := info.box.? or_else cut_box(&last_layout.box, side, size)
 	layout := Layout {
 		isolated      = info.isolated,
-		box           = box,
-		bounds        = box,
 		side          = info.side,
-		next_cut_side = .Left if int(side) > 1 else .Top,
-		next_size     = last_layout.next_size,
-		next_padding  = last_layout.next_padding,
 	}
+	if last_layout, ok := current_layout().?; ok {
+		side := info.side.? or_else last_layout.next_cut_side
+		size := info.size.? or_else last_layout.next_size[int(side) / 2]
+		layout.box = info.box.? or_else cut_box(&last_layout.box, side, size)
+		layout.next_size     = last_layout.next_size
+		layout.next_padding  = last_layout.next_padding
+		layout.next_cut_side = .Left if int(side) > 1 else .Top
+	} else {
+		layout.box = info.box.? or_return
+	}
+	layout.bounds = layout.box
 	return push_layout(layout)
 }
 // End the current layout

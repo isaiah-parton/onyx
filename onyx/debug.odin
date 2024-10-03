@@ -4,7 +4,7 @@ import "core:fmt"
 
 @(private)
 do_debug_layer :: proc() {
-	begin_layer({box = view_box(), sorting = .Above, kind = .Debug, options = {.Ghost}})
+	begin_layer({box = view_box(), sorting = .Above, kind = .Debug})
 	draw_text(
 		{},
 		{

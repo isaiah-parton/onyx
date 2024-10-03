@@ -121,12 +121,14 @@ Core :: struct {
 	mouse_button:          Mouse_Button,
 	last_mouse_pos:        [2]f32,
 	mouse_pos:             [2]f32,
+	mouse_delta: [2]f32,
 	mouse_scroll:          [2]f32,
 	mouse_bits:            Mouse_Bits,
 	last_mouse_bits:       Mouse_Bits,
 	keys, last_keys:       #sparse[Keyboard_Key]bool,
 	runes:                 [dynamic]rune,
 	visible, focused:      bool,
+	window_moving: bool,
 
 	// Style
 	style:                 Style,
@@ -161,7 +163,7 @@ Core :: struct {
 	draw_call_count:       int,
 	current_draw_call:     ^Draw_Call,
 	gfx:                   Graphics,
-	cursors:               #sparse[Mouse_Cursor]glfw.CursorHandle,
+	cursors:               [Mouse_Cursor]glfw.CursorHandle,
 }
 
 view_box :: proc() -> Box {
@@ -210,6 +212,9 @@ init :: proc(window: glfw.WindowHandle) -> bool {
 	)
 
 	// Set event callbacks
+	glfw.SetWindowIconifyCallback(core.window, proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = false})
+	glfw.SetWindowFocusCallback(core.window, proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = true})
+	glfw.SetWindowMaximizeCallback(core.window, proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = true})
 	glfw.SetScrollCallback(
 		core.window,
 		proc "c" (_: glfw.WindowHandle, x, y: f64) {
@@ -253,6 +258,7 @@ init :: proc(window: glfw.WindowHandle) -> bool {
 	glfw.SetCursorPosCallback(
 		core.window,
 		proc "c" (_: glfw.WindowHandle, x, y: f64) {
+			core.last_mouse_pos = core.mouse_pos
 			core.mouse_pos = {f32(x), f32(y)}
 		},
 	)
@@ -313,6 +319,17 @@ new_frame :: proc() {
 
 	// Handle window events
 	glfw.PollEvents()
+
+	if core.window_moving {
+		if mouse_released(.Left) {
+			core.window_moving = false
+		} else {
+			x, y := glfw.GetWindowPos(core.window)
+			mouse_delta := core.mouse_pos - core.last_mouse_pos
+			glfw.SetWindowPos(core.window, x + i32(mouse_delta.x), y + i32(mouse_delta.y))
+			core.mouse_pos = core.last_mouse_pos
+		}
+	}
 
 	// Set and reset cursor
 	glfw.SetCursor(core.window, core.cursors[core.cursor_type])
@@ -440,7 +457,7 @@ render :: proc() {
 		core.font_atlas.modified = false
 	}
 
-	if core.draw_this_frame {
+	if core.draw_this_frame && core.visible {
 		start_time := time.now()
 		draw(&core.gfx, &core.draw_list, core.draw_calls[:])
 
@@ -459,7 +476,6 @@ render :: proc() {
 	core.vertex_state = {}
 
 	// Reset input values
-	core.last_mouse_pos = core.mouse_pos
 	core.last_mouse_bits = core.mouse_bits
 	core.last_keys = core.keys
 	core.mouse_scroll = {}

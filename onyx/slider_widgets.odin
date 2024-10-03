@@ -14,7 +14,7 @@ init_slider :: proc(info: ^Slider_Info($T), loc := #caller_location) -> bool {
 	info.id = hash(loc)
 	info.self = get_widget(info.id) or_return
 	info.sticky = true
-	info.desired_size = core.style.visual_size
+	info.desired_size = {core.style.visual_size.x, core.style.visual_size.y * 0.75}
 	info.hi = max(info.hi, info.lo + 1)
 	return true
 }
@@ -71,9 +71,19 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 
 slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T) {
 	info := info
-	init_slider(&info, loc)
-	add_slider(&info)
+	if init_slider(&info, loc) {
+		add_slider(&info)
+	}
 	return info
+}
+
+init_box_slider :: proc(using info: ^Slider_Info($T), loc := #caller_location) -> bool {
+	info.id = hash(loc)
+	info.self = get_widget(info.id) or_return
+	info.sticky = true
+	info.desired_size = core.style.visual_size
+	info.hi = max(info.hi, info.lo + 1)
+	return true
 }
 
 add_box_slider :: proc(using info: ^Slider_Info($T)) -> bool {
@@ -99,7 +109,8 @@ add_box_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 
 box_slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T) {
 	info := info
-	init_slider(&info, loc)
-	add_box_slider(&info)
+	if init_slider(&info, loc) {
+		add_box_slider(&info)
+	}
 	return info
 }

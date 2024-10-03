@@ -55,7 +55,6 @@ begin_tooltip :: proc(using info: Tooltip_Info, loc := #caller_location) -> bool
 		{
 			box     = box,
 			// parent = current_layer(),
-			options = {.Ghost},
 			// origin = box_center(box),
 			// scale = [2]f32{1, info.time},
 			// rotation = diff.x * 0.001,

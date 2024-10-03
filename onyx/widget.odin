@@ -288,12 +288,13 @@ end_widget :: proc() {
 hover_widget :: proc(widget: ^Widget) {
 	// Disabled?
 	if widget.disabled do return
-	// Layer not hovered?
-	if core.hovered_layer != widget.layer.id do return
+	// Below highest hovered widget
+	if widget.layer.index < core.highest_layer_index do return
 	// Clipped?
 	if clip, ok := current_clip().?; ok && !point_in_box(core.mouse_pos, current_clip().?) do return
 	// Ok hover
 	core.next_hovered_widget = widget.id
+	core.next_hovered_layer = widget.layer.id
 }
 // Try make this widget focused
 focus_widget :: proc(widget: ^Widget) {

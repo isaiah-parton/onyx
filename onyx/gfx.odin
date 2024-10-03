@@ -38,6 +38,7 @@ Graphics :: struct {
 }
 
 resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
+	if width <= 0 || height <= 0 do return
 	gfx.width = u32(width)
 	gfx.height = u32(height)
 	gfx.surface_config.width = gfx.width
@@ -458,8 +459,9 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		pass,
 		0,
 		0,
-		core.view.x,
-		core.view.y,
+		// Quick fix to avoid a validation error
+		max(core.view.x, 1),
+		max(core.view.y, 1),
 		0,
 		0,
 	)

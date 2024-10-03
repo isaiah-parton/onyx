@@ -67,7 +67,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
 		background = {0, 0, 0, 255},
 		foreground = {25, 25, 32, 255},
-		substance = {65, 65, 75, 255},
+		substance = {55, 55, 60, 255},
 		accent = {59, 130, 246, 255},
 		accent_content = {255, 255, 255, 255},
 		content = {255, 255, 255, 255},

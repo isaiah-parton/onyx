@@ -1,19 +1,14 @@
 package onyx
-
-/*
-	Layers are surfaces with a unique z-index on which widgets are drawn.
-	They can be reordered by the mouse
-
-	FIXME: Opened layers on menus cause frame drop the first time opened (only on D3D11)
-*/
-
+// Layers exist only to allow ordered rendering
+// Layers have no interaction of their own, but clicking or hovering a widget in a given layer, will update its
+// state.
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 import "core:slice"
 
-Layer_Kind :: enum int {
+Layer_Order :: enum int {
 	Background,
 	Floating,
 	Topmost,
@@ -34,7 +29,6 @@ Layer_Status :: enum {
 Layer_State :: bit_set[Layer_Status]
 
 Layer_Option :: enum {
-	Ghost,
 	Isolated,
 	Attached,
 }
@@ -43,14 +37,18 @@ Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
 	id:                Id,
-	parent:            ^Layer, // The layer's parent
-	children:          [dynamic]^Layer, // The layer's children
+	parent:            ^Layer,
+	children:          [dynamic]^Layer,
 	last_state, state: Layer_State,
-	options:           Layer_Options, // Option bit flags
-	kind:              Layer_Kind,
+	options:           Layer_Options,
+	kind:              Layer_Order,
+	// Contents are clipped to this box
 	box:               Box,
-	dead:              bool, // Should be deleted?
+	// Will be deleted at the end of this frame
+	dead:              bool,
+	// Global draw opacity
 	opacity:           f32,
+	// Render order
 	index:             int,
 	frames:            int,
 }
@@ -60,7 +58,7 @@ Layer_Info :: struct {
 	parent:   ^Layer,
 	options:  Layer_Options,
 	box:      Box,
-	kind:     Maybe(Layer_Kind),
+	kind:     Maybe(Layer_Order),
 	origin:   [2]f32,
 	scale:    Maybe([2]f32),
 	rotation: f32,
@@ -108,11 +106,11 @@ set_layer_index :: proc(layer: ^Layer, index: int) {
 	layer.index = index
 }
 
-get_lowest_layer_of_kind :: proc(kind: Layer_Kind) -> int {
-	return get_highest_layer_of_kind(Layer_Kind(int(kind) - 1)) + 1
+get_lowest_layer_of_kind :: proc(kind: Layer_Order) -> int {
+	return get_highest_layer_of_kind(Layer_Order(int(kind) - 1)) + 1
 }
 
-get_highest_layer_of_kind :: proc(kind: Layer_Kind) -> int {
+get_highest_layer_of_kind :: proc(kind: Layer_Order) -> int {
 	index: int
 	for i in 0 ..< len(core.layers) {
 		layer := &core.layers[i]
@@ -225,15 +223,6 @@ end_layer :: proc() {
 	pop_matrix()
 
 	layer := current_layer().?
-
-	// Get hover state
-	if (.Ghost not_in layer.options) && point_in_box(core.mouse_pos, layer.box) {
-		if layer.index >= core.highest_layer_index {
-			// The layer has the highest z index yet
-			core.highest_layer_index = layer.index
-			core.next_hovered_layer = layer.id
-		}
-	}
 
 	pop_layout()
 	pop_stack(&core.layer_stack)

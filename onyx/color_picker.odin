@@ -190,3 +190,27 @@ color_wheel :: proc(info: Color_Wheel_Info, loc := #caller_location) -> Color_Wh
 	}
 	return info
 }
+
+Color_Picker_Info :: struct {
+	using _: Widget_Info,
+	color: ^Color,
+}
+
+init_color_picker :: proc(using info: ^Color_Picker_Info, loc := #caller_location) -> bool {
+if info.color == nil do return false
+if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
+	return true
+}
+
+add_color_picker :: proc(using info: ^Color_Picker_Info) -> bool {
+	begin_widget(info) or_return
+	defer end_widget()
+
+	if self.visible {
+		draw_box_fill(self.box, color^)
+		draw_box_stroke(self.box, 1, core.style.color.substance)
+	}
+
+	return true
+}

@@ -25,10 +25,8 @@ Button_Info :: struct {
 }
 
 init_button :: proc(info: ^Button_Info, loc := #caller_location) -> bool {
-	assert(info != nil)
-	info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
-	info.text_job, _ = make_text_job(
+	if info == nil do return false
+	info.text_job = make_text_job(
 		{
 			text = info.text,
 			size = info.font_size.? or_else core.style.button_text_size,
@@ -36,8 +34,10 @@ init_button :: proc(info: ^Button_Info, loc := #caller_location) -> bool {
 			align_v = .Middle,
 			align_h = .Middle,
 		},
-	)
+	) or_return
 	info.desired_size = info.text_job.size + {18, 6}
+	info.id = hash(loc)
+	info.self = get_widget(info.id) or_return
 	return true
 }
 
@@ -122,7 +122,8 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 
 button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 	info := info
-	init_button(&info, loc)
-	add_button(&info)
+	if init_button(&info, loc) {
+		add_button(&info)
+	}
 	return info
 }

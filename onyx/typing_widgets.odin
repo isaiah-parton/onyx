@@ -218,7 +218,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 		text   = text,
 		font   = core.style.fonts[.Medium],
 		size   = core.style.content_text_size,
-		hidden = info.hidden,
+		hidden = info.hidden && len(text) > 0,
 	}
 
 	text_origin := [2]f32{self.box.lo.x + 5, 0}
