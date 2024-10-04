@@ -1054,23 +1054,7 @@ draw_rounded_box_stroke :: proc(
 	}
 }
 
-foreground :: proc() {
-	layout, ok := current_layout().?
-	if !ok do return
-	draw_rounded_box_fill(
-		layout.box,
-		core.style.rounding,
-		core.style.color.foreground,
-	)
-	draw_rounded_box_stroke(
-		layout.box,
-		core.style.rounding,
-		1,
-		core.style.color.substance,
-	)
-}
-
-// Advanced shapes
+// lil guys
 
 draw_spinner :: proc(center: [2]f32, color: Color) {
 	from :=
@@ -1081,7 +1065,7 @@ draw_spinner :: proc(center: [2]f32, color: Color) {
 		math.sin(f32(time.duration_seconds(time.since(core.start_time)) * 3)) *
 			1
 
-	inner := f32(6)
+	inner := f32(7)
 	outer := f32(10)
 	half := (inner + outer) / 2
 

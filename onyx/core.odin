@@ -3,7 +3,7 @@ package onyx
 import "vendor:glfw"
 
 import "vendor:fontstash"
-
+import "tedit"
 import "base:runtime"
 import "core:fmt"
 import "core:math"
@@ -11,8 +11,8 @@ import "core:math/linalg"
 import "core:mem"
 import "core:slice"
 import "core:strings"
+import "core:sys/windows"
 import "core:time"
-
 import "vendor:wgpu"
 
 MAX_IDS :: 32
@@ -121,14 +121,15 @@ Core :: struct {
 	mouse_button:          Mouse_Button,
 	last_mouse_pos:        [2]f32,
 	mouse_pos:             [2]f32,
-	mouse_delta: [2]f32,
+	mouse_delta:           [2]f32,
 	mouse_scroll:          [2]f32,
 	mouse_bits:            Mouse_Bits,
 	last_mouse_bits:       Mouse_Bits,
 	keys, last_keys:       #sparse[Keyboard_Key]bool,
 	runes:                 [dynamic]rune,
 	visible, focused:      bool,
-	window_moving: bool,
+	window_moving:         bool,
+	window_move_offset:    [2]f32,
 
 	// Style
 	style:                 Style,
@@ -146,6 +147,7 @@ Core :: struct {
 	font_atlas:            Atlas,
 	current_font:          int,
 	user_images:           [100]Maybe(Image),
+	text_editor: tedit.Editor,
 
 	// Drawing
 	draw_this_frame:       bool,
@@ -198,70 +200,58 @@ init :: proc(window: glfw.WindowHandle) -> bool {
 
 	// Create cursors
 	core.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
-	core.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(
-		glfw.POINTING_HAND_CURSOR,
-	)
+	core.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(glfw.POINTING_HAND_CURSOR)
 	core.cursors[.I_Beam] = glfw.CreateStandardCursor(glfw.IBEAM_CURSOR)
 	core.cursors[.Resize_EW] = glfw.CreateStandardCursor(glfw.RESIZE_EW_CURSOR)
 	core.cursors[.Resize_NS] = glfw.CreateStandardCursor(glfw.RESIZE_NS_CURSOR)
-	core.cursors[.Resize_NESW] = glfw.CreateStandardCursor(
-		glfw.RESIZE_NESW_CURSOR,
-	)
-	core.cursors[.Resize_NWSE] = glfw.CreateStandardCursor(
-		glfw.RESIZE_NWSE_CURSOR,
-	)
+	core.cursors[.Resize_NESW] = glfw.CreateStandardCursor(glfw.RESIZE_NESW_CURSOR)
+	core.cursors[.Resize_NWSE] = glfw.CreateStandardCursor(glfw.RESIZE_NWSE_CURSOR)
 
 	// Set event callbacks
-	glfw.SetWindowIconifyCallback(core.window, proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = false})
-	glfw.SetWindowFocusCallback(core.window, proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = true})
-	glfw.SetWindowMaximizeCallback(core.window, proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = true})
-	glfw.SetScrollCallback(
+	glfw.SetWindowIconifyCallback(
 		core.window,
-		proc "c" (_: glfw.WindowHandle, x, y: f64) {
-			core.mouse_scroll = {f32(x), f32(y)}
-		},
+		proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = false},
 	)
-	glfw.SetWindowSizeCallback(
+	glfw.SetWindowFocusCallback(
 		core.window,
-		proc "c" (_: glfw.WindowHandle, width, height: i32) {
-			context = runtime.default_context()
-			core.draw_this_frame = true
-			core.draw_next_frame = true
-			core.view = {f32(width), f32(height)}
-			resize_graphics(&core.gfx, int(width), int(height))
-		},
+		proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = true},
 	)
-	glfw.SetCharCallback(
+	glfw.SetWindowMaximizeCallback(
 		core.window,
-		proc "c" (_: glfw.WindowHandle, char: rune) {
-			context = runtime.default_context()
-			append(&core.runes, char)
-		},
+		proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = true},
 	)
-	glfw.SetKeyCallback(
-		core.window,
-		proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
-			if key < 0 {
-				return
-			}
-			switch action {
-			case glfw.PRESS:
-				core.keys[Keyboard_Key(key)] = true
-			case glfw.RELEASE:
-				core.keys[Keyboard_Key(key)] = false
-			case glfw.REPEAT:
-				core.keys[Keyboard_Key(key)] = true
-				core.last_keys[Keyboard_Key(key)] = false
-			}
-		},
-	)
-	glfw.SetCursorPosCallback(
-		core.window,
-		proc "c" (_: glfw.WindowHandle, x, y: f64) {
-			core.last_mouse_pos = core.mouse_pos
-			core.mouse_pos = {f32(x), f32(y)}
-		},
-	)
+	glfw.SetScrollCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
+		core.mouse_scroll = {f32(x), f32(y)}
+	})
+	glfw.SetWindowSizeCallback(core.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
+		context = runtime.default_context()
+		core.draw_this_frame = true
+		core.draw_next_frame = true
+		core.view = {f32(width), f32(height)}
+		resize_graphics(&core.gfx, int(width), int(height))
+	})
+	glfw.SetCharCallback(core.window, proc "c" (_: glfw.WindowHandle, char: rune) {
+		context = runtime.default_context()
+		append(&core.runes, char)
+	})
+	glfw.SetKeyCallback(core.window, proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
+		if key < 0 {
+			return
+		}
+		switch action {
+		case glfw.PRESS:
+			core.keys[Keyboard_Key(key)] = true
+		case glfw.RELEASE:
+			core.keys[Keyboard_Key(key)] = false
+		case glfw.REPEAT:
+			core.keys[Keyboard_Key(key)] = true
+			core.last_keys[Keyboard_Key(key)] = false
+		}
+	})
+	glfw.SetCursorPosCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
+		core.last_mouse_pos = core.mouse_pos
+		core.mouse_pos = {f32(x), f32(y)}
+	})
 	glfw.SetMouseButtonCallback(
 		core.window,
 		proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
@@ -280,10 +270,7 @@ init :: proc(window: glfw.WindowHandle) -> bool {
 	// Initalize draw list
 	init_draw_list(&core.draw_list)
 	// Init font atlas
-	atlas_size: int = min(
-		cast(int)core.gfx.device_limits.maxTextureDimension2D,
-		MAX_ATLAS_SIZE,
-	)
+	atlas_size: int = min(cast(int)core.gfx.device_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
 
 	// Default style
@@ -305,9 +292,7 @@ new_frame :: proc() {
 		),
 	)
 	now := time.now()
-	core.delta_time = f32(
-		time.duration_seconds(time.diff(core.last_frame_time, now)),
-	)
+	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
 	core.frames += 1
 	core.frames_so_far += 1
@@ -321,14 +306,16 @@ new_frame :: proc() {
 	glfw.PollEvents()
 
 	if core.window_moving {
-		if mouse_released(.Left) {
-			core.window_moving = false
-		} else {
-			x, y := glfw.GetWindowPos(core.window)
-			mouse_delta := core.mouse_pos - core.last_mouse_pos
-			glfw.SetWindowPos(core.window, x + i32(mouse_delta.x), y + i32(mouse_delta.y))
-			core.mouse_pos = core.last_mouse_pos
+		core.window_moving = false
+		point: windows.POINT
+		if windows.GetCursorPos(&point) {
+			glfw.SetWindowPos(
+				core.window,
+				point.x + i32(core.window_move_offset.x),
+				point.y + i32(core.window_move_offset.y),
+			)
 		}
+		core.mouse_pos = core.last_mouse_pos
 	}
 
 	// Set and reset cursor

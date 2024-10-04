@@ -1,17 +1,17 @@
 package onyx
 
 import "core:math"
+import "core:math/bits"
 import "core:math/linalg"
 
 Color :: [4]u8
 
 color_from_hex :: proc(hex: u32) -> Color {
-	return Color {
-		u8(0xff & hex),
-		u8(0xff & (hex >> 2)),
-		u8(0xff & (hex >> 4)),
-		u8(0xff & (hex >> 6)),
-	}
+	return transmute(Color)bits.reverse_bits(hex << 8)
+}
+
+hex_from_color :: proc(color: Color) -> u32 {
+	return bits.reverse_bits(transmute(u32)color) >> 8
 }
 
 hsva_from_color :: proc(color: Color) -> (hsva: [4]f32) {

@@ -54,10 +54,9 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 		draw_rounded_box_fill(
 			{_box.lo, {knob_center.x, _box.hi.y}},
 			radius,
-			core.style.color.accent,
+			fade(core.style.color.accent, 0.5),
 		)
-		draw_arc_fill(knob_center, knob_radius, 0, math.TAU, core.style.color.background)
-		draw_arc_stroke(knob_center, knob_radius, 0, math.TAU, 1.5, core.style.color.accent)
+		draw_arc_fill(knob_center, knob_radius, 0, math.TAU, core.style.color.accent)
 	}
 
 	if (.Pressed in self.state) && value != nil {

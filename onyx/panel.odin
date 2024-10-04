@@ -53,7 +53,6 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	push_stack(&core.panel_stack, panel)
 
 	push_id(id)
-	defer pop_id()
 
 	if panel.moving == true {
 		if mouse_released(.Left) {
@@ -310,6 +309,7 @@ end_panel :: proc() {
 	layout := current_layout().?
 	panel.min_size += layout.content_size + layout.spacing_size
 	pop_layout()
+	pop_id()
 	end_layer()
 	pop_stack(&core.panel_stack)
 }

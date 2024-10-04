@@ -310,11 +310,10 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				draw_rounded_box_stroke(
 					self.box,
 					core.style.rounding,
-					1 + self.focus_time,
-					interpolate_colors(
-						self.focus_time,
-						core.style.color.substance,
+					2,
+					fade(
 						core.style.color.accent,
+						self.focus_time,
 					),
 				)
 			}

@@ -301,3 +301,30 @@ hover_widget :: proc(widget: ^Widget) {
 focus_widget :: proc(widget: ^Widget) {
 	core.focused_widget = widget.id
 }
+
+// Idk where else to put this, cause it's a generic widget
+foreground :: proc(loc := #caller_location) {
+	layout, ok := current_layout().?
+	if !ok do return
+
+	using info := Widget_Info{id = hash(loc), box = layout.box}
+	if begin_widget(&info) {
+		defer end_widget()
+
+		draw_rounded_box_fill(
+			info.self.box,
+			core.style.rounding,
+			core.style.color.foreground,
+		)
+		draw_rounded_box_stroke(
+			info.self.box,
+			core.style.rounding,
+			1,
+			core.style.color.substance,
+		)
+
+		if point_in_box(core.mouse_pos, info.self.box) {
+			hover_widget(info.self)
+		}
+	}
+}

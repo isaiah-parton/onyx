@@ -111,7 +111,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 		}
 
 		if is_loading {
-			draw_loader(box_center(self.box), 10, text_color)
+			draw_spinner(box_center(self.box), text_color)
 		}
 	}
 

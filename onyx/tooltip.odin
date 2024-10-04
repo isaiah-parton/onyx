@@ -59,12 +59,12 @@ begin_tooltip :: proc(using info: Tooltip_Info, loc := #caller_location) -> bool
 }
 
 end_tooltip :: proc() {
-	draw_rounded_box_stroke(
-		current_layer().?.box,
-		core.style.rounding,
-		1,
-		core.style.color.substance,
-	)
+	// draw_rounded_box_stroke(
+	// 	current_layer().?.box,
+	// 	core.style.rounding,
+	// 	1,
+	// 	core.style.color.substance,
+	// )
 	end_layer()
 }
 

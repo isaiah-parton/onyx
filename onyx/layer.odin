@@ -31,6 +31,7 @@ Layer_State :: bit_set[Layer_Status]
 Layer_Option :: enum {
 	Isolated,
 	Attached,
+	No_Sorting,
 }
 
 Layer_Options :: bit_set[Layer_Option]
@@ -64,6 +65,7 @@ Layer_Info :: struct {
 	rotation: f32,
 	opacity:  Maybe(f32),
 	sorting:  Layer_Sorting,
+	index: Maybe(int),
 }
 
 destroy_layer :: proc(layer: ^Layer) {
@@ -79,6 +81,8 @@ current_layer :: proc(loc := #caller_location) -> Maybe(^Layer) {
 
 set_layer_index :: proc(layer: ^Layer, index: int) {
 	assert(layer != nil)
+
+	if layer.index == index do return
 
 	for i in 0 ..< len(core.layers) {
 		other_layer := &core.layers[i]
@@ -151,13 +155,17 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer
 			set_layer_parent(layer, info.parent)
 		}
 
-		if layer.parent != nil {
-			set_layer_index(layer, layer.parent.index + 1)
+		if index, ok := info.index.?; ok {
+			set_layer_index(layer, index)
 		} else {
-			if info.sorting == .Above {
-				set_layer_index(layer, get_highest_layer_of_kind(kind) + 1)
+			if layer.parent != nil {
+				set_layer_index(layer, layer.parent.index + 1)
 			} else {
-				set_layer_index(layer, get_lowest_layer_of_kind(kind))
+				if info.sorting == .Above {
+					set_layer_index(layer, get_highest_layer_of_kind(kind) + 1)
+				} else {
+					set_layer_index(layer, get_lowest_layer_of_kind(kind))
+				}
 			}
 		}
 	}
@@ -185,7 +193,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer
 	if core.hovered_layer == layer.id {
 		layer.state += {.Hovered}
 		// Re-order layers if clicked
-		if mouse_pressed(.Left) && layer.kind == .Floating {
+		if mouse_pressed(.Left) && layer.kind == .Floating && .No_Sorting not_in layer.options {
 			bring_layer_to_front(layer)
 		}
 	}

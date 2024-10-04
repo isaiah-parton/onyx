@@ -41,11 +41,9 @@ begin_selector :: proc(using info: ^Selector_Info) -> bool {
 		draw_rounded_box_fill(
 			self.box,
 			core.style.rounding,
-			fade(core.style.color.substance, self.hover_time),
+			fade(core.style.color.substance, self.hover_time * 0.5),
 		)
-		if self.hover_time < 1 {
-			draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
-		}
+		draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 		text_pos := box_center(self.box) + [2]f32{-10, 0}
 		draw_text_glyphs(text_job, text_pos, core.style.color.content)
 		draw_arrow(
@@ -157,7 +155,7 @@ add_selector_option :: proc(using info: ^Selector_Option_Info) -> bool {
 		draw_rounded_box_fill(
 			self.box,
 			core.style.rounding,
-			fade(core.style.color.substance, self.hover_time),
+			fade(core.style.color.substance, self.hover_time * 0.5),
 		)
 		if info.state {
 			switch info.kind {
@@ -189,15 +187,16 @@ selector_option :: proc(
 	loc := #caller_location,
 ) -> Selector_Option_Info {
 	info := info
-	init_selector_option(&info, loc)
-	add_selector_option(&info)
+	if init_selector_option(&info, loc) {
+		add_selector_option(&info)
+	}
 	return info
 }
 
 enum_selector :: proc(value: ^$T, loc := #caller_location) where intrinsics.type_is_enum(T) {
 	if value == nil do return
 	info := Selector_Info{text = fmt.tprint(value^)}
-	init_selector(&info, loc)
+	if !init_selector(&info, loc) do return
 	if begin_selector(&info) {
 		shrink(3)
 		set_side(.Top)
@@ -209,6 +208,6 @@ enum_selector :: proc(value: ^$T, loc := #caller_location) where intrinsics.type
 			}
 			pop_id()
 		}
+		end_selector()
 	}
-	end_selector()
 }

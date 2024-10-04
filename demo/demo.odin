@@ -9,7 +9,9 @@ import "core:os"
 import "core:reflect"
 import "core:slice"
 import "core:strings"
+import "core:strconv"
 import "core:time"
+import "core:math/bits"
 
 import onyx "../onyx"
 import "vendor:glfw"
@@ -22,6 +24,7 @@ Option :: enum {
 }
 
 Component :: enum {
+Colors,
 	Tables,
 	Button,
 	Data_Input,
@@ -51,6 +54,7 @@ Component_Showcase :: struct {
 	sort_order:    onyx.Sort_Order,
 	sorted_column: int,
 	hsva: [4]f32,
+	hex: strings.Builder,
 }
 
 State :: struct {
@@ -101,6 +105,22 @@ component_showcase :: proc(state: ^Component_Showcase) {
 	}
 
 	#partial switch state.section.component {
+	case .Colors:
+		a := hsva_picker({hsva = &state.hsva})
+		b := alpha_slider({value = &state.hsva.a, color = color_from_hsva(state.hsva)})
+		if a.changed || b.changed {
+			strings.builder_reset(&state.hex)
+		}
+		if strings.builder_len(state.hex) == 0 {
+			hex := hex_from_color(color_from_hsva(state.hsva))
+			fmt.sbprintf(&state.hex, "%6x", hex)
+		}
+		if input({builder = &state.hex}).changed && strings.builder_len(state.hex) == 6 {
+			if value, ok := strconv.parse_u64_of_base(strings.to_string(state.hex), 16); ok {
+				state.hsva = hsva_from_color(color_from_hex(u32(value)))
+			}
+		}
+
 	case .Tables:
 		set_side(.Left)
 		rows_active: [dynamic]bool
@@ -164,12 +184,6 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			}
 			core.draw_next_frame = true
 		}
-		set_side(.Top)
-		color_wheel({hsva = &state.hsva})
-		slider(Slider_Info(f32){value = &state.hsva.x, hi = 360})
-		slider(Slider_Info(f32){value = &state.hsva.y})
-		slider(Slider_Info(f32){value = &state.hsva.z})
-		slider(Slider_Info(f32){value = &state.hsva.a})
 
 	case .Scroll_Zone:
 		set_side(.Left)

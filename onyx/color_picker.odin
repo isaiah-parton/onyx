@@ -59,13 +59,100 @@ triangle_barycentric :: proc(a, b, c, p: [2]f32) -> (u, v, w: f32) {
 	return
 }
 
-Color_Wheel_Info :: struct {
+draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: Color) {
+	draw_box_fill(box, primary)
+	for x in 0 ..< int(math.ceil(box_width(box) / size.x)) {
+		for y in 0 ..< int(math.ceil(box_height(box) / size.y)) {
+			if (x + y) % 2 == 0 {
+				pos := box.lo + [2]f32{f32(x), f32(y)} * size
+				draw_box_fill({pos, linalg.min(pos + size, box.hi)}, secondary)
+			}
+		}
+	}
+}
+
+Alpha_Slider_Info :: struct {
+	using _: Widget_Info,
+	value:   ^f32,
+	changed: bool,
+	color: Color,
+}
+
+init_alpha_slider :: proc(using info: ^Alpha_Slider_Info, loc := #caller_location) -> bool {
+	if value == nil do return false
+	desired_size = core.style.visual_size
+	sticky = true
+	id = hash(loc)
+	self = get_widget(id) or_return
+	return true
+}
+
+add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
+	begin_widget(info) or_return
+	defer end_widget()
+
+	if self.visible {
+		R :: 4
+		box := self.box
+		box.lo.y += R
+		box.hi.y -= R
+		draw_checkerboard_pattern(
+			box,
+			box_height(box) / 2,
+			{210, 210, 210, 255},
+			{160, 160, 160, 255},
+		)
+		color.a = 255
+		draw_horizontal_box_gradient(box, fade(color, 0), color)
+		time := clamp(value^, 0, 1)
+		x := box.lo.x + box_width(box) * time
+		draw_triangle_fill(
+			{x - 0.866025 * R, box.lo.y - 1.5 * R},
+			{x, box.lo.y},
+			{x + 0.866025 * R, box.lo.y - 1.5 * R},
+			core.style.color.content,
+		)
+		draw_triangle_fill(
+			{x - 0.866025 * R, box.hi.y + 1.5 * R},
+			{x, box.hi.y},
+			{x + 0.866025 * R, box.hi.y + 1.5 * R},
+			core.style.color.content,
+		)
+	}
+
+	if point_in_box(core.mouse_pos, self.box) {
+		hover_widget(self)
+	}
+
+	if .Pressed in self.state {
+		value^ = clamp((core.mouse_pos.x - self.box.lo.x) / box_width(self.box), 0, 1)
+		changed = true
+	}
+
+	return true
+}
+
+alpha_slider :: proc(info: Alpha_Slider_Info, loc := #caller_location) -> Alpha_Slider_Info {
+	info := info
+	if init_alpha_slider(&info, loc) {
+		add_alpha_slider(&info)
+	}
+	return info
+}
+
+HSVA_Picker_Mode :: enum {
+	Square,
+	Wheel,
+}
+
+HSVA_Picker_Info :: struct {
 	using _: Widget_Info,
 	hsva:    ^[4]f32,
+	mode:    HSVA_Picker_Mode,
 	changed: bool,
 }
 
-init_color_wheel :: proc(using info: ^Color_Wheel_Info) -> bool {
+init_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	if info == nil do return false
 	if info.hsva == nil do return false
 	desired_size = 200
@@ -75,7 +162,7 @@ init_color_wheel :: proc(using info: ^Color_Wheel_Info) -> bool {
 	return true
 }
 
-add_color_wheel :: proc(using info: ^Color_Wheel_Info) -> bool {
+add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
 
@@ -122,8 +209,8 @@ add_color_wheel :: proc(using info: ^Color_Wheel_Info) -> bool {
 				point = triangle_closest_point(point_a, point_b, point_c, point)
 			}
 			u, v, w := triangle_barycentric(point_a, point_b, point_c, point)
-			hsva.z = clamp(1 - v, 0.0001, 1)
-			hsva.y = clamp(u / hsva.z, 0.0001, 1)
+			hsva.z = clamp(1 - v, 0, 1)
+			hsva.y = clamp(u / hsva.z, 0, 1)
 			draw_arc_fill(point, 4, 0, math.TAU, {255, 0, 255, 255})
 		}
 		changed = true
@@ -179,11 +266,11 @@ add_color_wheel :: proc(using info: ^Color_Wheel_Info) -> bool {
 	return true
 }
 
-color_wheel :: proc(info: Color_Wheel_Info, loc := #caller_location) -> Color_Wheel_Info {
+hsva_picker :: proc(info: HSVA_Picker_Info, loc := #caller_location) -> HSVA_Picker_Info {
 	info := info
 	info.id = hash(loc)
-	if init_color_wheel(&info) {
-		add_color_wheel(&info)
+	if init_hsva_picker(&info) {
+		add_hsva_picker(&info)
 	}
 	return info
 }

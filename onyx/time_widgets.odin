@@ -381,7 +381,8 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 
 date_picker :: proc(info: Date_Picker_Info, loc := #caller_location) -> Date_Picker_Info {
 	info := info
-	init_date_picker(&info, loc)
-	add_date_picker(&info)
+	if init_date_picker(&info, loc) {
+		add_date_picker(&info)
+	}
 	return info
 }

@@ -11,6 +11,11 @@ package onyx
 // 	TODO: Add a separate field for total cut size that disregards desired size
 import "core:math"
 import "core:math/linalg"
+Layout_Mode :: enum {
+	Maximum,
+	Minimum,
+	Absolute,
+}
 // Info for creating a layout
 Layout_Info :: struct {
 	// If defined, the layout will occupy the given box
@@ -45,6 +50,7 @@ Layout :: struct {
 	fixed:         bool,
 	// Isolated from previous layout?
 	isolated:      bool,
+	mode: Layout_Mode,
 }
 // Queue the next size to be cut from this layout
 queue_layout_size :: proc(layout: ^Layout, size: f32) {
@@ -151,13 +157,21 @@ cut_current_layout :: proc(side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -
 // Get the next widget box
 // TODO: Rename this as it isn't used exclusively for singular widgets
 next_widget_box :: proc(info: ^Widget_Info) -> Box {
+	non_fixed_size :: proc(layout: ^Layout, desired_size: [2]f32) -> [2]f32 {
+		if layout.mode == .Maximum {
+			return linalg.max(layout.next_size, desired_size)
+		} else if layout.mode == .Minimum {
+			return linalg.min(layout.next_size, desired_size)
+		}
+		return layout.next_size
+	}
 	// First assert that a layout exists
 	layout := current_layout().?
 	// Decide the size of the box
 	size: [2]f32
 	if info != nil {
 		size = linalg.min(
-			info.desired_size if info.fixed_size else linalg.max(layout.next_size, info.desired_size),
+			info.desired_size if info.fixed_size else non_fixed_size(layout, info.desired_size),
 			layout.box.hi - layout.box.lo,
 		)
 	} else {
@@ -202,7 +216,9 @@ next_widget_box :: proc(info: ^Widget_Info) -> Box {
 
 // Procedures for setting the cut parameters of the current layout
 // **These are all assertive**
-
+set_mode :: proc(mode: Layout_Mode) {
+	current_layout().?.mode = mode
+}
 set_side :: proc(side: Side) {
 	layout := current_layout().?
 	layout.next_cut_side = side
