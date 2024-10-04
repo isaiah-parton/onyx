@@ -83,11 +83,30 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 	// Begin the panel layer
 	begin_layer({id = id, box = expand_box(panel.box, 10)})
-	panel.layer = current_layer().?
+	panel.layer = current_layer().? or_return
 
 	// Background
-	draw_rounded_box_fill(move_box(panel.box, 5), core.style.rounding, {0, 0, 0, 70})
-	draw_rounded_box_fill(panel.box, core.style.rounding, core.style.color.foreground)
+	background_widget := Widget_Info {
+		id     = panel.layer.id,
+		box    = panel.box,
+		sticky = true,
+	}
+	if begin_widget(&background_widget) {
+		defer end_widget()
+		using background_widget
+
+		draw_rounded_box_fill(move_box(self.box, 5), core.style.rounding, {0, 0, 0, 70})
+		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.foreground)
+
+		if point_in_box(core.mouse_pos, self.box) {
+			hover_widget(self)
+		}
+
+		if .Pressed in self.state {
+			panel.moving = true
+			panel.move_offset = core.mouse_pos - panel.box.lo
+		}
+	}
 
 	// The content layout box
 	inner_box := panel.box
@@ -154,8 +173,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		   .Hovered in panel.layer.state &&
 		   point_in_box(core.mouse_pos, title_box) {
 			if mouse_pressed(.Left) {
-				panel.moving = true
-				panel.move_offset = core.mouse_pos - panel.box.lo
+
 			}
 		}
 	}

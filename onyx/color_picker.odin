@@ -68,7 +68,7 @@ Color_Wheel_Info :: struct {
 init_color_wheel :: proc(using info: ^Color_Wheel_Info) -> bool {
 	if info == nil do return false
 	if info.hsva == nil do return false
-	desired_size = {120, 120}
+	desired_size = 200
 	fixed_size = true
 	sticky = true
 	self = get_widget(id) or_return
@@ -81,7 +81,7 @@ add_color_wheel :: proc(using info: ^Color_Wheel_Info) -> bool {
 
 	size := min(box_width(self.box), box_height(self.box))
 	outer := size / 2
-	inner := outer - 15
+	inner := outer * 0.75
 
 	center := box_center(self.box)
 	angle := hsva.x * math.RAD_PER_DEG
@@ -166,17 +166,14 @@ add_color_wheel :: proc(using info: ^Color_Wheel_Info) -> bool {
 		add_indices(index_a, index_b, index_c)
 
 		// SV circle
-		point := linalg.lerp(linalg.lerp(point_c, point_a, clamp(hsva.y, 0, 1)), point_b, clamp(1 - hsva.z, 0, 1))
-		r: f32 = 7 if (self.state >= {.Pressed} && .Active not_in self.state) else 5
-		draw_arc_fill(point, r, 0, math.TAU, color_from_hsva({hsva.x, hsva.y, hsva.z, 1}))
-		draw_ring_fill(
-			point,
-			r - 1,
-			r,
-			0,
-			math.TAU,
-			{0, 0, 0, 255} if hsva.z > 0.5 else 255,
+		point := linalg.lerp(
+			linalg.lerp(point_c, point_a, clamp(hsva.y, 0, 1)),
+			point_b,
+			clamp(1 - hsva.z, 0, 1),
 		)
+		r: f32 = 9 if (self.state >= {.Pressed} && .Active not_in self.state) else 7
+		draw_arc_fill(point, r, 0, math.TAU, color_from_hsva({hsva.x, hsva.y, hsva.z, 1}))
+		draw_ring_fill(point, r - 1, r, 0, math.TAU, {0, 0, 0, 255} if hsva.z > 0.5 else 255)
 	}
 
 	return true
@@ -193,12 +190,12 @@ color_wheel :: proc(info: Color_Wheel_Info, loc := #caller_location) -> Color_Wh
 
 Color_Picker_Info :: struct {
 	using _: Widget_Info,
-	color: ^Color,
+	color:   ^Color,
 }
 
 init_color_picker :: proc(using info: ^Color_Picker_Info, loc := #caller_location) -> bool {
-if info.color == nil do return false
-if id == 0 do id = hash(loc)
+	if info.color == nil do return false
+	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	return true
 }

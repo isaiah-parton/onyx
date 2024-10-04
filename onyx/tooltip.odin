@@ -51,16 +51,7 @@ begin_tooltip :: proc(using info: Tooltip_Info, loc := #caller_location) -> bool
 		core.draw_next_frame = true
 	}
 
-	begin_layer(
-		{
-			box     = box,
-			// parent = current_layer(),
-			// origin = box_center(box),
-			// scale = [2]f32{1, info.time},
-			// rotation = diff.x * 0.001,
-		},
-		loc,
-	)
+	begin_layer({box = box}, loc)
 	draw_rounded_box_fill(box, core.style.rounding, fade(core.style.color.background, 0.9))
 
 	end_widget()

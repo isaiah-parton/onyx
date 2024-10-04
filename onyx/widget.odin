@@ -295,6 +295,7 @@ hover_widget :: proc(widget: ^Widget) {
 	// Ok hover
 	core.next_hovered_widget = widget.id
 	core.next_hovered_layer = widget.layer.id
+	core.highest_layer_index = widget.layer.index
 }
 // Try make this widget focused
 focus_widget :: proc(widget: ^Widget) {

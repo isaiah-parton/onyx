@@ -299,11 +299,9 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 		draw_rounded_box_fill(
 			self.box,
 			core.style.rounding,
-			fade(core.style.color.substance, self.hover_time),
+			fade(core.style.color.substance, self.hover_time * 0.5),
 		)
-		if self.hover_time < 1 {
-			draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
-		}
+		draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 
 		b := strings.builder_make(context.temp_allocator)
 
