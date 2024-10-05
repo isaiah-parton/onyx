@@ -32,3 +32,5 @@ The info passed to the procedure is made mutable, then initialized and added.  T
 ## Todo
 
 - [ ] Popups
+- [ ] Forms for tab focusing
+- [ ] Better control over layer sorting
