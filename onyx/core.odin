@@ -428,6 +428,8 @@ new_frame :: proc() {
 	process_widgets()
 
 	set_texture(core.font_atlas.texture.internal)
+
+	append(&core.draw_list.prims, Primitive{kind = .Normal})
 }
 
 // Render queued draw calls and reset draw state
