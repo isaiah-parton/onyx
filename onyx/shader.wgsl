@@ -16,21 +16,33 @@ struct Prim {
 	cv1: vec2<f32>,
 	cv2: vec2<f32>,
 	radius: f32,
-	image: u32,
 	paint: u32,
+};
+
+struct Prims {
+	@align(16)
+	prims: array<Prim>,
 };
 
 @group(2)
 @binding(0)
-var<storage> prims: array<Prim>;
+var<storage> prims: Prims;
 
 struct Paint {
 	kind: u32,
+	col0: vec4<f32>,
+	col1: vec4<f32>,
+	// image: u32,
+};
+
+struct Paints {
+	@align(16)
+	paints: array<Paint>,
 };
 
 @group(2)
 @binding(1)
-var<storage> paints: array<Paint>;
+var<storage> paints: Paints;
 
 struct VertexInput {
 	@location(0) pos: vec2<f32>,
@@ -61,8 +73,8 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-	let prim = prims[in.prim];
-	let paint = paints[prim.paint];
+	let prim = prims.prims[in.prim];
+	let paint = paints.paints[prim.paint];
 
 	var out: vec4<f32>;
 

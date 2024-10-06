@@ -54,10 +54,11 @@ Paint_Kind :: enum u32 {
 	Radial_Gradient,
 }
 
-Paint :: struct {
+Paint :: struct #align(64) {
 	kind: Paint_Kind,
 	col0: [4]f32,
 	col1: [4]f32,
+	// image:  u32,
 }
 
 Primitive_Kind :: enum u32 {
@@ -66,13 +67,12 @@ Primitive_Kind :: enum u32 {
 	Rect,
 }
 
-Primitive :: struct {
+Primitive :: struct #align(16) {
 	kind:   Primitive_Kind,
 	cv0:    [2]f32,
 	cv1:    [2]f32,
 	cv2:    [2]f32,
 	radius: f32,
-	image:  u32,
 	paint:  u32,
 }
 
@@ -88,6 +88,8 @@ Vertex_State :: struct {
 	col:   [4]u8,
 	prim:  u32,
 	alpha: f32,
+
+	padding: u64,
 }
 
 // Matrix used for vertex transforms

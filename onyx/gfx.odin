@@ -129,9 +129,9 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			adapter,
 			&{
 				requiredFeatureCount = 1,
-				requiredFeatures = ([^]wgpu.FeatureName)(&[?]wgpu.FeatureName{
-					.VertexWritableStorage,
-				}),
+				requiredFeatures = ([^]wgpu.FeatureName)(
+					&[?]wgpu.FeatureName{.VertexWritableStorage},
+				),
 				deviceLostUserdata = gfx,
 				deviceLostCallback = proc "c" (
 					reason: wgpu.DeviceLostReason,
@@ -208,13 +208,9 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		)
 		gfx.prim_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
-			&{
-				label = "PrimitiveBuffer",
-				size = size_of(Primitive),
-				usage = {.Storage, .CopyDst},
-			},
+			&{label = "PrimitiveBuffer", size = size_of(Primitive), usage = {.Storage, .CopyDst}},
 		)
-		gfx.prim_buffer = wgpu.DeviceCreateBuffer(
+		gfx.paint_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
 			&{label = "PaintBuffer", size = size_of(Paint), usage = {.Storage, .CopyDst}},
 		)
@@ -251,18 +247,26 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			&{
 				label = "StorageBindGroupLayout",
 				entryCount = 2,
-				entries = ([^]wgpu.BindGroupLayoutEntry)(&[?]wgpu.BindGroupLayoutEntry {
-					{
-						binding = 0,
-						buffer = wgpu.BufferBindingLayout{type = .Storage},
-						visibility = {.Vertex, .Fragment},
+				entries = ([^]wgpu.BindGroupLayoutEntry)(
+					&[?]wgpu.BindGroupLayoutEntry {
+						{
+							binding = 0,
+							buffer = wgpu.BufferBindingLayout {
+								type = .ReadOnlyStorage,
+								minBindingSize = size_of(Primitive),
+							},
+							visibility = {.Vertex, .Fragment},
+						},
+						{
+							binding = 1,
+							buffer = wgpu.BufferBindingLayout {
+								type = .ReadOnlyStorage,
+								minBindingSize = size_of(Paint),
+							},
+							visibility = {.Vertex, .Fragment},
+						},
 					},
-					{
-						binding = 1,
-						buffer = wgpu.BufferBindingLayout{type = .Storage},
-						visibility = {.Vertex, .Fragment},
-					},
-				}),
+				),
 			},
 		)
 		// Create bind group
@@ -285,18 +289,12 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 				label = "StorageBindGroup",
 				layout = storage_bind_group_layout,
 				entryCount = 2,
-				entries = ([^]wgpu.BindGroupEntry)(&[?]wgpu.BindGroupEntry {
-					{
-						binding = 0,
-						buffer = gfx.prim_buffer,
-						// size = PRIMITIVE_BUFFER_CAP,
+				entries = ([^]wgpu.BindGroupEntry)(
+					&[?]wgpu.BindGroupEntry {
+						{binding = 0, buffer = gfx.prim_buffer, size = size_of(Primitive)},
+						{binding = 1, buffer = gfx.paint_buffer, size = size_of(Paint)},
 					},
-					{
-						binding = 1,
-						buffer = gfx.paint_buffer,
-						// size = PAINT_BUFFER_CAP,
-					},
-				}),
+				),
 			},
 		)
 		// Create pipeline layout
@@ -305,11 +303,13 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			&{
 				label = "PipelineLayout",
 				bindGroupLayoutCount = 3,
-				bindGroupLayouts = ([^]wgpu.BindGroupLayout)(&[?]wgpu.BindGroupLayout {
-					uniform_bind_group_layout,
-					gfx.texture_bind_group_layout,
-					storage_bind_group_layout,
-				}),
+				bindGroupLayouts = ([^]wgpu.BindGroupLayout)(
+					&[?]wgpu.BindGroupLayout {
+						uniform_bind_group_layout,
+						gfx.texture_bind_group_layout,
+						storage_bind_group_layout,
+					},
+				),
 			},
 		)
 		// Create shader module
@@ -488,14 +488,14 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		gfx.prim_buffer,
 		0,
 		raw_data(core.draw_list.prims),
-		size_of(uniform),
+		size_of(Primitive) * len(core.draw_list.prims),
 	)
 	wgpu.QueueWriteBuffer(
 		gfx.queue,
 		gfx.paint_buffer,
 		0,
 		raw_data(core.draw_list.paints),
-		size_of(uniform),
+		size_of(Paint) * len(core.draw_list.paints),
 	)
 
 	// Render them
