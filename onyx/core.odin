@@ -434,6 +434,11 @@ new_frame :: proc() {
 
 // Render queued draw calls and reset draw state
 render :: proc() {
+
+	p := add_circle_primitive(core.view / 2, 50)
+	set_vertex_prim(p)
+	draw_box_fill({core.view / 2 - 100, core.view / 2 + 100}, 255)
+
 	// Render debug info rq
 	if core.debug.enabled {
 		do_debug_layer()

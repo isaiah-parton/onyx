@@ -54,7 +54,7 @@ Paint_Kind :: enum u32 {
 	Radial_Gradient,
 }
 
-Paint :: struct #align(64) {
+Paint :: struct #align(16) {
 	kind: Paint_Kind,
 	col0: [4]f32,
 	col1: [4]f32,
@@ -64,11 +64,13 @@ Paint :: struct #align(64) {
 Primitive_Kind :: enum u32 {
 	Normal,
 	Circle,
-	Rect,
+	Box,
+	BlurredBox,
 }
 
-Primitive :: struct #align(16) {
+Primitive :: struct {
 	kind:   Primitive_Kind,
+	pad:      u32,
 	cv0:    [2]f32,
 	cv1:    [2]f32,
 	cv2:    [2]f32,
@@ -84,11 +86,10 @@ Vertex :: struct {
 }
 
 Vertex_State :: struct {
-	uv:    [2]f32,
-	col:   [4]u8,
-	prim:  u32,
-	alpha: f32,
-
+	uv:      [2]f32,
+	col:     [4]u8,
+	prim:    u32,
+	alpha:   f32,
 	padding: u64,
 }
 

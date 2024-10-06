@@ -828,76 +828,104 @@ draw_rounded_box_fill :: proc(box: Box, radius: f32, color: Color) {
 		return
 	}
 	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
-	if radius <= 0 {
-		draw_box_fill(box, color)
+
+	prim := u32(len(core.draw_list.prims))
+	append(&core.draw_list.prims, Primitive{kind = .Box, radius = radius, cv0 = box.lo, cv1 = box.hi})
+
+	set_vertex_prim(prim)
+	draw_box_fill(box, color)
+	set_vertex_prim(0)
+}
+
+draw_rounded_box_shadow :: proc(box: Box, radius: f32, color: Color) {
+	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
-	vertices := get_rounded_corner_vertices(radius)
+	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
 
-	center: [2]f32
-	first_index: u32
+	prim := u32(len(core.draw_list.prims))
+	append(&core.draw_list.prims, Primitive{kind = .BlurredBox, radius = radius, cv0 = box.lo, cv1 = box.hi, cv2 = 4})
 
-	set_vertex_uv({})
-	set_vertex_color(color)
-
-	center = box.lo + radius
-	first_index = add_vertex(center)
-	for v, n in vertices[.Top_Left] {
-		index := add_vertex(center + v * radius)
-		if n > 0 {
-			add_indices(first_index, index - 1, index)
-		}
-	}
-
-	center = {box.hi.x - radius, box.lo.y + radius}
-	first_index = add_vertex(center)
-	for v, n in vertices[.Top_Right] {
-		index := add_vertex(center + v * radius)
-		if n > 0 {
-			add_indices(first_index, index - 1, index)
-		}
-	}
-
-	center = box.hi - radius
-	first_index = add_vertex(center)
-	for v, n in vertices[.Bottom_Right] {
-		index := add_vertex(center + v * radius)
-		if n > 0 {
-			add_indices(first_index, index - 1, index)
-		}
-	}
-
-	center = {box.lo.x + radius, box.hi.y - radius}
-	first_index = add_vertex(center)
-	for v, n in vertices[.Bottom_Left] {
-		index := add_vertex(center + v * radius)
-		if n > 0 {
-			add_indices(first_index, index - 1, index)
-		}
-	}
-	if box.hi.x - radius > box.lo.x + radius {
-		draw_box_fill(
-			{{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.hi.y}},
-			color,
-		)
-	}
-	if box.hi.y - radius > box.lo.y + radius {
-		draw_box_fill(
-			{
-				{box.lo.x, box.lo.y + radius},
-				{box.lo.x + radius, box.hi.y - radius},
-			},
-			color,
-		)
-		draw_box_fill(
-			{
-				{box.hi.x - radius, box.lo.y + radius},
-				{box.hi.x, box.hi.y - radius},
-			},
-			color,
-		)
-	}
+	set_vertex_prim(prim)
+	draw_box_fill(expand_box(box, radius * 10), color)
+	set_vertex_prim(0)
 }
+
+// draw_rounded_box_fill :: proc(box: Box, radius: f32, color: Color) {
+// 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
+// 		return
+// 	}
+// 	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
+// 	if radius <= 0 {
+// 		draw_box_fill(box, color)
+// 		return
+// 	}
+// 	vertices := get_rounded_corner_vertices(radius)
+
+// 	center: [2]f32
+// 	first_index: u32
+
+// 	set_vertex_uv({})
+// 	set_vertex_color(color)
+
+// 	center = box.lo + radius
+// 	first_index = add_vertex(center)
+// 	for v, n in vertices[.Top_Left] {
+// 		index := add_vertex(center + v * radius)
+// 		if n > 0 {
+// 			add_indices(first_index, index - 1, index)
+// 		}
+// 	}
+
+// 	center = {box.hi.x - radius, box.lo.y + radius}
+// 	first_index = add_vertex(center)
+// 	for v, n in vertices[.Top_Right] {
+// 		index := add_vertex(center + v * radius)
+// 		if n > 0 {
+// 			add_indices(first_index, index - 1, index)
+// 		}
+// 	}
+
+// 	center = box.hi - radius
+// 	first_index = add_vertex(center)
+// 	for v, n in vertices[.Bottom_Right] {
+// 		index := add_vertex(center + v * radius)
+// 		if n > 0 {
+// 			add_indices(first_index, index - 1, index)
+// 		}
+// 	}
+
+// 	center = {box.lo.x + radius, box.hi.y - radius}
+// 	first_index = add_vertex(center)
+// 	for v, n in vertices[.Bottom_Left] {
+// 		index := add_vertex(center + v * radius)
+// 		if n > 0 {
+// 			add_indices(first_index, index - 1, index)
+// 		}
+// 	}
+// 	if box.hi.x - radius > box.lo.x + radius {
+// 		draw_box_fill(
+// 			{{box.lo.x + radius, box.lo.y}, {box.hi.x - radius, box.hi.y}},
+// 			color,
+// 		)
+// 	}
+// 	if box.hi.y - radius > box.lo.y + radius {
+// 		draw_box_fill(
+// 			{
+// 				{box.lo.x, box.lo.y + radius},
+// 				{box.lo.x + radius, box.hi.y - radius},
+// 			},
+// 			color,
+// 		)
+// 		draw_box_fill(
+// 			{
+// 				{box.hi.x - radius, box.lo.y + radius},
+// 				{box.hi.x, box.hi.y - radius},
+// 			},
+// 			color,
+// 		)
+// 	}
+// }
 
 draw_rounded_box_corners_fill :: proc(
 	box: Box,

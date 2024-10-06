@@ -94,7 +94,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		defer end_widget()
 		using background_widget
 
-		draw_rounded_box_fill(move_box(self.box, 5), core.style.rounding, {0, 0, 0, 70})
+		draw_rounded_box_shadow(self.box, core.style.rounding, {0, 0, 0, 100})
 		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.foreground)
 
 		if point_in_box(core.mouse_pos, self.box) {
@@ -299,13 +299,7 @@ end_panel :: proc() {
 		// pop_id()
 	}
 	// Panel outline
-	draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)
-	draw_rounded_box_stroke(
-		expand_box(panel.box, 1),
-		core.style.rounding * 1.25,
-		1,
-		core.style.color.foreground,
-	)
+	// draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)
 	layout := current_layout().?
 	panel.min_size += layout.content_size + layout.spacing_size
 	pop_layout()

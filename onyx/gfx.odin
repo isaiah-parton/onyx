@@ -208,11 +208,11 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		)
 		gfx.prim_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
-			&{label = "PrimitiveBuffer", size = size_of(Primitive), usage = {.Storage, .CopyDst}},
+			&{label = "PrimitiveBuffer", size = size_of(Primitive) * 1024, usage = {.Storage, .CopyDst}},
 		)
 		gfx.paint_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
-			&{label = "PaintBuffer", size = size_of(Paint), usage = {.Storage, .CopyDst}},
+			&{label = "PaintBuffer", size = size_of(Paint) * 512, usage = {.Storage, .CopyDst}},
 		)
 		// Create bind group layouts
 		uniform_bind_group_layout := wgpu.DeviceCreateBindGroupLayout(
@@ -291,8 +291,8 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 				entryCount = 2,
 				entries = ([^]wgpu.BindGroupEntry)(
 					&[?]wgpu.BindGroupEntry {
-						{binding = 0, buffer = gfx.prim_buffer, size = size_of(Primitive)},
-						{binding = 1, buffer = gfx.paint_buffer, size = size_of(Paint)},
+						{binding = 0, buffer = gfx.prim_buffer, size = size_of(Primitive) * 1024},
+						{binding = 1, buffer = gfx.paint_buffer, size = size_of(Paint) * 512},
 					},
 				),
 			},
@@ -468,8 +468,10 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		0,
 		u64(len(draw_list.indices) * size_of(u32)),
 	)
+
 	wgpu.RenderPassEncoderSetBindGroup(pass, 0, gfx.uniform_bind_group)
 	wgpu.RenderPassEncoderSetBindGroup(pass, 2, gfx.storage_bind_group)
+
 	wgpu.RenderPassEncoderSetViewport(
 		pass,
 		0,
