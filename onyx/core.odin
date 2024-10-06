@@ -2,8 +2,6 @@ package onyx
 
 import "vendor:glfw"
 
-import "vendor:fontstash"
-import "tedit"
 import "base:runtime"
 import "core:fmt"
 import "core:math"
@@ -13,6 +11,8 @@ import "core:slice"
 import "core:strings"
 import "core:sys/windows"
 import "core:time"
+import "tedit"
+import "vendor:fontstash"
 import "vendor:wgpu"
 
 MAX_IDS :: 32
@@ -147,7 +147,7 @@ Core :: struct {
 	font_atlas:            Atlas,
 	current_font:          int,
 	user_images:           [100]Maybe(Image),
-	text_editor: tedit.Editor,
+	text_editor:           tedit.Editor,
 
 	// Drawing
 	draw_this_frame:       bool,
@@ -305,17 +305,19 @@ new_frame :: proc() {
 	// Handle window events
 	glfw.PollEvents()
 
-	if core.window_moving {
-		core.window_moving = false
-		point: windows.POINT
-		if windows.GetCursorPos(&point) {
-			glfw.SetWindowPos(
-				core.window,
-				point.x + i32(core.window_move_offset.x),
-				point.y + i32(core.window_move_offset.y),
-			)
+	when ODIN_OS == .Windows {
+		if core.window_moving {
+			core.window_moving = false
+			point: windows.POINT
+			if windows.GetCursorPos(&point) {
+				glfw.SetWindowPos(
+					core.window,
+					point.x + i32(core.window_move_offset.x),
+					point.y + i32(core.window_move_offset.y),
+				)
+			}
+			core.mouse_pos = core.last_mouse_pos
 		}
-		core.mouse_pos = core.last_mouse_pos
 	}
 
 	// Set and reset cursor
@@ -434,11 +436,6 @@ new_frame :: proc() {
 
 // Render queued draw calls and reset draw state
 render :: proc() {
-
-	p := add_circle_primitive(core.view / 2, 50)
-	set_vertex_prim(p)
-	draw_box_fill({core.view / 2 - 100, core.view / 2 + 100}, 255)
-
 	// Render debug info rq
 	if core.debug.enabled {
 		do_debug_layer()

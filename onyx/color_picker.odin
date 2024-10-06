@@ -75,7 +75,7 @@ Alpha_Slider_Info :: struct {
 	using _: Widget_Info,
 	value:   ^f32,
 	changed: bool,
-	color: Color,
+	color:   Color,
 }
 
 init_alpha_slider :: proc(using info: ^Alpha_Slider_Info, loc := #caller_location) -> bool {
@@ -211,7 +211,6 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			u, v, w := triangle_barycentric(point_a, point_b, point_c, point)
 			hsva.z = clamp(1 - v, 0, 1)
 			hsva.y = clamp(u / hsva.z, 0, 1)
-			draw_arc_fill(point, 4, 0, math.TAU, {255, 0, 255, 255})
 		}
 		changed = true
 	} else {
@@ -259,8 +258,8 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			clamp(1 - hsva.z, 0, 1),
 		)
 		r: f32 = 9 if (self.state >= {.Pressed} && .Active not_in self.state) else 7
-		draw_arc_fill(point, r, 0, math.TAU, color_from_hsva({hsva.x, hsva.y, hsva.z, 1}))
-		draw_ring_fill(point, r - 1, r, 0, math.TAU, {0, 0, 0, 255} if hsva.z > 0.5 else 255)
+		draw_circle_fill(point, r + 1, {0, 0, 0, 255} if hsva.z > 0.5 else 255)
+		draw_circle_fill(point, r, color_from_hsva({hsva.x, hsva.y, hsva.z, 1}))
 	}
 
 	return true

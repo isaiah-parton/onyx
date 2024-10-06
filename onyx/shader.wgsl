@@ -1,7 +1,3 @@
-const prim_generic = 0;
-const prim_circle = 1;
-const prim_rect = 2;
-
 struct Uniforms {
     proj_mtx: mat4x4f,
 };
@@ -16,6 +12,7 @@ struct Prim {
 	cv1: vec2<f32>,
 	cv2: vec2<f32>,
 	radius: f32,
+	width: f32,
 	paint: u32,
 };
 
@@ -61,11 +58,19 @@ struct VertexOutput {
 
 // SDF shapes
 fn sd_circle(p: vec2<f32>, r: f32) -> f32 {
-	return length(p) - r;
+	return length(p) - r + 1;
+}
+fn sd_ellipse(p: vec2<f32>, r: vec2<f32>) -> f32 {
+	return sd_circle(vec2<f32>(p.x * (r.y / r.x), p.y), r.y);
 }
 fn sd_box(p: vec2<f32>, b: vec2<f32>, r: f32) -> f32 {
 	let d = abs(p) - b + r;
-	return length(max(d, vec2<f32>(0.0, 0.0))) + min(max(d.x, d.y), 0.0) - r;
+	return length(max(d, vec2<f32>(0.0, 0.0))) + min(max(d.x, d.y), 0.0) - r + 1;
+}
+fn sd_box_stroke(p: vec2<f32>, b: vec2<f32>, r: f32, w: f32) -> f32 {
+	// let d = abs(p) - b + r;
+	// return length(max(d, vec2<f32>(0.0, 0.0))) + min(max(d.x, d.y), 0.0) - r;
+	return abs(sd_box(p, b, r)) - w / 2;
 }
 // uh shadows or smth
 fn rounded_box_shadow_x(x: f32, y: f32, sigma: f32, corner: f32, half_size: vec2<f32>) -> f32 {
@@ -104,8 +109,13 @@ fn sd_prim(prim: Prim, p: vec2<f32>) -> f32 {
 			let center = 0.5 * (prim.cv0 + prim.cv1);
 			d = sd_box(p - center, (prim.cv1 - prim.cv0) * 0.5, prim.radius);
 		}
-		// Rounded box shadow
+		// Box stroke
 		case 3u: {
+			let center = 0.5 * (prim.cv0 + prim.cv1);
+			d = sd_box_stroke(p - center, (prim.cv1 - prim.cv0) * 0.5, prim.radius, prim.width);
+		}
+		// Rounded box shadow
+		case 4u: {
 			let blur_radius = prim.cv2.x;
       let center = 0.5*(prim.cv1 + prim.cv0);
       let half_size = 0.5*(prim.cv1 - prim.cv0);
@@ -124,6 +134,9 @@ fn sd_prim(prim: Prim, p: vec2<f32>) -> f32 {
           y += step;
       }
       d = (1.0 - value * 4.0);
+		}
+		case 5u: {
+			d = sd_ellipse(p - prim.cv0, prim.cv1);
 		}
 		default: {}
 	}

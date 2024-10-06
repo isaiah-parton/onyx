@@ -94,7 +94,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		defer end_widget()
 		using background_widget
 
-		draw_rounded_box_shadow(self.box, core.style.rounding, {0, 0, 0, 100})
+		draw_rounded_box_shadow(self.box, core.style.rounding, 5, {0, 0, 0, 40})
 		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.foreground)
 
 		if point_in_box(core.mouse_pos, self.box) {

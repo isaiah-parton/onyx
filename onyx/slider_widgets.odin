@@ -56,7 +56,7 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 			radius,
 			fade(core.style.color.accent, 0.5),
 		)
-		draw_arc_fill(knob_center, knob_radius, 0, math.TAU, core.style.color.accent)
+		draw_circle_fill(knob_center, knob_radius, core.style.color.accent)
 	}
 
 	if (.Pressed in self.state) && value != nil {

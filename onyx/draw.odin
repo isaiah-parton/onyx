@@ -54,7 +54,7 @@ Paint_Kind :: enum u32 {
 	Radial_Gradient,
 }
 
-Paint :: struct #align(16) {
+Paint :: struct #align (16) {
 	kind: Paint_Kind,
 	col0: [4]f32,
 	col1: [4]f32,
@@ -65,16 +65,19 @@ Primitive_Kind :: enum u32 {
 	Normal,
 	Circle,
 	Box,
+	BoxStroke,
 	BlurredBox,
+	Ellipse,
 }
 
-Primitive :: struct {
+Primitive :: struct #align (16) {
 	kind:   Primitive_Kind,
-	pad:      u32,
+	pad:    u32,
 	cv0:    [2]f32,
 	cv1:    [2]f32,
 	cv2:    [2]f32,
 	radius: f32,
+	width:  f32,
 	paint:  u32,
 }
 
@@ -163,6 +166,20 @@ set_vertex_color :: proc(color: Color) {
 
 set_global_alpha :: proc(alpha: f32) {
 	core.vertex_state.alpha = alpha
+}
+
+transform_point :: proc(p: [2]f32) -> [2]f32 {
+	p := [2]f32 {
+		core.current_matrix[0, 0] * p.x +
+		core.current_matrix[0, 1] * p.y +
+		core.current_matrix[0, 2] +
+		core.current_matrix[0, 3],
+		core.current_matrix[1, 0] * p.x +
+		core.current_matrix[1, 1] * p.y +
+		core.current_matrix[1, 2] +
+		core.current_matrix[1, 3],
+	}
+	return p
 }
 
 // Append a vertex and return it's index

@@ -168,11 +168,11 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 					dot_time := variant.dot_times[e]
 					dot_time = animate(dot_time, 0.15, hn == e && .Hovered in self.state)
 					if kind.show_dots {
-						draw_arc_fill(p, 4.5, 0, math.TAU, field.color)
+						draw_circle_fill(p, 4.5, field.color)
 					}
 					if dot_time > 0 {
-						draw_arc_fill(p, 8 * dot_time, 0, math.TAU, field.color)
-						draw_arc_fill(p, 6 * dot_time, 0, math.TAU, core.style.color.foreground)
+						draw_circle_fill(p, 8 * dot_time, field.color)
+						draw_circle_fill(p, 6 * dot_time, core.style.color.foreground)
 					}
 					variant.dot_times[e] = dot_time
 					lp = p

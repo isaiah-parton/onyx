@@ -3,15 +3,15 @@ package demo
 import "base:runtime"
 import "core:fmt"
 import "core:math"
+import "core:math/bits"
 import "core:math/rand"
 import "core:mem"
 import "core:os"
 import "core:reflect"
 import "core:slice"
-import "core:strings"
 import "core:strconv"
+import "core:strings"
 import "core:time"
-import "core:math/bits"
 
 import onyx "../onyx"
 import "vendor:glfw"
@@ -24,7 +24,7 @@ Option :: enum {
 }
 
 Component :: enum {
-Colors,
+	Colors,
 	Tables,
 	Button,
 	Data_Input,
@@ -53,8 +53,8 @@ Component_Showcase :: struct {
 	entries:       [dynamic]Table_Entry,
 	sort_order:    onyx.Sort_Order,
 	sorted_column: int,
-	hsva: [4]f32,
-	hex: strings.Builder,
+	hsva:          [4]f32,
+	hex:           strings.Builder,
 }
 
 State :: struct {
