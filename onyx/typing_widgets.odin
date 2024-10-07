@@ -311,10 +311,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 					self.box,
 					core.style.rounding,
 					2,
-					fade(
-						core.style.color.accent,
-						self.focus_time,
-					),
+					fade(core.style.color.accent, self.focus_time),
 				)
 			}
 
@@ -327,9 +324,6 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				)
 			}
 
-			if !info.undecorated {
-				draw_rounded_box_mask(self.box, core.style.rounding, core.style.color.foreground)
-			}
 		}
 
 		// Mouse selection

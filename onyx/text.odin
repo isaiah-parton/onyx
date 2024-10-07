@@ -108,7 +108,7 @@ Text_Job :: struct {
 	lines:                                    []Text_Job_Line,
 	line_height:                              f32,
 	size:                                     [2]f32,
-	ascent: f32,
+	ascent:                                   f32,
 	cursor_glyph, hovered_line, hovered_rune: int,
 }
 
@@ -346,7 +346,11 @@ iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 		it.glyph = {}
 	} else {
 		codepoint := '•' if it.info.hidden else it.codepoint
-		it.glyph = get_glyph(it.font, it.size, codepoint) or_else (get_glyph_from_fallback_font(codepoint, it.info.size) or_return)
+		it.glyph =
+			get_glyph(it.font, it.size, codepoint) or_else (get_glyph_from_fallback_font(
+					codepoint,
+					it.info.size,
+				) or_return)
 	}
 	return true
 }
@@ -582,8 +586,8 @@ draw_aligned_rune :: proc(
 		box.hi.x = origin.x
 
 	case .Middle:
-		box.lo.x = origin.x - math.floor(size.x / 2)
-		box.hi.x = origin.x + math.floor(size.x / 2)
+		box.lo.x = origin.x - size.x / 2
+		box.hi.x = origin.x + size.x / 2
 
 	case .Left:
 		box.lo.x = origin.x
@@ -596,8 +600,8 @@ draw_aligned_rune :: proc(
 		box.hi.y = origin.y
 
 	case .Middle:
-		box.lo.y = origin.y - math.floor(size.y / 2)
-		box.hi.y = origin.y + math.floor(size.y / 2)
+		box.lo.y = origin.y - size.y / 2
+		box.hi.y = origin.y + size.y / 2
 
 	case .Top:
 		box.lo.y = origin.y

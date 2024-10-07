@@ -23,7 +23,7 @@ BUFFER_SIZE :: mem.Megabyte * 2
 MAX_VERTICES :: 65536
 MAX_INDICES :: 65536
 
-PRIMITIVE_BUFFER_CAP :: size_of(Primitive) * 1024
+PRIMITIVE_BUFFER_CAP :: size_of(Shape) * 1024
 PAINT_BUFFER_CAP :: size_of(Paint) * 1024
 
 Gradient :: union {
@@ -61,24 +61,31 @@ Paint :: struct #align (16) {
 	// image:  u32,
 }
 
-Primitive_Kind :: enum u32 {
+Shape_Kind :: enum u32 {
 	Normal,
 	Circle,
 	Box,
-	BoxStroke,
 	BlurredBox,
 	Ellipse,
+	Bezier,
+	Curve,
+	Path,
+	Polygon,
 }
 
-Primitive :: struct #align (16) {
-	kind:   Primitive_Kind,
-	pad:    u32,
-	cv0:    [2]f32,
-	cv1:    [2]f32,
-	cv2:    [2]f32,
-	radius: f32,
-	width:  f32,
-	paint:  u32,
+Shape :: struct #align (16) {
+	kind:    Shape_Kind,
+	padding: u32,
+	cv0:     [2]f32,
+	cv1:     [2]f32,
+	cv2:     [2]f32,
+	corners: [4]f32,
+	radius:  f32,
+	width:   f32,
+	paint:   u32,
+	start:   u32,
+	count:   u32,
+	stroke:  b32,
 }
 
 Vertex :: struct {
@@ -102,8 +109,9 @@ Matrix :: matrix[4, 4]f32
 Draw_List :: struct {
 	vertices: [dynamic]Vertex,
 	indices:  [dynamic]u32,
-	prims:    [dynamic]Primitive,
+	shapes:   [dynamic]Shape,
 	paints:   [dynamic]Paint,
+	cvs:      [dynamic][2]f32,
 }
 
 // A draw call to the GPU these are managed internally
@@ -134,12 +142,13 @@ destroy_draw_list :: proc(draw_list: ^Draw_List) {
 clear_draw_list :: proc(draw_list: ^Draw_List) {
 	clear(&draw_list.vertices)
 	clear(&draw_list.indices)
-	clear(&draw_list.prims)
+	clear(&draw_list.shapes)
+	clear(&draw_list.cvs)
 }
 
 add_circle_primitive :: proc(center: [2]f32, radius: f32) -> u32 {
-	index := u32(len(core.draw_list.prims))
-	append(&core.draw_list.prims, Primitive{kind = .Circle, cv0 = center, radius = radius})
+	index := u32(len(core.draw_list.shapes))
+	append(&core.draw_list.shapes, Shape{kind = .Circle, cv0 = center, radius = radius})
 	return index
 }
 

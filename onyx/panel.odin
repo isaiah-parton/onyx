@@ -117,8 +117,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 		draw_rounded_box_corners_fill(
 			title_box,
-			core.style.rounding,
-			{.Top_Left, .Top_Right},
+			{core.style.rounding, core.style.rounding, 0, 0},
 			fade(core.style.color.substance, 0.5),
 		)
 
@@ -141,8 +140,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 			draw_rounded_box_corners_fill(
 				self.box,
-				core.style.rounding,
-				{.Top_Right},
+				{1 = core.style.rounding},
 				fade({200, 50, 50, 255}, self.hover_time),
 			)
 
@@ -199,8 +197,7 @@ end_panel :: proc() {
 
 			draw_rounded_box_corners_fill(
 				self.box,
-				core.style.rounding,
-				{.Bottom_Right},
+				{3 = core.style.rounding},
 				fade(core.style.color.substance, 0.5 * self.hover_time),
 			)
 

@@ -102,45 +102,16 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 					)
 				}
 				path := get_path()
-				weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
 				for i in 0 ..< path.count - 1 {
 					// Points
 					p0 := path.points[max(i - 1, 0)]
 					p1 := path.points[i]
 					p2 := path.points[min(i + 1, path.count - 1)]
 					p3 := path.points[min(i + 2, path.count - 1)]
-
 					// Control points
 					c1 := p1 + (p2 - p0) / 6
 					c2 := p2 - (p3 - p1) / 6
-
-					// Do curve
-					segments := int((p2.x - p1.x) / 5)
-					step: f32 = 1.0 / f32(segments)
-					lp: [2]f32
-					ti, bi: u32
-					for n in 0 ..= segments {
-						t: f32 = f32(n) * step
-						times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
-						p: [2]f32 = {
-							(times * weights * (matrix[4, 1]f32){p1.x, c1.x, c2.x, p2.x})[0][0],
-							(times * weights * (matrix[4, 1]f32){p1.y, c1.y, c2.y, p2.y})[0][0],
-						}
-						set_vertex_uv({})
-						set_vertex_color(
-							fade(field.color, (inner_box.hi.y - p.y) / box_height(inner_box)),
-						)
-						nti := add_vertex(p)
-						set_vertex_color({})
-						nbi := add_vertex({p.x, inner_box.hi.y})
-						if n > 0 {
-							add_indices(ti, nti, bi, nti, nbi, bi)
-							draw_line(lp, p, 2, field.color)
-						}
-						ti = nti
-						bi = nbi
-						lp = p
-					}
+					draw_cubic_bezier(p1, c1, c2, p2, 2, field.color)
 				}
 				end_path()
 			}
@@ -242,20 +213,12 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 					field_height :=
 						(f32(entry.values[f]) / f32(hi * f64(len(fields)))) *
 						(inner_box.hi.y - inner_box.lo.y)
-					corners: Corners
-					if f == 0 {
-						corners += {.Top_Left, .Top_Right}
-					}
-					if f == len(fields) - 1 {
-						corners += {.Bottom_Left, .Bottom_Right}
-					}
-					draw_rounded_box_corners_fill(
+					draw_rounded_box_fill(
 						{
 							{block.lo.x, block.hi.y - (height + field_height)},
 							{block.hi.x, block.hi.y - height},
 						},
 						core.style.rounding,
-						corners,
 						field.color,
 					)
 					height += field_height
@@ -307,7 +270,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 					corners: Corners = {}
 					if f == 0 do corners += {.Top_Left, .Bottom_Left}
 					if f == len(fields) - 1 do corners += {.Top_Right, .Bottom_Right}
-					draw_rounded_box_corners_fill(bar, core.style.rounding, corners, field.color)
+					draw_rounded_box_fill(bar, core.style.rounding, field.color)
 					if kind.value_labels {
 						draw_text(
 							{(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},

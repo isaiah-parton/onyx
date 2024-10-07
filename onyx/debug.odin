@@ -1,6 +1,27 @@
 package onyx
 
 import "core:fmt"
+import "core:time"
+
+Profiler_Scope :: enum {
+	Render,
+}
+
+Profiler :: struct {
+	t: [Profiler_Scope]time.Time,
+	d: [Profiler_Scope]time.Duration,
+}
+
+@(private = "file")
+__prof: Profiler
+
+@(deferred_in = __profiler_end_scope)
+profiler_begin_scope :: proc(scope: Profiler_Scope) {
+	__prof.t[scope] = time.now()
+}
+__profiler_end_scope :: proc(scope: Profiler_Scope) {
+	__prof.d[scope] = time.since(__prof.t[scope])
+}
 
 @(private)
 do_debug_layer :: proc() {
@@ -17,7 +38,18 @@ do_debug_layer :: proc() {
 			font = core.style.fonts[.Regular],
 			size = 20,
 		},
-		color_from(0x5cf968ff),
+		{255, 255, 255, 255},
 	)
+	for scope, s in Profiler_Scope {
+		draw_text(
+			{0, 100 + f32(20 * s)},
+			{
+				text = fmt.tprint(time.duration_milliseconds(__prof.d[scope])),
+				font = core.style.fonts[.Regular],
+				size = 20,
+			},
+			{255, 255, 255, 255},
+		)
+	}
 	end_layer()
 }

@@ -265,7 +265,7 @@ init :: proc(window: glfw.WindowHandle) -> bool {
 	)
 
 	// Initialize graphics pipeline
-	init_graphics(&core.gfx, core.window, 4)
+	init_graphics(&core.gfx, core.window, 1)
 
 	// Initalize draw list
 	init_draw_list(&core.draw_list)
@@ -431,7 +431,7 @@ new_frame :: proc() {
 
 	set_texture(core.font_atlas.texture.internal)
 
-	append(&core.draw_list.prims, Primitive{kind = .Normal})
+	append(&core.draw_list.shapes, Shape{kind = .Normal})
 }
 
 // Render queued draw calls and reset draw state
@@ -449,12 +449,11 @@ render :: proc() {
 	}
 
 	if core.draw_this_frame && core.visible {
-		start_time := time.now()
+		profiler_begin_scope(.Render)
 		draw(&core.gfx, &core.draw_list, core.draw_calls[:])
 
 		core.drawn_frames += 1
 		core.draw_this_frame = false
-		core.render_duration = time.since(start_time)
 	}
 
 	// Reset draw calls and draw list

@@ -138,8 +138,6 @@ end_container :: proc() {
 		}
 	}
 
-	// Rounded corner mask to fake rounded clipping
-	draw_rounded_box_mask(self.box, core.style.rounding, core.style.color.foreground)
 	// Table outline
 	draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 

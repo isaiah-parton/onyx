@@ -220,15 +220,33 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	if self.visible {
 		// H wheel
 		STEP :: math.TAU / 48.0
+		prim_index := u32(len(core.draw_list.shapes))
+		append(
+			&core.draw_list.shapes,
+			Shape {
+				kind = .Circle,
+				cv0 = center,
+				stroke = true,
+				width = (outer - inner) - 1,
+				radius = (inner + outer) / 2,
+			},
+		)
+		set_vertex_prim(prim_index)
 		for t: f32 = 0; t < math.TAU; t += STEP {
 			normal := [2]f32{math.cos(t), math.sin(t)}
 			next_normal := [2]f32{math.cos(t + STEP), math.sin(t + STEP)}
+
+			inner_radius := inner - 2
+			outer_radius := outer + 2
+
 			set_vertex_color(color_from_hsva({t * math.DEG_PER_RAD, 1, 1, 1}))
 			index_0, index_1 :=
-				add_vertex(center + normal * outer), add_vertex(center + normal * inner)
+				add_vertex(center + normal * outer_radius),
+				add_vertex(center + normal * inner_radius)
 			set_vertex_color(color_from_hsva({(t + STEP) * math.DEG_PER_RAD, 1, 1, 1}))
 			index_2, index_3 :=
-				add_vertex(center + next_normal * inner), add_vertex(center + next_normal * outer)
+				add_vertex(center + next_normal * inner_radius),
+				add_vertex(center + next_normal * outer_radius)
 			add_indices(index_0, index_1, index_2, index_0, index_2, index_3)
 		}
 
@@ -243,13 +261,21 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			center + {math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * inner
 
 		// SV triangle
+		set_vertex_prim(add_polygon_primitive(point_a, point_b, point_c))
 		set_vertex_color(color_from_hsva({hsva.x, 1, 1, 1}))
-		index_a := add_vertex(point_a)
+		index_a := add_vertex(center + {math.cos(angle), math.sin(angle)} * (inner + 2))
 		set_vertex_color({0, 0, 0, 255})
-		index_b := add_vertex(point_b)
+		index_b := add_vertex(
+			center +
+			{math.cos(angle - TRIANGLE_STEP), math.sin(angle - TRIANGLE_STEP)} * (inner + 2),
+		)
 		set_vertex_color(255)
-		index_c := add_vertex(point_c)
+		index_c := add_vertex(
+			center +
+			{math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * (inner + 2),
+		)
 		add_indices(index_a, index_b, index_c)
+		set_vertex_prim(0)
 
 		// SV circle
 		point := linalg.lerp(

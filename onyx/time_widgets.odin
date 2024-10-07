@@ -147,6 +147,7 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 			add_space(CALENDAR_WEEK_SPACING)
 			begin_layout({side = .Top, size = size})
 			set_side(.Left)
+			set_mode(.Absolute)
 		}
 		year, month, day := t.date(time)
 		date := Date{i64(year), i8(month), i8(day)}
@@ -159,21 +160,22 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 		}
 		begin_widget(&widget_info) or_continue
 
-		if widget_info.self.visible {
+		if self.visible {
 			is_month := i8(month) == i8(info.month)
 			// Range highlight
 			if time._nsec > selection_times[0]._nsec &&
 			   time._nsec <= selection_times[1]._nsec + i64(t.Hour * 24) {
-				corners: Corners = {}
+				corners: [4]f32
 				if time._nsec == selection_times[0]._nsec + i64(t.Hour * 24) {
-					corners += {.Top_Left, .Bottom_Left}
+					corners[0] = core.style.rounding
+					corners[2] = core.style.rounding
 				}
 				if time._nsec == selection_times[1]._nsec + i64(t.Hour * 24) {
-					corners += {.Top_Right, .Bottom_Right}
+					corners[1] = core.style.rounding
+					corners[2] = core.style.rounding
 				}
 				draw_rounded_box_corners_fill(
-					self.box,
-					core.style.shape.rounding,
+					expand_box(self.box, 1),
 					corners,
 					fade(core.style.color.substance, 1 if is_month else 0.5),
 				)

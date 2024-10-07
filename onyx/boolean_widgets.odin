@@ -96,7 +96,16 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 		center := box_center(icon_box)
 		// Paint icon
 		if state^ {
-			draw_check(center, SIZE / 4, core.style.color.background)
+			draw_aligned_rune(
+				core.style.fonts[.Icon],
+				20,
+				'\ueb7b',
+				center,
+				core.style.color.background,
+				.Middle,
+				.Middle,
+			)
+			// draw_check(center, SIZE / 4, core.style.color.background)
 		}
 		// Paint text
 		text_pos: [2]f32
