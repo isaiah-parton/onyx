@@ -23,9 +23,6 @@ BUFFER_SIZE :: mem.Megabyte * 2
 MAX_VERTICES :: 65536
 MAX_INDICES :: 65536
 
-PRIMITIVE_BUFFER_CAP :: size_of(Shape) * 1024
-PAINT_BUFFER_CAP :: size_of(Paint) * 1024
-
 Gradient :: union {
 	Linear_Gradient,
 	Radial_Gradient,
@@ -83,6 +80,7 @@ Shape :: struct #align (16) {
 	radius:  f32,
 	width:   f32,
 	paint:   u32,
+	scissor: u32,
 	start:   u32,
 	count:   u32,
 	stroke:  b32,
@@ -92,13 +90,13 @@ Vertex :: struct {
 	pos:  [2]f32,
 	uv:   [2]f32,
 	col:  [4]u8,
-	prim: u32,
+	shape: u32,
 }
 
 Vertex_State :: struct {
 	uv:      [2]f32,
 	col:     [4]u8,
-	prim:    u32,
+	shape:   u32,
 	alpha:   f32,
 	padding: u64,
 }
@@ -129,6 +127,11 @@ Path :: struct {
 	closed: bool,
 }
 
+Draw_State :: struct {
+	scissor: u32,
+	shape: u32,
+}
+
 init_draw_list :: proc(draw_list: ^Draw_List) {
 	reserve(&draw_list.vertices, MAX_VERTICES)
 	reserve(&draw_list.indices, MAX_INDICES)
@@ -146,14 +149,18 @@ clear_draw_list :: proc(draw_list: ^Draw_List) {
 	clear(&draw_list.cvs)
 }
 
-add_circle_primitive :: proc(center: [2]f32, radius: f32) -> u32 {
+add_shape_circle :: proc(center: [2]f32, radius: f32) -> u32 {
 	index := u32(len(core.draw_list.shapes))
 	append(&core.draw_list.shapes, Shape{kind = .Circle, cv0 = center, radius = radius})
 	return index
 }
 
-set_vertex_prim :: proc(prim: u32) {
-	core.vertex_state.prim = prim
+set_scissor_shape :: proc(shape: u32) {
+	core.draw_state.scissor = shape
+}
+
+set_vertex_shape :: proc(shape: u32) {
+	core.vertex_state.shape = shape
 }
 
 set_vertex_uv :: proc(uv: [2]f32) {
@@ -210,7 +217,7 @@ add_vertex_2f32 :: proc(x, y: f32) -> (i: u32) {
 			pos = pos,
 			uv = core.vertex_state.uv,
 			col = core.vertex_state.col,
-			prim = core.vertex_state.prim,
+			shape = core.vertex_state.shape,
 		},
 	)
 	return

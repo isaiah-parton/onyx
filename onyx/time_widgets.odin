@@ -156,7 +156,7 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 		today_year, today_month, today_day := t.date(t.now())
 
 		using widget_info := Widget_Info {
-			id = hash(i),
+			id = hash(i + 1),
 		}
 		begin_widget(&widget_info) or_continue
 

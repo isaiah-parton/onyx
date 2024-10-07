@@ -185,17 +185,30 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 		info.self = get_widget(info.id) or_return
 	}
 
-	// Look up a widget with that ID
 	widget := info.self
+
+	// Place widget
+	widget.box = info.box.? or_else next_widget_box(info)
+
+	if widget.frames >= core.frames {
+		draw_box_fill(
+			widget.box,
+			{
+				255,
+				0,
+				0,
+				u8(128.0 + math.sin(time.duration_seconds(time.since(core.start_time)) * 12.0) * 64.0),
+			},
+		)
+		return false
+	}
+	widget.frames = core.frames
 
 	// Push to the stack
 	push_stack(&core.widget_stack, widget) or_return
 
 	// Widget must have a valid layer
 	widget.layer = current_layer().? or_return
-
-	// Place widget
-	widget.box = info.box.? or_else next_widget_box(info)
 
 	// Keep alive
 	widget.dead = false
@@ -307,21 +320,15 @@ foreground :: proc(loc := #caller_location) {
 	layout, ok := current_layout().?
 	if !ok do return
 
-	using info := Widget_Info{id = hash(loc), box = layout.box}
+	using info := Widget_Info {
+		id  = hash(loc),
+		box = layout.box,
+	}
 	if begin_widget(&info) {
 		defer end_widget()
 
-		draw_rounded_box_fill(
-			info.self.box,
-			core.style.rounding,
-			core.style.color.foreground,
-		)
-		draw_rounded_box_stroke(
-			info.self.box,
-			core.style.rounding,
-			1,
-			core.style.color.substance,
-		)
+		draw_rounded_box_fill(info.self.box, core.style.rounding, core.style.color.foreground)
+		draw_rounded_box_stroke(info.self.box, core.style.rounding, 1, core.style.color.substance)
 
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)

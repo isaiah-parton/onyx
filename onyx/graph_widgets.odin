@@ -270,7 +270,11 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 					corners: Corners = {}
 					if f == 0 do corners += {.Top_Left, .Bottom_Left}
 					if f == len(fields) - 1 do corners += {.Top_Right, .Bottom_Right}
-					draw_rounded_box_fill(bar, core.style.rounding, field.color)
+					draw_rounded_box_corners_fill(
+						bar,
+						{core.style.rounding, core.style.rounding, 0, 0},
+						field.color,
+					)
 					if kind.value_labels {
 						draw_text(
 							{(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},

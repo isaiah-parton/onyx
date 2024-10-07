@@ -276,7 +276,8 @@ draw_text_highlight :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 }
 
 draw_text_glyphs :: proc(job: Text_Job, pos: [2]f32, color: Color) {
-	pos := linalg.floor(pos)
+	// TODO: To floor, or not to floor
+	// pos := linalg.floor(pos)
 	for glyph in job.glyphs {
 		if glyph.codepoint == 0 || glyph.source == {} do continue
 		glyph_pos := pos + glyph.pos + glyph.offset
@@ -359,7 +360,7 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 
 	// Update horizontal offset with last glyph
 	if iter.codepoint != 0 {
-		iter.glyph_pos.x += iter.glyph.advance
+		iter.glyph_pos.x += math.floor(iter.glyph.advance)
 	}
 
 	// Get the next glyph
@@ -429,7 +430,7 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 		}
 		iter.glyph_pos.y += iter.size.ascent - iter.size.descent + iter.size.line_gap
 	}
-	iter.line_size.x += iter.glyph.advance
+	iter.line_size.x += math.floor(iter.glyph.advance)
 	if iter.last_codepoint != 0 {
 		iter.line_size.x += iter.font.spacing
 	}

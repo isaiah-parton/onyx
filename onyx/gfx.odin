@@ -1,17 +1,21 @@
 package onyx
 
+import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 import "core:mem"
 import "core:slice"
-import "core:thread"
-
-import "base:runtime"
 import "core:sys/windows"
+import "core:thread"
+import "core:time"
 import "vendor:glfw"
 import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
+
+SHAPE_BUFFER_CAPACITY :: size_of(Shape) * 1024
+PAINT_BUFFER_CAPACITY :: size_of(Paint) * 512
+CVS_BUFFER_CAPACITY :: size_of([2]f32) * 512
 
 Shader_Uniforms :: struct {
 	proj_mtx: matrix[4, 4]f32,
@@ -38,7 +42,7 @@ Graphics :: struct {
 	uniform_buffer:            wgpu.Buffer,
 	vertex_buffer:             wgpu.Buffer,
 	index_buffer:              wgpu.Buffer,
-	prim_buffer:               wgpu.Buffer,
+	shape_buffer:              wgpu.Buffer,
 	paint_buffer:              wgpu.Buffer,
 	cvs_buffer:                wgpu.Buffer,
 	msaa_texture:              wgpu.Texture,
@@ -207,23 +211,19 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			gfx.device,
 			&{label = "IndexBuffer", size = BUFFER_SIZE, usage = {.Index, .CopyDst}},
 		)
-		gfx.prim_buffer = wgpu.DeviceCreateBuffer(
+		gfx.shape_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
-			&{
-				label = "PrimitiveBuffer",
-				size = size_of(Shape) * 1024,
-				usage = {.Storage, .CopyDst},
-			},
+			&{label = "ShapeBuffer", size = SHAPE_BUFFER_CAPACITY, usage = {.Storage, .CopyDst}},
 		)
 		gfx.paint_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
-			&{label = "PaintBuffer", size = size_of(Paint) * 512, usage = {.Storage, .CopyDst}},
+			&{label = "PaintBuffer", size = PAINT_BUFFER_CAPACITY, usage = {.Storage, .CopyDst}},
 		)
 		gfx.cvs_buffer = wgpu.DeviceCreateBuffer(
 			gfx.device,
 			&{
 				label = "ControlVertexBuffer",
-				size = size_of([2]f32) * 512,
+				size = CVS_BUFFER_CAPACITY,
 				usage = {.Storage, .CopyDst},
 			},
 		)
@@ -312,9 +312,9 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 				entryCount = 3,
 				entries = ([^]wgpu.BindGroupEntry)(
 					&[?]wgpu.BindGroupEntry {
-						{binding = 0, buffer = gfx.prim_buffer, size = size_of(Shape) * 1024},
-						{binding = 1, buffer = gfx.paint_buffer, size = size_of(Paint) * 512},
-						{binding = 2, buffer = gfx.cvs_buffer, size = size_of([2]f32) * 512},
+						{binding = 0, buffer = gfx.shape_buffer, size = SHAPE_BUFFER_CAPACITY},
+						{binding = 1, buffer = gfx.paint_buffer, size = PAINT_BUFFER_CAPACITY},
+						{binding = 2, buffer = gfx.cvs_buffer, size = CVS_BUFFER_CAPACITY},
 					},
 				),
 			},
@@ -335,6 +335,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			},
 		)
 		// Create shader module
+		t := time.now()
 		module := wgpu.DeviceCreateShaderModule(
 			gfx.device,
 			&wgpu.ShaderModuleDescriptor {
@@ -344,12 +345,13 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 				},
 			},
 		)
+		fmt.printfln("Shader compilation took %fms", time.duration_milliseconds(time.since(t)))
 
 		vertex_attributes := [?]wgpu.VertexAttribute {
 			{format = .Float32x2, offset = u64(offset_of(Vertex, pos)), shaderLocation = 0},
 			{format = .Float32x2, offset = u64(offset_of(Vertex, uv)), shaderLocation = 1},
 			{format = .Unorm8x4, offset = u64(offset_of(Vertex, col)), shaderLocation = 2},
-			{format = .Uint32, offset = u64(offset_of(Vertex, prim)), shaderLocation = 3},
+			{format = .Uint32, offset = u64(offset_of(Vertex, shape)), shaderLocation = 3},
 		}
 		// Create the pipeline
 		gfx.pipeline = wgpu.DeviceCreateRenderPipeline(
@@ -396,7 +398,7 @@ uninit_graphics :: proc(gfx: ^Graphics) {
 	wgpu.SurfaceRelease(gfx.surface)
 	wgpu.BufferRelease(gfx.vertex_buffer)
 	wgpu.BufferRelease(gfx.index_buffer)
-	wgpu.BufferRelease(gfx.prim_buffer)
+	wgpu.BufferRelease(gfx.shape_buffer)
 	wgpu.BufferRelease(gfx.paint_buffer)
 	wgpu.BufferRelease(gfx.cvs_buffer)
 	wgpu.AdapterRelease(gfx.adapter)
@@ -512,7 +514,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	wgpu.QueueWriteBuffer(gfx.queue, gfx.uniform_buffer, 0, &uniform, size_of(uniform))
 	wgpu.QueueWriteBuffer(
 		gfx.queue,
-		gfx.prim_buffer,
+		gfx.shape_buffer,
 		0,
 		raw_data(core.draw_list.shapes),
 		size_of(Shape) * len(core.draw_list.shapes),
@@ -548,7 +550,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		sampler := wgpu.DeviceCreateSampler(
 			gfx.device,
 			&{
-				magFilter = .Linear,
+				magFilter = .Nearest,
 				minFilter = .Linear,
 				addressModeU = .ClampToEdge,
 				addressModeV = .ClampToEdge,

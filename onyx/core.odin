@@ -163,6 +163,7 @@ Core :: struct {
 	draw_list:             Draw_List,
 	draw_calls:            [MAX_DRAW_CALLS]Draw_Call,
 	draw_call_count:       int,
+	draw_state:						Draw_State,
 	current_draw_call:     ^Draw_Call,
 	gfx:                   Graphics,
 	cursors:               [Mouse_Cursor]glfw.CursorHandle,

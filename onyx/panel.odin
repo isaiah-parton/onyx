@@ -209,19 +209,19 @@ end_panel :: proc() {
 				core.style.color.content,
 				0.5 + 0.5 * self.hover_time,
 			)
-			begin_path()
-			point(origin + {-0.3, -1} * scale)
-			point(origin + {-1, -1} * scale)
-			point(origin + {-1, -0.3} * scale)
-			stroke_path(2, icon_color)
-			end_path()
-			begin_path()
-			point(origin + {0.3, 1} * scale)
-			point(origin + {1, 1} * scale)
-			point(origin + {1, 0.3} * scale)
-			stroke_path(2, icon_color)
-			end_path()
-			draw_line(origin - scale, origin + scale, 2, icon_color)
+			draw_triangle_fill(
+				origin + {0, -1} * scale,
+				origin + {-1, -1} * scale,
+				origin + {-1, 0} * scale,
+				icon_color,
+			)
+			draw_triangle_fill(
+				origin + {0, 1} * scale,
+				origin + {1, 1} * scale,
+				origin + {1, 0} * scale,
+				icon_color,
+			)
+			draw_line(origin - 0.8 * scale, origin + 0.8 * scale, 2, icon_color)
 
 			if .Pressed in (self.state - self.last_state) {
 				panel.resizing = true

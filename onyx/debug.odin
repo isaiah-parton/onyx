@@ -44,7 +44,7 @@ do_debug_layer :: proc() {
 		draw_text(
 			{0, 100 + f32(20 * s)},
 			{
-				text = fmt.tprint(time.duration_milliseconds(__prof.d[scope])),
+				text = fmt.tprintf("Render: %.2fms", time.duration_milliseconds(__prof.d[scope])),
 				font = core.style.fonts[.Regular],
 				size = 20,
 			},

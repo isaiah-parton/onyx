@@ -227,11 +227,11 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 				kind = .Circle,
 				cv0 = center,
 				stroke = true,
-				width = (outer - inner) - 1,
+				width = (outer - inner) - 4,
 				radius = (inner + outer) / 2,
 			},
 		)
-		set_vertex_prim(prim_index)
+		set_vertex_shape(prim_index)
 		for t: f32 = 0; t < math.TAU; t += STEP {
 			normal := [2]f32{math.cos(t), math.sin(t)}
 			next_normal := [2]f32{math.cos(t + STEP), math.sin(t + STEP)}
@@ -261,7 +261,7 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			center + {math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * inner
 
 		// SV triangle
-		set_vertex_prim(add_polygon_primitive(point_a, point_b, point_c))
+		set_vertex_shape(add_polygon_shape(point_a, point_b, point_c))
 		set_vertex_color(color_from_hsva({hsva.x, 1, 1, 1}))
 		index_a := add_vertex(center + {math.cos(angle), math.sin(angle)} * (inner + 2))
 		set_vertex_color({0, 0, 0, 255})
@@ -275,7 +275,7 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			{math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * (inner + 2),
 		)
 		add_indices(index_a, index_b, index_c)
-		set_vertex_prim(0)
+		set_vertex_shape(0)
 
 		// SV circle
 		point := linalg.lerp(

@@ -67,6 +67,7 @@ draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color)
 
 	size: [2]f32 = {f32(texture.width), f32(texture.height)}
 
+	set_vertex_shape(add_shape(Shape{kind = .Normal}))
 	set_vertex_uv(source.lo / size)
 	tl := add_vertex(target.lo)
 	set_vertex_uv({source.lo.x, source.hi.y} / size)
@@ -77,7 +78,7 @@ draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color)
 	tr := add_vertex({target.hi.x, target.lo.y})
 
 	add_indices(tl, br, bl, tl, tr, br)
-
+set_vertex_shape(0)
 	set_texture(last_texture)
 }
 

@@ -8,298 +8,76 @@ import "core:time"
 
 ANGLE_TOLERANCE :: 0.01
 
-CIRCLE_8 := [?][2]f32 {
-	{1.000000, 0.000000},
-	{0.707107, 0.707107},
-	{0.000000, 1.000000},
-	{-0.707107, 0.707107},
-	{-1.000000, 0.000000},
-	{-0.707107, -0.707107},
-	{0.000000, -1.000000},
-	{0.707107, -0.707107},
-	{1.000000, 0.000000},
+add_shape_box :: proc(box: Box, corners: [4]f32) -> u32 {
+	return add_shape(
+		Shape {
+			kind = .Box,
+			corners = corners,
+			cv0 = transform_point(box.lo),
+			cv1 = transform_point(box.hi),
+		},
+	)
 }
 
-CIRCLE_16 := [?][2]f32 {
-	{1.000000, 0.000000},
-	{0.923880, 0.382683},
-	{0.707107, 0.707107},
-	{0.382683, 0.923880},
-	{0.000000, 1.000000},
-	{-0.382684, 0.923880},
-	{-0.707107, 0.707107},
-	{-0.923880, 0.382683},
-	{-1.000000, 0.000000},
-	{-0.923880, -0.382683},
-	{-0.707107, -0.707107},
-	{-0.382684, -0.923880},
-	{0.000000, -1.000000},
-	{0.382684, -0.923879},
-	{0.707107, -0.707107},
-	{0.923880, -0.382683},
-	{1.000000, 0.000000},
+add_shape :: proc(shape: Shape) -> u32 {
+	index := u32(len(core.draw_list.shapes))
+	shape := shape
+	shape.scissor = core.draw_state.scissor
+	append(&core.draw_list.shapes, shape)
+	return index
 }
 
-CIRCLE_32 := [?][2]f32 {
-	{1.000000, 0.000000},
-	{0.980785, 0.195090},
-	{0.923880, 0.382683},
-	{0.831470, 0.555570},
-	{0.707107, 0.707107},
-	{0.555570, 0.831470},
-	{0.382683, 0.923880},
-	{0.195090, 0.980785},
-	{0.000000, 1.000000},
-	{-0.195090, 0.980785},
-	{-0.382683, 0.923880},
-	{-0.555570, 0.831470},
-	{-0.707107, 0.707107},
-	{-0.831470, 0.555570},
-	{-0.923880, 0.382683},
-	{-0.980785, 0.195090},
-	{-1.000000, 0.000000},
-	{-0.980785, -0.195090},
-	{-0.923880, -0.382683},
-	{-0.831470, -0.555570},
-	{-0.707107, -0.707107},
-	{-0.555570, -0.831470},
-	{-0.382683, -0.923880},
-	{-0.195090, -0.980785},
-	{-0.000000, -1.000000},
-	{0.195090, -0.980785},
-	{0.382683, -0.923880},
-	{0.555570, -0.831470},
-	{0.707107, -0.707107},
-	{0.831470, -0.555570},
-	{0.923880, -0.382683},
-	{0.980785, -0.195090},
-	{1.000000, -0.000000},
-}
-
-CIRCLE_64 := [?][2]f32 {
-	{1.000000, 0.000000},
-	{0.995185, 0.098017},
-	{0.980785, 0.195090},
-	{0.956940, 0.290285},
-	{0.923880, 0.382683},
-	{0.881921, 0.471397},
-	{0.831470, 0.555570},
-	{0.773010, 0.634393},
-	{0.707107, 0.707107},
-	{0.634393, 0.773010},
-	{0.555570, 0.831470},
-	{0.471397, 0.881921},
-	{0.382683, 0.923880},
-	{0.290285, 0.956940},
-	{0.195090, 0.980785},
-	{0.098017, 0.995185},
-	{0.000000, 1.000000},
-	{-0.098017, 0.995185},
-	{-0.195090, 0.980785},
-	{-0.290285, 0.956940},
-	{-0.382683, 0.923880},
-	{-0.471397, 0.881921},
-	{-0.555570, 0.831470},
-	{-0.634393, 0.773010},
-	{-0.707107, 0.707107},
-	{-0.773010, 0.634393},
-	{-0.831470, 0.555570},
-	{-0.881921, 0.471397},
-	{-0.923880, 0.382683},
-	{-0.956940, 0.290285},
-	{-0.980785, 0.195090},
-	{-0.995185, 0.098017},
-	{-1.000000, 0.000000},
-	{-0.995185, -0.098017},
-	{-0.980785, -0.195090},
-	{-0.956940, -0.290285},
-	{-0.923880, -0.382683},
-	{-0.881921, -0.471397},
-	{-0.831470, -0.555570},
-	{-0.773010, -0.634393},
-	{-0.707107, -0.707107},
-	{-0.634393, -0.773010},
-	{-0.555570, -0.831470},
-	{-0.471397, -0.881921},
-	{-0.382683, -0.923880},
-	{-0.290285, -0.956940},
-	{-0.195090, -0.980785},
-	{-0.098017, -0.995185},
-	{-0.000000, -1.000000},
-	{0.098017, -0.995185},
-	{0.195090, -0.980785},
-	{0.290285, -0.956940},
-	{0.382683, -0.923880},
-	{0.471397, -0.881921},
-	{0.555570, -0.831470},
-	{0.634393, -0.773010},
-	{0.707107, -0.707107},
-	{0.773010, -0.634393},
-	{0.831470, -0.555570},
-	{0.881921, -0.471397},
-	{0.923880, -0.382683},
-	{0.956940, -0.290285},
-	{0.980785, -0.195090},
-	{0.995185, -0.098017},
-	{1.000000, -0.000000},
-}
-
-CIRCLE_128 := [?][2]f32 {
-	{1.000000, 0.000000},
-	{0.998795, 0.049068},
-	{0.995185, 0.098017},
-	{0.989177, 0.146730},
-	{0.980785, 0.195090},
-	{0.970031, 0.242980},
-	{0.956940, 0.290285},
-	{0.941544, 0.336890},
-	{0.923880, 0.382683},
-	{0.903989, 0.427555},
-	{0.881921, 0.471397},
-	{0.857729, 0.514103},
-	{0.831470, 0.555570},
-	{0.803208, 0.595699},
-	{0.773010, 0.634393},
-	{0.740951, 0.671559},
-	{0.707107, 0.707107},
-	{0.671559, 0.740951},
-	{0.634393, 0.773010},
-	{0.595699, 0.803208},
-	{0.555570, 0.831470},
-	{0.514103, 0.857729},
-	{0.471397, 0.881921},
-	{0.427555, 0.903989},
-	{0.382683, 0.923880},
-	{0.336890, 0.941544},
-	{0.290285, 0.956940},
-	{0.242980, 0.970031},
-	{0.195090, 0.980785},
-	{0.146730, 0.989177},
-	{0.098017, 0.995185},
-	{0.049068, 0.998795},
-	{0.000000, 1.000000},
-	{-0.049068, 0.998795},
-	{-0.098017, 0.995185},
-	{-0.146730, 0.989177},
-	{-0.195090, 0.980785},
-	{-0.242980, 0.970031},
-	{-0.290285, 0.956940},
-	{-0.336890, 0.941544},
-	{-0.382683, 0.923880},
-	{-0.427555, 0.903989},
-	{-0.471397, 0.881921},
-	{-0.514103, 0.857729},
-	{-0.555570, 0.831470},
-	{-0.595699, 0.803208},
-	{-0.634393, 0.773010},
-	{-0.671559, 0.740951},
-	{-0.707107, 0.707107},
-	{-0.740951, 0.671559},
-	{-0.773010, 0.634393},
-	{-0.803208, 0.595699},
-	{-0.831470, 0.555570},
-	{-0.857729, 0.514103},
-	{-0.881921, 0.471397},
-	{-0.903989, 0.427555},
-	{-0.923880, 0.382683},
-	{-0.941544, 0.336890},
-	{-0.956940, 0.290285},
-	{-0.970031, 0.242980},
-	{-0.980785, 0.195090},
-	{-0.989177, 0.146730},
-	{-0.995185, 0.098017},
-	{-0.998795, 0.049068},
-	{-1.000000, 0.000000},
-	{-0.998795, -0.049068},
-	{-0.995185, -0.098017},
-	{-0.989177, -0.146730},
-	{-0.980785, -0.195090},
-	{-0.970031, -0.242980},
-	{-0.956940, -0.290285},
-	{-0.941544, -0.336890},
-	{-0.923880, -0.382683},
-	{-0.903989, -0.427555},
-	{-0.881921, -0.471397},
-	{-0.857729, -0.514103},
-	{-0.831470, -0.555570},
-	{-0.803208, -0.595699},
-	{-0.773010, -0.634393},
-	{-0.740951, -0.671559},
-	{-0.707107, -0.707107},
-	{-0.671559, -0.740951},
-	{-0.634393, -0.773010},
-	{-0.595699, -0.803208},
-	{-0.555570, -0.831470},
-	{-0.514103, -0.857729},
-	{-0.471397, -0.881921},
-	{-0.427555, -0.903989},
-	{-0.382683, -0.923880},
-	{-0.336890, -0.941544},
-	{-0.290285, -0.956940},
-	{-0.242980, -0.970031},
-	{-0.195090, -0.980785},
-	{-0.146730, -0.989177},
-	{-0.098017, -0.995185},
-	{-0.049068, -0.998795},
-	{-0.000000, -1.000000},
-	{0.049068, -0.998795},
-	{0.098017, -0.995185},
-	{0.146730, -0.989177},
-	{0.195090, -0.980785},
-	{0.242980, -0.970031},
-	{0.290285, -0.956940},
-	{0.336890, -0.941544},
-	{0.382683, -0.923880},
-	{0.427555, -0.903989},
-	{0.471397, -0.881921},
-	{0.514103, -0.857729},
-	{0.555570, -0.831470},
-	{0.595699, -0.803208},
-	{0.634393, -0.773010},
-	{0.671559, -0.740951},
-	{0.707107, -0.707107},
-	{0.740951, -0.671559},
-	{0.773010, -0.634393},
-	{0.803208, -0.595699},
-	{0.831470, -0.555570},
-	{0.857729, -0.514103},
-	{0.881921, -0.471397},
-	{0.903989, -0.427555},
-	{0.923880, -0.382683},
-	{0.941544, -0.336890},
-	{0.956940, -0.290285},
-	{0.970031, -0.242980},
-	{0.980785, -0.195090},
-	{0.989177, -0.146730},
-	{0.995185, -0.098017},
-	{0.998795, -0.049068},
-	{1.000000, -0.000000},
-}
-
-get_precomputed_circle_vertices :: proc(radius: f32) -> [][2]f32 {
-	if radius <= 2 {
-		return CIRCLE_8[:]
-	} else if radius <= 5 {
-		return CIRCLE_16[:]
-	} else if radius < 18 {
-		return CIRCLE_32[:]
-	} else if radius < 50 {
-		return CIRCLE_64[:]
+get_shape_bounding_box :: proc(shape: Shape) -> Box {
+	box: Box = {math.F32_MAX, 0}
+	switch shape.kind {
+	case .Normal:
+	case .Box:
+		box.lo = shape.cv0
+		box.hi = shape.cv1
+	case .Circle:
+		box.lo = shape.cv0 - shape.radius
+		box.hi = shape.cv0 + shape.radius
+	case .Path:
+		for i in 0..<shape.count {
+			j := shape.start + i
+			box.lo = linalg.min(box.lo, core.draw_list.cvs[j])
+			box.hi = linalg.max(box.hi, core.draw_list.cvs[j])
+		}
+	case .Polygon:
+		for i in 0..<shape.count {
+			j := shape.start + i
+			box.lo = linalg.min(box.lo, core.draw_list.cvs[j])
+			box.hi = linalg.max(box.hi, core.draw_list.cvs[j])
+		}
+		box.lo -= 1
+		box.hi += 1
+	case .Bezier:
+		box.lo = linalg.min(shape.cv0, shape.cv1, shape.cv2) - shape.width * 2
+		box.hi = linalg.max(shape.cv0, shape.cv1, shape.cv2) + shape.width * 2
+	case .BlurredBox:
+		box.lo = shape.cv0 - shape.cv1 * 3
+		box.hi = shape.cv0 + shape.cv1 * 3
+	case .Curve:
+	case .Ellipse:
 	}
-	return CIRCLE_128[:]
+	if clip, ok := current_clip().?; ok {
+		box.lo = linalg.max(box.lo, clip.lo)
+		box.hi = linalg.min(box.hi, clip.hi)
+	}
+	return box
 }
 
-get_rounded_corner_vertices :: proc(radius: f32) -> (corners: [Corner][][2]f32) {
-	vertices := get_precomputed_circle_vertices(radius)
-	n := len(vertices) / 4 + 1
-	corners[.Bottom_Right] = vertices[:n]
-	vertices = vertices[n - 1:]
-	corners[.Bottom_Left] = vertices[:n]
-	vertices = vertices[n - 1:]
-	corners[.Top_Left] = vertices[:n]
-	vertices = vertices[n - 1:]
-	corners[.Top_Right] = vertices[:]
-	return
+render_shape :: proc(shape: u32, color: Color) {
+	box := get_shape_bounding_box(core.draw_list.shapes[shape])
+	set_vertex_shape(shape)
+	set_vertex_color(color)
+	set_vertex_uv({})
+	a := add_vertex(box.lo)
+	b := add_vertex({box.lo.x, box.hi.y})
+	c := add_vertex(box.hi)
+	d := add_vertex({box.hi.x, box.lo.y})
+	add_indices(a, b, c, a, c, d)
+	set_vertex_shape(0)
 }
 
 clear_path :: proc(path: ^Path) {
@@ -500,34 +278,28 @@ draw_triangle_strip_fill :: proc(points: [][2]f32, color: Color) {
 		}
 	}
 }
-draw_line :: proc(a, b: [2]f32, thickness: f32, color: Color) {
+draw_line :: proc(a, b: [2]f32, width: f32, color: Color) {
 	delta := b - a
 	length := math.sqrt(f32(delta.x * delta.x + delta.y * delta.y))
-	if length > 0 && thickness > 0 {
-		scale := thickness / (2 * length)
+	if length > 0 && width > 0 {
+		scale := width / (2 * length)
 		radius: [2]f32 = {-scale * delta.y, scale * delta.x}
-		draw_triangle_strip_fill(
+		draw_polygon_fill(
 			{
 				{a.x + radius.x, a.y + radius.y},
 				{a.x - radius.x, a.y - radius.y},
-				{b.x + radius.x, b.y + radius.y},
 				{b.x - radius.x, b.y - radius.y},
+				{b.x + radius.x, b.y + radius.y},
 			},
 			color,
 		)
 	}
 }
 
-draw_bezier_simple :: proc(p0, p1, p2: [2]f32, width: f32, color: Color) {
-	prim := u32(len(core.draw_list.shapes))
-	append(
-		&core.draw_list.shapes,
-		Shape{kind = .Bezier, cv0 = p0, cv1 = p1, cv2 = p2, width = width},
-	)
-
-	set_vertex_prim(prim)
-	draw_box_fill({linalg.min(p0, p1, p2) - width, linalg.max(p0, p1, p2) + width}, color)
-	set_vertex_prim(0)
+draw_quad_bezier :: proc(p0, p1, p2: [2]f32, width: f32, color: Color) {
+	// width := width - 1
+	shape_index := add_shape(Shape{kind = .Bezier, cv0 = p0, cv1 = p1, cv2 = p2, width = width})
+	render_shape(shape_index, color)
 }
 
 draw_curve :: proc(pts: [][2]f32, width: f32, color: Color) {
@@ -551,20 +323,20 @@ draw_curve :: proc(pts: [][2]f32, width: f32, color: Color) {
 
 	append(&core.draw_list.cvs, ..pts)
 
-	set_vertex_prim(prim)
+	set_vertex_shape(prim)
 	draw_box_fill(box, color)
-	set_vertex_prim(0)
+	set_vertex_shape(0)
 }
 
 draw_cubic_bezier :: proc(a, b, c, d: [2]f32, width: f32, color: Color) {
 	ab := linalg.lerp(a, b, 0.5)
 	cd := linalg.lerp(c, d, 0.5)
 	mp := linalg.lerp(ab, cd, 0.5)
-	draw_bezier_simple(a, ab, mp, width, color)
-	draw_bezier_simple(mp, cd, d, width, color)
+	draw_quad_bezier(a, ab, mp, width, color)
+	draw_quad_bezier(mp, cd, d, width, color)
 }
 
-add_polygon_primitive :: proc(pts: ..[2]f32) -> u32 {
+add_polygon_shape :: proc(pts: ..[2]f32) -> u32 {
 	prim_index := u32(len(core.draw_list.shapes))
 	prim := Shape {
 		kind  = .Polygon,
@@ -579,40 +351,17 @@ add_polygon_primitive :: proc(pts: ..[2]f32) -> u32 {
 }
 
 draw_polygon_fill :: proc(pts: [][2]f32, color: Color) {
-	prim_index := u32(len(core.draw_list.shapes))
-	box := Box{math.F32_MAX, 0}
-	prim := Shape {
+	shape := Shape {
 		kind  = .Polygon,
 		start = u32(len(core.draw_list.cvs)),
+		count = u32(len(pts)),
 	}
-	for p in pts {
-		box.lo = linalg.min(box.lo, p)
-		box.hi = linalg.max(box.hi, p)
-		append(&core.draw_list.cvs, p)
-		prim.count += 1
-	}
-	append(&core.draw_list.shapes, prim)
-	set_vertex_prim(prim_index)
-	draw_box_fill(box, color)
-	set_vertex_prim(0)
+	append(&core.draw_list.cvs, ..pts)
+	shape_index := add_shape(shape)
+	render_shape(shape_index, color)
 }
 
-draw_bezier_stroke :: proc(p0, p1, p2, p3: [2]f32, segments: int, thickness: f32, color: Color) {
-	step: f32 = 1.0 / f32(segments)
-	lp: [2]f32 = p0
-	weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
-	for t: f32 = step; t <= 1.0 + step; t += step {
-		times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
-		p: [2]f32 = {
-			(times * weights * (matrix[4, 1]f32){p0.x, p1.x, p2.x, p3.x})[0][0],
-			(times * weights * (matrix[4, 1]f32){p0.y, p1.y, p2.y, p3.y})[0][0],
-		}
-		draw_line(lp, p, thickness, color)
-		lp = p
-	}
-}
-
-get_bezier_point :: proc(p0, p1, p2, p3: [2]f32, t: f32) -> [2]f32 {
+lerp_cubic_bezier :: proc(p0, p1, p2, p3: [2]f32, t: f32) -> [2]f32 {
 	weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
 	times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
 	return [2]f32 {
@@ -655,21 +404,13 @@ draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
 }
 
 draw_circle_fill :: proc(center: [2]f32, radius: f32, color: Color) {
-	prim := u32(len(core.draw_list.shapes))
-	append(&core.draw_list.shapes, Shape{kind = .Circle, cv0 = center, radius = radius})
-
-	set_vertex_prim(prim)
-	draw_box_fill(Box{center - radius, center + radius}, color)
-	set_vertex_prim(0)
+	shape_index := add_shape(Shape{kind = .Circle, cv0 = center, radius = radius})
+	render_shape(shape_index, color)
 }
 
 draw_ellipse_fill :: proc(center, radius: [2]f32, color: Color) {
-	prim := u32(len(core.draw_list.shapes))
-	append(&core.draw_list.shapes, Shape{kind = .Ellipse, cv0 = center, cv1 = radius})
-
-	set_vertex_prim(prim)
-	draw_box_fill(Box{center - radius, center + radius}, color)
-	set_vertex_prim(0)
+	shape_index := add_shape(Shape{kind = .Ellipse, cv0 = center, cv1 = radius})
+	render_shape(shape_index, color)
 }
 
 draw_ring_fill :: proc(center: [2]f32, inner, outer, from, to: f32, color: Color) {
@@ -726,13 +467,7 @@ draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color:
 	}
 }
 draw_box_fill :: proc(box: Box, color: Color) {
-	set_vertex_color(color)
-	set_vertex_uv({})
-	tl := add_vertex(box.lo)
-	bl := add_vertex({box.lo.x, box.hi.y})
-	br := add_vertex(box.hi)
-	tr := add_vertex({box.hi.x, box.lo.y})
-	add_indices(tl, br, bl, tl, tr, br)
+	render_shape(add_shape_box(box, {}), color)
 }
 draw_box_fill_clipped :: proc(box: Box, color: Color) {
 	box := box
@@ -751,44 +486,14 @@ draw_rounded_box_corners_fill :: proc(box: Box, corners: [4]f32, color: Color) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
-
-	shape_index := u32(len(core.draw_list.shapes))
-	append(
-		&core.draw_list.shapes,
-		Shape {
-			kind = .Box,
-			corners = corners,
-			cv0 = transform_point(box.lo),
-			cv1 = transform_point(box.hi),
-		},
-	)
-
-	set_vertex_prim(shape_index)
-	draw_box_fill(box, color)
-	set_vertex_prim(0)
+	render_shape(add_shape_box(box, corners), color)
 }
-
 
 draw_rounded_box_fill :: proc(box: Box, radius: f32, color: Color) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
-	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
-
-	prim := u32(len(core.draw_list.shapes))
-	append(
-		&core.draw_list.shapes,
-		Shape {
-			kind = .Box,
-			corners = radius,
-			cv0 = transform_point(box.lo),
-			cv1 = transform_point(box.hi),
-		},
-	)
-
-	set_vertex_prim(prim)
-	draw_box_fill(box, color)
-	set_vertex_prim(0)
+	render_shape(add_shape_box(box, radius), color)
 }
 
 draw_rounded_box_shadow :: proc(box: Box, corner_radius, blur_radius: f32, color: Color) {
@@ -797,7 +502,7 @@ draw_rounded_box_shadow :: proc(box: Box, corner_radius, blur_radius: f32, color
 	}
 	corner_radius := min(corner_radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
 
-	prim := u32(len(core.draw_list.shapes))
+	shape_index := u32(len(core.draw_list.shapes))
 	append(
 		&core.draw_list.shapes,
 		Shape {
@@ -809,9 +514,7 @@ draw_rounded_box_shadow :: proc(box: Box, corner_radius, blur_radius: f32, color
 		},
 	)
 
-	set_vertex_prim(prim)
-	draw_box_fill(expand_box(box, blur_radius * 3), color)
-	set_vertex_prim(0)
+	render_shape(shape_index, color)
 }
 
 draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
@@ -820,7 +523,7 @@ draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
 	}
 	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
 
-	prim := u32(len(core.draw_list.shapes))
+	shape_index := u32(len(core.draw_list.shapes))
 	append(
 		&core.draw_list.shapes,
 		Shape {
@@ -833,9 +536,7 @@ draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
 		},
 	)
 
-	set_vertex_prim(prim)
-	draw_box_fill(expand_box(box, width / 2), color)
-	set_vertex_prim(0)
+	render_shape(shape_index, color)
 }
 
 // lil guys

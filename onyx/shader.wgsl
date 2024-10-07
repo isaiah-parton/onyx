@@ -15,6 +15,7 @@ struct Shape {
 	radius: f32,
 	width: f32,
 	paint: u32,
+	scissor: u32,
 	start: u32,
 	count: u32,
 	stroke: u32,
@@ -305,7 +306,7 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
         	 s *= -1.0;
         }
       }
-      return s * sqrt(d) + 1;
+      return s * sqrt(d) + 0.5;
     }
 		default: {}
 	}
@@ -339,11 +340,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 	out = textureSample(draw_call_texture, draw_call_sampler, in.uv) * in.col;
 
-	var d = sd_shape(shape, in.pos.xy);
+	var d = 0.0;
 
 	if (shape.kind > 0u) {
-		out.a *= (1.0 - d);
+		d = sd_shape(shape, in.pos.xy);
 	}
+
+	if (shape.scissor > 0u) {
+		d = max(d, sd_shape(shapes.shapes[shape.scissor], in.pos.xy));
+	}
+
+	out.a *= (1.0 - d);
 
   return out;
 }

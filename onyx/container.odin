@@ -56,7 +56,7 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 		self.desired_scroll -= delta_scroll * 100
 	}
 	push_clip(self.box)
-	append_draw_call(current_layer().?.index)
+	set_scissor_shape(add_shape_box(self.box, core.style.rounding))
 	push_stack(&core.container_stack, self) or_return
 
 	layout_pos := self.box.lo - linalg.floor(self.scroll)
@@ -69,27 +69,10 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 }
 
 end_container :: proc() {
+	set_scissor_shape(0)
 	self := current_container().?
 	layout := current_layout().?
 	self.size = linalg.max(layout.content_size + layout.spacing_size, self.size)
-
-	//TODO: Remove this
-	// draw_text(
-	// 	self.box.lo,
-	// 	{text = fmt.tprintf("%.1f", box_size(self.box)), font = core.style.fonts[.Light], size = 20},
-	// 	{255, 255, 255, 255},
-	// )
-	// draw_text(
-	// 	self.box.lo + {0, 20},
-	// 	{text = fmt.tprintf("%.1f", self.size), font = core.style.fonts[.Light], size = 20},
-	// 	{255, 255, 255, 255},
-	// )
-	// draw_text(
-	// 	self.box.lo + {0, 40},
-	// 	{text = fmt.tprintf("%.1f", self.scroll), font = core.style.fonts[.Light], size = 20},
-	// 	{255, 255, 255, 255},
-	// )
-
 
 	// Clamp scroll
 	self.desired_scroll = linalg.max(
@@ -111,9 +94,11 @@ end_container :: proc() {
 
 	end_layout()
 
+	inner_box := shrink_box(self.box, 4)
+
 	if self.scroll_y {
 		box := get_box_cut_right(
-			self.box,
+			inner_box,
 			self.scroll_time.y * core.style.shape.scrollbar_thickness,
 		)
 		if self.scroll_x {
@@ -126,7 +111,7 @@ end_container :: proc() {
 	}
 	if self.scroll_x {
 		box := get_box_cut_bottom(
-			self.box,
+			inner_box,
 			self.scroll_time.x * core.style.shape.scrollbar_thickness,
 		)
 		if self.scroll_y {
