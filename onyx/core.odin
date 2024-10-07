@@ -432,6 +432,7 @@ new_frame :: proc() {
 
 	set_texture(core.font_atlas.texture.internal)
 
+	append(&core.draw_list.paints, Paint{kind = .Image})
 	append(&core.draw_list.shapes, Shape{kind = .Normal})
 }
 

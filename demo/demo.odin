@@ -120,6 +120,12 @@ component_showcase :: proc(state: ^Component_Showcase) {
 				state.hsva = hsva_from_color(color_from_hex(u32(value)))
 			}
 		}
+		si := runtime.type_info_base(type_info_of(Color_Scheme)).variant.(runtime.Type_Info_Struct)
+		for i in 0..<si.field_count {
+		push_id(int(i + 1))
+			color_button({value = (^Color)(rawptr(uintptr(&core.style.color) + si.offsets[i]))})
+			pop_id()
+		}
 
 	case .Tables:
 		set_side(.Left)

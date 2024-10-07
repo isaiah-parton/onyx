@@ -56,6 +56,7 @@ Widget_Kind :: union {
 	Boolean_Widget_Kind,
 	Date_Picker_Widget_Kind,
 	Table_Widget_Kind,
+	Color_Conversion_Widget_Kind,
 }
 // Interaction state
 Widget_Status :: enum {

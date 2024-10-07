@@ -1,5 +1,6 @@
 package onyx
 import "core:math"
+import "core:math/ease"
 import "core:math/linalg"
 
 barycentric :: proc(point, a, b, c: [2]f32) -> (u, v: f32) {
@@ -69,6 +70,93 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: Co
 			}
 		}
 	}
+}
+
+Color_Conversion_Widget_Kind :: struct {
+	hsva: [4]f32,
+}
+
+Color_Button_Info :: struct {
+	using _: Widget_Info,
+	value:   ^Color,
+	changed: bool,
+}
+
+init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_location) -> bool {
+	if value == nil do return false
+	id = hash(loc)
+	self = get_widget(id) or_return
+	desired_size = core.style.visual_size
+	return true
+}
+
+add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
+	begin_widget(info) or_return
+	defer end_widget()
+
+	menu_behavior(self)
+
+	if self.visible {
+		// draw_rounded_box_shadow(self.box, core.style.rounding, 3, {0, 0, 0, 40})
+		draw_rounded_box_fill(self.box, core.style.rounding, value^)
+		draw_inner_box_shadow(self.box, core.style.rounding, 5, {{0, 0, 255, 255}, {255, 0, 0, 255}})
+		if self.hover_time > 0 {
+			draw_rounded_box_stroke(self.box, core.style.rounding, 2, fade(core.style.color.substance, self.hover_time))
+		}
+	}
+
+	kind := widget_kind(self, Color_Conversion_Widget_Kind)
+
+	if .Open in self.state {
+		picker_info := HSVA_Picker_Info {
+			hsva = &kind.hsva,
+			mode = .Wheel,
+		}
+		init_hsva_picker(&picker_info)
+
+		layer_box := get_menu_box(
+			self.box,
+			picker_info.desired_size + core.style.menu_padding * 2,
+		)
+
+		open_time := ease.quadratic_out(self.open_time)
+
+		if layer, ok := layer(
+			{
+				id = self.id,
+				origin = layer_box.lo,
+				box = layer_box,
+				opacity = open_time,
+			},
+		); ok {
+			foreground()
+			shrink(core.style.menu_padding)
+			set_width_auto()
+			set_height_auto()
+			add_hsva_picker(&picker_info)
+			if picker_info.changed {
+				value^ = color_from_hsva(kind.hsva)
+			}
+			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
+				self.state -= {.Open}
+			}
+		}
+	} else {
+		if .Pressed in (self.state - self.last_state) {
+			self.state += {.Open}
+		}
+		kind.hsva = hsva_from_color(value^)
+	}
+
+	return true
+}
+
+color_button :: proc(info: Color_Button_Info, loc := #caller_location) -> Color_Button_Info {
+	info := info
+	if init_color_button(&info, loc) {
+		add_color_button(&info)
+	}
+	return info
 }
 
 Alpha_Slider_Info :: struct {

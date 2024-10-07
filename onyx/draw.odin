@@ -47,15 +47,17 @@ Stroke_Justify :: enum {
 
 Paint_Kind :: enum u32 {
 	Image,
+	Inner_Gradient,
 	Linear_Gradient,
 	Radial_Gradient,
 }
 
-Paint :: struct #align (16) {
+Paint :: struct #align(16) {
 	kind: Paint_Kind,
+	padding: [3]u32,
 	col0: [4]f32,
 	col1: [4]f32,
-	// image:  u32,
+	size: f32,
 }
 
 Shape_Kind :: enum u32 {
@@ -63,8 +65,7 @@ Shape_Kind :: enum u32 {
 	Circle,
 	Box,
 	BlurredBox,
-	Ellipse,
-	Bezier,
+	Bezier = 5,
 	Curve,
 	Path,
 	Polygon,
@@ -129,6 +130,7 @@ Path :: struct {
 
 Draw_State :: struct {
 	scissor: u32,
+	paint: u32,
 	shape: u32,
 }
 
@@ -146,17 +148,22 @@ clear_draw_list :: proc(draw_list: ^Draw_List) {
 	clear(&draw_list.vertices)
 	clear(&draw_list.indices)
 	clear(&draw_list.shapes)
+	clear(&draw_list.paints)
 	clear(&draw_list.cvs)
-}
-
-add_shape_circle :: proc(center: [2]f32, radius: f32) -> u32 {
-	index := u32(len(core.draw_list.shapes))
-	append(&core.draw_list.shapes, Shape{kind = .Circle, cv0 = center, radius = radius})
-	return index
 }
 
 set_scissor_shape :: proc(shape: u32) {
 	core.draw_state.scissor = shape
+}
+
+set_paint :: proc(paint: u32) {
+	core.draw_state.paint = paint
+}
+
+add_paint :: proc(paint: Paint) -> u32 {
+	index := u32(len(core.draw_list.paints))
+	append(&core.draw_list.paints, paint)
+	return index
 }
 
 set_vertex_shape :: proc(shape: u32) {

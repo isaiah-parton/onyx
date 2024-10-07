@@ -33,6 +33,7 @@ struct Paint {
 	kind: u32,
 	col0: vec4<f32>,
 	col1: vec4<f32>,
+	size: f32,
 	// image: u32,
 };
 
@@ -73,9 +74,6 @@ struct VertexOutput {
 fn sd_circle(p: vec2<f32>, r: f32) -> f32 {
 	return length(p) - r;
 }
-fn sd_ellipse(p: vec2<f32>, r: vec2<f32>) -> f32 {
-	return sd_circle(vec2<f32>(p.x * (r.y / r.x), p.y), r.y);
-}
 fn sd_box(p: vec2<f32>, b: vec2<f32>, rr: vec4<f32>) -> f32 {
 	var r: vec2<f32>;
 	if (p.x > 0.0) {
@@ -87,7 +85,7 @@ fn sd_box(p: vec2<f32>, b: vec2<f32>, rr: vec4<f32>) -> f32 {
 		r.x = r.y;
 	}
   let q = abs(p) - b + r.x;
-  return min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0, 0.0))) - r.x + 1.0;
+  return min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0, 0.0))) - r.x + 0.5;
 }
 fn sd_bezier_approx(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32>) -> f32 {
   let v0 = normalize(B - A); let v1 = normalize(C - A);
@@ -240,10 +238,6 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
       }
       d = (1.0 - value * 4.0);
 		}
-		// Ellipse
-		case 4u: {
-			d = sd_ellipse(p - shape.cv0, shape.cv1);
-		}
 		// Bezier
 		case 5u: {
 			d = sd_bezier(p, shape.cv0, shape.cv1, shape.cv2) - shape.width;
@@ -311,9 +305,9 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
 		default: {}
 	}
 	if (shape.stroke != 0u) {
-		d = abs(d) - shape.width / 2;
+		d = abs(d) - shape.width / 2 + 0.5;
 	}
-	return max(d, 0.0);
+	return d;
 }
 
 fn not(v: vec3<bool>) -> vec3<bool> {
@@ -338,8 +332,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	var out: vec4<f32>;
 	var alpha: f32 = 1.0;
 
-	out = textureSample(draw_call_texture, draw_call_sampler, in.uv) * in.col;
-
 	var d = 0.0;
 
 	if (shape.kind > 0u) {
@@ -348,6 +340,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 	if (shape.scissor > 0u) {
 		d = max(d, sd_shape(shapes.shapes[shape.scissor], in.pos.xy));
+	}
+
+	// Get pixel color
+	switch (paint.kind) {
+		case 1u: {
+			out =	paint.col0 + (paint.col1 - paint.col0) * min(abs(d + shape.radius) / 10.0, 1.0);
+		}
+		default: {
+			out = textureSample(draw_call_texture, draw_call_sampler, in.uv) * in.col;
+		}
 	}
 
 	out.a *= (1.0 - d);

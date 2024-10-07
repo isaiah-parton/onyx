@@ -19,9 +19,16 @@ add_shape_box :: proc(box: Box, corners: [4]f32) -> u32 {
 	)
 }
 
+add_shape_circle :: proc(center: [2]f32, radius: f32) -> u32 {
+	index := u32(len(core.draw_list.shapes))
+	append(&core.draw_list.shapes, Shape{kind = .Circle, cv0 = center, radius = radius})
+	return index
+}
+
 add_shape :: proc(shape: Shape) -> u32 {
 	index := u32(len(core.draw_list.shapes))
 	shape := shape
+	shape.paint = core.draw_state.paint
 	shape.scissor = core.draw_state.scissor
 	append(&core.draw_list.shapes, shape)
 	return index
@@ -38,13 +45,13 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 		box.lo = shape.cv0 - shape.radius
 		box.hi = shape.cv0 + shape.radius
 	case .Path:
-		for i in 0..<shape.count {
+		for i in 0 ..< shape.count {
 			j := shape.start + i
 			box.lo = linalg.min(box.lo, core.draw_list.cvs[j])
 			box.hi = linalg.max(box.hi, core.draw_list.cvs[j])
 		}
 	case .Polygon:
-		for i in 0..<shape.count {
+		for i in 0 ..< shape.count {
 			j := shape.start + i
 			box.lo = linalg.min(box.lo, core.draw_list.cvs[j])
 			box.hi = linalg.max(box.hi, core.draw_list.cvs[j])
@@ -58,7 +65,6 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 		box.lo = shape.cv0 - shape.cv1 * 3
 		box.hi = shape.cv0 + shape.cv1 * 3
 	case .Curve:
-	case .Ellipse:
 	}
 	if clip, ok := current_clip().?; ok {
 		box.lo = linalg.max(box.lo, clip.lo)
@@ -169,8 +175,7 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 		right = thickness
 	}
 
-	set_vertex_color(color)
-	set_vertex_uv({})
+	v0, v1: [2]f32
 
 	for i in 0 ..< path.count {
 		a := i - 1
@@ -209,35 +214,16 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 			miter1: [2]f32 = {-tangent1.y, tangent1.x}
 			dot1 := linalg.dot(normal, miter1)
 
-			add_vertex(p1 + (right / dot1) * miter1)
-			add_vertex(p1 - (left / dot1) * miter1)
+			v0 = p1 - (left / dot1) * miter1
+			v1 = p1 + (right / dot1) * miter1
 		}
 
 		// End of segment
-		add_vertex(p2 + (right / dot2) * miter2)
-		add_vertex(p2 - (left / dot2) * miter2)
-		// Join vertices
-		if path.closed && i == path.count - 1 {
-			// Join to first endpoint
-			add_indices(
-				first_index + u32(i * 2),
-				first_index + u32(i * 2 + 1),
-				first_index,
-				first_index + u32(i * 2 + 1),
-				first_index + 1,
-				first_index,
-			)
-		} else if i < path.count - 1 {
-			// Join to next endpoint
-			add_indices(
-				first_index + u32(i * 2),
-				first_index + u32(i * 2 + 1),
-				first_index + u32(i * 2 + 2),
-				first_index + u32(i * 2 + 3),
-				first_index + u32(i * 2 + 2),
-				first_index + u32(i * 2 + 1),
-			)
-		}
+		nv0 := p2 - (left / dot2) * miter2
+		nv1 := p2 + (right / dot2) * miter2
+
+		draw_polygon_fill({v0, v1, nv1, nv0}, color)
+		v0, v1 = nv0, nv1
 	}
 }
 
@@ -248,6 +234,25 @@ __join_miter :: proc(p0, p1, p2: [2]f32) -> (dot: f32, miter: [2]f32) {
 	miter = {-tangent.y, tangent.x}
 	dot = linalg.dot(normal, miter)
 	return
+}
+
+normalize_color :: proc(color: Color) -> [4]f32 {
+	return {f32(color.r) / 255.0, f32(color.g) / 255.0, f32(color.b) / 255.0, f32(color.a) / 255.0}
+}
+
+draw_inner_box_shadow :: proc(box: Box, radius, size: f32, colors: [2]Color) {
+	set_paint(
+		add_paint(
+			Paint {
+				kind = .Inner_Gradient,
+				col0 = normalize_color(colors[0]),
+				col1 = normalize_color(colors[1]),
+				size = size,
+			},
+		),
+	)
+	render_shape(add_shape_box(box, radius), {255, 255, 255, 255})
+	set_paint(0)
 }
 
 /*
@@ -405,11 +410,6 @@ draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
 
 draw_circle_fill :: proc(center: [2]f32, radius: f32, color: Color) {
 	shape_index := add_shape(Shape{kind = .Circle, cv0 = center, radius = radius})
-	render_shape(shape_index, color)
-}
-
-draw_ellipse_fill :: proc(center, radius: [2]f32, color: Color) {
-	shape_index := add_shape(Shape{kind = .Ellipse, cv0 = center, cv1 = radius})
 	render_shape(shape_index, color)
 }
 
