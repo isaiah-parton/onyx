@@ -29,12 +29,24 @@ struct Shapes {
 @binding(0)
 var<storage> shapes: Shapes;
 
+struct PackedMat3x2 {
+    m11: f32,
+    m12: f32,
+    m21: f32,
+    m22: f32,
+    m31: f32,
+    m32: f32,
+};
+
+fn unpack_mat3x2(m: PackedMat3x2) -> mat3x2<f32> {
+    return mat3x2<f32>(m.m11, m.m12, m.m21, m.m22, m.m31, m.m32);
+}
+
 struct Paint {
 	kind: u32,
 	col0: vec4<f32>,
 	col1: vec4<f32>,
-	size: f32,
-	// image: u32,
+	image: u32,
 };
 
 struct Paints {
@@ -46,12 +58,14 @@ struct Paints {
 var<storage> paints: Paints;
 
 struct CVS {
-	cvs: array<vec2<f32>>
+	cvs: array<vec2<f32>>,
 };
 
 @group(2)
 @binding(2)
 var<storage> cvs: CVS;
+
+
 
 struct VertexInput {
 	@location(0) pos: vec2<f32>,
@@ -67,8 +81,17 @@ struct VertexOutput {
 	@location(2) shape: u32,
 };
 
-@group(1) @binding(0) var draw_call_sampler: sampler;
-@group(1) @binding(1) var draw_call_texture: texture_2d<f32>;
+@group(1)
+@binding(0)
+var samp: sampler;
+
+@group(1)
+@binding(1)
+var tex: texture_2d<f32>;
+
+@group(1)
+@binding(2)
+var images: texture_2d_array<f32>;
 
 // SDF shapes
 fn sd_circle(p: vec2<f32>, r: f32) -> f32 {
@@ -95,8 +118,7 @@ fn sd_bezier_approx(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32>) -> f
   }
   return length(get_distance_vector(A-p, B-p, C-p));
 }
-fn sd_bezier(pos: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32> ) -> f32
-{
+fn sd_bezier(pos: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32> ) -> f32 {
   let a = B - A;
   let b = A - 2.0*B + C;
   let c = a * 2.0;
@@ -110,16 +132,13 @@ fn sd_bezier(pos: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32> ) -> f32
   let p3 = p*p*p;
   let q = kx*(2.0*kx*kx + -3.0*ky) + kz;
   var h = q*q + 4.0*p3;
-  if( h >= 0.0)
-  {
+  if (h >= 0.0) {
     h = sqrt(h);
     let x = (vec2<f32>(h,-h)-q)/2.0;
     let uv = sign(x)*pow(abs(x), vec2<f32>(1.0/3.0));
     let t = clamp( uv.x+uv.y-kx, 0.0, 1.0 );
     res = dot2(d + (c + b*t)*t);
-  }
-  else
-  {
+  } else {
     let z = sqrt(-p);
     let v = acos( q/(p*z*2.0) ) / 3.0;
     let m = cos(v);
@@ -149,22 +168,22 @@ fn dot2(v: vec2<f32>) -> f32 {
 // From: http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
 fn get_distance_vector(b0: vec2<f32>, b1: vec2<f32>, b2: vec2<f32>) -> vec2<f32> {
 
-    let a=det(b0,b2);
-    let b=2.0*det(b1,b0);
-    let d=2.0*det(b2,b1);
+    let a = det(b0, b2);
+    let b = 2.0 * det(b1, b0);
+    let d = 2.0 * det(b2, b1);
 
-    let f=b*d-a*a;
-    let d21=b2-b1; let d10=b1-b0; let d20=b2-b0;
-    var gf=2.0*(b*d21+d*d10+a*d20);
-    gf=vec2<f32>(gf.y,-gf.x);
-    let pp=-f*gf/dot(gf,gf);
-    let d0p=b0-pp;
-    let ap=det(d0p,d20); let bp=2.0*det(d10,d0p);
+    let f = b * d - a * a;
+    let d21 = b2 - b1; let d10 = b1 - b0; let d20 = b2 - b0;
+    var gf = 2.0 * (b * d21 + d * d10 + a * d20);
+    gf = vec2<f32>(gf.y, -gf.x);
+    let pp = -f * gf / dot(gf, gf);
+    let d0p = b0 - pp;
+    let ap = det(d0p, d20); let bp = 2.0 * det(d10, d0p);
     // (note that 2*ap+bp+dp=2*a+b+d=4*area(b0,b1,b2))
-    let t=clamp((ap+bp)/(2.0*a+b+d), 0.0 ,1.0);
-    return mix(mix(b0,b1,t),mix(b1,b2,t),t);
+    let t = clamp((ap + bp) / (2.0 * a + b + d), 0.0, 1.0);
+    return mix(mix(b0, b1, t), mix(b1, b2, t), t);
 }
-fn det(a: vec2<f32>, b: vec2<f32>) -> f32 { return a.x*b.y-b.x*a.y; }
+fn det(a: vec2<f32>, b: vec2<f32>) -> f32 { return a.x * b.y - b.x * a.y; }
 
 // This approximates the error function, needed for the gaussian integral
 fn erf(x: vec2<f32>) -> vec2<f32> {
@@ -345,10 +364,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	// Get pixel color
 	switch (paint.kind) {
 		case 1u: {
-			out =	mix(paint.col0, paint.col1, min(abs(d * 0.9) / 4.0, 1.0));
+			out = textureSample(images, samp, in.uv, paint.image) * in.col;
 		}
 		default: {
-			out = textureSample(draw_call_texture, draw_call_sampler, in.uv) * in.col;
+			out = textureSample(tex, samp, in.uv) * in.col;
 		}
 	}
 

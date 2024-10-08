@@ -7,13 +7,11 @@ import "core:mem"
 
 import "vendor:wgpu"
 
-// ANGLE_TOLERANCE :: 0.1
 MAX_PATH_POINTS :: 400
 MAX_MATRICES :: 100
 MAX_DRAW_CALLS :: 64
 
 MAX_FONTS :: 100
-// MAX_IMAGES :: 256
 
 MAX_ATLASES :: 8
 MIN_ATLAS_SIZE :: 1024
@@ -52,12 +50,13 @@ Paint_Kind :: enum u32 {
 	Radial_Gradient,
 }
 
-Paint :: struct #align(16) {
-	kind: Paint_Kind,
+Paint :: struct #align (16) {
+	kind:    Paint_Kind,
 	padding: [3]u32,
-	col0: [4]f32,
-	col1: [4]f32,
-	size: f32,
+	col0:    [4]f32,
+	col1:    [4]f32,
+	size:    f32,
+	image:   u32,
 }
 
 Shape_Kind :: enum u32 {
@@ -88,9 +87,9 @@ Shape :: struct #align (16) {
 }
 
 Vertex :: struct {
-	pos:  [2]f32,
-	uv:   [2]f32,
-	col:  [4]u8,
+	pos:   [2]f32,
+	uv:    [2]f32,
+	col:   [4]u8,
 	shape: u32,
 }
 
@@ -130,8 +129,8 @@ Path :: struct {
 
 Draw_State :: struct {
 	scissor: u32,
-	paint: u32,
-	shape: u32,
+	paint:   u32,
+	shape:   u32,
 }
 
 init_draw_list :: proc(draw_list: ^Draw_List) {

@@ -45,7 +45,7 @@ Graphics :: struct {
 	shape_buffer:              wgpu.Buffer,
 	paint_buffer:              wgpu.Buffer,
 	cvs_buffer:                wgpu.Buffer,
-	msaa_texture:              wgpu.Texture,
+	textures:                  wgpu.Texture,
 }
 
 resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
@@ -55,19 +55,6 @@ resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
 	gfx.surface_config.width = gfx.width
 	gfx.surface_config.height = gfx.height
 	wgpu.SurfaceConfigure(gfx.surface, &gfx.surface_config)
-	wgpu.TextureDestroy(gfx.msaa_texture)
-	wgpu.TextureRelease(gfx.msaa_texture)
-	gfx.msaa_texture = wgpu.DeviceCreateTexture(
-		gfx.device,
-		&{
-			sampleCount = u32(gfx.sample_count),
-			format = gfx.surface_config.format,
-			usage = {.RenderAttachment},
-			dimension = ._2D,
-			mipLevelCount = 1,
-			size = {gfx.width, gfx.height, 1},
-		},
-	)
 }
 
 init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: int) {
@@ -180,18 +167,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			alphaMode   = surface_capabilities.alphaModes[0],
 		}
 		wgpu.SurfaceConfigure(gfx.surface, &gfx.surface_config)
-		// Create MSAA Texture
-		gfx.msaa_texture = wgpu.DeviceCreateTexture(
-			gfx.device,
-			&{
-				sampleCount = u32(gfx.sample_count),
-				format = gfx.surface_config.format,
-				usage = {.RenderAttachment},
-				dimension = ._2D,
-				mipLevelCount = 1,
-				size = {u32(gfx.width), u32(gfx.height), 1},
-			},
-		)
 		// Get the command queue
 		gfx.queue = wgpu.DeviceGetQueue(gfx.device)
 		// Create buffers
@@ -244,12 +219,22 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			gfx.device,
 			&{
 				label = "TextureBindGroupLayout",
-				entryCount = 2,
+				entryCount = 3,
 				entries = transmute([^]wgpu.BindGroupLayoutEntry)&[?]wgpu.BindGroupLayoutEntry {
 					{binding = 0, sampler = {type = .Filtering}, visibility = {.Fragment}},
 					{
 						binding = 1,
 						texture = {sampleType = .Float, viewDimension = ._2D},
+						visibility = {.Fragment},
+					},
+					{
+						binding = 2,
+						texture = {sampleType = .Float, viewDimension = ._2D},
+						visibility = {.Fragment},
+					},
+					{
+						binding = 3,
+						texture = {sampleType = .Float, viewDimension = ._2DArray},
 						visibility = {.Fragment},
 					},
 				},
@@ -404,7 +389,6 @@ uninit_graphics :: proc(gfx: ^Graphics) {
 	wgpu.AdapterRelease(gfx.adapter)
 	wgpu.QueueRelease(gfx.queue)
 	wgpu.RenderPipelineRelease(gfx.pipeline)
-	wgpu.TextureRelease(gfx.msaa_texture)
 	wgpu.DeviceRelease(gfx.device)
 }
 
@@ -461,9 +445,6 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	}
 	defer wgpu.TextureRelease(surface_texture.texture)
 
-	msaa_view := wgpu.TextureCreateView(gfx.msaa_texture, nil)
-	defer wgpu.TextureViewRelease(msaa_view)
-
 	surface_view := wgpu.TextureCreateView(surface_texture.texture, nil)
 	defer wgpu.TextureViewRelease(surface_view)
 
@@ -472,8 +453,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		&{
 			colorAttachmentCount = 1,
 			colorAttachments = &wgpu.RenderPassColorAttachment {
-				view = surface_view if gfx.sample_count == 1 else msaa_view,
-				resolveTarget = nil if gfx.sample_count == 1 else surface_view,
+				view = surface_view,
 				loadOp = .Clear,
 				storeOp = .Store,
 				clearValue = {0, 0, 0, 0},
@@ -506,6 +486,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		// Quick fix to avoid a validation error
 		max(core.view.x, 1),
 		max(core.view.y, 1),
+		//
 		0,
 		0,
 	)
@@ -533,6 +514,10 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		raw_data(core.draw_list.cvs),
 		size_of([2]f32) * len(core.draw_list.cvs),
 	)
+
+	// Create transient texture view
+	texture_view := wgpu.TextureCreateView(call.texture)
+	defer wgpu.TextureViewRelease(texture_view)
 
 	// Render them
 	for &call in core.draw_calls[:core.draw_call_count] {
@@ -563,10 +548,11 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			&{
 				label = "TextureBindGroup",
 				layout = gfx.texture_bind_group_layout,
-				entryCount = 2,
+				entryCount = 3,
 				entries = transmute([^]wgpu.BindGroupEntry)&[?]wgpu.BindGroupEntry {
 					{binding = 0, sampler = sampler},
 					{binding = 1, textureView = texture_view},
+					{binding = 2, textureView = image_view},
 				},
 			},
 		)

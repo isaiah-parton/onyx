@@ -8,6 +8,19 @@ import img "core:image"
 import png "core:image/png"
 import "vendor:wgpu"
 
+// IDEA
+// a bunch of textures, maybe divided into smaller chunks, each user-loaded texture occupies one chunk until it is vacated
+
+Texture_Slot :: struct {
+	texture: wgpu.Texture,
+	origin:  [2]u32,
+	size:    [2]u32,
+}
+
+Texture_Storage :: struct {
+	slots: [16]Texture_Slot,
+}
+
 Image :: struct {
 	using image: img.Image,
 	atlas_src:   Maybe(Box),
@@ -56,7 +69,6 @@ draw_texture :: proc(texture: Texture, box: Box, tint: Color) {
 	add_indices(tl, br, bl, tl, tr, br)
 
 	set_texture(last_texture)
-
 }
 
 draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color) {
