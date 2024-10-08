@@ -172,10 +172,10 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 				}
 				if time._nsec == selection_times[1]._nsec + i64(t.Hour * 24) {
 					corners[1] = core.style.rounding
-					corners[2] = core.style.rounding
+					corners[3] = core.style.rounding
 				}
 				draw_rounded_box_corners_fill(
-					expand_box(self.box, 1),
+					self.box,
 					corners,
 					fade(core.style.color.substance, 1 if is_month else 0.5),
 				)
@@ -354,6 +354,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 				scale = [2]f32{scale, scale},
 			},
 		); ok {
+			draw_shadow(layer_box)
 			foreground()
 			shrink(core.style.menu_padding)
 			set_width_auto()

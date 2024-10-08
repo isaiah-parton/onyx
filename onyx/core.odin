@@ -433,10 +433,14 @@ new_frame :: proc() {
 	// Process widgets
 	process_widgets()
 
-	set_texture(core.font_atlas.texture.internal)
-
-	append(&core.draw_list.paints, Paint{kind = .Image})
+	// Add default draw elements
+	// Index 0 acts like null
+	append(&core.draw_list.paints, Paint{kind = .Normal})
 	append(&core.draw_list.shapes, Shape{kind = .Normal})
+
+	// Make the default draw elements active
+	set_vertex_shape(0)
+	set_paint(0)
 }
 
 // Render queued draw calls and reset draw state

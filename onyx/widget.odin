@@ -329,7 +329,7 @@ foreground :: proc(loc := #caller_location) {
 		defer end_widget()
 
 		draw_rounded_box_fill(info.self.box, core.style.rounding, core.style.color.foreground)
-		draw_rounded_box_stroke(info.self.box, core.style.rounding, 1, core.style.color.substance)
+		// draw_rounded_box_stroke(info.self.box, core.style.rounding, 1, core.style.color.substance)
 
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)

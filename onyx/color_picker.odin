@@ -77,14 +77,25 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: Co
 
 Color_Conversion_Widget_Kind :: struct {
 	hsva: [4]f32,
-	text: strings.Builder,
+	inputs: [Color_Format]strings.Builder,
+	alpha_input: strings.Builder,
 }
 
+Color_Format :: enum {
+	HEX,
+	RGB,
+	CMYK,
+	HSL,
+}
+Color_Format_Set :: bit_set[Color_Format]
+
 Color_Button_Info :: struct {
-	using _:  Widget_Info,
-	value:    ^Color,
-	text_job: Text_Job,
-	changed:  bool,
+	using _:     Widget_Info,
+	value:       ^Color,
+	show_alpha:  bool,
+	input_formats: Color_Format_Set,
+	text_job:    Text_Job,
+	changed:     bool,
 }
 
 init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_location) -> bool {
@@ -138,7 +149,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 	}
 
 	kind := widget_kind(self, Color_Conversion_Widget_Kind)
-
+	PADDING :: 10
 	if .Open in self.state {
 		picker_info := HSVA_Picker_Info {
 			hsva = &kind.hsva,
@@ -146,23 +157,49 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		}
 		init_hsva_picker(&picker_info)
 
+		layer_size := picker_info.desired_size + PADDING * 2
+		input_size: [2]f32
+
 		slider_info := Alpha_Slider_Info {
 			value    = &kind.hsva.a,
 			vertical = true,
 		}
-		init_alpha_slider(&slider_info)
 
-		input_info := Input_Info {
-			builder = &kind.text,
+		if show_alpha {
+			init_alpha_slider(&slider_info)
 		}
-		init_input(&input_info)
+
+		inputs: [Color_Format]Input_Info
+
+		for format, f in Color_Format {
+			if format in input_formats {
+			inputs[format].monospace = true
+				inputs[format].builder = &kind.inputs[format]
+				text: string
+				switch format {
+				case .HEX:
+					text = fmt.tprintf("HEX #%6x", hex_from_color(value^))
+				case .RGB:
+					text = fmt.tprintf("RGB %i, %i, %i", value.r, value.g, value.b)
+				case .CMYK:
+				case .HSL:
+					hsl := hsl_from_norm_rgb(normalize_color(value^).rgb)
+					text = fmt.tprintf("HSL %.0f, %.0f, %.0f", hsl.x, hsl.y * 100, hsl.z * 100)
+				}
+				if strings.builder_len(inputs[format].builder^) == 0 {
+					strings.write_string(inputs[format].builder, text)
+				}
+				push_id(f + 1)
+				init_input(&inputs[format])
+				pop_id()
+				input_size.x = max(input_size.x, inputs[format].desired_size.x)
+			}
+		}
 
 		layer_box := get_menu_box(
 			self.box,
-			picker_info.desired_size +
-			core.style.menu_padding * 2 +
-			{slider_info.desired_size.x, input_info.desired_size.y} +
-			20,
+			layer_size + input_size,
+			.Right,
 		)
 
 		open_time := ease.quadratic_out(self.open_time)
@@ -170,24 +207,34 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		if layer, ok := layer(
 			{id = self.id, origin = layer_box.lo, box = layer_box, opacity = open_time},
 		); ok {
+		draw_shadow(layer_box)
 			foreground()
-			shrink(core.style.menu_padding)
+			shrink(PADDING)
 			set_height_auto()
-			set_width_fill()
-			set_side(.Bottom)
-			add_input(&input_info)
-			add_space(20)
 			set_width_auto()
 			set_side(.Left)
 			add_hsva_picker(&picker_info)
-			add_space(20)
+			add_space(10)
 			add_alpha_slider(&slider_info)
-			if input_info.changed && strings.builder_len(kind.text) == 6 {
-				if value, ok := strconv.parse_u64_of_base(strings.to_string(kind.text), 16); ok {
-					kind.hsva = hsva_from_color(color_from_hex(u32(value)))
+			add_space(10)
+			set_side(.Top)
+			for format, f in Color_Format {
+				if format not_in input_formats do continue
+				if f > 0 {
+					add_space(10)
 				}
+				add_input(&inputs[format])
+				if picker_info.changed {
+					strings.builder_reset(inputs[format].builder)
+				}
+				// if hex_input.changed && strings.builder_len(kind.text) == 6 {
+				// 	if value, ok := strconv.parse_u64_of_base(strings.to_string(kind.text), 16); ok {
+				// 		kind.hsva = hsva_from_color(color_from_hex(u32(value)))
+				// 	}
+				// }
 			}
-			if picker_info.changed || input_info.changed || slider_info.changed {
+
+			if picker_info.changed || slider_info.changed {
 				value^ = color_from_hsva(kind.hsva)
 			}
 			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {

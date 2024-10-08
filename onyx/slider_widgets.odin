@@ -100,7 +100,7 @@ add_box_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 	}
 	if .Pressed in self.state {
 		new_time := clamp((core.mouse_pos.x - self.box.lo.x) / box_width(self.box), 0, 1)
-		value^ = lo + f64(new_time * f32(hi - lo))
+		value^ = lo + T(new_time * f32(hi - lo))
 		core.draw_next_frame = true
 	}
 	return true

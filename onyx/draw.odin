@@ -44,8 +44,8 @@ Stroke_Justify :: enum {
 }
 
 Paint_Kind :: enum u32 {
-	Image,
-	Inner_Gradient,
+	Normal,
+	User_Image,
 	Linear_Gradient,
 	Radial_Gradient,
 }
@@ -64,8 +64,9 @@ Shape_Kind :: enum u32 {
 	Circle,
 	Box,
 	BlurredBox,
-	Bezier = 5,
-	Curve,
+	Arc,
+	Bezier,
+	Pie,
 	Path,
 	Polygon,
 }
@@ -112,13 +113,13 @@ Draw_List :: struct {
 	cvs:      [dynamic][2]f32,
 }
 
-// A draw call to the GPU these are managed internally
 Draw_Call :: struct {
-	gradient:                Gradient,
-	clip_box:                Box,
-	texture:                 wgpu.Texture,
-	elem_offset, elem_count: int,
-	index:                   int,
+	gradient:      Gradient,
+	clip_box:      Box,
+	user_texture:  Maybe(wgpu.Texture),
+	elem_offset:   int,
+	elem_count:    int,
+	index:         int,
 }
 
 Path :: struct {
@@ -279,7 +280,7 @@ append_draw_call :: proc(index: int, loc := #caller_location) {
 		elem_offset = len(core.draw_list.indices),
 		index       = index,
 		clip_box    = current_clip().? or_else view_box(),
-		texture     = core.current_texture,
+		user_texture    = core.current_texture,
 	}
 	core.draw_call_count += 1
 }

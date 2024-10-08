@@ -122,6 +122,11 @@ make_text_job :: proc(
 ) {
 	iter := make_text_iterator(info) or_return
 
+	// Check glyph limit
+	if len(core.glyphs) > 4096 {
+		clear(&core.glyphs)
+	}
+
 	first_glyph := len(core.glyphs)
 	first_line := len(core.lines)
 
@@ -142,11 +147,6 @@ make_text_job :: proc(
 	job.hovered_line = max(0, int(mouse_pos.y / job.line_height))
 
 	at_end: bool
-
-	// Check glyph limit
-	if len(core.glyphs) >= 2000 {
-		clear(&core.glyphs)
-	}
 
 	for {
 		if !iterate_text(&iter) {
@@ -264,7 +264,7 @@ draw_text_highlight :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 	for line, l in job.lines {
 		if line.highlight[0] < line.highlight[1] {
 			line_top: f32 = job.line_height * f32(l)
-			draw_box_fill_clipped(
+			draw_box_fill(
 				{
 					pos + {line.highlight[0] - 1, line_top},
 					pos + {line.highlight[1] + 1, line_top + job.line_height},
@@ -281,8 +281,7 @@ draw_text_glyphs :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 	for glyph in job.glyphs {
 		if glyph.codepoint == 0 || glyph.source == {} do continue
 		glyph_pos := pos + glyph.pos + glyph.offset
-		draw_texture_portion_clipped(
-			core.font_atlas.texture,
+		draw_glyph(
 			glyph.source,
 			{glyph_pos, glyph_pos + (glyph.source.hi - glyph.source.lo)},
 			color,
@@ -296,7 +295,7 @@ draw_text_cursor :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 	}
 	glyph := job.glyphs[job.cursor_glyph]
 	glyph_pos := pos + glyph.pos
-	draw_box_fill_clipped({glyph_pos + {-1, -2}, glyph_pos + {1, job.line_height + 2}}, color)
+	draw_box_fill({glyph_pos + {-1, -2}, glyph_pos + {1, job.line_height + 2}}, color)
 }
 
 destroy_font :: proc(font: ^Font) {

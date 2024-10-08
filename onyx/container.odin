@@ -128,7 +128,6 @@ end_container :: proc() {
 
 	pop_clip()
 	pop_stack(&core.container_stack)
-	append_draw_call(current_layer().?.index)
 }
 
 current_container :: proc() -> Maybe(^Container) {

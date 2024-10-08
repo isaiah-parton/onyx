@@ -13,7 +13,7 @@ import "vendor:glfw"
 import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
 
-SHAPE_BUFFER_CAPACITY :: size_of(Shape) * 1024
+SHAPE_BUFFER_CAPACITY :: size_of(Shape) * 4096
 PAINT_BUFFER_CAPACITY :: size_of(Paint) * 512
 CVS_BUFFER_CAPACITY :: size_of([2]f32) * 512
 
@@ -45,7 +45,6 @@ Graphics :: struct {
 	shape_buffer:              wgpu.Buffer,
 	paint_buffer:              wgpu.Buffer,
 	cvs_buffer:                wgpu.Buffer,
-	textures:                  wgpu.Texture,
 }
 
 resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
@@ -80,7 +79,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		// Works on my machine
 		wgpu.InstanceRequestAdapter(
 			gfx.instance,
-			&{compatibleSurface = gfx.surface},
+			&{compatibleSurface = gfx.surface, powerPreference = .LowPower},
 			on_adapter,
 			gfx,
 		)
@@ -232,11 +231,6 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 						texture = {sampleType = .Float, viewDimension = ._2D},
 						visibility = {.Fragment},
 					},
-					{
-						binding = 3,
-						texture = {sampleType = .Float, viewDimension = ._2DArray},
-						visibility = {.Fragment},
-					},
 				},
 			},
 		)
@@ -323,7 +317,8 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		t := time.now()
 		module := wgpu.DeviceCreateShaderModule(
 			gfx.device,
-			&wgpu.ShaderModuleDescriptor {
+			&{
+				label = "Shader",
 				nextInChain = &wgpu.ShaderModuleWGSLDescriptor {
 					sType = .ShaderModuleWGSLDescriptor,
 					code = #load("shader.wgsl", cstring),
@@ -516,20 +511,26 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	)
 
 	// Create transient texture view
-	texture_view := wgpu.TextureCreateView(call.texture)
-	defer wgpu.TextureViewRelease(texture_view)
+	atlas_texture_view := wgpu.TextureCreateView(core.font_atlas.texture.internal)
+	defer wgpu.TextureViewRelease(atlas_texture_view)
 
 	// Render them
 	for &call in core.draw_calls[:core.draw_call_count] {
+
 		// Redundancy checks
 		if call.elem_count == 0 ||
 		   call.clip_box.hi.x <= call.clip_box.lo.x ||
 		   call.clip_box.hi.y <= call.clip_box.lo.y {
 			continue
 		}
-		// Create transient texture view
-		texture_view := wgpu.TextureCreateView(call.texture)
-		defer wgpu.TextureViewRelease(texture_view)
+
+		// Create view for user texture
+		user_texture_view: wgpu.TextureView = atlas_texture_view
+		defer if user_texture_view != atlas_texture_view do wgpu.TextureViewRelease(user_texture_view)
+		if user_texture, ok := call.user_texture.?; ok {
+			user_texture_view = wgpu.TextureCreateView(user_texture)
+		}
+
 		// Create transient sampler
 		sampler := wgpu.DeviceCreateSampler(
 			gfx.device,
@@ -542,6 +543,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			},
 		)
 		defer wgpu.SamplerRelease(sampler)
+
 		// Create transient bind group
 		texture_bind_group := wgpu.DeviceCreateBindGroup(
 			gfx.device,
@@ -551,14 +553,16 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 				entryCount = 3,
 				entries = transmute([^]wgpu.BindGroupEntry)&[?]wgpu.BindGroupEntry {
 					{binding = 0, sampler = sampler},
-					{binding = 1, textureView = texture_view},
-					{binding = 2, textureView = image_view},
+					{binding = 1, textureView = atlas_texture_view},
+					{binding = 2, textureView = user_texture_view},
 				},
 			},
 		)
 		defer wgpu.BindGroupRelease(texture_bind_group)
+
 		// Set bind groups
 		wgpu.RenderPassEncoderSetBindGroup(rpass, 1, texture_bind_group)
+
 		// Draw elements
 		wgpu.RenderPassEncoderDrawIndexed(
 			rpass,

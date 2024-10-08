@@ -33,10 +33,11 @@ do_debug_layer :: proc() {
 		{},
 		{
 			text = fmt.tprintf(
-				"fps: %i\nframes drawn: %i\ndraw calls: %i",
+				"fps: %i\nframes drawn: %i\ndraw calls: %i (minus debug layer)",
 				core.frames_this_second,
 				core.drawn_frames,
-				core.draw_call_count,
+				// Debug layer not included
+				core.draw_call_count - 1,
 			),
 			font = core.style.fonts[.Regular],
 			size = 20,

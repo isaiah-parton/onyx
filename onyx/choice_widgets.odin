@@ -78,7 +78,7 @@ begin_selector :: proc(using info: ^Selector_Info) -> bool {
 				opacity = open_time,
 			},
 		)
-		draw_rounded_box_shadow(menu_box, core.style.rounding, 6, {0, 0, 0, 40})
+		draw_shadow(menu_box)
 		foreground()
 		set_width_auto()
 		set_height_auto()

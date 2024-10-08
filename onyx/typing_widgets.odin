@@ -20,15 +20,20 @@ Input_Decal :: enum {
 }
 
 Input_Info :: struct {
-	using _:                      Widget_Info,
-	builder:                      ^strings.Builder,
-	text:                         string,
-	placeholder:                  string,
-	shake:                        f32,
-	multiline, read_only, hidden: bool,
-	decal:                        Input_Decal,
-	undecorated:                  bool,
-	changed, submitted, enter:    bool,
+	using _:     Widget_Info,
+	builder:     ^strings.Builder,
+	text:        string,
+	monospace:   bool,
+	placeholder: string,
+	shake:       f32,
+	multiline:   bool,
+	read_only:   bool,
+	hidden:      bool,
+	decal:       Input_Decal,
+	undecorated: bool,
+	changed:     bool,
+	submitted:   bool,
+	enter:       bool,
 }
 
 Input_Widget_Kind :: struct {
@@ -216,7 +221,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	// Initial text info
 	text_info: Text_Info = {
 		text   = text,
-		font   = core.style.fonts[.Medium],
+		font   = core.style.fonts[.Monospace if monospace else .Medium],
 		size   = core.style.content_text_size,
 		hidden = info.hidden && len(text) > 0,
 	}

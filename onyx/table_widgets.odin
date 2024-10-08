@@ -150,11 +150,13 @@ begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 
 	container := current_container().? or_return
 
-	first = int(container.scroll.y / core.style.table_row_height)
-	last = min(
-		first + int(math.ceil(box_height(self.box) / core.style.table_row_height)),
-		info.row_count - 1,
-	)
+	first = 0
+	last = row_count - 1
+	// first = int(container.scroll.y / core.style.table_row_height)
+	// last = min(
+	// 	first + int(math.ceil(box_height(self.box) / core.style.table_row_height)),
+	// 	info.row_count - 1,
+	// )
 	// Add space for the header
 	add_space(core.style.table_row_height * f32(first + 1))
 	// Season the hashing context

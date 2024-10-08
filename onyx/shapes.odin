@@ -20,9 +20,7 @@ add_shape_box :: proc(box: Box, corners: [4]f32) -> u32 {
 }
 
 add_shape_circle :: proc(center: [2]f32, radius: f32) -> u32 {
-	index := u32(len(core.draw_list.shapes))
-	append(&core.draw_list.shapes, Shape{kind = .Circle, cv0 = center, radius = radius})
-	return index
+	return add_shape(Shape{kind = .Circle, cv0 = center, radius = radius})
 }
 
 add_shape :: proc(shape: Shape) -> u32 {
@@ -64,11 +62,18 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 	case .BlurredBox:
 		box.lo = shape.cv0 - shape.cv1 * 3
 		box.hi = shape.cv0 + shape.cv1 * 3
-	case .Curve:
+	case .Arc, .Pie:
+		box.lo = shape.cv0 - shape.radius - shape.width
+		box.hi = shape.cv0 + shape.radius + shape.width
 	}
-	if clip, ok := current_clip().?; ok {
-		box.lo = linalg.max(box.lo, clip.lo)
-		box.hi = linalg.min(box.hi, clip.hi)
+
+	// Shadows are not clipped like other shapes since they are currently only drawn below new layers
+	// This is subject to change.
+	if shape.kind != .BlurredBox {
+		if clip, ok := current_clip().?; ok {
+			box.lo = linalg.max(box.lo, clip.lo)
+			box.hi = linalg.min(box.hi, clip.hi)
+		}
 	}
 	return box
 }
@@ -240,21 +245,6 @@ normalize_color :: proc(color: Color) -> [4]f32 {
 	return {f32(color.r) / 255.0, f32(color.g) / 255.0, f32(color.b) / 255.0, f32(color.a) / 255.0}
 }
 
-draw_inner_box_shadow :: proc(box: Box, radius, size: f32, colors: [2]Color) {
-	set_paint(
-		add_paint(
-			Paint {
-				kind = .Inner_Gradient,
-				col0 = normalize_color(colors[0]),
-				col1 = normalize_color(colors[1]),
-				size = size,
-			},
-		),
-	)
-	render_shape(add_shape_box(box, radius), {255, 255, 255, 255})
-	set_paint(0)
-}
-
 /*
 	Basic shapes drawn in immediate mode
 */
@@ -307,32 +297,6 @@ draw_quad_bezier :: proc(p0, p1, p2: [2]f32, width: f32, color: Color) {
 	render_shape(shape_index, color)
 }
 
-draw_curve :: proc(pts: [][2]f32, width: f32, color: Color) {
-	box := Box{math.F32_MAX, 0}
-
-	prim := u32(len(core.draw_list.shapes))
-	append(
-		&core.draw_list.shapes,
-		Shape {
-			kind = .Curve,
-			start = u32(len(core.draw_list.cvs)),
-			count = u32(len(pts) / 3) + 1,
-			width = width,
-		},
-	)
-
-	for p in pts {
-		box.lo = linalg.min(box.lo, p)
-		box.hi = linalg.max(box.hi, p)
-	}
-
-	append(&core.draw_list.cvs, ..pts)
-
-	set_vertex_shape(prim)
-	draw_box_fill(box, color)
-	set_vertex_shape(0)
-}
-
 draw_cubic_bezier :: proc(a, b, c, d: [2]f32, width: f32, color: Color) {
 	ab := linalg.lerp(a, b, 0.5)
 	cd := linalg.lerp(c, d, 0.5)
@@ -375,26 +339,48 @@ lerp_cubic_bezier :: proc(p0, p1, p2, p3: [2]f32, t: f32) -> [2]f32 {
 	}
 }
 
-get_arc_steps :: proc(radius, angle: f32) -> int {
-	return max(int((angle / (math.PI * 0.1)) * (radius * 0.25)), 4)
-}
-// Draw a filled arc around a given center
-draw_arc_fill :: proc(center: [2]f32, radius, from, to: f32, color: Color) {
+draw_pie :: proc(center: [2]f32, from, to, radius: f32, color: Color) {
 	from, to := from, to
 	if from > to do from, to = to, from
-	da := to - from
-	nsteps := get_arc_steps(radius, da)
+	th0 := -(from + (to - from) * 0.5) + math.PI
+	th1 := (to - from) / 2
+	render_shape(
+		add_shape(
+			Shape {
+				kind = .Pie,
+				cv0 = center,
+				cv1 = [2]f32{math.sin(th0), math.cos(th0)},
+				cv2 = [2]f32{math.sin(th1), math.cos(th1)},
+				radius = radius,
+			},
+		),
+		color,
+	)
+}
 
-	set_vertex_color(color)
-	set_vertex_uv({})
-	first_index := add_vertex(center.x, center.y)
-	for n in 0 ..= nsteps {
-		a := from + da * f32(n) / f32(nsteps)
-		index := add_vertex(center + {math.cos(a), math.sin(a)} * radius)
-		if n < nsteps {
-			add_indices(first_index, index, index + 1)
-		}
-	}
+draw_arc :: proc(
+	center: [2]f32,
+	from, to: f32,
+	radius, width: f32,
+	color: Color,
+) {
+	from, to := from, to
+	if from > to do from, to = to, from
+	th0 := -(from + (to - from) * 0.5) + math.PI
+	th1 := (to - from) / 2
+	render_shape(
+		add_shape(
+			Shape {
+				kind = .Arc,
+				cv0 = center,
+				cv1 = [2]f32{math.sin(th0), math.cos(th0)},
+				cv2 = [2]f32{math.sin(th1), math.cos(th1)},
+				radius = radius,
+				width = width,
+			},
+		),
+		color,
+	)
 }
 
 draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
@@ -424,71 +410,10 @@ draw_circle_fill :: proc(center: [2]f32, radius: f32, color: Color) {
 	render_shape(shape_index, color)
 }
 
-draw_ring_fill :: proc(center: [2]f32, inner, outer, from, to: f32, color: Color) {
-	from, to := from, to
-	if from > to do from, to = to, from
-	da := to - from
-	nsteps := get_arc_steps(outer, da)
-	step := da / f32(nsteps)
-
-	core.vertex_state.uv = {}
-	core.vertex_state.col = color
-
-	last_inner_index := add_vertex(center + {1, 0} * inner)
-	last_outer_index := add_vertex(center + {1, 0} * outer)
-	for n in 0 ..= nsteps {
-		angle := from + f32(n) * step
-		inner_index := add_vertex(center + {math.cos(angle), math.sin(angle)} * inner)
-		outer_index := add_vertex(center + {math.cos(angle), math.sin(angle)} * outer)
-		if n > 0 {
-			add_indices(
-				last_inner_index,
-				last_outer_index,
-				outer_index,
-				last_inner_index,
-				outer_index,
-				inner_index,
-			)
-		}
-		last_inner_index = inner_index
-		last_outer_index = outer_index
-	}
-}
-
-// Draw a stroke along an arc
-draw_arc_stroke :: proc(center: [2]f32, radius, from, to, thickness: f32, color: Color) {
-	from, to := from, to
-	if from > to do from, to = to, from
-	da := to - from
-	nsteps := get_arc_steps(radius, da)
-
-	set_vertex_color(color)
-	set_vertex_uv({})
-	first_index := add_vertex(center.x, center.y)
-	last_inner, last_outer: u32
-	for n in 0 ..= nsteps {
-		a := from + da * f32(n) / f32(nsteps)
-		norm := [2]f32{math.cos(a), math.sin(a)}
-		inner := add_vertex(center + norm * (radius - thickness))
-		outer := add_vertex(center + norm * radius)
-		if n > 0 {
-			add_indices(last_outer, outer, last_inner, outer, inner, last_inner)
-		}
-		last_inner, last_outer = inner, outer
-	}
-}
 draw_box_fill :: proc(box: Box, color: Color) {
 	render_shape(add_shape_box(box, {}), color)
 }
-draw_box_fill_clipped :: proc(box: Box, color: Color) {
-	box := box
-	if clip, ok := current_clip().?; ok {
-		box.lo = linalg.max(box.lo, clip.lo)
-		box.hi = linalg.min(box.hi, clip.hi)
-		if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
-	}
-	draw_box_fill(box, color)
-}
+
 draw_box_stroke :: proc(box: Box, width: f32, color: Color) {
 	draw_rounded_box_stroke(box, 0, width, color)
 }
@@ -528,6 +453,10 @@ draw_rounded_box_shadow :: proc(box: Box, corner_radius, blur_radius: f32, color
 	render_shape(shape_index, color)
 }
 
+draw_shadow :: proc(box: Box) {
+	draw_rounded_box_shadow(move_box(box, {0, 2}), core.style.rounding, 6, {0, 0, 0, 40})
+}
+
 draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
@@ -560,21 +489,7 @@ draw_spinner :: proc(center: [2]f32, color: Color) {
 	outer := f32(10)
 	half := (inner + outer) / 2
 
-	draw_ring_fill(center, inner, outer, from, to, color)
-	draw_arc_fill(
-		center + {math.cos(from), math.sin(from)} * half,
-		(outer - inner) / 2,
-		0,
-		math.TAU,
-		color,
-	)
-	draw_arc_fill(
-		center + {math.cos(to), math.sin(to)} * half,
-		(outer - inner) / 2,
-		0,
-		math.TAU,
-		color,
-	)
+	draw_arc(center, from, to, inner, outer, color)
 
 	core.draw_next_frame = true
 }

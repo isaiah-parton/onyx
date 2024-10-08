@@ -88,13 +88,13 @@ get_menu_box :: proc(parent: Box, size: [2]f32, side: Side = .Bottom) -> Box {
 		}
 	case .Left:
 		box = Box {
-			{parent.lo.x - (margin + size.x), parent.lo.y},
-			{parent.lo.x - margin, parent.lo.y + size.y},
+			{parent.lo.x - (margin + size.x), box_center_y(parent) - size.y / 2},
+			{parent.lo.x - margin, box_center_y(parent) + size.y / 2},
 		}
 	case .Right:
 		box = Box {
-			{parent.hi.x + margin, parent.lo.y},
-			{parent.hi.x + margin + size.x, parent.lo.y + size.y},
+			{parent.hi.x + margin, box_center_y(parent) - size.y / 2},
+			{parent.hi.x + margin + size.x, box_center_y(parent) + size.y / 2},
 		}
 	}
 	return box

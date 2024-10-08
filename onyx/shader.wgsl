@@ -65,8 +65,6 @@ struct CVS {
 @binding(2)
 var<storage> cvs: CVS;
 
-
-
 struct VertexInput {
 	@location(0) pos: vec2<f32>,
 	@location(1) uv: vec2<f32>,
@@ -87,16 +85,50 @@ var samp: sampler;
 
 @group(1)
 @binding(1)
-var tex: texture_2d<f32>;
+var atlas_tex: texture_2d<f32>;
 
 @group(1)
 @binding(2)
-var images: texture_2d_array<f32>;
+var user_tex: texture_2d<f32>;
 
-// SDF shapes
+fn sd_subtract(d1: f32, d2: f32) -> f32 {
+	return max(-d1, d2);
+}
+
 fn sd_circle(p: vec2<f32>, r: f32) -> f32 {
 	return length(p) - r;
 }
+
+fn sd_pie(p: vec2<f32>, sca: vec2<f32>, scb: vec2<f32>, r: f32) -> f32 {
+	var pp = p * mat2x2<f32>(sca,vec2<f32>(-sca.y,sca.x));
+	pp.x = abs(pp.x);
+	let l = length(pp) - r;
+	let m = length(pp - scb * clamp(dot(pp, scb), 0.0, r));
+	return max(l, m * sign(scb.y * pp.x - scb.x * pp.y)) + 0.5;
+}
+
+fn sd_pie2(p: vec2<f32>, n: vec2<f32>) -> f32 {
+	return abs(p).x * n.y + p.y * n.x;
+}
+
+fn sd_arc_square(p: vec2<f32>, sca: vec2<f32>, scb: vec2<f32>, radius: f32, width: f32) -> f32 {
+	// Rotate point.
+  let pp = p * mat2x2<f32>(sca,vec2<f32>(-sca.y,sca.x));
+  return sd_subtract(sd_pie2(pp, vec2<f32>(scb.x, -scb.y)), abs(sd_circle(pp, radius)) - width);
+}
+
+fn sd_arc(p: vec2<f32>, sca: vec2<f32>, scb: vec2<f32>, ra: f32, rb: f32) -> f32 {
+	var pp = p * mat2x2<f32>(vec2<f32>(sca.x,sca.y),vec2<f32>(-sca.y,sca.x));
+  pp.x = abs(pp.x);
+  var k = 0.0;
+  if (scb.y*pp.x>scb.x*pp.y) {
+      k = dot(pp,scb);
+  } else {
+      k = length(pp);
+  }
+  return sqrt( dot(pp,pp) + ra*ra - 2.0*ra*k ) - rb + 0.5;
+}
+
 fn sd_box(p: vec2<f32>, b: vec2<f32>, rr: vec4<f32>) -> f32 {
 	var r: vec2<f32>;
 	if (p.x > 0.0) {
@@ -110,6 +142,7 @@ fn sd_box(p: vec2<f32>, b: vec2<f32>, rr: vec4<f32>) -> f32 {
   let q = abs(p) - b + r.x;
   return min(max(q.x, q.y), 0.0) + length(max(q, vec2<f32>(0.0, 0.0))) - r.x + 0.5;
 }
+
 fn sd_bezier_approx(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32>) -> f32 {
   let v0 = normalize(B - A); let v1 = normalize(C - A);
   let det = v0.x * v1.y - v1.x * v0.y;
@@ -118,6 +151,7 @@ fn sd_bezier_approx(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32>) -> f
   }
   return length(get_distance_vector(A-p, B-p, C-p));
 }
+
 fn sd_bezier(pos: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32> ) -> f32 {
   let a = B - A;
   let b = A - 2.0*B + C;
@@ -151,21 +185,23 @@ fn sd_bezier(pos: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32> ) -> f32 {
   }
   return sqrt( res );
 }
-// uh shadows or smth
+
 fn rounded_box_shadow_x(x: f32, y: f32, sigma: f32, corner: f32, half_size: vec2<f32>) -> f32 {
 	let delta = min(half_size.y - corner - abs(y), 0.0);
 	let curved = half_size.x - corner + sqrt(max(0.0, corner * corner - delta * delta));
   let integral = 0.5 + 0.5 * erf((x + vec2(-curved, curved)) * (sqrt(0.5) / sigma));
   return integral.y - integral.x;
 }
+
 fn gaussian(x: f32, sigma: f32) -> f32 {
 	let pi: f32 = 3.141592653589793;
   return exp(-(x * x) / (2.0 * sigma * sigma)) / (sqrt(2.0 * pi) * sigma);
 }
+
 fn dot2(v: vec2<f32>) -> f32 {
     return dot(v,v);
 }
-// From: http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
+
 fn get_distance_vector(b0: vec2<f32>, b1: vec2<f32>, b2: vec2<f32>) -> vec2<f32> {
 
     let a = det(b0, b2);
@@ -183,9 +219,9 @@ fn get_distance_vector(b0: vec2<f32>, b1: vec2<f32>, b2: vec2<f32>) -> vec2<f32>
     let t = clamp((ap + bp) / (2.0 * a + b + d), 0.0, 1.0);
     return mix(mix(b0, b1, t), mix(b1, b2, t), t);
 }
+
 fn det(a: vec2<f32>, b: vec2<f32>) -> f32 { return a.x * b.y - b.x * a.y; }
 
-// This approximates the error function, needed for the gaussian integral
 fn erf(x: vec2<f32>) -> vec2<f32> {
     let s = sign(x);
     let a = abs(x);
@@ -203,7 +239,6 @@ fn lineTest(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>) -> bool {
   return (A.x + t*v.x) > p.x;
 }
 
-/// Is the point with the area between the curve and line segment A C?
 fn bezierTest(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32>) -> bool {
   // Compute barycentric coordinates of p.
   // p = s * A + t * B + (1-s-t) * C
@@ -257,16 +292,17 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
       }
       d = (1.0 - value * 4.0);
 		}
+		// Arc
+		case 4u: {
+			d = sd_arc(p - shape.cv0, shape.cv1, shape.cv2, shape.radius, shape.width);
+		}
 		// Bezier
 		case 5u: {
 			d = sd_bezier(p, shape.cv0, shape.cv1, shape.cv2) - shape.width;
 		}
-		// Curve
+		// Pie
 		case 6u: {
-			for(var i=0; i<i32(shape.count); i = i+1) {
-			let j = i32(shape.start) + 3*i;
-        d = min(d, sd_bezier(p, cvs.cvs[j], cvs.cvs[j+1], cvs.cvs[j+2]));
-      }
+			d = sd_pie(p - shape.cv0, shape.cv1, shape.cv2, shape.radius);
 		}
 		// Quad Path
 		case 7u: {
@@ -363,11 +399,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 	// Get pixel color
 	switch (paint.kind) {
+		// User_Image
 		case 1u: {
-			out = textureSample(images, samp, in.uv, paint.image) * in.col;
+			out = textureSample(user_tex, samp, in.uv) * in.col;
 		}
 		default: {
-			out = textureSample(tex, samp, in.uv) * in.col;
+			out = textureSample(atlas_tex, samp, in.uv) * in.col;
 		}
 	}
 

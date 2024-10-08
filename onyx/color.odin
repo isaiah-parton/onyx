@@ -73,6 +73,15 @@ color_from_hsva :: proc(hsva: [4]f32) -> Color {
 	return {u8(r * 255.0), u8(g * 255.0), u8(b * 255.0), u8(hsva.a * 255.0)}
 }
 
+hsl_from_norm_rgb :: proc(rgb: [3]f32) -> [3]f32 {
+	v := max(rgb.r, rgb.g, rgb.b)
+	c := v - min(rgb.r, rgb.g, rgb.b)
+	f := 1 - abs(v + v - c - 1)
+	h :=
+		((rgb.g - rgb.b) / c) if (c > 0 && v == rgb.r) else ((2 + (rgb.b - rgb.r) / c) if v == rgb.g else (4 + (rgb.r - rgb.g) / c))
+	return {60 * ((h + 6) if h < 0 else h), (c / f) if f > 0 else 0, (v + v - c) / 2}
+}
+
 color_from :: proc {
 	color_from_hex,
 	color_from_hsl,
