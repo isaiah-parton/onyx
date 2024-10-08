@@ -408,6 +408,17 @@ draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
 	add_indices(tl, br, bl, tl, tr, br)
 }
 
+draw_vertical_box_gradient :: proc(box: Box, top, bottom: Color) {
+	set_vertex_uv({})
+	set_vertex_color(top)
+	tl := add_vertex(box.lo)
+	tr := add_vertex({box.hi.x, box.lo.y})
+	set_vertex_color(bottom)
+	bl := add_vertex({box.lo.x, box.hi.y})
+	br := add_vertex(box.hi)
+	add_indices(tl, br, bl, tl, tr, br)
+}
+
 draw_circle_fill :: proc(center: [2]f32, radius: f32, color: Color) {
 	shape_index := add_shape(Shape{kind = .Circle, cv0 = center, radius = radius})
 	render_shape(shape_index, color)

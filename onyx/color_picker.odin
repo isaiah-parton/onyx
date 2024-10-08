@@ -1,7 +1,10 @@
 package onyx
+import "core:fmt"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
+import "core:strconv"
+import "core:strings"
 
 barycentric :: proc(point, a, b, c: [2]f32) -> (u, v: f32) {
 	d := c - a
@@ -74,16 +77,27 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: Co
 
 Color_Conversion_Widget_Kind :: struct {
 	hsva: [4]f32,
+	text: strings.Builder,
 }
 
 Color_Button_Info :: struct {
-	using _: Widget_Info,
-	value:   ^Color,
-	changed: bool,
+	using _:  Widget_Info,
+	value:    ^Color,
+	text_job: Text_Job,
+	changed:  bool,
 }
 
 init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_location) -> bool {
 	if value == nil do return false
+	text_job = make_text_job(
+		{
+			text = fmt.tprintf("%6x", hex_from_color(value^)),
+			font = core.style.fonts[.Regular],
+			size = 20,
+			align_h = .Middle,
+			align_v = .Middle,
+		},
+	) or_return
 	id = hash(loc)
 	self = get_widget(id) or_return
 	desired_size = core.style.visual_size
@@ -97,12 +111,30 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 	menu_behavior(self)
 
 	if self.visible {
-		// draw_rounded_box_shadow(self.box, core.style.rounding, 3, {0, 0, 0, 40})
+		draw_rounded_box_shadow(
+			self.box,
+			core.style.rounding,
+			6,
+			fade({0, 0, 0, 40}, self.hover_time),
+		)
 		draw_rounded_box_fill(self.box, core.style.rounding, value^)
-		draw_inner_box_shadow(self.box, core.style.rounding, 5, {{0, 0, 255, 255}, {255, 0, 0, 255}})
-		if self.hover_time > 0 {
-			draw_rounded_box_stroke(self.box, core.style.rounding, 2, fade(core.style.color.substance, self.hover_time))
-		}
+		set_scissor_shape(add_shape_box(self.box, core.style.rounding))
+		draw_text_glyphs(
+			text_job,
+			box_center(self.box),
+			{0, 0, 0, 255} if get_color_brightness(value^) > 0.5 else 255,
+		)
+		set_scissor_shape(0)
+		draw_rounded_box_stroke(
+			self.box,
+			core.style.rounding,
+			1,
+			interpolate_colors(
+				self.hover_time,
+				core.style.color.substance,
+				core.style.color.accent,
+			),
+		)
 	}
 
 	kind := widget_kind(self, Color_Conversion_Widget_Kind)
@@ -114,27 +146,48 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		}
 		init_hsva_picker(&picker_info)
 
+		slider_info := Alpha_Slider_Info {
+			value    = &kind.hsva.a,
+			vertical = true,
+		}
+		init_alpha_slider(&slider_info)
+
+		input_info := Input_Info {
+			builder = &kind.text,
+		}
+		init_input(&input_info)
+
 		layer_box := get_menu_box(
 			self.box,
-			picker_info.desired_size + core.style.menu_padding * 2,
+			picker_info.desired_size +
+			core.style.menu_padding * 2 +
+			{slider_info.desired_size.x, input_info.desired_size.y} +
+			20,
 		)
 
 		open_time := ease.quadratic_out(self.open_time)
 
 		if layer, ok := layer(
-			{
-				id = self.id,
-				origin = layer_box.lo,
-				box = layer_box,
-				opacity = open_time,
-			},
+			{id = self.id, origin = layer_box.lo, box = layer_box, opacity = open_time},
 		); ok {
 			foreground()
 			shrink(core.style.menu_padding)
-			set_width_auto()
 			set_height_auto()
+			set_width_fill()
+			set_side(.Bottom)
+			add_input(&input_info)
+			add_space(20)
+			set_width_auto()
+			set_side(.Left)
 			add_hsva_picker(&picker_info)
-			if picker_info.changed {
+			add_space(20)
+			add_alpha_slider(&slider_info)
+			if input_info.changed && strings.builder_len(kind.text) == 6 {
+				if value, ok := strconv.parse_u64_of_base(strings.to_string(kind.text), 16); ok {
+					kind.hsva = hsva_from_color(color_from_hex(u32(value)))
+				}
+			}
+			if picker_info.changed || input_info.changed || slider_info.changed {
 				value^ = color_from_hsva(kind.hsva)
 			}
 			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
@@ -160,15 +213,19 @@ color_button :: proc(info: Color_Button_Info, loc := #caller_location) -> Color_
 }
 
 Alpha_Slider_Info :: struct {
-	using _: Widget_Info,
-	value:   ^f32,
-	changed: bool,
-	color:   Color,
+	using _:  Widget_Info,
+	value:    ^f32,
+	vertical: bool,
+	changed:  bool,
+	color:    Color,
 }
 
 init_alpha_slider :: proc(using info: ^Alpha_Slider_Info, loc := #caller_location) -> bool {
 	if value == nil do return false
 	desired_size = core.style.visual_size
+	if vertical {
+		desired_size.xy = desired_size.yx
+	}
 	sticky = true
 	id = hash(loc)
 	self = get_widget(id) or_return
@@ -179,6 +236,9 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
 
+	i := int(info.vertical)
+	j := 1 - i
+
 	if self.visible {
 		R :: 4
 		box := self.box
@@ -186,26 +246,42 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 		box.hi.y -= R
 		draw_checkerboard_pattern(
 			box,
-			box_height(box) / 2,
+			(box.hi[j] - box.lo[j]) / 2,
 			{210, 210, 210, 255},
 			{160, 160, 160, 255},
 		)
 		color.a = 255
-		draw_horizontal_box_gradient(box, fade(color, 0), color)
 		time := clamp(value^, 0, 1)
-		x := box.lo.x + box_width(box) * time
-		draw_triangle_fill(
-			{x - 0.866025 * R, box.lo.y - 1.5 * R},
-			{x, box.lo.y},
-			{x + 0.866025 * R, box.lo.y - 1.5 * R},
-			core.style.color.content,
-		)
-		draw_triangle_fill(
-			{x - 0.866025 * R, box.hi.y + 1.5 * R},
-			{x, box.hi.y},
-			{x + 0.866025 * R, box.hi.y + 1.5 * R},
-			core.style.color.content,
-		)
+		pos := box.lo[i] + (box.hi[i] - box.lo[i]) * time
+		if vertical {
+			draw_vertical_box_gradient(box, fade(color, 0), color)
+			draw_triangle_fill(
+				{box.lo.x - 1.5 * R, pos - 0.866025 * R},
+				{box.lo.x, pos},
+				{box.lo.x - 1.5 * R, pos + 0.866025 * R},
+				core.style.color.content,
+			)
+			draw_triangle_fill(
+				{box.hi.x + 1.5 * R, pos - 0.866025 * R},
+				{box.hi.x, pos},
+				{box.hi.x + 1.5 * R, pos + 0.866025 * R},
+				core.style.color.content,
+			)
+		} else {
+			draw_horizontal_box_gradient(box, fade(color, 0), color)
+			draw_triangle_fill(
+				{pos - 0.866025 * R, box.lo.y - 1.5 * R},
+				{pos, box.lo.y},
+				{pos + 0.866025 * R, box.lo.y - 1.5 * R},
+				core.style.color.content,
+			)
+			draw_triangle_fill(
+				{pos - 0.866025 * R, box.hi.y + 1.5 * R},
+				{pos, box.hi.y},
+				{pos + 0.866025 * R, box.hi.y + 1.5 * R},
+				core.style.color.content,
+			)
+		}
 	}
 
 	if point_in_box(core.mouse_pos, self.box) {
@@ -213,7 +289,11 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 	}
 
 	if .Pressed in self.state {
-		value^ = clamp((core.mouse_pos.x - self.box.lo.x) / box_width(self.box), 0, 1)
+		value^ = clamp(
+			(core.mouse_pos[i] - self.box.lo[i]) / (self.box.hi[i] - self.box.lo[i]),
+			0,
+			1,
+		)
 		changed = true
 	}
 

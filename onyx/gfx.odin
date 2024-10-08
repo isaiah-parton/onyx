@@ -467,7 +467,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	surface_view := wgpu.TextureCreateView(surface_texture.texture, nil)
 	defer wgpu.TextureViewRelease(surface_view)
 
-	pass := wgpu.CommandEncoderBeginRenderPass(
+	rpass := wgpu.CommandEncoderBeginRenderPass(
 		encoder,
 		&{
 			colorAttachmentCount = 1,
@@ -480,27 +480,27 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			},
 		},
 	)
-	wgpu.RenderPassEncoderSetPipeline(pass, gfx.pipeline)
+	wgpu.RenderPassEncoderSetPipeline(rpass, gfx.pipeline)
 	wgpu.RenderPassEncoderSetVertexBuffer(
-		pass,
+		rpass,
 		0,
 		gfx.vertex_buffer,
 		0,
 		u64(len(draw_list.vertices) * size_of(Vertex)),
 	)
 	wgpu.RenderPassEncoderSetIndexBuffer(
-		pass,
+		rpass,
 		gfx.index_buffer,
 		.Uint32,
 		0,
 		u64(len(draw_list.indices) * size_of(u32)),
 	)
 
-	wgpu.RenderPassEncoderSetBindGroup(pass, 0, gfx.uniform_bind_group)
-	wgpu.RenderPassEncoderSetBindGroup(pass, 2, gfx.storage_bind_group)
+	wgpu.RenderPassEncoderSetBindGroup(rpass, 0, gfx.uniform_bind_group)
+	wgpu.RenderPassEncoderSetBindGroup(rpass, 2, gfx.storage_bind_group)
 
 	wgpu.RenderPassEncoderSetViewport(
-		pass,
+		rpass,
 		0,
 		0,
 		// Quick fix to avoid a validation error
@@ -536,16 +536,15 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 
 	// Render them
 	for &call in core.draw_calls[:core.draw_call_count] {
+		// Redundancy checks
 		if call.elem_count == 0 ||
 		   call.clip_box.hi.x <= call.clip_box.lo.x ||
 		   call.clip_box.hi.y <= call.clip_box.lo.y {
 			continue
 		}
-
 		// Create transient texture view
 		texture_view := wgpu.TextureCreateView(call.texture)
 		defer wgpu.TextureViewRelease(texture_view)
-
 		// Create transient sampler
 		sampler := wgpu.DeviceCreateSampler(
 			gfx.device,
@@ -558,7 +557,6 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			},
 		)
 		defer wgpu.SamplerRelease(sampler)
-
 		// Create transient bind group
 		texture_bind_group := wgpu.DeviceCreateBindGroup(
 			gfx.device,
@@ -573,22 +571,11 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			},
 		)
 		defer wgpu.BindGroupRelease(texture_bind_group)
-
-		// Configure render pass
-		wgpu.RenderPassEncoderSetBindGroup(pass, 1, texture_bind_group)
-
-		call.clip_box = clamp_box(call.clip_box, view_box())
-		wgpu.RenderPassEncoderSetScissorRect(
-			pass,
-			u32(call.clip_box.lo.x),
-			u32(call.clip_box.lo.y),
-			u32(call.clip_box.hi.x - call.clip_box.lo.x),
-			u32(call.clip_box.hi.y - call.clip_box.lo.y),
-		)
-
+		// Set bind groups
+		wgpu.RenderPassEncoderSetBindGroup(rpass, 1, texture_bind_group)
 		// Draw elements
 		wgpu.RenderPassEncoderDrawIndexed(
-			pass,
+			rpass,
 			u32(call.elem_count),
 			1,
 			u32(call.elem_offset),
@@ -596,8 +583,8 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 			0,
 		)
 	}
-	wgpu.RenderPassEncoderEnd(pass)
-	wgpu.RenderPassEncoderRelease(pass)
+	wgpu.RenderPassEncoderEnd(rpass)
+	wgpu.RenderPassEncoderRelease(rpass)
 
 	command_buffer := wgpu.CommandEncoderFinish(encoder)
 	defer wgpu.CommandBufferRelease(command_buffer)

@@ -78,6 +78,14 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			text_color = core.style.color.content
 
 		case .Primary:
+			if self.hover_time > 0 {
+				draw_rounded_box_shadow(
+					self.box,
+					core.style.rounding,
+					6,
+					fade({0, 0, 0, 40}, self.hover_time),
+				)
+			}
 			draw_rounded_box_fill(
 				self.box,
 				core.style.rounding,

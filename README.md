@@ -1,6 +1,10 @@
 # Onyx
 
-This is my immediate-mode ui library that I'm making for some desktop apps I have in mind.  It's currently nowhere near production-ready, I'm still working out the core functionality, but it already has a lot of widgets.
+Beautiful immediate-mode gui that runs as fast as your monitor.
+
+As of October 2024, I've completely done away with rasterized shapes and now all rendering is done with signed-distance fields in the shader this has taken a great load off of the CPU, and made the sky the limit for visual fidelity.
+
+This is my immediate-mode ui library that I'm making for some desktop apps I have in mind.  It's currently nowhere near production-ready (though it lives up to its title), I'm still working out the core functionality, but it already has a lot of widgets.
 It is not renderer or platform agnostic, but by using GLFW and WGPU, I hope to bring it to every desktop platform.  It's not meant to be integrated into existing projects like dear imgui, but rather for creating tools and desktop apps.
 I'm currently finalizing the layout functionality before I move ahead with more widgets and things.
 

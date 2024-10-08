@@ -208,6 +208,6 @@ enum_selector :: proc(value: ^$T, loc := #caller_location) where intrinsics.type
 			}
 			pop_id()
 		}
-		end_selector()
 	}
+	end_selector()
 }

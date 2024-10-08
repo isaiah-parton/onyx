@@ -106,23 +106,13 @@ component_showcase :: proc(state: ^Component_Showcase) {
 
 	#partial switch state.section.component {
 	case .Colors:
-		a := hsva_picker({hsva = &state.hsva})
-		b := alpha_slider({value = &state.hsva.a, color = color_from_hsva(state.hsva)})
-		if a.changed || b.changed {
-			strings.builder_reset(&state.hex)
-		}
-		if strings.builder_len(state.hex) == 0 {
-			hex := hex_from_color(color_from_hsva(state.hsva))
-			fmt.sbprintf(&state.hex, "%6x", hex)
-		}
-		if input({builder = &state.hex}).changed && strings.builder_len(state.hex) == 6 {
-			if value, ok := strconv.parse_u64_of_base(strings.to_string(state.hex), 16); ok {
-				state.hsva = hsva_from_color(color_from_hex(u32(value)))
-			}
-		}
 		si := runtime.type_info_base(type_info_of(Color_Scheme)).variant.(runtime.Type_Info_Struct)
-		for i in 0..<si.field_count {
-		push_id(int(i + 1))
+		for i in 0 ..< si.field_count {
+			if i > 0 {
+				add_space(10)
+			}
+			push_id(int(i + 1))
+			label({text = si.names[i]})
 			color_button({value = (^Color)(rawptr(uintptr(&core.style.color) + si.offsets[i]))})
 			pop_id()
 		}

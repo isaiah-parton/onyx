@@ -163,7 +163,7 @@ Core :: struct {
 	draw_list:             Draw_List,
 	draw_calls:            [MAX_DRAW_CALLS]Draw_Call,
 	draw_call_count:       int,
-	draw_state:						Draw_State,
+	draw_state:            Draw_State,
 	current_draw_call:     ^Draw_Call,
 	gfx:                   Graphics,
 	cursors:               [Mouse_Cursor]glfw.CursorHandle,
@@ -292,6 +292,9 @@ new_frame :: proc() {
 			time.since(core.last_frame_time),
 		),
 	)
+
+	profiler_begin_scope(.New_Frame)
+
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
@@ -445,13 +448,14 @@ render :: proc() {
 
 	// Update the atlas if needed
 	if core.font_atlas.modified {
+		profiler_begin_scope(.Render_Prepare)
 		t := time.now()
 		update_atlas(&core.font_atlas, &core.gfx)
 		core.font_atlas.modified = false
 	}
 
 	if core.draw_this_frame && core.visible {
-		profiler_begin_scope(.Render)
+		profiler_begin_scope(.Render_Draw)
 		draw(&core.gfx, &core.draw_list, core.draw_calls[:])
 
 		core.drawn_frames += 1

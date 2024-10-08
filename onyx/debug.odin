@@ -4,7 +4,10 @@ import "core:fmt"
 import "core:time"
 
 Profiler_Scope :: enum {
-	Render,
+	New_Frame,
+	Render_Prepare,
+	Render_Draw,
+	Render_Present,
 }
 
 Profiler :: struct {
@@ -42,9 +45,13 @@ do_debug_layer :: proc() {
 	)
 	for scope, s in Profiler_Scope {
 		draw_text(
-			{0, 100 + f32(20 * s)},
+			{0, core.view.y - f32(20 * (s + 1))},
 			{
-				text = fmt.tprintf("Render: %.2fms", time.duration_milliseconds(__prof.d[scope])),
+				text = fmt.tprintf(
+					"%v: %.2fms",
+					scope,
+					time.duration_milliseconds(__prof.d[scope]),
+				),
 				font = core.style.fonts[.Regular],
 				size = 20,
 			},

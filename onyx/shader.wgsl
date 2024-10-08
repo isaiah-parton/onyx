@@ -345,14 +345,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	// Get pixel color
 	switch (paint.kind) {
 		case 1u: {
-			out =	paint.col0 + (paint.col1 - paint.col0) * min(abs(d + shape.radius) / 10.0, 1.0);
+			out =	mix(paint.col0, paint.col1, min(abs(d * 0.9) / 4.0, 1.0));
 		}
 		default: {
 			out = textureSample(draw_call_texture, draw_call_sampler, in.uv) * in.col;
 		}
 	}
 
-	out.a *= (1.0 - d);
+	out.a *= (1.0 - max(d, 0.0));
 
   return out;
 }

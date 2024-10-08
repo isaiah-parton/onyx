@@ -53,24 +53,24 @@ hsva_from_color :: proc(color: Color) -> (hsva: [4]f32) {
 	return
 }
 color_from_hsva :: proc(hsva: [4]f32) -> Color {
-  r, g, b, k, t: f32
+	r, g, b, k, t: f32
 
-  k = math.mod(5.0 + hsva.x / 60.0, 6)
-  t = 4.0 - k
-  k = clamp(min(t, k), 0, 1)
-  r = hsva.z - hsva.z * hsva.y * k
+	k = math.mod(5.0 + hsva.x / 60.0, 6)
+	t = 4.0 - k
+	k = clamp(min(t, k), 0, 1)
+	r = hsva.z - hsva.z * hsva.y * k
 
-  k = math.mod(3.0 + hsva.x / 60.0, 6)
-  t = 4.0 - k
-  k = clamp(min(t, k), 0, 1)
-  g = hsva.z - hsva.z * hsva.y * k
+	k = math.mod(3.0 + hsva.x / 60.0, 6)
+	t = 4.0 - k
+	k = clamp(min(t, k), 0, 1)
+	g = hsva.z - hsva.z * hsva.y * k
 
-  k = math.mod(1.0 + hsva.x / 60.0, 6)
-  t = 4.0 - k
-  k = clamp(min(t, k), 0, 1)
-  b = hsva.z - hsva.z * hsva.y * k
+	k = math.mod(1.0 + hsva.x / 60.0, 6)
+	t = 4.0 - k
+	k = clamp(min(t, k), 0, 1)
+	b = hsva.z - hsva.z * hsva.y * k
 
-  return {u8(r * 255.0), u8(g * 255.0), u8(b * 255.0), u8(hsva.a * 255.0)}
+	return {u8(r * 255.0), u8(g * 255.0), u8(b * 255.0), u8(hsva.a * 255.0)}
 }
 
 color_from :: proc {
