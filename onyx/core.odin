@@ -195,7 +195,7 @@ init :: proc(window: glfw.WindowHandle, style: ^Style = nil) -> bool {
 	if style == nil {
 		core.style.color = dark_color_scheme()
 		core.style.shape = default_style_shape()
-		fmt.printfln("No style provided by user, looking for default fonts in '%s'", filepath.abs(FONT_PATH))
+		fmt.printfln("No style provided by user, looking for default fonts in '%s'", filepath.abs(FONT_PATH) or_return)
 		core.style.default_font = load_font(fmt.tprintf("%s/Geist-Medium.ttf", FONT_PATH)) or_return
 		core.style.monospace_font = load_font(fmt.tprintf("%s/Recursive_Monospace-Regular.ttf", FONT_PATH)) or_return
 		core.style.header_font = load_font(fmt.tprintf("%s/Lora-Medium.ttf", FONT_PATH)) or_return
