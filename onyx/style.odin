@@ -4,22 +4,18 @@ Color_Scheme :: struct {
 	background, foreground, substance, accent, accent_content, content: Color,
 }
 
-Font_Style :: enum {
-	// This style is used as a fallback font
-	// Every glyph not found in the defined font for a text job will be checked against it
-	Icon,
-	// 4 normal font weights
-	Light,
-	Regular,
-	Medium,
-	Bold,
-	// Monospace for code
-	Monospace,
-}
-
 Style :: struct {
-	fonts:       [Font_Style]int,
+	// Used as a fallback in case a glyph is not found
+	icon_font: int,
+	// For code editor
+	monospace_font: int,
+	// Might want a fancy serif font for headers
+	header_font: Maybe(int),
+	// Default font for everything
+	default_font: int,
+	// Color scheme should be separate
 	color:       Color_Scheme,
+	// Dunno why this is its own struct
 	using shape: Style_Shape,
 }
 
@@ -40,7 +36,7 @@ default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
 		tooltip_padding = 3,
 		panel_padding = 10,
-		header_text_size = 26,
+		header_text_size = 36,
 		button_text_size = 18,
 		tab_text_size = 18,
 		content_text_size = 18,
@@ -72,11 +68,6 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		accent_content = {255, 255, 255, 255},
 		content = {255, 255, 255, 255},
 	}
-}
-
-load_font_style :: proc(style: Font_Style, path: string) -> bool {
-	core.style.fonts[style] = load_font(path) or_return
-	return true
 }
 
 set_style_rounding :: proc(amount: f32) {

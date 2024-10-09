@@ -222,7 +222,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	// Initial text info
 	text_info: Text_Info = {
 		text   = text,
-		font   = core.style.fonts[.Monospace if monospace else .Medium],
+		font   = core.style.monospace_font if monospace else core.style.default_font,
 		size   = core.style.content_text_size,
 		hidden = info.hidden && len(text) > 0,
 	}

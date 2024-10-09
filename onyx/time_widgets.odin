@@ -89,18 +89,18 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 
 	if layout({side = .Top, size = size}) {
 		set_padding(5)
-		if button({text = "\uEA64", font_style = .Icon, style = .Outlined}).clicked {
+		if button({text = "\uEA64", style = .Outlined}).clicked {
 			month_offset -= 1
 		}
 		set_side(.Right)
-		if button({text = "\uEA6E", font_style = .Icon, style = .Outlined}).clicked {
+		if button({text = "\uEA6E", style = .Outlined}).clicked {
 			month_offset += 1
 		}
 		draw_text(
 			box_center(layout_box()),
 			{
 				text = fmt.tprintf("%s %i", t.Month(info.month), info.year),
-				font = core.style.fonts[.Medium],
+				font = core.style.default_font,
 				size = 18,
 				align_h = .Middle,
 				align_v = .Middle,
@@ -125,7 +125,7 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 			box_center(sub_box),
 			{
 				text = weekday,
-				font = core.style.fonts[.Regular],
+				font = core.style.default_font,
 				size = 18,
 				align_h = .Middle,
 				align_v = .Middle,
@@ -210,7 +210,7 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 				box_center(self.box),
 				{
 					text = fmt.tprint(day),
-					font = core.style.fonts[.Medium if is_month else .Regular],
+					font = core.style.default_font,
 					size = 18,
 					align_v = .Middle,
 					align_h = .Middle,
@@ -320,7 +320,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 			[2]f32{self.box.lo.x + 7, box_center_y(self.box)},
 			{
 				text = strings.to_string(b),
-				font = core.style.fonts[.Regular],
+				font = core.style.default_font,
 				size = core.style.content_text_size,
 				align_v = .Middle,
 			},

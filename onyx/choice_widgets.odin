@@ -24,7 +24,7 @@ init_selector :: proc(using info: ^Selector_Info, loc := #caller_location) -> bo
 	text_info := Text_Info {
 		text    = text,
 		size    = core.style.button_text_size,
-		font    = core.style.fonts[.Medium],
+		font    = core.style.default_font,
 		align_v = .Middle,
 		align_h = .Middle,
 	}
@@ -136,7 +136,7 @@ init_selector_option :: proc(using info: ^Selector_Option_Info, loc := #caller_l
 		{
 			text = text,
 			size = core.style.button_text_size,
-			font = core.style.fonts[.Medium],
+			font = core.style.default_font,
 			align_v = .Middle,
 		},
 	)

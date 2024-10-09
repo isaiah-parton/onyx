@@ -5,7 +5,8 @@ import "tedit"
 Label_Info :: struct {
 	using _:             Widget_Info,
 	text:                string,
-	font_style:          Maybe(Font_Style),
+	header: bool,
+	font:          			Maybe(int),
 	font_size:           Maybe(f32),
 	text_job:            Text_Job,
 	copied_to_clipboard: bool,
@@ -17,7 +18,7 @@ init_label :: proc(using info: ^Label_Info, loc := #caller_location) -> bool {
 		{
 			text = text,
 			size = font_size.? or_else core.style.content_text_size,
-			font = core.style.fonts[font_style.? or_else .Regular],
+			font = font.? or_else core.style.default_font,
 			align_h = .Left,
 			align_v = .Top,
 		},
@@ -46,6 +47,15 @@ add_label :: proc(using info: ^Label_Info) -> bool {
 
 label :: proc(info: Label_Info, loc := #caller_location) -> Label_Info {
 	info := info
+	init_label(&info, loc)
+	add_label(&info)
+	return info
+}
+
+header :: proc(info: Label_Info, loc := #caller_location) -> Label_Info {
+	info := info
+	info.font = core.style.header_font
+	info.font_size = core.style.header_text_size
 	init_label(&info, loc)
 	add_label(&info)
 	return info

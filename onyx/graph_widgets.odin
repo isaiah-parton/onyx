@@ -195,7 +195,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
 						{
 							text = entry.label,
-							font = core.style.fonts[.Light],
+							font = core.style.default_font,
 							size = 16,
 							align_h = .Middle,
 							align_v = .Top,
@@ -252,7 +252,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
 						{
 							text = entry.label,
-							font = core.style.fonts[.Regular],
+							font = core.style.default_font,
 							size = 18,
 							align_h = .Middle,
 							align_v = .Top,
@@ -280,7 +280,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 							{(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},
 							{
 								text = fmt.tprint(entry.values[f]),
-								font = core.style.fonts[.Regular],
+								font = core.style.default_font,
 								size = 18,
 								align_h = .Middle,
 								align_v = .Bottom,
@@ -314,7 +314,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				box.lo + [2]f32{5, 13},
 				{
 					text = entries[tooltip_idx].label,
-					font = core.style.fonts[.Medium],
+					font = core.style.default_font,
 					size = 18,
 					align_v = .Middle,
 				},
@@ -329,7 +329,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				{tip_box.lo.x, (tip_box.lo.y + tip_box.hi.y) / 2},
 				{
 					text = field.name,
-					font = core.style.fonts[.Medium],
+					font = core.style.default_font,
 					size = 18,
 					align_v = .Middle,
 				},
@@ -339,7 +339,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				{tip_box.hi.x, (tip_box.lo.y + tip_box.hi.y) / 2},
 				{
 					text = fmt.tprintf("%v", entries[tooltip_idx].values[f]),
-					font = core.style.fonts[.Regular],
+					font = core.style.default_font,
 					size = 18,
 					align_h = .Right,
 					align_v = .Middle,

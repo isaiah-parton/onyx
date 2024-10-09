@@ -91,6 +91,7 @@ component_showcase :: proc(state: ^State) {
 
 	#partial switch state.component {
 	case .Colors:
+		header({text = "Bruh Moment"})
 		si := runtime.type_info_base(type_info_of(Color_Scheme)).variant.(runtime.Type_Info_Struct)
 		for i in 0 ..< si.field_count {
 			if i > 0 {
@@ -385,12 +386,6 @@ main :: proc() {
 	window := glfw.CreateWindow(1600, 900, "demo", nil, nil)
 
 	onyx.init(window)
-	onyx.load_font_style(.Bold, "fonts/Geist-Bold.ttf")
-	onyx.load_font_style(.Medium, "fonts/Geist-Medium.ttf")
-	onyx.load_font_style(.Light, "fonts/Geist-Light.ttf")
-	onyx.load_font_style(.Regular, "fonts/Geist-Regular.ttf")
-	onyx.load_font_style(.Monospace, "fonts/iAWriterMonoS-Regular.ttf")
-	onyx.load_font_style(.Icon, "fonts/remixicon.ttf")
 
 	for !glfw.WindowShouldClose(onyx.core.window) {
 		onyx.new_frame()

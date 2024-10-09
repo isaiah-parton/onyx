@@ -39,7 +39,7 @@ do_debug_layer :: proc() {
 				// Debug layer not included
 				len(core.draw_calls) - 1,
 			),
-			font = core.style.fonts[.Regular],
+			font = core.style.default_font,
 			size = 20,
 		},
 		{255, 255, 255, 255},
@@ -53,7 +53,7 @@ do_debug_layer :: proc() {
 					scope,
 					time.duration_milliseconds(__prof.d[scope]),
 				),
-				font = core.style.fonts[.Regular],
+				font = core.style.default_font,
 				size = 20,
 			},
 			{255, 255, 255, 255},

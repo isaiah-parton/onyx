@@ -22,7 +22,7 @@ init_breadcrumb :: proc(info: ^Breadcrumb_Info, loc := #caller_location) -> bool
 	info.self = get_widget(info.id) or_return
 	info.__text_info = {
 		text = info.options[info.index^],
-		font = core.style.fonts[.Medium],
+		font = core.style.default_font,
 		size = core.style.button_text_size,
 	}
 	info.__has_menu = len(info.options) > 1

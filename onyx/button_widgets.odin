@@ -17,7 +17,7 @@ Button_Info :: struct {
 	text:       string,
 	is_loading: bool,
 	style:      Button_Style,
-	font_style: Maybe(Font_Style),
+	font: Maybe(int),
 	font_size:  Maybe(f32),
 	color:      Maybe(Color),
 	text_job:   Text_Job,
@@ -30,7 +30,7 @@ init_button :: proc(info: ^Button_Info, loc := #caller_location) -> bool {
 		{
 			text = info.text,
 			size = info.font_size.? or_else core.style.button_text_size,
-			font = core.style.fonts[info.font_style.? or_else .Medium],
+			font = core.style.default_font,
 			align_v = .Middle,
 			align_h = .Middle,
 		},

@@ -103,7 +103,7 @@ init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_locatio
 	text_job = make_text_job(
 		{
 			text = fmt.tprintf("%6x", hex_from_color(value^)),
-			font = core.style.fonts[.Regular],
+			font = core.style.default_font,
 			size = 20,
 			align_h = .Middle,
 			align_v = .Middle,

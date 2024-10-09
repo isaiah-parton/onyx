@@ -123,7 +123,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 		draw_text(
 			{title_box.lo.x + 5, (title_box.hi.y + title_box.lo.y) / 2},
-			{text = info.title, font = core.style.fonts[.Regular], size = 20, align_v = .Middle},
+			{text = info.title, font = core.style.default_font, size = 20, align_v = .Middle},
 			core.style.color.content,
 		)
 

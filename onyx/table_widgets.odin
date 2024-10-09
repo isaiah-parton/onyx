@@ -120,7 +120,7 @@ init_table :: proc(info: ^Table_Info, loc := #caller_location) -> bool {
 		make_text_job(
 			{
 				text = text,
-				font = core.style.fonts[.Medium],
+				font = core.style.default_font,
 				size = core.style.button_text_size,
 				align_h = .Middle,
 				align_v = .Middle,

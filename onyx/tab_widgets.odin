@@ -65,7 +65,7 @@ add_tabs :: proc(using info: ^Tabs_Info) -> bool {
 				box_center(option_box),
 				{
 					text = option,
-					font = core.style.fonts[.Regular],
+					font = core.style.default_font,
 					size = 18,
 					align_h = .Middle,
 					align_v = .Middle,

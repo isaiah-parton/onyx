@@ -38,7 +38,7 @@ init_boolean_widget :: proc(info: ^Boolean_Widget_Info, loc := #caller_location)
 	info.text_side = info.text_side.? or_else .Left
 	if len(info.text) > 0 {
 		if text_job, ok := make_text_job(
-			{font = core.style.fonts[.Regular], size = 18, text = info.text},
+			{font = core.style.default_font, size = 18, text = info.text},
 		); ok {
 			info.text_job = text_job
 			if info.text_side == .Bottom || info.text_side == .Top {
@@ -150,7 +150,7 @@ init_toggle_switch :: proc(using info: ^Toggle_Switch_Info, loc := #caller_locat
 	desired_size = [2]f32{2, 1} * core.style.visual_size.y * 0.75
 	if len(text) > 0 {
 		text_job = make_text_job(
-			{font = core.style.fonts[.Regular], size = 18, text = text},
+			{font = core.style.default_font, size = 18, text = text},
 		) or_return
 		desired_size.x += text_job.size.x + TEXT_PADDING
 	}

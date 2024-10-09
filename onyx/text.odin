@@ -325,7 +325,7 @@ make_text_iterator :: proc(info: Text_Info) -> (iter: Text_Iterator, ok: bool) {
 }
 
 get_glyph_from_fallback_font :: proc(codepoint: rune, size: f32) -> (glyph: Glyph, ok: bool) {
-	font := &core.fonts[core.style.fonts[.Icon]].?
+	font := &core.fonts[core.style.icon_font].?
 	return get_glyph(font, get_font_size(font, size) or_return, codepoint)
 }
 

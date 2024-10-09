@@ -3,6 +3,8 @@ package onyx
 import "vendor:glfw"
 
 import "base:runtime"
+import "core:os"
+import "core:path/filepath"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -15,6 +17,7 @@ import "tedit"
 import "vendor:fontstash"
 import "vendor:wgpu"
 
+FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx/fonts")
 MAX_IDS :: 32
 MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
@@ -185,8 +188,21 @@ view_height :: proc() -> f32 {
 	return core.view.y
 }
 
-init :: proc(window: glfw.WindowHandle) -> bool {
+init :: proc(window: glfw.WindowHandle, style: ^Style = nil) -> bool {
 	if window == nil do return false
+
+	// Default style
+	if style == nil {
+		core.style.color = dark_color_scheme()
+		core.style.shape = default_style_shape()
+		fmt.printfln("No style provided by user, looking for default fonts in '%s'", filepath.abs(FONT_PATH))
+		core.style.default_font = load_font(fmt.tprintf("%s/Geist-Medium.ttf", FONT_PATH)) or_return
+		core.style.monospace_font = load_font(fmt.tprintf("%s/Recursive_Monospace-Regular.ttf", FONT_PATH)) or_return
+		core.style.header_font = load_font(fmt.tprintf("%s/Lora-Medium.ttf", FONT_PATH)) or_return
+		core.style.icon_font = load_font(fmt.tprintf("%s/remixicon.ttf", FONT_PATH)) or_return
+	} else {
+		core.style = style^
+	}
 
 	core.window = window
 	width, height := glfw.GetWindowSize(core.window)
@@ -273,10 +289,6 @@ init :: proc(window: glfw.WindowHandle) -> bool {
 	// Init font atlas
 	atlas_size: int = min(cast(int)core.gfx.device_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
-
-	// Default style
-	core.style.color = dark_color_scheme()
-	core.style.shape = default_style_shape()
 
 	return true
 }
