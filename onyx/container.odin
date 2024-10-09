@@ -45,7 +45,7 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 	}
 
 	// Minimum size
-	self.size = linalg.max(info.size, box_size(self.box))
+	self.size = linalg.max(self.size, info.size, box_size(self.box))
 
 	// Mouse wheel input
 	if self.active {
@@ -55,8 +55,7 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 		}
 		self.desired_scroll -= delta_scroll * 100
 	}
-	push_clip(self.box)
-	set_scissor_shape(add_shape_box(self.box, core.style.rounding))
+	push_scissor(self.box, add_shape_box(self.box, core.style.rounding))
 	push_stack(&core.container_stack, self) or_return
 
 	layout_pos := self.box.lo - linalg.floor(self.scroll)
@@ -69,7 +68,6 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 }
 
 end_container :: proc() {
-	set_scissor_shape(0)
 	self := current_container().?
 	layout := current_layout().?
 	self.size = linalg.max(layout.content_size + layout.spacing_size, self.size)
@@ -126,7 +124,7 @@ end_container :: proc() {
 	// Table outline
 	draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 
-	pop_clip()
+	pop_scissor()
 	pop_stack(&core.container_stack)
 }
 
@@ -137,17 +135,30 @@ current_container :: proc() -> Maybe(^Container) {
 	return nil
 }
 
-push_clip :: proc(box: Box) {
-	push_stack(&core.clip_stack, box)
+Scissor :: struct {
+	box: Box,
+	shape: u32,
 }
 
-pop_clip :: proc() {
-	pop_stack(&core.clip_stack)
+push_scissor :: proc(box: Box, shape: u32 = 0) {
+	box := box
+	if scissor, ok := current_scissor().?; ok {
+		box = clamp_box(box, scissor.box)
+	}
+	push_stack(&core.scissor_stack, Scissor{box = box, shape = shape})
+	set_scissor_shape(shape)
 }
 
-current_clip :: proc() -> Maybe(Box) {
-	if core.clip_stack.height > 0 {
-		return core.clip_stack.items[core.clip_stack.height - 1]
+pop_scissor :: proc() {
+	pop_stack(&core.scissor_stack)
+	if scissor, ok := current_scissor().?; ok {
+		set_scissor_shape(scissor.shape)
+	}
+}
+
+current_scissor :: proc() -> Maybe(Scissor) {
+	if core.scissor_stack.height > 0 {
+	return core.scissor_stack.items[core.scissor_stack.height - 1]
 	}
 	return nil
 }

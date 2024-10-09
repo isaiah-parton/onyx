@@ -37,14 +37,14 @@ Component :: enum {
 }
 
 State :: struct {
-	component: Component,
+	component:     Component,
 	light_mode:    bool,
 	checkboxes:    [Option]bool,
 	bio:           string,
 	full_name:     string,
 	birth_country: string,
-	from_angle:  f32,
-	to_angle:  f32,
+	from_angle:    f32,
+	to_angle:      f32,
 	start_time:    time.Time,
 	option:        Option,
 	date_range:    [2]Maybe(onyx.Date),
@@ -54,8 +54,8 @@ State :: struct {
 	sorted_column: int,
 	hsva:          [4]f32,
 	hex:           strings.Builder,
-	texture: wgpu.Texture,
-	images:             [4]onyx.Image,
+	texture:       wgpu.Texture,
+	images:        [4]onyx.Image,
 }
 
 state: State
@@ -77,12 +77,7 @@ component_showcase :: proc(state: ^State) {
 	foreground()
 	if layout({size = 65, side = .Top}) {
 		shrink(15)
-		tabs(
-			{
-				index = (^int)(&state.component),
-				options = reflect.enum_field_names(Component),
-			},
-		)
+		tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Component)})
 		set_side(.Right)
 		if toggle_switch({state = &state.light_mode, text = "\uf1bc" if state.light_mode else "\uef72", text_side = .Left}).toggled {
 			if state.light_mode {
@@ -103,7 +98,13 @@ component_showcase :: proc(state: ^State) {
 			}
 			push_id(int(i + 1))
 			label({text = si.names[i]})
-			color_button({value = (^Color)(rawptr(uintptr(&core.style.color) + si.offsets[i])), input_formats = {.RGB, .HSL, .HEX}})
+			color_button(
+				{
+					value = (^Color)(rawptr(uintptr(&core.style.color) + si.offsets[i])),
+					show_alpha = true,
+					input_formats = {.RGB, .HSL, .HEX},
+				},
+			)
 			pop_id()
 		}
 
@@ -143,10 +144,7 @@ component_showcase :: proc(state: ^State) {
 			sort_proc :: proc(i, j: Table_Entry) -> bool {
 				i := i
 				j := j
-				field := reflect.struct_field_at(
-					Table_Entry,
-					state.sorted_column,
-				)
+				field := reflect.struct_field_at(Table_Entry, state.sorted_column)
 				switch field.type.id {
 				case string:
 					return(
@@ -251,8 +249,7 @@ component_showcase :: proc(state: ^State) {
 				add_space(10)
 			}
 			yes := state.option == member
-			radio_button({text = fmt.tprint(member), state = &yes})
-			if yes {
+			if radio_button({text = fmt.tprint(member), state = &yes}).toggled {
 				state.option = member
 			}
 			pop_id()

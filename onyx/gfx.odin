@@ -417,7 +417,7 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	}
 
 	// Sort draw calls by index
-	slice.sort_by(core.draw_calls[:core.draw_call_count], proc(i, j: Draw_Call) -> bool {
+	slice.sort_by(core.draw_calls[:], proc(i, j: Draw_Call) -> bool {
 		return i.index < j.index
 	})
 
@@ -515,12 +515,10 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 	defer wgpu.TextureViewRelease(atlas_texture_view)
 
 	// Render them
-	for &call in core.draw_calls[:core.draw_call_count] {
+	for &call in core.draw_calls {
 
 		// Redundancy checks
-		if call.elem_count == 0 ||
-		   call.clip_box.hi.x <= call.clip_box.lo.x ||
-		   call.clip_box.hi.y <= call.clip_box.lo.y {
+		if call.elem_count == 0 {
 			continue
 		}
 

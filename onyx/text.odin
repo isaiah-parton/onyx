@@ -430,7 +430,7 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 		iter.glyph_pos.y += iter.size.ascent - iter.size.descent + iter.size.line_gap
 	}
 	iter.line_size.x += math.floor(iter.glyph.advance)
-	if iter.last_codepoint != 0 {
+	if ok && iter.last_codepoint != 0 {
 		iter.line_size.x += iter.font.spacing
 	}
 
@@ -556,9 +556,11 @@ get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (glyph: Gly
 }
 
 draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
-	job, _ := make_text_job(info)
-	draw_text_glyphs(job, origin, color)
-	return job.size
+	if job, ok := make_text_job(info); ok {
+		draw_text_glyphs(job, origin, color)
+		return job.size
+	}
+	return {}
 }
 
 draw_aligned_rune :: proc(
@@ -573,87 +575,34 @@ draw_aligned_rune :: proc(
 	size: [2]f32,
 	ok: bool,
 ) #optional_ok {
-
 	font := &core.fonts[font].?
 	glyph := get_glyph(font, get_font_size(font, font_size) or_return, rune(icon)) or_return
 	size = glyph.source.hi - glyph.source.lo
 
 	box: Box
 	switch align_h {
-
 	case .Right:
 		box.lo.x = origin.x - size.x
 		box.hi.x = origin.x
-
 	case .Middle:
 		box.lo.x = origin.x - size.x / 2
 		box.hi.x = origin.x + size.x / 2
-
 	case .Left:
 		box.lo.x = origin.x
 		box.hi.x = origin.x + size.x
 	}
 	switch align_v {
-
 	case .Bottom, .Baseline:
 		box.lo.y = origin.y - size.y
 		box.hi.y = origin.y
-
 	case .Middle:
 		box.lo.y = origin.y - size.y / 2
 		box.hi.y = origin.y + size.y / 2
-
 	case .Top:
 		box.lo.y = origin.y
 		box.hi.y = origin.y + size.y
 	}
-	draw_texture_portion(core.font_atlas.texture, glyph.source, box, color)
+
+	draw_glyph(glyph.source, box, color)
 	return
-}
-
-draw_rune_aligned_clipped :: proc(
-	font: int,
-	size: f32,
-	icon: rune,
-	origin: [2]f32,
-	color: Color,
-	align: [2]Alignment,
-	clip: Box,
-) -> [2]f32 {
-	font := &core.fonts[font].?
-	font_size, _ := get_font_size(font, size)
-	glyph, _ := get_glyph(font, font_size, rune(icon))
-	icon_size := glyph.source.hi - glyph.source.lo
-
-	box: Box
-	switch align.x {
-
-	case .Far:
-		box.lo.x = origin.x - icon_size.x
-		box.hi.x = origin.x
-
-	case .Middle:
-		box.lo.x = origin.x - icon_size.x / 2
-		box.hi.x = origin.x + icon_size.x / 2
-
-	case .Near:
-		box.lo.x = origin.x
-		box.hi.x = origin.x + icon_size.x
-	}
-	switch align.y {
-
-	case .Far:
-		box.lo.y = origin.y - icon_size.y
-		box.hi.y = origin.y
-
-	case .Middle:
-		box.lo.y = origin.y - icon_size.y / 2
-		box.hi.y = origin.y + icon_size.y / 2
-
-	case .Near:
-		box.lo.y = origin.y
-		box.hi.y = origin.y + icon_size.y
-	}
-	draw_texture_portion(core.font_atlas.texture, glyph.source, box, color)
-	return icon_size
 }

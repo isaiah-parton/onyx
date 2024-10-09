@@ -88,7 +88,7 @@ color_from :: proc {
 	color_from_hsva,
 }
 
-interpolate_colors :: proc(time: f32, colors: ..Color) -> Color {
+lerp_colors :: proc(time: f32, colors: ..Color) -> Color {
 	if len(colors) > 0 {
 		if len(colors) == 1 {
 			return colors[0]

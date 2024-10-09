@@ -215,7 +215,7 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 					align_v = .Middle,
 					align_h = .Middle,
 				},
-				interpolate_colors(
+				lerp_colors(
 					self.focus_time,
 					core.style.color.content if is_month else fade(core.style.color.content, 0.5),
 					core.style.color.background,

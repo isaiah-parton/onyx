@@ -67,12 +67,17 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 		box.hi = shape.cv0 + shape.radius + shape.width
 	}
 
+	if shape.stroke {
+		box.lo -= shape.width / 2
+		box.hi += shape.width / 2
+	}
+
 	// Shadows are not clipped like other shapes since they are currently only drawn below new layers
 	// This is subject to change.
 	if shape.kind != .BlurredBox {
-		if clip, ok := current_clip().?; ok {
-			box.lo = linalg.max(box.lo, clip.lo)
-			box.hi = linalg.min(box.hi, clip.hi)
+		if scissor, ok := current_scissor().?; ok {
+		box.lo = linalg.max(box.lo, scissor.box.lo)
+		box.hi = linalg.min(box.hi, scissor.box.hi)
 		}
 	}
 	return box
@@ -80,6 +85,7 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 
 render_shape :: proc(shape: u32, color: Color) {
 	box := get_shape_bounding_box(core.draw_list.shapes[shape])
+	if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
 	set_vertex_shape(shape)
 	set_vertex_color(color)
 	set_vertex_uv({})
@@ -245,34 +251,74 @@ normalize_color :: proc(color: Color) -> [4]f32 {
 	return {f32(color.r) / 255.0, f32(color.g) / 255.0, f32(color.b) / 255.0, f32(color.a) / 255.0}
 }
 
-/*
-	Basic shapes drawn in immediate mode
-*/
+draw_glyph :: proc(source, target: Box, tint: Color) {
+	source, target := source, target
+	if scissor, ok := current_scissor().?; ok {
+		left := scissor.box.lo.x - target.lo.x
+		if left > 0 {
+			target.lo.x += left
+			source.lo.x += left
+		}
+		top := scissor.box.lo.y - target.lo.y
+		if top > 0 {
+			target.lo.y += top
+			source.lo.y += top
+		}
+		right := target.hi.x - scissor.box.hi.x
+		if right > 0 {
+			target.hi.x -= right
+			source.hi.x -= right
+		}
+		bottom := target.hi.y - scissor.box.hi.y
+		if bottom > 0 {
+			target.hi.y -= bottom
+			source.hi.y -= bottom
+		}
+		if target.lo.x >= target.hi.x || target.lo.y >= target.hi.y do return
+	}
+	size: [2]f32 = {f32(core.font_atlas.width), f32(core.font_atlas.height)}
+	set_vertex_shape(add_shape(Shape{kind = .Normal}))
+	set_vertex_uv(source.lo / size)
+	set_vertex_color(tint)
+	tl := add_vertex(target.lo)
+	set_vertex_uv({source.lo.x, source.hi.y} / size)
+	bl := add_vertex({target.lo.x, target.hi.y})
+	set_vertex_uv(source.hi / size)
+	br := add_vertex(target.hi)
+	set_vertex_uv({source.hi.x, source.lo.y} / size)
+	tr := add_vertex({target.hi.x, target.lo.y})
+	add_indices(tl, br, bl, tl, tr, br)
+	set_vertex_shape(0)
+}
+
 draw_triangle_fill :: proc(a, b, c: [2]f32, color: Color) {
 	draw_polygon_fill({a, b, c}, color)
 }
-draw_triangle_strip_fill :: proc(points: [][2]f32, color: Color) {
-	if len(points) < 4 {
-		return
-	}
-	for i in 2 ..< len(points) {
-		if i % 2 == 0 {
-			draw_triangle_fill(
-				{points[i].x, points[i].y},
-				{points[i - 2].x, points[i - 2].y},
-				{points[i - 1].x, points[i - 1].y},
-				color,
-			)
-		} else {
-			draw_triangle_fill(
-				{points[i].x, points[i].y},
-				{points[i - 1].x, points[i - 1].y},
-				{points[i - 2].x, points[i - 2].y},
-				color,
-			)
-		}
-	}
-}
+
+// TODO: Remove
+// draw_triangle_strip_fill :: proc(points: [][2]f32, color: Color) {
+// 	if len(points) < 4 {
+// 		return
+// 	}
+// 	for i in 2 ..< len(points) {
+// 		if i % 2 == 0 {
+// 			draw_triangle_fill(
+// 				{points[i].x, points[i].y},
+// 				{points[i - 2].x, points[i - 2].y},
+// 				{points[i - 1].x, points[i - 1].y},
+// 				color,
+// 			)
+// 		} else {
+// 			draw_triangle_fill(
+// 				{points[i].x, points[i].y},
+// 				{points[i - 1].x, points[i - 1].y},
+// 				{points[i - 2].x, points[i - 2].y},
+// 				color,
+// 			)
+// 		}
+// 	}
+// }
+
 draw_line :: proc(a, b: [2]f32, width: f32, color: Color) {
 	delta := b - a
 	length := math.sqrt(f32(delta.x * delta.x + delta.y * delta.y))
@@ -291,9 +337,8 @@ draw_line :: proc(a, b: [2]f32, width: f32, color: Color) {
 	}
 }
 
-draw_quad_bezier :: proc(p0, p1, p2: [2]f32, width: f32, color: Color) {
-	// width := width - 1
-	shape_index := add_shape(Shape{kind = .Bezier, cv0 = p0, cv1 = p1, cv2 = p2, width = width})
+draw_quad_bezier :: proc(a, b, c: [2]f32, width: f32, color: Color) {
+	shape_index := add_shape(Shape{kind = .Bezier, cv0 = a, cv1 = b, cv2 = c, width = width})
 	render_shape(shape_index, color)
 }
 
@@ -330,12 +375,12 @@ draw_polygon_fill :: proc(pts: [][2]f32, color: Color) {
 	render_shape(shape_index, color)
 }
 
-lerp_cubic_bezier :: proc(p0, p1, p2, p3: [2]f32, t: f32) -> [2]f32 {
+lerp_cubic_bezier :: proc(a, b, c, d: [2]f32, t: f32) -> [2]f32 {
 	weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
 	times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
 	return [2]f32 {
-		(times * weights * (matrix[4, 1]f32){p0.x, p1.x, p2.x, p3.x})[0][0],
-		(times * weights * (matrix[4, 1]f32){p0.y, p1.y, p2.y, p3.y})[0][0],
+		(times * weights * (matrix[4, 1]f32){a.x, b.x, c.x, d.x})[0][0],
+		(times * weights * (matrix[4, 1]f32){a.y, b.y, c.y, d.y})[0][0],
 	}
 }
 
@@ -479,27 +524,14 @@ draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
 	render_shape(shape_index, color)
 }
 
-// lil guys
-
-draw_spinner :: proc(center: [2]f32, color: Color) {
+draw_spinner :: proc(center: [2]f32, radius: f32, color: Color) {
 	from := f32(time.duration_seconds(time.since(core.start_time)) * 2) * math.PI
 	to := from + 2.5 + math.sin(f32(time.duration_seconds(time.since(core.start_time)) * 3)) * 1
 
-	inner := f32(7)
-	outer := f32(10)
-	half := (inner + outer) / 2
+	width := radius * 0.2
 
-	draw_arc(center, from, to, inner, outer, color)
+	draw_arc(center, from, to, radius - width / 2, width, color)
 
-	core.draw_next_frame = true
-}
-
-draw_loader :: proc(pos: [2]f32, scale: f32, color: Color) {
-	time := f32(time.duration_seconds(time.since(core.start_time))) * 4.5
-	radius := scale / 2
-	center := [2]f32{pos.x + math.cos(time) * scale, pos.y}
-	size := [2]f32{radius * (1 + math.abs(math.cos(time + math.PI / 2)) * 0.75), radius}
-	draw_rounded_box_fill({center - size, center + size}, scale, color)
 	core.draw_next_frame = true
 }
 

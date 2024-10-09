@@ -215,7 +215,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	widget.dead = false
 
 	// Set visible flag
-	widget.visible = core.visible && get_clip(current_clip().?, widget.box) != .Full
+	widget.visible = core.visible && get_clip(current_scissor().?.box, widget.box) != .Full
 
 	// Reset state
 	widget.last_state = widget.state
@@ -305,7 +305,7 @@ hover_widget :: proc(widget: ^Widget) {
 	// Below highest hovered widget
 	if widget.layer.index < core.highest_layer_index do return
 	// Clipped?
-	if clip, ok := current_clip().?; ok && !point_in_box(core.mouse_pos, current_clip().?) do return
+	if clip, ok := current_scissor().?; ok && !point_in_box(core.mouse_pos, current_scissor().?.box) do return
 	// Ok hover
 	core.next_hovered_widget = widget.id
 	core.next_hovered_layer = widget.layer.id

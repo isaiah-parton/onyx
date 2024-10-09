@@ -192,7 +192,7 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 		draw_rounded_box_fill(
 			switch_box,
 			outer_radius,
-			interpolate_colors(how_on, core.style.color.substance, core.style.color.accent),
+			lerp_colors(how_on, core.style.color.substance, core.style.color.accent),
 		)
 		draw_circle_fill(lever_center, inner_radius, core.style.color.content)
 
@@ -270,7 +270,7 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 		draw_circle_fill(
 			icon_center,
 			SIZE / 2,
-			interpolate_colors(state_time, core.style.color.substance, core.style.color.accent),
+			lerp_colors(state_time, core.style.color.substance, core.style.color.accent),
 		)
 		if state_time > 0 {
 			draw_circle_fill(

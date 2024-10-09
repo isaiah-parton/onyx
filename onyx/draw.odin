@@ -114,12 +114,10 @@ Draw_List :: struct {
 }
 
 Draw_Call :: struct {
-	gradient:      Gradient,
-	clip_box:      Box,
-	user_texture:  Maybe(wgpu.Texture),
-	elem_offset:   int,
-	elem_count:    int,
-	index:         int,
+	user_texture: Maybe(wgpu.Texture),
+	elem_offset:  int,
+	elem_count:   int,
+	index:        int,
 }
 
 Path :: struct {
@@ -274,15 +272,12 @@ pop_matrix :: proc() {
 }
 
 append_draw_call :: proc(index: int, loc := #caller_location) {
-	assert(core.draw_call_count < MAX_DRAW_CALLS, "outa draw calls dawg", loc)
-	core.current_draw_call = &core.draw_calls[core.draw_call_count]
-	core.current_draw_call^ = Draw_Call {
-		elem_offset = len(core.draw_list.indices),
-		index       = index,
-		clip_box    = current_clip().? or_else view_box(),
-		user_texture    = core.current_texture,
-	}
-	core.draw_call_count += 1
+	append(&core.draw_calls, Draw_Call {
+		index        = index,
+		elem_offset  = len(core.draw_list.indices),
+		user_texture = core.current_texture,
+	})
+	core.current_draw_call = &core.draw_calls[len(core.draw_calls) - 1]
 }
 
 matrix_identity :: proc() -> Matrix {

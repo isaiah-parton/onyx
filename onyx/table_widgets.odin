@@ -168,18 +168,6 @@ end_table :: proc(info: ^Table_Info) {
 	container := current_container().?
 	box := container.layout.bounds
 
-	// Vertical dividing lines
-	// offset := f32(0)
-	// for i in 0 ..< info.widths_len {
-	// 	if i > 0 {
-	// 		draw_box_fill(
-	// 			{{box.lo.x + offset, box.lo.y}, {box.lo.x + offset + 1, box.hi.y}},
-	// 			core.style.color.substance,
-	// 		)
-	// 	}
-	// 	offset += info.widths[i]
-	// }
-
 	// Header
 	header_box := get_box_cut_top(
 		{
@@ -193,7 +181,6 @@ end_table :: proc(info: ^Table_Info) {
 		header_box,
 		alpha_blend_colors(core.style.color.foreground, core.style.color.substance, 0.5),
 	)
-	// draw_box_fill(get_box_cut_bottom(header_box, 1), core.style.color.substance)
 	begin_layout({box = header_box})
 	// Set layout sizes
 	layout := current_layout().?
@@ -227,9 +214,6 @@ end_table :: proc(info: ^Table_Info) {
 			box_center(self.box),
 			fade(core.style.color.content, 0.5),
 		)
-		// if c > 0 {
-		// 	draw_box_fill(get_box_cut_left(self.box, 1), core.style.color.substance)
-		// }
 
 		if self.state >= {.Clicked} {
 			if info.sorted_column != nil && info.sort_order != nil {

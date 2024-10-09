@@ -126,7 +126,7 @@ fn sd_arc(p: vec2<f32>, sca: vec2<f32>, scb: vec2<f32>, ra: f32, rb: f32) -> f32
   } else {
       k = length(pp);
   }
-  return sqrt( dot(pp,pp) + ra*ra - 2.0*ra*k ) - rb + 0.5;
+  return sqrt( dot(pp,pp) + ra*ra - 2.0*ra*k ) - rb + 1;
 }
 
 fn sd_box(p: vec2<f32>, b: vec2<f32>, rr: vec4<f32>) -> f32 {

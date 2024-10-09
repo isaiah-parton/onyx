@@ -28,7 +28,7 @@ Stack :: struct($T: typeid, $N: int) {
 }
 
 push_stack :: proc(stack: ^Stack($T, $N), item: T) -> bool {
-	if stack.height >= N {
+	if stack.height < 0 || stack.height >= N {
 		return false
 	}
 	stack.items[stack.height] = item
@@ -127,7 +127,8 @@ Core :: struct {
 	last_mouse_bits:       Mouse_Bits,
 	keys, last_keys:       #sparse[Keyboard_Key]bool,
 	runes:                 [dynamic]rune,
-	visible, focused:      bool,
+	visible:               bool,
+	focused:               bool,
 	window_moving:         bool,
 	window_move_offset:    [2]f32,
 
@@ -146,27 +147,26 @@ Core :: struct {
 	lines:                 [dynamic]Text_Job_Line,
 	font_atlas:            Atlas,
 	current_font:          int,
-	user_images:           [100]Maybe(Image),
 	text_editor:           tedit.Editor,
+	user_images:           [100]Maybe(Image),
 
 	// Drawing
 	draw_this_frame:       bool,
 	draw_next_frame:       bool,
-	vertex_state:          Vertex_State,
-	current_matrix:        ^Matrix,
-	current_texture:       wgpu.Texture,
-	clip_stack:            Stack(Box, 100),
-	path_stack:            Stack(Path, 10),
-	matrix_stack:          Stack(Matrix, MAX_MATRICES),
 	frames:                int,
 	drawn_frames:          int,
-	draw_list:             Draw_List,
-	draw_calls:            [MAX_DRAW_CALLS]Draw_Call,
-	draw_call_count:       int,
 	draw_state:            Draw_State,
+	vertex_state:          Vertex_State,
+	matrix_stack:          Stack(Matrix, MAX_MATRICES),
+	current_matrix:        ^Matrix,
+	current_texture:       wgpu.Texture,
+	scissor_stack:         Stack(Scissor, 100),
+	path_stack:            Stack(Path, 10),
+	draw_list:             Draw_List,
+	draw_calls:            [dynamic]Draw_Call,
 	current_draw_call:     ^Draw_Call,
-	gfx:                   Graphics,
 	cursors:               [Mouse_Cursor]glfw.CursorHandle,
+	gfx:                   Graphics,
 }
 
 view_box :: proc() -> Box {
@@ -338,7 +338,7 @@ new_frame :: proc() {
 	}
 
 	// Reset stuff
-	core.clip_stack.height = 0
+	core.scissor_stack.height = 0
 	core.matrix_stack.height = 0
 	core.layer_stack.height = 0
 	core.layout_stack.height = 0
@@ -467,10 +467,14 @@ render :: proc() {
 	}
 
 	// Reset draw calls and draw list
-	core.draw_call_count = 0
+	clear(&core.draw_calls)
 	core.current_draw_call = nil
+
 	clear_draw_list(&core.draw_list)
 	core.current_texture = {}
+
+	// Reset draw state
+	core.draw_state = {}
 
 	// Reset vertex state
 	core.vertex_state = {}

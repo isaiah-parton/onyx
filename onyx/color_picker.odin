@@ -128,7 +128,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			6,
 			fade({0, 0, 0, 40}, self.hover_time),
 		)
-		draw_rounded_box_fill(self.box, core.style.rounding, value^)
+		draw_rounded_box_fill(shrink_box(self.box, 2), core.style.rounding * 0.75, value^)
 		set_scissor_shape(add_shape_box(self.box, core.style.rounding))
 		draw_text_glyphs(
 			text_job,
@@ -140,10 +140,9 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			self.box,
 			core.style.rounding,
 			1,
-			interpolate_colors(
-				self.hover_time,
-				core.style.color.substance,
+			fade(
 				core.style.color.accent,
+				self.hover_time,
 			),
 		)
 	}
@@ -178,14 +177,15 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 				text: string
 				switch format {
 				case .HEX:
-					text = fmt.tprintf("HEX #%6x", hex_from_color(value^))
+					text = fmt.tprintf("#%6x", hex_from_color(value^))
 				case .RGB:
-					text = fmt.tprintf("RGB %i, %i, %i", value.r, value.g, value.b)
+					text = fmt.tprintf("%i, %i, %i", value.r, value.g, value.b)
 				case .CMYK:
 				case .HSL:
 					hsl := hsl_from_norm_rgb(normalize_color(value^).rgb)
-					text = fmt.tprintf("HSL %.0f, %.0f, %.0f", hsl.x, hsl.y * 100, hsl.z * 100)
+					text = fmt.tprintf("%.0f, %.0f, %.0f", hsl.x, hsl.y * 100, hsl.z * 100)
 				}
+				inputs[format].prefix = fmt.tprintf("%v ", format)
 				if strings.builder_len(inputs[format].builder^) == 0 {
 					strings.write_string(inputs[format].builder, text)
 				}

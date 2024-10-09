@@ -37,7 +37,7 @@ do_debug_layer :: proc() {
 				core.frames_this_second,
 				core.drawn_frames,
 				// Debug layer not included
-				core.draw_call_count - 1,
+				len(core.draw_calls) - 1,
 			),
 			font = core.style.fonts[.Regular],
 			size = 20,
