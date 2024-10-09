@@ -2,8 +2,6 @@ package onyx
 
 import "vendor:glfw"
 
-import "vendor:fontstash"
-import "tedit"
 import "base:runtime"
 import "core:fmt"
 import "core:math"
@@ -13,6 +11,8 @@ import "core:slice"
 import "core:strings"
 import "core:sys/windows"
 import "core:time"
+import "tedit"
+import "vendor:fontstash"
 import "vendor:wgpu"
 
 MAX_IDS :: 32
@@ -28,7 +28,7 @@ Stack :: struct($T: typeid, $N: int) {
 }
 
 push_stack :: proc(stack: ^Stack($T, $N), item: T) -> bool {
-	if stack.height >= N {
+	if stack.height < 0 || stack.height >= N {
 		return false
 	}
 	stack.items[stack.height] = item
@@ -127,7 +127,8 @@ Core :: struct {
 	last_mouse_bits:       Mouse_Bits,
 	keys, last_keys:       #sparse[Keyboard_Key]bool,
 	runes:                 [dynamic]rune,
-	visible, focused:      bool,
+	visible:               bool,
+	focused:               bool,
 	window_moving:         bool,
 	window_move_offset:    [2]f32,
 
@@ -146,26 +147,26 @@ Core :: struct {
 	lines:                 [dynamic]Text_Job_Line,
 	font_atlas:            Atlas,
 	current_font:          int,
+	text_editor:           tedit.Editor,
 	user_images:           [100]Maybe(Image),
-	text_editor: tedit.Editor,
 
 	// Drawing
 	draw_this_frame:       bool,
 	draw_next_frame:       bool,
-	vertex_state:          Vertex_State,
-	current_matrix:        ^Matrix,
-	current_texture:       wgpu.Texture,
-	clip_stack:            Stack(Box, 100),
-	path_stack:            Stack(Path, 10),
-	matrix_stack:          Stack(Matrix, MAX_MATRICES),
 	frames:                int,
 	drawn_frames:          int,
+	draw_state:            Draw_State,
+	vertex_state:          Vertex_State,
+	matrix_stack:          Stack(Matrix, MAX_MATRICES),
+	current_matrix:        ^Matrix,
+	current_texture:       wgpu.Texture,
+	scissor_stack:         Stack(Scissor, 100),
+	path_stack:            Stack(Path, 10),
 	draw_list:             Draw_List,
-	draw_calls:            [MAX_DRAW_CALLS]Draw_Call,
-	draw_call_count:       int,
+	draw_calls:            [dynamic]Draw_Call,
 	current_draw_call:     ^Draw_Call,
-	gfx:                   Graphics,
 	cursors:               [Mouse_Cursor]glfw.CursorHandle,
+	gfx:                   Graphics,
 }
 
 view_box :: proc() -> Box {
@@ -265,7 +266,7 @@ init :: proc(window: glfw.WindowHandle) -> bool {
 	)
 
 	// Initialize graphics pipeline
-	init_graphics(&core.gfx, core.window, 4)
+	init_graphics(&core.gfx, core.window, 1)
 
 	// Initalize draw list
 	init_draw_list(&core.draw_list)
@@ -291,6 +292,9 @@ new_frame :: proc() {
 			time.since(core.last_frame_time),
 		),
 	)
+
+	profiler_begin_scope(.New_Frame)
+
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
@@ -305,17 +309,19 @@ new_frame :: proc() {
 	// Handle window events
 	glfw.PollEvents()
 
-	if core.window_moving {
-		core.window_moving = false
-		point: windows.POINT
-		if windows.GetCursorPos(&point) {
-			glfw.SetWindowPos(
-				core.window,
-				point.x + i32(core.window_move_offset.x),
-				point.y + i32(core.window_move_offset.y),
-			)
+	when ODIN_OS == .Windows {
+		if core.window_moving {
+			core.window_moving = false
+			point: windows.POINT
+			if windows.GetCursorPos(&point) {
+				glfw.SetWindowPos(
+					core.window,
+					point.x + i32(core.window_move_offset.x),
+					point.y + i32(core.window_move_offset.y),
+				)
+			}
+			core.mouse_pos = core.last_mouse_pos
 		}
-		core.mouse_pos = core.last_mouse_pos
 	}
 
 	// Set and reset cursor
@@ -332,7 +338,7 @@ new_frame :: proc() {
 	}
 
 	// Reset stuff
-	core.clip_stack.height = 0
+	core.scissor_stack.height = 0
 	core.matrix_stack.height = 0
 	core.layer_stack.height = 0
 	core.layout_stack.height = 0
@@ -427,7 +433,14 @@ new_frame :: proc() {
 	// Process widgets
 	process_widgets()
 
-	set_texture(core.font_atlas.texture.internal)
+	// Add default draw elements
+	// Index 0 acts like null
+	append(&core.draw_list.paints, Paint{kind = .Normal})
+	append(&core.draw_list.shapes, Shape{kind = .Normal})
+
+	// Make the default draw elements active
+	set_vertex_shape(0)
+	set_paint(0)
 }
 
 // Render queued draw calls and reset draw state
@@ -439,25 +452,29 @@ render :: proc() {
 
 	// Update the atlas if needed
 	if core.font_atlas.modified {
+		profiler_begin_scope(.Render_Prepare)
 		t := time.now()
 		update_atlas(&core.font_atlas, &core.gfx)
 		core.font_atlas.modified = false
 	}
 
 	if core.draw_this_frame && core.visible {
-		start_time := time.now()
+		profiler_begin_scope(.Render_Draw)
 		draw(&core.gfx, &core.draw_list, core.draw_calls[:])
 
 		core.drawn_frames += 1
 		core.draw_this_frame = false
-		core.render_duration = time.since(start_time)
 	}
 
 	// Reset draw calls and draw list
-	core.draw_call_count = 0
+	clear(&core.draw_calls)
 	core.current_draw_call = nil
+
 	clear_draw_list(&core.draw_list)
 	core.current_texture = {}
+
+	// Reset draw state
+	core.draw_state = {}
 
 	// Reset vertex state
 	core.vertex_state = {}

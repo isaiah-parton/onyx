@@ -1,6 +1,10 @@
 package onyx
+import "core:fmt"
 import "core:math"
+import "core:math/ease"
 import "core:math/linalg"
+import "core:strconv"
+import "core:strings"
 
 barycentric :: proc(point, a, b, c: [2]f32) -> (u, v: f32) {
 	d := c - a
@@ -71,16 +75,204 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: Co
 	}
 }
 
+Color_Conversion_Widget_Kind :: struct {
+	hsva: [4]f32,
+	inputs: [Color_Format]strings.Builder,
+	alpha_input: strings.Builder,
+}
+
+Color_Format :: enum {
+	HEX,
+	RGB,
+	CMYK,
+	HSL,
+}
+Color_Format_Set :: bit_set[Color_Format]
+
+Color_Button_Info :: struct {
+	using _:     Widget_Info,
+	value:       ^Color,
+	show_alpha:  bool,
+	input_formats: Color_Format_Set,
+	text_job:    Text_Job,
+	changed:     bool,
+}
+
+init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_location) -> bool {
+	if value == nil do return false
+	text_job = make_text_job(
+		{
+			text = fmt.tprintf("%6x", hex_from_color(value^)),
+			font = core.style.fonts[.Regular],
+			size = 20,
+			align_h = .Middle,
+			align_v = .Middle,
+		},
+	) or_return
+	id = hash(loc)
+	self = get_widget(id) or_return
+	desired_size = core.style.visual_size
+	return true
+}
+
+add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
+	begin_widget(info) or_return
+	defer end_widget()
+
+	menu_behavior(self)
+
+	if self.visible {
+		draw_rounded_box_shadow(
+			self.box,
+			core.style.rounding,
+			6,
+			fade({0, 0, 0, 40}, self.hover_time),
+		)
+		draw_rounded_box_fill(shrink_box(self.box, 2), core.style.rounding * 0.75, value^)
+		set_scissor_shape(add_shape_box(self.box, core.style.rounding))
+		draw_text_glyphs(
+			text_job,
+			box_center(self.box),
+			{0, 0, 0, 255} if get_color_brightness(value^) > 0.5 else 255,
+		)
+		set_scissor_shape(0)
+		draw_rounded_box_stroke(
+			self.box,
+			core.style.rounding,
+			1,
+			fade(
+				core.style.color.accent,
+				self.hover_time,
+			),
+		)
+	}
+
+	kind := widget_kind(self, Color_Conversion_Widget_Kind)
+	PADDING :: 10
+	if .Open in self.state {
+		picker_info := HSVA_Picker_Info {
+			hsva = &kind.hsva,
+			mode = .Wheel,
+		}
+		init_hsva_picker(&picker_info)
+
+		layer_size := picker_info.desired_size + PADDING * 2
+		input_size: [2]f32
+
+		slider_info := Alpha_Slider_Info {
+			value    = &kind.hsva.a,
+			vertical = true,
+		}
+
+		if show_alpha {
+			init_alpha_slider(&slider_info)
+		}
+
+		inputs: [Color_Format]Input_Info
+
+		for format, f in Color_Format {
+			if format in input_formats {
+			inputs[format].monospace = true
+				inputs[format].builder = &kind.inputs[format]
+				text: string
+				switch format {
+				case .HEX:
+					text = fmt.tprintf("#%6x", hex_from_color(value^))
+				case .RGB:
+					text = fmt.tprintf("%i, %i, %i", value.r, value.g, value.b)
+				case .CMYK:
+				case .HSL:
+					hsl := hsl_from_norm_rgb(normalize_color(value^).rgb)
+					text = fmt.tprintf("%.0f, %.0f, %.0f", hsl.x, hsl.y * 100, hsl.z * 100)
+				}
+				inputs[format].prefix = fmt.tprintf("%v ", format)
+				if strings.builder_len(inputs[format].builder^) == 0 {
+					strings.write_string(inputs[format].builder, text)
+				}
+				push_id(f + 1)
+				init_input(&inputs[format])
+				pop_id()
+				input_size.x = max(input_size.x, inputs[format].desired_size.x)
+			}
+		}
+
+		layer_box := get_menu_box(
+			self.box,
+			layer_size + input_size,
+			.Right,
+		)
+
+		open_time := ease.quadratic_out(self.open_time)
+
+		if layer, ok := layer(
+			{id = self.id, origin = layer_box.lo, box = layer_box, opacity = open_time},
+		); ok {
+		draw_shadow(layer_box)
+			foreground()
+			shrink(PADDING)
+			set_height_auto()
+			set_width_auto()
+			set_side(.Left)
+			add_hsva_picker(&picker_info)
+			add_space(10)
+			add_alpha_slider(&slider_info)
+			add_space(10)
+			set_side(.Top)
+			for format, f in Color_Format {
+				if format not_in input_formats do continue
+				if f > 0 {
+					add_space(10)
+				}
+				add_input(&inputs[format])
+				if picker_info.changed {
+					strings.builder_reset(inputs[format].builder)
+				}
+				// if hex_input.changed && strings.builder_len(kind.text) == 6 {
+				// 	if value, ok := strconv.parse_u64_of_base(strings.to_string(kind.text), 16); ok {
+				// 		kind.hsva = hsva_from_color(color_from_hex(u32(value)))
+				// 	}
+				// }
+			}
+
+			if picker_info.changed || slider_info.changed {
+				value^ = color_from_hsva(kind.hsva)
+			}
+			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
+				self.state -= {.Open}
+			}
+		}
+	} else {
+		if .Pressed in (self.state - self.last_state) {
+			self.state += {.Open}
+		}
+		kind.hsva = hsva_from_color(value^)
+	}
+
+	return true
+}
+
+color_button :: proc(info: Color_Button_Info, loc := #caller_location) -> Color_Button_Info {
+	info := info
+	if init_color_button(&info, loc) {
+		add_color_button(&info)
+	}
+	return info
+}
+
 Alpha_Slider_Info :: struct {
-	using _: Widget_Info,
-	value:   ^f32,
-	changed: bool,
-	color: Color,
+	using _:  Widget_Info,
+	value:    ^f32,
+	vertical: bool,
+	changed:  bool,
+	color:    Color,
 }
 
 init_alpha_slider :: proc(using info: ^Alpha_Slider_Info, loc := #caller_location) -> bool {
 	if value == nil do return false
 	desired_size = core.style.visual_size
+	if vertical {
+		desired_size.xy = desired_size.yx
+	}
 	sticky = true
 	id = hash(loc)
 	self = get_widget(id) or_return
@@ -91,6 +283,9 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
 
+	i := int(info.vertical)
+	j := 1 - i
+
 	if self.visible {
 		R :: 4
 		box := self.box
@@ -98,26 +293,42 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 		box.hi.y -= R
 		draw_checkerboard_pattern(
 			box,
-			box_height(box) / 2,
+			(box.hi[j] - box.lo[j]) / 2,
 			{210, 210, 210, 255},
 			{160, 160, 160, 255},
 		)
 		color.a = 255
-		draw_horizontal_box_gradient(box, fade(color, 0), color)
 		time := clamp(value^, 0, 1)
-		x := box.lo.x + box_width(box) * time
-		draw_triangle_fill(
-			{x - 0.866025 * R, box.lo.y - 1.5 * R},
-			{x, box.lo.y},
-			{x + 0.866025 * R, box.lo.y - 1.5 * R},
-			core.style.color.content,
-		)
-		draw_triangle_fill(
-			{x - 0.866025 * R, box.hi.y + 1.5 * R},
-			{x, box.hi.y},
-			{x + 0.866025 * R, box.hi.y + 1.5 * R},
-			core.style.color.content,
-		)
+		pos := box.lo[i] + (box.hi[i] - box.lo[i]) * time
+		if vertical {
+			draw_vertical_box_gradient(box, fade(color, 0), color)
+			draw_triangle_fill(
+				{box.lo.x - 1.5 * R, pos - 0.866025 * R},
+				{box.lo.x, pos},
+				{box.lo.x - 1.5 * R, pos + 0.866025 * R},
+				core.style.color.content,
+			)
+			draw_triangle_fill(
+				{box.hi.x + 1.5 * R, pos - 0.866025 * R},
+				{box.hi.x, pos},
+				{box.hi.x + 1.5 * R, pos + 0.866025 * R},
+				core.style.color.content,
+			)
+		} else {
+			draw_horizontal_box_gradient(box, fade(color, 0), color)
+			draw_triangle_fill(
+				{pos - 0.866025 * R, box.lo.y - 1.5 * R},
+				{pos, box.lo.y},
+				{pos + 0.866025 * R, box.lo.y - 1.5 * R},
+				core.style.color.content,
+			)
+			draw_triangle_fill(
+				{pos - 0.866025 * R, box.hi.y + 1.5 * R},
+				{pos, box.hi.y},
+				{pos + 0.866025 * R, box.hi.y + 1.5 * R},
+				core.style.color.content,
+			)
+		}
 	}
 
 	if point_in_box(core.mouse_pos, self.box) {
@@ -125,7 +336,11 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 	}
 
 	if .Pressed in self.state {
-		value^ = clamp((core.mouse_pos.x - self.box.lo.x) / box_width(self.box), 0, 1)
+		value^ = clamp(
+			(core.mouse_pos[i] - self.box.lo[i]) / (self.box.hi[i] - self.box.lo[i]),
+			0,
+			1,
+		)
 		changed = true
 	}
 
@@ -211,7 +426,6 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			u, v, w := triangle_barycentric(point_a, point_b, point_c, point)
 			hsva.z = clamp(1 - v, 0, 1)
 			hsva.y = clamp(u / hsva.z, 0, 1)
-			draw_arc_fill(point, 4, 0, math.TAU, {255, 0, 255, 255})
 		}
 		changed = true
 	} else {
@@ -221,15 +435,33 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	if self.visible {
 		// H wheel
 		STEP :: math.TAU / 48.0
+		prim_index := u32(len(core.draw_list.shapes))
+		append(
+			&core.draw_list.shapes,
+			Shape {
+				kind = .Circle,
+				cv0 = center,
+				stroke = true,
+				width = (outer - inner) - 4,
+				radius = (inner + outer) / 2,
+			},
+		)
+		set_vertex_shape(prim_index)
 		for t: f32 = 0; t < math.TAU; t += STEP {
 			normal := [2]f32{math.cos(t), math.sin(t)}
 			next_normal := [2]f32{math.cos(t + STEP), math.sin(t + STEP)}
+
+			inner_radius := inner - 2
+			outer_radius := outer + 2
+
 			set_vertex_color(color_from_hsva({t * math.DEG_PER_RAD, 1, 1, 1}))
 			index_0, index_1 :=
-				add_vertex(center + normal * outer), add_vertex(center + normal * inner)
+				add_vertex(center + normal * outer_radius),
+				add_vertex(center + normal * inner_radius)
 			set_vertex_color(color_from_hsva({(t + STEP) * math.DEG_PER_RAD, 1, 1, 1}))
 			index_2, index_3 :=
-				add_vertex(center + next_normal * inner), add_vertex(center + next_normal * outer)
+				add_vertex(center + next_normal * inner_radius),
+				add_vertex(center + next_normal * outer_radius)
 			add_indices(index_0, index_1, index_2, index_0, index_2, index_3)
 		}
 
@@ -244,13 +476,21 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			center + {math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * inner
 
 		// SV triangle
+		set_vertex_shape(add_polygon_shape(point_a, point_b, point_c))
 		set_vertex_color(color_from_hsva({hsva.x, 1, 1, 1}))
-		index_a := add_vertex(point_a)
+		index_a := add_vertex(center + {math.cos(angle), math.sin(angle)} * (inner + 2))
 		set_vertex_color({0, 0, 0, 255})
-		index_b := add_vertex(point_b)
+		index_b := add_vertex(
+			center +
+			{math.cos(angle - TRIANGLE_STEP), math.sin(angle - TRIANGLE_STEP)} * (inner + 2),
+		)
 		set_vertex_color(255)
-		index_c := add_vertex(point_c)
+		index_c := add_vertex(
+			center +
+			{math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * (inner + 2),
+		)
 		add_indices(index_a, index_b, index_c)
+		set_vertex_shape(0)
 
 		// SV circle
 		point := linalg.lerp(
@@ -259,8 +499,8 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			clamp(1 - hsva.z, 0, 1),
 		)
 		r: f32 = 9 if (self.state >= {.Pressed} && .Active not_in self.state) else 7
-		draw_arc_fill(point, r, 0, math.TAU, color_from_hsva({hsva.x, hsva.y, hsva.z, 1}))
-		draw_ring_fill(point, r - 1, r, 0, math.TAU, {0, 0, 0, 255} if hsva.z > 0.5 else 255)
+		draw_circle_fill(point, r + 1, {0, 0, 0, 255} if hsva.z > 0.5 else 255)
+		draw_circle_fill(point, r, color_from_hsva({hsva.x, hsva.y, hsva.z, 1}))
 	}
 
 	return true

@@ -94,7 +94,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		defer end_widget()
 		using background_widget
 
-		draw_rounded_box_fill(move_box(self.box, 5), core.style.rounding, {0, 0, 0, 70})
+		draw_rounded_box_shadow(self.box, core.style.rounding, 5, {0, 0, 0, 40})
 		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.foreground)
 
 		if point_in_box(core.mouse_pos, self.box) {
@@ -117,8 +117,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 		draw_rounded_box_corners_fill(
 			title_box,
-			core.style.rounding,
-			{.Top_Left, .Top_Right},
+			{core.style.rounding, core.style.rounding, 0, 0},
 			fade(core.style.color.substance, 0.5),
 		)
 
@@ -141,8 +140,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 			draw_rounded_box_corners_fill(
 				self.box,
-				core.style.rounding,
-				{.Top_Right},
+				{1 = core.style.rounding},
 				fade({200, 50, 50, 255}, self.hover_time),
 			)
 
@@ -199,8 +197,7 @@ end_panel :: proc() {
 
 			draw_rounded_box_corners_fill(
 				self.box,
-				core.style.rounding,
-				{.Bottom_Right},
+				{3 = core.style.rounding},
 				fade(core.style.color.substance, 0.5 * self.hover_time),
 			)
 
@@ -212,19 +209,19 @@ end_panel :: proc() {
 				core.style.color.content,
 				0.5 + 0.5 * self.hover_time,
 			)
-			begin_path()
-			point(origin + {-0.3, -1} * scale)
-			point(origin + {-1, -1} * scale)
-			point(origin + {-1, -0.3} * scale)
-			stroke_path(2, icon_color)
-			end_path()
-			begin_path()
-			point(origin + {0.3, 1} * scale)
-			point(origin + {1, 1} * scale)
-			point(origin + {1, 0.3} * scale)
-			stroke_path(2, icon_color)
-			end_path()
-			draw_line(origin - scale, origin + scale, 2, icon_color)
+			draw_triangle_fill(
+				origin + {0, -1} * scale,
+				origin + {-1, -1} * scale,
+				origin + {-1, 0} * scale,
+				icon_color,
+			)
+			draw_triangle_fill(
+				origin + {0, 1} * scale,
+				origin + {1, 1} * scale,
+				origin + {1, 0} * scale,
+				icon_color,
+			)
+			draw_line(origin - 0.8 * scale, origin + 0.8 * scale, 2, icon_color)
 
 			if .Pressed in (self.state - self.last_state) {
 				panel.resizing = true
@@ -299,13 +296,7 @@ end_panel :: proc() {
 		// pop_id()
 	}
 	// Panel outline
-	draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)
-	draw_rounded_box_stroke(
-		expand_box(panel.box, 1),
-		core.style.rounding * 1.25,
-		1,
-		core.style.color.foreground,
-	)
+	// draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)
 	layout := current_layout().?
 	panel.min_size += layout.content_size + layout.spacing_size
 	pop_layout()

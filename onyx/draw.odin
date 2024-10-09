@@ -7,13 +7,11 @@ import "core:mem"
 
 import "vendor:wgpu"
 
-// ANGLE_TOLERANCE :: 0.1
 MAX_PATH_POINTS :: 400
 MAX_MATRICES :: 100
 MAX_DRAW_CALLS :: 64
 
 MAX_FONTS :: 100
-// MAX_IMAGES :: 256
 
 MAX_ATLASES :: 8
 MIN_ATLAS_SIZE :: 1024
@@ -45,16 +43,63 @@ Stroke_Justify :: enum {
 	Outer,
 }
 
+Paint_Kind :: enum u32 {
+	Normal,
+	User_Image,
+	Linear_Gradient,
+	Radial_Gradient,
+}
+
+Paint :: struct #align (16) {
+	kind:    Paint_Kind,
+	padding: [3]u32,
+	col0:    [4]f32,
+	col1:    [4]f32,
+	size:    f32,
+	image:   u32,
+}
+
+Shape_Kind :: enum u32 {
+	Normal,
+	Circle,
+	Box,
+	BlurredBox,
+	Arc,
+	Bezier,
+	Pie,
+	Path,
+	Polygon,
+}
+
+Shape :: struct #align (16) {
+	kind:    Shape_Kind,
+	padding: u32,
+	cv0:     [2]f32,
+	cv1:     [2]f32,
+	cv2:     [2]f32,
+	corners: [4]f32,
+	radius:  f32,
+	width:   f32,
+	paint:   u32,
+	scissor: u32,
+	start:   u32,
+	count:   u32,
+	stroke:  b32,
+}
+
 Vertex :: struct {
-	pos: [2]f32,
-	uv:  [2]f32,
-	col: [4]u8,
+	pos:   [2]f32,
+	uv:    [2]f32,
+	col:   [4]u8,
+	shape: u32,
 }
 
 Vertex_State :: struct {
-	uv:    [2]f32,
-	col:   [4]u8,
-	alpha: f32,
+	uv:      [2]f32,
+	col:     [4]u8,
+	shape:   u32,
+	alpha:   f32,
+	padding: u64,
 }
 
 // Matrix used for vertex transforms
@@ -63,21 +108,28 @@ Matrix :: matrix[4, 4]f32
 Draw_List :: struct {
 	vertices: [dynamic]Vertex,
 	indices:  [dynamic]u32,
+	shapes:   [dynamic]Shape,
+	paints:   [dynamic]Paint,
+	cvs:      [dynamic][2]f32,
 }
 
-// A draw call to the GPU these are managed internally
 Draw_Call :: struct {
-	gradient:                Gradient,
-	clip_box:                Box,
-	texture:                 wgpu.Texture,
-	elem_offset, elem_count: int,
-	index:                   int,
+	user_texture: Maybe(wgpu.Texture),
+	elem_offset:  int,
+	elem_count:   int,
+	index:        int,
 }
 
 Path :: struct {
 	points: [MAX_PATH_POINTS][2]f32,
 	count:  int,
 	closed: bool,
+}
+
+Draw_State :: struct {
+	scissor: u32,
+	paint:   u32,
+	shape:   u32,
 }
 
 init_draw_list :: proc(draw_list: ^Draw_List) {
@@ -93,6 +145,27 @@ destroy_draw_list :: proc(draw_list: ^Draw_List) {
 clear_draw_list :: proc(draw_list: ^Draw_List) {
 	clear(&draw_list.vertices)
 	clear(&draw_list.indices)
+	clear(&draw_list.shapes)
+	clear(&draw_list.paints)
+	clear(&draw_list.cvs)
+}
+
+set_scissor_shape :: proc(shape: u32) {
+	core.draw_state.scissor = shape
+}
+
+set_paint :: proc(paint: u32) {
+	core.draw_state.paint = paint
+}
+
+add_paint :: proc(paint: Paint) -> u32 {
+	index := u32(len(core.draw_list.paints))
+	append(&core.draw_list.paints, paint)
+	return index
+}
+
+set_vertex_shape :: proc(shape: u32) {
+	core.vertex_state.shape = shape
 }
 
 set_vertex_uv :: proc(uv: [2]f32) {
@@ -116,6 +189,20 @@ set_global_alpha :: proc(alpha: f32) {
 	core.vertex_state.alpha = alpha
 }
 
+transform_point :: proc(p: [2]f32) -> [2]f32 {
+	p := [2]f32 {
+		core.current_matrix[0, 0] * p.x +
+		core.current_matrix[0, 1] * p.y +
+		core.current_matrix[0, 2] +
+		core.current_matrix[0, 3],
+		core.current_matrix[1, 0] * p.x +
+		core.current_matrix[1, 1] * p.y +
+		core.current_matrix[1, 2] +
+		core.current_matrix[1, 3],
+	}
+	return p
+}
+
 // Append a vertex and return it's index
 add_vertex_2f32 :: proc(x, y: f32) -> (i: u32) {
 	pos: [2]f32 = {
@@ -131,7 +218,12 @@ add_vertex_2f32 :: proc(x, y: f32) -> (i: u32) {
 	i = next_vertex_index()
 	append(
 		&core.draw_list.vertices,
-		Vertex{pos = pos, uv = core.vertex_state.uv, col = core.vertex_state.col},
+		Vertex {
+			pos = pos,
+			uv = core.vertex_state.uv,
+			col = core.vertex_state.col,
+			shape = core.vertex_state.shape,
+		},
 	)
 	return
 }
@@ -180,15 +272,12 @@ pop_matrix :: proc() {
 }
 
 append_draw_call :: proc(index: int, loc := #caller_location) {
-	assert(core.draw_call_count < MAX_DRAW_CALLS, "outa draw calls dawg", loc)
-	core.current_draw_call = &core.draw_calls[core.draw_call_count]
-	core.current_draw_call^ = Draw_Call {
-		elem_offset = len(core.draw_list.indices),
-		index       = index,
-		clip_box    = current_clip().? or_else view_box(),
-		texture     = core.current_texture,
-	}
-	core.draw_call_count += 1
+	append(&core.draw_calls, Draw_Call {
+		index        = index,
+		elem_offset  = len(core.draw_list.indices),
+		user_texture = core.current_texture,
+	})
+	core.current_draw_call = &core.draw_calls[len(core.draw_calls) - 1]
 }
 
 matrix_identity :: proc() -> Matrix {

@@ -108,7 +108,7 @@ Text_Job :: struct {
 	lines:                                    []Text_Job_Line,
 	line_height:                              f32,
 	size:                                     [2]f32,
-	ascent: f32,
+	ascent:                                   f32,
 	cursor_glyph, hovered_line, hovered_rune: int,
 }
 
@@ -121,6 +121,11 @@ make_text_job :: proc(
 	ok: bool,
 ) {
 	iter := make_text_iterator(info) or_return
+
+	// Check glyph limit
+	if len(core.glyphs) > 4096 {
+		clear(&core.glyphs)
+	}
 
 	first_glyph := len(core.glyphs)
 	first_line := len(core.lines)
@@ -142,11 +147,6 @@ make_text_job :: proc(
 	job.hovered_line = max(0, int(mouse_pos.y / job.line_height))
 
 	at_end: bool
-
-	// Check glyph limit
-	if len(core.glyphs) >= 2000 {
-		clear(&core.glyphs)
-	}
 
 	for {
 		if !iterate_text(&iter) {
@@ -264,7 +264,7 @@ draw_text_highlight :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 	for line, l in job.lines {
 		if line.highlight[0] < line.highlight[1] {
 			line_top: f32 = job.line_height * f32(l)
-			draw_box_fill_clipped(
+			draw_box_fill(
 				{
 					pos + {line.highlight[0] - 1, line_top},
 					pos + {line.highlight[1] + 1, line_top + job.line_height},
@@ -276,12 +276,12 @@ draw_text_highlight :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 }
 
 draw_text_glyphs :: proc(job: Text_Job, pos: [2]f32, color: Color) {
-	pos := linalg.floor(pos)
+	// TODO: To floor, or not to floor
+	// pos := linalg.floor(pos)
 	for glyph in job.glyphs {
 		if glyph.codepoint == 0 || glyph.source == {} do continue
 		glyph_pos := pos + glyph.pos + glyph.offset
-		draw_texture_portion_clipped(
-			core.font_atlas.texture,
+		draw_glyph(
 			glyph.source,
 			{glyph_pos, glyph_pos + (glyph.source.hi - glyph.source.lo)},
 			color,
@@ -295,7 +295,7 @@ draw_text_cursor :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 	}
 	glyph := job.glyphs[job.cursor_glyph]
 	glyph_pos := pos + glyph.pos
-	draw_box_fill_clipped({glyph_pos + {-1, -2}, glyph_pos + {1, job.line_height + 2}}, color)
+	draw_box_fill({glyph_pos + {-1, -2}, glyph_pos + {1, job.line_height + 2}}, color)
 }
 
 destroy_font :: proc(font: ^Font) {
@@ -346,7 +346,11 @@ iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 		it.glyph = {}
 	} else {
 		codepoint := '•' if it.info.hidden else it.codepoint
-		it.glyph = get_glyph(it.font, it.size, codepoint) or_else (get_glyph_from_fallback_font(codepoint, it.info.size) or_return)
+		it.glyph =
+			get_glyph(it.font, it.size, codepoint) or_else (get_glyph_from_fallback_font(
+					codepoint,
+					it.info.size,
+				) or_return)
 	}
 	return true
 }
@@ -355,7 +359,7 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 
 	// Update horizontal offset with last glyph
 	if iter.codepoint != 0 {
-		iter.glyph_pos.x += iter.glyph.advance
+		iter.glyph_pos.x += math.floor(iter.glyph.advance)
 	}
 
 	// Get the next glyph
@@ -425,8 +429,8 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 		}
 		iter.glyph_pos.y += iter.size.ascent - iter.size.descent + iter.size.line_gap
 	}
-	iter.line_size.x += iter.glyph.advance
-	if iter.last_codepoint != 0 {
+	iter.line_size.x += math.floor(iter.glyph.advance)
+	if ok && iter.last_codepoint != 0 {
 		iter.line_size.x += iter.font.spacing
 	}
 
@@ -552,9 +556,11 @@ get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (glyph: Gly
 }
 
 draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
-	job, _ := make_text_job(info)
-	draw_text_glyphs(job, origin, color)
-	return job.size
+	if job, ok := make_text_job(info); ok {
+		draw_text_glyphs(job, origin, color)
+		return job.size
+	}
+	return {}
 }
 
 draw_aligned_rune :: proc(
@@ -569,87 +575,34 @@ draw_aligned_rune :: proc(
 	size: [2]f32,
 	ok: bool,
 ) #optional_ok {
-
 	font := &core.fonts[font].?
 	glyph := get_glyph(font, get_font_size(font, font_size) or_return, rune(icon)) or_return
 	size = glyph.source.hi - glyph.source.lo
 
 	box: Box
 	switch align_h {
-
 	case .Right:
 		box.lo.x = origin.x - size.x
 		box.hi.x = origin.x
-
 	case .Middle:
-		box.lo.x = origin.x - math.floor(size.x / 2)
-		box.hi.x = origin.x + math.floor(size.x / 2)
-
+		box.lo.x = origin.x - size.x / 2
+		box.hi.x = origin.x + size.x / 2
 	case .Left:
 		box.lo.x = origin.x
 		box.hi.x = origin.x + size.x
 	}
 	switch align_v {
-
 	case .Bottom, .Baseline:
 		box.lo.y = origin.y - size.y
 		box.hi.y = origin.y
-
 	case .Middle:
-		box.lo.y = origin.y - math.floor(size.y / 2)
-		box.hi.y = origin.y + math.floor(size.y / 2)
-
+		box.lo.y = origin.y - size.y / 2
+		box.hi.y = origin.y + size.y / 2
 	case .Top:
 		box.lo.y = origin.y
 		box.hi.y = origin.y + size.y
 	}
-	draw_texture_portion(core.font_atlas.texture, glyph.source, box, color)
+
+	draw_glyph(glyph.source, box, color)
 	return
-}
-
-draw_rune_aligned_clipped :: proc(
-	font: int,
-	size: f32,
-	icon: rune,
-	origin: [2]f32,
-	color: Color,
-	align: [2]Alignment,
-	clip: Box,
-) -> [2]f32 {
-	font := &core.fonts[font].?
-	font_size, _ := get_font_size(font, size)
-	glyph, _ := get_glyph(font, font_size, rune(icon))
-	icon_size := glyph.source.hi - glyph.source.lo
-
-	box: Box
-	switch align.x {
-
-	case .Far:
-		box.lo.x = origin.x - icon_size.x
-		box.hi.x = origin.x
-
-	case .Middle:
-		box.lo.x = origin.x - icon_size.x / 2
-		box.hi.x = origin.x + icon_size.x / 2
-
-	case .Near:
-		box.lo.x = origin.x
-		box.hi.x = origin.x + icon_size.x
-	}
-	switch align.y {
-
-	case .Far:
-		box.lo.y = origin.y - icon_size.y
-		box.hi.y = origin.y
-
-	case .Middle:
-		box.lo.y = origin.y - icon_size.y / 2
-		box.hi.y = origin.y + icon_size.y / 2
-
-	case .Near:
-		box.lo.y = origin.y
-		box.hi.y = origin.y + icon_size.y
-	}
-	draw_texture_portion(core.font_atlas.texture, glyph.source, box, color)
-	return icon_size
 }

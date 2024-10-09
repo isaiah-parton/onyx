@@ -56,6 +56,7 @@ Widget_Kind :: union {
 	Boolean_Widget_Kind,
 	Date_Picker_Widget_Kind,
 	Table_Widget_Kind,
+	Color_Conversion_Widget_Kind,
 }
 // Interaction state
 Widget_Status :: enum {
@@ -185,8 +186,24 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 		info.self = get_widget(info.id) or_return
 	}
 
-	// Look up a widget with that ID
 	widget := info.self
+
+	// Place widget
+	widget.box = info.box.? or_else next_widget_box(info)
+
+	if widget.frames >= core.frames {
+		draw_box_fill(
+			widget.box,
+			{
+				255,
+				0,
+				0,
+				u8(128.0 + math.sin(time.duration_seconds(time.since(core.start_time)) * 12.0) * 64.0),
+			},
+		)
+		return false
+	}
+	widget.frames = core.frames
 
 	// Push to the stack
 	push_stack(&core.widget_stack, widget) or_return
@@ -194,14 +211,11 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	// Widget must have a valid layer
 	widget.layer = current_layer().? or_return
 
-	// Place widget
-	widget.box = info.box.? or_else next_widget_box(info)
-
 	// Keep alive
 	widget.dead = false
 
 	// Set visible flag
-	widget.visible = core.visible && get_clip(current_clip().?, widget.box) != .Full
+	widget.visible = core.visible && get_clip(current_scissor().?.box, widget.box) != .Full
 
 	// Reset state
 	widget.last_state = widget.state
@@ -291,7 +305,7 @@ hover_widget :: proc(widget: ^Widget) {
 	// Below highest hovered widget
 	if widget.layer.index < core.highest_layer_index do return
 	// Clipped?
-	if clip, ok := current_clip().?; ok && !point_in_box(core.mouse_pos, current_clip().?) do return
+	if clip, ok := current_scissor().?; ok && !point_in_box(core.mouse_pos, current_scissor().?.box) do return
 	// Ok hover
 	core.next_hovered_widget = widget.id
 	core.next_hovered_layer = widget.layer.id
@@ -307,21 +321,15 @@ foreground :: proc(loc := #caller_location) {
 	layout, ok := current_layout().?
 	if !ok do return
 
-	using info := Widget_Info{id = hash(loc), box = layout.box}
+	using info := Widget_Info {
+		id  = hash(loc),
+		box = layout.box,
+	}
 	if begin_widget(&info) {
 		defer end_widget()
 
-		draw_rounded_box_fill(
-			info.self.box,
-			core.style.rounding,
-			core.style.color.foreground,
-		)
-		draw_rounded_box_stroke(
-			info.self.box,
-			core.style.rounding,
-			1,
-			core.style.color.substance,
-		)
+		draw_rounded_box_fill(info.self.box, core.style.rounding, core.style.color.foreground)
+		// draw_rounded_box_stroke(info.self.box, core.style.rounding, 1, core.style.color.substance)
 
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)

@@ -1,20 +1,22 @@
 package demo
 
+import onyx "../onyx"
 import "base:runtime"
 import "core:fmt"
+import img "core:image"
+import "core:image/png"
 import "core:math"
+import "core:math/bits"
 import "core:math/rand"
 import "core:mem"
 import "core:os"
 import "core:reflect"
 import "core:slice"
-import "core:strings"
 import "core:strconv"
+import "core:strings"
 import "core:time"
-import "core:math/bits"
-
-import onyx "../onyx"
 import "vendor:glfw"
+import "vendor:wgpu"
 
 Option :: enum {
 	Process,
@@ -24,7 +26,7 @@ Option :: enum {
 }
 
 Component :: enum {
-Colors,
+	Colors,
 	Tables,
 	Button,
 	Data_Input,
@@ -34,18 +36,15 @@ Colors,
 	Scroll_Zone,
 }
 
-Component_Section :: struct {
-	component: Component,
-}
-
-Component_Showcase :: struct {
+State :: struct {
+	component:     Component,
 	light_mode:    bool,
-	section:       Component_Section,
 	checkboxes:    [Option]bool,
 	bio:           string,
 	full_name:     string,
 	birth_country: string,
-	slider_value:  f64,
+	from_angle:    f32,
+	to_angle:      f32,
 	start_time:    time.Time,
 	option:        Option,
 	date_range:    [2]Maybe(onyx.Date),
@@ -53,13 +52,10 @@ Component_Showcase :: struct {
 	entries:       [dynamic]Table_Entry,
 	sort_order:    onyx.Sort_Order,
 	sorted_column: int,
-	hsva: [4]f32,
-	hex: strings.Builder,
-}
-
-State :: struct {
-	component_showcase: Component_Showcase,
-	images:             [4]onyx.Image,
+	hsva:          [4]f32,
+	hex:           strings.Builder,
+	texture:       wgpu.Texture,
+	images:        [4]onyx.Image,
 }
 
 state: State
@@ -72,7 +68,7 @@ Table_Entry :: struct {
 	location:    string,
 }
 
-component_showcase :: proc(state: ^Component_Showcase) {
+component_showcase :: proc(state: ^State) {
 	using onyx
 
 	begin_layer({box = view_box(), kind = .Background})
@@ -81,12 +77,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 	foreground()
 	if layout({size = 65, side = .Top}) {
 		shrink(15)
-		tabs(
-			{
-				index = (^int)(&state.section.component),
-				options = reflect.enum_field_names(Component),
-			},
-		)
+		tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Component)})
 		set_side(.Right)
 		if toggle_switch({state = &state.light_mode, text = "\uf1bc" if state.light_mode else "\uef72", text_side = .Left}).toggled {
 			if state.light_mode {
@@ -98,27 +89,23 @@ component_showcase :: proc(state: ^Component_Showcase) {
 	}
 	shrink(40)
 
-	if panel({title = "panel"}) {
-		shrink(10)
-		set_height_auto()
-		date_picker({first = &state.date_range[0]})
-	}
-
-	#partial switch state.section.component {
+	#partial switch state.component {
 	case .Colors:
-		a := hsva_picker({hsva = &state.hsva})
-		b := alpha_slider({value = &state.hsva.a, color = color_from_hsva(state.hsva)})
-		if a.changed || b.changed {
-			strings.builder_reset(&state.hex)
-		}
-		if strings.builder_len(state.hex) == 0 {
-			hex := hex_from_color(color_from_hsva(state.hsva))
-			fmt.sbprintf(&state.hex, "%6x", hex)
-		}
-		if input({builder = &state.hex}).changed && strings.builder_len(state.hex) == 6 {
-			if value, ok := strconv.parse_u64_of_base(strings.to_string(state.hex), 16); ok {
-				state.hsva = hsva_from_color(color_from_hex(u32(value)))
+		si := runtime.type_info_base(type_info_of(Color_Scheme)).variant.(runtime.Type_Info_Struct)
+		for i in 0 ..< si.field_count {
+			if i > 0 {
+				add_space(10)
 			}
+			push_id(int(i + 1))
+			label({text = si.names[i]})
+			color_button(
+				{
+					value = (^Color)(rawptr(uintptr(&core.style.color) + si.offsets[i])),
+					show_alpha = true,
+					input_formats = {.RGB, .HSL, .HEX},
+				},
+			)
+			pop_id()
 		}
 
 	case .Tables:
@@ -130,11 +117,11 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			sorted_column      = &state.sorted_column,
 			sort_order         = &state.sort_order,
 			columns            = {
-				{name = "Name"},
+				{name = "Name", width = 120},
 				{name = "Hash", width = 200},
-				{name = "Public Key"},
-				{name = "Private Key"},
-				{name = "Location"},
+				{name = "Public Key", width = 150},
+				{name = "Private Key", width = 150},
+				{name = "Location", width = 150},
 			},
 			row_count          = len(state.entries),
 			max_displayed_rows = 15,
@@ -157,10 +144,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 			sort_proc :: proc(i, j: Table_Entry) -> bool {
 				i := i
 				j := j
-				field := reflect.struct_field_at(
-					Table_Entry,
-					state.component_showcase.sorted_column,
-				)
+				field := reflect.struct_field_at(Table_Entry, state.sorted_column)
 				switch field.type.id {
 				case string:
 					return(
@@ -218,12 +202,13 @@ component_showcase :: proc(state: ^Component_Showcase) {
 
 	case .Slider:
 		set_side(.Top)
-		label({text = "Normal"})
-		slider(Slider_Info(f64){value = &state.slider_value})
+		label({text = "From"})
+		box_slider(Slider_Info(f32){value = &state.from_angle, hi = math.TAU})
 		add_space(10)
-		label({text = "Box"})
-		add_space(10)
-		box_slider(Slider_Info(f64){value = &state.slider_value})
+		label({text = "To"})
+		box_slider(Slider_Info(f32){value = &state.to_angle, hi = math.TAU})
+		draw_arc(core.view / 2, state.from_angle, state.to_angle, 10, 4, {255, 255, 255, 255})
+		draw_pie(core.view / 2 + 100, state.from_angle, state.to_angle, 15, {255, 255, 255, 255})
 
 	case .Button:
 		set_side(.Top)
@@ -264,8 +249,7 @@ component_showcase :: proc(state: ^Component_Showcase) {
 				add_space(10)
 			}
 			yes := state.option == member
-			radio_button({text = fmt.tprint(member), state = &yes})
-			if yes {
+			if radio_button({text = fmt.tprint(member), state = &yes}).toggled {
 				state.option = member
 			}
 			pop_id()
@@ -382,11 +366,11 @@ main :: proc() {
 		allocator = runtime.default_allocator()
 	}
 
-	state.component_showcase.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
+	state.date_range = {onyx.Date{2024, 2, 17}, onyx.Date{2024, 3, 2}}
 
 	for i in 0 ..< 100 {
 		append(
-			&state.component_showcase.entries,
+			&state.entries,
 			Table_Entry {
 				hash = fmt.aprintf("%x", rand.int31()),
 				id = u64(rand.int_max(999)),
@@ -405,11 +389,12 @@ main :: proc() {
 	onyx.load_font_style(.Medium, "fonts/Geist-Medium.ttf")
 	onyx.load_font_style(.Light, "fonts/Geist-Light.ttf")
 	onyx.load_font_style(.Regular, "fonts/Geist-Regular.ttf")
+	onyx.load_font_style(.Monospace, "fonts/iAWriterMonoS-Regular.ttf")
 	onyx.load_font_style(.Icon, "fonts/remixicon.ttf")
 
 	for !glfw.WindowShouldClose(onyx.core.window) {
 		onyx.new_frame()
-		component_showcase(&state.component_showcase)
+		component_showcase(&state)
 		onyx.render()
 	}
 

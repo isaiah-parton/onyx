@@ -69,7 +69,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			draw_rounded_box_fill(
 				self.box,
 				core.style.rounding,
-				interpolate_colors(
+				lerp_colors(
 					self.hover_time * 0.25,
 					color.? or_else core.style.color.substance,
 					core.style.color.foreground,
@@ -78,10 +78,18 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			text_color = core.style.color.content
 
 		case .Primary:
+			if self.hover_time > 0 {
+				draw_rounded_box_shadow(
+					self.box,
+					core.style.rounding,
+					6,
+					fade({0, 0, 0, 40}, self.hover_time),
+				)
+			}
 			draw_rounded_box_fill(
 				self.box,
 				core.style.rounding,
-				interpolate_colors(
+				lerp_colors(
 					self.hover_time * 0.25,
 					color.? or_else core.style.color.accent,
 					core.style.color.foreground,
@@ -111,7 +119,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 		}
 
 		if is_loading {
-			draw_spinner(box_center(self.box), text_color)
+			draw_spinner(box_center(self.box), box_height(self.box) * 0.75, text_color)
 		}
 	}
 

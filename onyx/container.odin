@@ -45,7 +45,7 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 	}
 
 	// Minimum size
-	self.size = linalg.max(info.size, box_size(self.box))
+	self.size = linalg.max(self.size, info.size, box_size(self.box))
 
 	// Mouse wheel input
 	if self.active {
@@ -55,8 +55,7 @@ begin_container :: proc(info: Container_Info, loc := #caller_location) -> bool {
 		}
 		self.desired_scroll -= delta_scroll * 100
 	}
-	push_clip(self.box)
-	append_draw_call(current_layer().?.index)
+	push_scissor(self.box, add_shape_box(self.box, core.style.rounding))
 	push_stack(&core.container_stack, self) or_return
 
 	layout_pos := self.box.lo - linalg.floor(self.scroll)
@@ -72,24 +71,6 @@ end_container :: proc() {
 	self := current_container().?
 	layout := current_layout().?
 	self.size = linalg.max(layout.content_size + layout.spacing_size, self.size)
-
-	//TODO: Remove this
-	// draw_text(
-	// 	self.box.lo,
-	// 	{text = fmt.tprintf("%.1f", box_size(self.box)), font = core.style.fonts[.Light], size = 20},
-	// 	{255, 255, 255, 255},
-	// )
-	// draw_text(
-	// 	self.box.lo + {0, 20},
-	// 	{text = fmt.tprintf("%.1f", self.size), font = core.style.fonts[.Light], size = 20},
-	// 	{255, 255, 255, 255},
-	// )
-	// draw_text(
-	// 	self.box.lo + {0, 40},
-	// 	{text = fmt.tprintf("%.1f", self.scroll), font = core.style.fonts[.Light], size = 20},
-	// 	{255, 255, 255, 255},
-	// )
-
 
 	// Clamp scroll
 	self.desired_scroll = linalg.max(
@@ -111,9 +92,11 @@ end_container :: proc() {
 
 	end_layout()
 
+	inner_box := shrink_box(self.box, 4)
+
 	if self.scroll_y {
 		box := get_box_cut_right(
-			self.box,
+			inner_box,
 			self.scroll_time.y * core.style.shape.scrollbar_thickness,
 		)
 		if self.scroll_x {
@@ -126,7 +109,7 @@ end_container :: proc() {
 	}
 	if self.scroll_x {
 		box := get_box_cut_bottom(
-			self.box,
+			inner_box,
 			self.scroll_time.x * core.style.shape.scrollbar_thickness,
 		)
 		if self.scroll_y {
@@ -138,14 +121,11 @@ end_container :: proc() {
 		}
 	}
 
-	// Rounded corner mask to fake rounded clipping
-	draw_rounded_box_mask(self.box, core.style.rounding, core.style.color.foreground)
 	// Table outline
 	draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 
-	pop_clip()
+	pop_scissor()
 	pop_stack(&core.container_stack)
-	append_draw_call(current_layer().?.index)
 }
 
 current_container :: proc() -> Maybe(^Container) {
@@ -155,17 +135,30 @@ current_container :: proc() -> Maybe(^Container) {
 	return nil
 }
 
-push_clip :: proc(box: Box) {
-	push_stack(&core.clip_stack, box)
+Scissor :: struct {
+	box: Box,
+	shape: u32,
 }
 
-pop_clip :: proc() {
-	pop_stack(&core.clip_stack)
+push_scissor :: proc(box: Box, shape: u32 = 0) {
+	box := box
+	if scissor, ok := current_scissor().?; ok {
+		box = clamp_box(box, scissor.box)
+	}
+	push_stack(&core.scissor_stack, Scissor{box = box, shape = shape})
+	set_scissor_shape(shape)
 }
 
-current_clip :: proc() -> Maybe(Box) {
-	if core.clip_stack.height > 0 {
-		return core.clip_stack.items[core.clip_stack.height - 1]
+pop_scissor :: proc() {
+	pop_stack(&core.scissor_stack)
+	if scissor, ok := current_scissor().?; ok {
+		set_scissor_shape(scissor.shape)
+	}
+}
+
+current_scissor :: proc() -> Maybe(Scissor) {
+	if core.scissor_stack.height > 0 {
+	return core.scissor_stack.items[core.scissor_stack.height - 1]
 	}
 	return nil
 }

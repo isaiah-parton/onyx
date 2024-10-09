@@ -147,6 +147,7 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 			add_space(CALENDAR_WEEK_SPACING)
 			begin_layout({side = .Top, size = size})
 			set_side(.Left)
+			set_mode(.Absolute)
 		}
 		year, month, day := t.date(time)
 		date := Date{i64(year), i8(month), i8(day)}
@@ -155,25 +156,26 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 		today_year, today_month, today_day := t.date(t.now())
 
 		using widget_info := Widget_Info {
-			id = hash(i),
+			id = hash(i + 1),
 		}
 		begin_widget(&widget_info) or_continue
 
-		if widget_info.self.visible {
+		if self.visible {
 			is_month := i8(month) == i8(info.month)
 			// Range highlight
 			if time._nsec > selection_times[0]._nsec &&
 			   time._nsec <= selection_times[1]._nsec + i64(t.Hour * 24) {
-				corners: Corners = {}
+				corners: [4]f32
 				if time._nsec == selection_times[0]._nsec + i64(t.Hour * 24) {
-					corners += {.Top_Left, .Bottom_Left}
+					corners[0] = core.style.rounding
+					corners[2] = core.style.rounding
 				}
 				if time._nsec == selection_times[1]._nsec + i64(t.Hour * 24) {
-					corners += {.Top_Right, .Bottom_Right}
+					corners[1] = core.style.rounding
+					corners[3] = core.style.rounding
 				}
 				draw_rounded_box_corners_fill(
 					self.box,
-					core.style.shape.rounding,
 					corners,
 					fade(core.style.color.substance, 1 if is_month else 0.5),
 				)
@@ -213,7 +215,7 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 					align_v = .Middle,
 					align_h = .Middle,
 				},
-				interpolate_colors(
+				lerp_colors(
 					self.focus_time,
 					core.style.color.content if is_month else fade(core.style.color.content, 0.5),
 					core.style.color.background,
@@ -352,6 +354,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 				scale = [2]f32{scale, scale},
 			},
 		); ok {
+			draw_shadow(layer_box)
 			foreground()
 			shrink(core.style.menu_padding)
 			set_width_auto()

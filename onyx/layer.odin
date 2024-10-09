@@ -203,7 +203,7 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer
 	}
 
 	// Set vertex z position
-	push_clip(layer.box)
+	push_scissor(layer.box)
 	append_draw_call(current_layer().?.index)
 	set_global_alpha(layer.opacity)
 
@@ -235,7 +235,7 @@ end_layer :: proc() {
 	pop_layout()
 	pop_stack(&core.layer_stack)
 
-	pop_clip()
+	pop_scissor()
 
 	// Append a new draw call for the previous layer if there is one and reset the global alpha
 	if layer, ok := current_layer().?; ok {

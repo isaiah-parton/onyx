@@ -10,7 +10,7 @@ Selector_Info :: struct {
 	using _:    Widget_Info,
 	text:       string,
 	menu_align: Alignment,
-	text_job: Text_Job,
+	text_job:   Text_Job,
 }
 
 Menu_Widget_Kind :: struct {
@@ -78,6 +78,7 @@ begin_selector :: proc(using info: ^Selector_Info) -> bool {
 				opacity = open_time,
 			},
 		)
+		draw_shadow(menu_box)
 		foreground()
 		set_width_auto()
 		set_height_auto()
@@ -120,26 +121,25 @@ Selector_Option_Kind :: enum {
 }
 
 Selector_Option_Info :: struct {
-	using _:    Widget_Info,
-	text:       string,
-	state:      bool,
-	kind:       Selector_Option_Kind,
-	text_job: 	Text_Job,
-	clicked: bool,
+	using _:  Widget_Info,
+	text:     string,
+	state:    bool,
+	kind:     Selector_Option_Kind,
+	text_job: Text_Job,
+	clicked:  bool,
 }
 
-init_selector_option :: proc(
-	using info: ^Selector_Option_Info,
-	loc := #caller_location,
-) -> bool {
+init_selector_option :: proc(using info: ^Selector_Option_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
 	self = get_widget(id) or_return
-	text_job, _ = make_text_job({
-		text    = text,
-		size    = core.style.button_text_size,
-		font    = core.style.fonts[.Medium],
-		align_v = .Middle,
-	})
+	text_job, _ = make_text_job(
+		{
+			text = text,
+			size = core.style.button_text_size,
+			font = core.style.fonts[.Medium],
+			align_v = .Middle,
+		},
+	)
 	desired_size = text_job.size + {20, 10}
 	desired_size.x += desired_size.y
 	return true
@@ -162,11 +162,9 @@ add_selector_option :: proc(using info: ^Selector_Option_Info) -> bool {
 			case .Check:
 				draw_check(self.box.lo + box_height(self.box) / 2, 5, core.style.color.content)
 			case .Dot:
-				draw_arc_fill(
+				draw_circle_fill(
 					self.box.lo + box_height(self.box) / 2,
 					5,
-					0,
-					math.TAU,
 					core.style.color.content,
 				)
 			}
@@ -195,7 +193,9 @@ selector_option :: proc(
 
 enum_selector :: proc(value: ^$T, loc := #caller_location) where intrinsics.type_is_enum(T) {
 	if value == nil do return
-	info := Selector_Info{text = fmt.tprint(value^)}
+	info := Selector_Info {
+		text = fmt.tprint(value^),
+	}
 	if !init_selector(&info, loc) do return
 	if begin_selector(&info) {
 		shrink(3)
@@ -208,6 +208,6 @@ enum_selector :: proc(value: ^$T, loc := #caller_location) where intrinsics.type
 			}
 			pop_id()
 		}
-		end_selector()
 	}
+	end_selector()
 }

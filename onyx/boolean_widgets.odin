@@ -16,7 +16,7 @@ Boolean_Widget_Info :: struct {
 	text:      string,
 	text_side: Maybe(Side),
 	text_job:  Text_Job,
-	toggled: bool,
+	toggled:   bool,
 }
 
 Boolean_Widget_Kind :: struct {
@@ -192,9 +192,9 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 		draw_rounded_box_fill(
 			switch_box,
 			outer_radius,
-			interpolate_colors(how_on, core.style.color.substance, core.style.color.accent),
+			lerp_colors(how_on, core.style.color.substance, core.style.color.accent),
 		)
-		draw_arc_fill(lever_center, inner_radius, 0, math.TAU, core.style.color.content)
+		draw_circle_fill(lever_center, inner_radius, core.style.color.content)
 
 		switch text_side {
 		case .Left:
@@ -267,19 +267,15 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 		}
 
 		state_time := ease.circular_in_out(kind.state_time)
-		draw_arc_fill(
+		draw_circle_fill(
 			icon_center,
 			SIZE / 2,
-			0,
-			math.TAU,
-			interpolate_colors(state_time, core.style.color.substance, core.style.color.accent),
+			lerp_colors(state_time, core.style.color.substance, core.style.color.accent),
 		)
 		if state_time > 0 {
-			draw_arc_fill(
+			draw_circle_fill(
 				icon_center,
 				(SIZE / 2 - 5) * kind.state_time,
-				0,
-				math.TAU,
 				fade(core.style.color.background, state_time),
 			)
 		}

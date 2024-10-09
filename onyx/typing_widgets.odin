@@ -16,19 +16,25 @@ import "tedit"
 Input_Decal :: enum {
 	None,
 	Check,
-	Loader,
+	Spinner,
 }
 
 Input_Info :: struct {
-	using _:                      Widget_Info,
-	builder:                      ^strings.Builder,
-	text:                         string,
-	placeholder:                  string,
-	shake:                        f32,
-	multiline, read_only, hidden: bool,
-	decal:                        Input_Decal,
-	undecorated:                  bool,
-	changed, submitted, enter:    bool,
+	using _:     Widget_Info,
+	builder:     ^strings.Builder,
+	text:        string,
+	placeholder: string,
+	prefix:      Maybe(string),
+	decal:       Input_Decal,
+	shake:       f32,
+	monospace:   bool,
+	multiline:   bool,
+	read_only:   bool,
+	hidden:      bool,
+	undecorated: bool,
+	changed:     bool,
+	submitted:   bool,
+	enter:       bool,
 }
 
 Input_Widget_Kind :: struct {
@@ -216,7 +222,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	// Initial text info
 	text_info: Text_Info = {
 		text   = text,
-		font   = core.style.fonts[.Medium],
+		font   = core.style.fonts[.Monospace if monospace else .Medium],
 		size   = core.style.content_text_size,
 		hidden = info.hidden && len(text) > 0,
 	}
@@ -233,6 +239,15 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 					(self.box.hi.y + self.box.lo.y) / 2 -
 					(font_size.ascent - font_size.descent) / 2
 			}
+		}
+	}
+
+	// `text_offset` must be updated for the mouse interaction to line up
+	prefix_text_job: Maybe(Text_Job)
+	if prefix, ok := prefix.?; ok {
+		prefix_text_job, _ = make_text_job({text = prefix, options = text_info.options})
+		if prefix_text_job, ok := prefix_text_job.?; ok {
+			text_origin.x += prefix_text_job.size.x
 		}
 	}
 
@@ -266,12 +281,21 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 		text_origin -= kind.offset
 
 		if self.visible {
-			push_clip(self.box)
+			push_scissor(self.box, add_shape_box(self.box, core.style.rounding))
+			scissor := core.draw_state.scissor
 			// Draw text placeholder
 			if len(text_info.text) == 0 {
 				text_info := text_info
 				text_info.text = info.placeholder
-				draw_text(text_origin, text_info, core.style.color.substance)
+				draw_text(text_origin, text_info, fade(core.style.color.content, 0.5))
+			}
+			// Draw prefix
+			if prefix_text_job, ok := prefix_text_job.?; ok {
+				draw_text_glyphs(
+					prefix_text_job,
+					text_origin + {-prefix_text_job.size.x, 0},
+					fade(core.style.color.content, 0.5),
+				)
 			}
 			// First draw the highlighting behind the text
 			if .Active in self.last_state {
@@ -283,7 +307,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 			if .Active in self.last_state {
 				draw_text_cursor(text_job, text_origin, core.style.color.accent)
 			}
-			pop_clip()
+			pop_scissor()
 
 			// Draw decal
 			if kind.icon_time > 0 {
@@ -300,8 +324,8 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 					point(center + {1, -0.713} * scale)
 					stroke_path(2, {0, 255, 120, 255})
 					end_path()
-				case .Loader:
-					draw_loader(center, 5, core.style.color.content)
+				case .Spinner:
+					draw_spinner(center, 5, core.style.color.content)
 				}
 			}
 
@@ -311,10 +335,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 					self.box,
 					core.style.rounding,
 					2,
-					fade(
-						core.style.color.accent,
-						self.focus_time,
-					),
+					fade(core.style.color.accent, self.focus_time),
 				)
 			}
 
@@ -327,9 +348,6 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				)
 			}
 
-			if !info.undecorated {
-				draw_rounded_box_mask(self.box, core.style.rounding, core.style.color.foreground)
-			}
 		}
 
 		// Mouse selection

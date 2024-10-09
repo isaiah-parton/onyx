@@ -53,24 +53,33 @@ hsva_from_color :: proc(color: Color) -> (hsva: [4]f32) {
 	return
 }
 color_from_hsva :: proc(hsva: [4]f32) -> Color {
-  r, g, b, k, t: f32
+	r, g, b, k, t: f32
 
-  k = math.mod(5.0 + hsva.x / 60.0, 6)
-  t = 4.0 - k
-  k = clamp(min(t, k), 0, 1)
-  r = hsva.z - hsva.z * hsva.y * k
+	k = math.mod(5.0 + hsva.x / 60.0, 6)
+	t = 4.0 - k
+	k = clamp(min(t, k), 0, 1)
+	r = hsva.z - hsva.z * hsva.y * k
 
-  k = math.mod(3.0 + hsva.x / 60.0, 6)
-  t = 4.0 - k
-  k = clamp(min(t, k), 0, 1)
-  g = hsva.z - hsva.z * hsva.y * k
+	k = math.mod(3.0 + hsva.x / 60.0, 6)
+	t = 4.0 - k
+	k = clamp(min(t, k), 0, 1)
+	g = hsva.z - hsva.z * hsva.y * k
 
-  k = math.mod(1.0 + hsva.x / 60.0, 6)
-  t = 4.0 - k
-  k = clamp(min(t, k), 0, 1)
-  b = hsva.z - hsva.z * hsva.y * k
+	k = math.mod(1.0 + hsva.x / 60.0, 6)
+	t = 4.0 - k
+	k = clamp(min(t, k), 0, 1)
+	b = hsva.z - hsva.z * hsva.y * k
 
-  return {u8(r * 255.0), u8(g * 255.0), u8(b * 255.0), u8(hsva.a * 255.0)}
+	return {u8(r * 255.0), u8(g * 255.0), u8(b * 255.0), u8(hsva.a * 255.0)}
+}
+
+hsl_from_norm_rgb :: proc(rgb: [3]f32) -> [3]f32 {
+	v := max(rgb.r, rgb.g, rgb.b)
+	c := v - min(rgb.r, rgb.g, rgb.b)
+	f := 1 - abs(v + v - c - 1)
+	h :=
+		((rgb.g - rgb.b) / c) if (c > 0 && v == rgb.r) else ((2 + (rgb.b - rgb.r) / c) if v == rgb.g else (4 + (rgb.r - rgb.g) / c))
+	return {60 * ((h + 6) if h < 0 else h), (c / f) if f > 0 else 0, (v + v - c) / 2}
 }
 
 color_from :: proc {
@@ -79,7 +88,7 @@ color_from :: proc {
 	color_from_hsva,
 }
 
-interpolate_colors :: proc(time: f32, colors: ..Color) -> Color {
+lerp_colors :: proc(time: f32, colors: ..Color) -> Color {
 	if len(colors) > 0 {
 		if len(colors) == 1 {
 			return colors[0]

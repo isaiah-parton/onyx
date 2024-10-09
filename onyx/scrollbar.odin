@@ -51,9 +51,9 @@ add_scrollbar :: proc(using info: ^Scrollbar_Info) -> bool {
 	self.focus_time = animate(self.focus_time, 0.15, make_visible || .Hovered in self.state)
 
 	if self.visible {
-		draw_box_stroke(_box, 1, fade(core.style.color.substance, self.focus_time))
-		draw_box_fill(_box, fade(core.style.color.substance, 0.5 * self.focus_time))
-		draw_box_fill(handle_box, fade(core.style.color.content, 0.5 * self.focus_time))
+		rounding := (_box.hi[j] - _box.lo[j]) / 2
+		draw_rounded_box_fill(_box, rounding, fade(core.style.color.substance, 0.7 * self.focus_time))
+		draw_rounded_box_fill(handle_box, rounding, fade(core.style.color.content, 0.7 * self.focus_time))
 	}
 
 	if .Pressed in self.state {
