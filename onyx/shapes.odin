@@ -512,7 +512,7 @@ draw_spinner :: proc(center: [2]f32, radius: f32, color: Color) {
 	from := f32(time.duration_seconds(time.since(core.start_time)) * 2) * math.PI
 	to := from + 2.5 + math.sin(f32(time.duration_seconds(time.since(core.start_time)) * 3)) * 1
 
-	width := radius * 0.2
+	width := radius * 0.25
 
 	draw_arc(center, from, to, radius - width / 2, width, color)
 

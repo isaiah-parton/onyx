@@ -190,7 +190,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 					hsl := hsl_from_norm_rgb(normalize_color(value^).rgb)
 					text = fmt.tprintf("%.0f, %.0f, %.0f", hsl.x, hsl.y * 100, hsl.z * 100)
 				}
-				inputs[format].prefix = fmt.tprintf("%v ", format)
+				// inputs[format].prefix = fmt.tprintf("%v ", format)
 				if strings.builder_len(inputs[format].builder^) == 0 {
 					strings.write_string(inputs[format].builder, text)
 				}
@@ -220,6 +220,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 				if f > 0 {
 					add_space(10)
 				}
+				label({id = hash(f + 1), text = fmt.tprint(format)})
 				add_input(&inputs[format])
 				// Detect change and update the value
 				if inputs[format].changed {

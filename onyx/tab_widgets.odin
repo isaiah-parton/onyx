@@ -12,11 +12,11 @@ Tabs_Widget_Kind :: struct {
 	timers: [10]f32,
 }
 
-init_tabs :: proc(info: ^Tabs_Info, loc := #caller_location) -> bool {
-	info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
-	info.options = info.options[:min(len(info.options), 10)]
-	info.desired_size = {f32(len(info.options)) * 100, 30}
+init_tabs :: proc(using info: ^Tabs_Info, loc := #caller_location) -> bool {
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
+	options = options[:min(len(options), 10)]
+	desired_size = {f32(len(options)) * 100, 30}
 	return true
 }
 

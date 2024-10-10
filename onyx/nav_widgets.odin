@@ -7,34 +7,33 @@ import "core:math/linalg"
 import "core:reflect"
 
 Breadcrumb_Info :: struct {
-	using _:     Widget_Info,
-	index:       ^int,
-	options:     []string,
-	is_tail:     bool,
-	__has_menu:  bool,
-	__text_info: Text_Info,
+	using _:   Widget_Info,
+	text:      string,
+	index:     ^int,
+	options:   []string,
+	is_tail:   bool,
+	has_menu:  bool,
+	text_info: Text_Info,
 }
 
-init_breadcrumb :: proc(info: ^Breadcrumb_Info, loc := #caller_location) -> bool {
+init_breadcrumb :: proc(using info: ^Breadcrumb_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
-	assert(info.index != nil)
-	info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
-	info.__text_info = {
-		text = info.options[info.index^],
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
+	has_menu = len(options) > 1 && index != nil
+	text_info = {
+		text = options[index^] if has_menu else text,
 		font = core.style.default_font,
 		size = core.style.button_text_size,
 	}
-	info.__has_menu = len(info.options) > 1
-
-	info.desired_size = measure_text(info.__text_info)
-	if !info.is_tail {
-		info.desired_size.x += 20
+	desired_size = measure_text(text_info)
+	if !is_tail {
+		desired_size.x += 20
 	}
-	if info.__has_menu {
-		info.desired_size.x += 15
+	if has_menu {
+		desired_size.x += 15
 	}
-	info.fixed_size = true
+	fixed_size = true
 	return true
 }
 
@@ -51,8 +50,8 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 
 	if self.visible {
 		color := fade(core.style.color.content, 0.5 + 0.5 * self.hover_time)
-		draw_text(self.box.lo, info.__text_info, color)
-		if info.__has_menu {
+		draw_text(self.box.lo, info.text_info, color)
+		if info.has_menu {
 			draw_arrow({math.floor(self.box.hi.x - 24), box_center_y(self.box)}, 5, color)
 		}
 		if !info.is_tail {
@@ -65,9 +64,9 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 		}
 	}
 
-	if info.__has_menu {
+	if info.has_menu {
 		if .Pressed in self.state {
-		self.state += {.Open}
+			self.state += {.Open}
 		}
 
 		if .Open in self.state {
@@ -80,7 +79,11 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 			for option, o in info.options[:min(len(info.options), MAX_OPTIONS)] {
 				if o == info.index^ do continue
 				push_id(o)
-				buttons[o] = {text = option, style = .Ghost, font_size = 20}
+				buttons[o] = {
+					text      = option,
+					style     = .Ghost,
+					font_size = 20,
+				}
 				init_button(&buttons[0]) or_continue
 				menu_size.x = max(menu_size.x, buttons[o].desired_size.x)
 				menu_size.y += buttons[o].desired_size.y
@@ -140,9 +143,10 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 	return true
 }
 
-do_breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Breadcrumb_Info {
+breadcrumb :: proc(info: Breadcrumb_Info, loc := #caller_location) -> Breadcrumb_Info {
 	info := info
-	init_breadcrumb(&info, loc)
-	add_breadcrumb(&info)
+	if init_breadcrumb(&info, loc) {
+		add_breadcrumb(&info)
+	}
 	return info
 }

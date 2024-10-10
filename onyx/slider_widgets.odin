@@ -11,11 +11,11 @@ Slider_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 }
 
 init_slider :: proc(info: ^Slider_Info($T), loc := #caller_location) -> bool {
-	info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
-	info.sticky = true
-	info.desired_size = {core.style.visual_size.x, core.style.visual_size.y * 0.75}
-	info.hi = max(info.hi, info.lo + 1)
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
+	sticky = true
+	desired_size = {core.style.visual_size.x, core.style.visual_size.y * 0.75}
+	hi = max(hi, lo + 1)
 	return true
 }
 
@@ -77,11 +77,11 @@ slider :: proc(info: Slider_Info($T), loc := #caller_location) -> Slider_Info(T)
 }
 
 init_box_slider :: proc(using info: ^Slider_Info($T), loc := #caller_location) -> bool {
-	info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
-	info.sticky = true
-	info.desired_size = core.style.visual_size
-	info.hi = max(info.hi, info.lo + 1)
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
+	sticky = true
+	desired_size = core.style.visual_size
+	hi = max(hi, lo + 1)
 	return true
 }
 

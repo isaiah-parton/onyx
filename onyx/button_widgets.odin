@@ -24,20 +24,20 @@ Button_Info :: struct {
 	clicked:    bool,
 }
 
-init_button :: proc(info: ^Button_Info, loc := #caller_location) -> bool {
+init_button :: proc(using info: ^Button_Info, loc := #caller_location) -> bool {
 	if info == nil do return false
-	info.text_job = make_text_job(
+	text_job = make_text_job(
 		{
-			text = info.text,
-			size = info.font_size.? or_else core.style.button_text_size,
+			text = text,
+			size = font_size.? or_else core.style.button_text_size,
 			font = core.style.default_font,
 			align_v = .Middle,
 			align_h = .Middle,
 		},
 	) or_return
-	info.desired_size = info.text_job.size + {18, 6}
-	info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
+	desired_size = text_job.size + {18, 6}
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
 	return true
 }
 
@@ -119,7 +119,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 		}
 
 		if is_loading {
-			draw_spinner(box_center(self.box), box_height(self.box) * 0.75, text_color)
+			draw_spinner(box_center(self.box), box_height(self.box) * 0.3, text_color)
 		}
 	}
 

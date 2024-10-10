@@ -416,7 +416,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 		// User_Image
 		case 1u: {
 			out = textureSample(atlas_tex, samp, in.uv) * in.col;
-			out.a *= 1.1;
+			out.a *= 1.125;
 		}
 		case 2u: {
 			out = textureSample(user_tex, samp, in.uv) * in.col;

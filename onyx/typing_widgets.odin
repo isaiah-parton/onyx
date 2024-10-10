@@ -52,7 +52,7 @@ String_Input_Info :: struct {
 }
 
 init_input :: proc(using info: ^Input_Info, loc := #caller_location) -> bool {
-	id = hash(loc)
+	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	sticky = true
 	desired_size = core.style.visual_size

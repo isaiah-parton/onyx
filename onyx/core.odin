@@ -95,6 +95,10 @@ Core :: struct {
 	disable_widgets:       bool,
 	drag_offset:           [2]f32,
 
+	// Form
+	form: Form,
+	form_active: bool,
+
 	// Layout
 	layout_stack:          Stack(Layout, MAX_LAYOUTS),
 

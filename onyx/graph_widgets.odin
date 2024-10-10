@@ -45,12 +45,12 @@ Graph_Widget_Kind :: struct {
 	dot_times: [100]f32,
 }
 
-init_graph :: proc(info: ^Graph_Info, loc := #caller_location) -> bool {
-	if len(info.entries) == 0 do return false
-	info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
-	info.spacing = max(info.spacing, 10)
-	info.desired_size = {info.spacing * f32(len(info.entries)), f32(info.hi - info.lo) * 2}
+init_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
+	if len(entries) == 0 do return false
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
+	spacing = max(spacing, 10)
+	desired_size = {spacing * f32(len(entries)), f32(hi - lo) * 2}
 	return true
 }
 

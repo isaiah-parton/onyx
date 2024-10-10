@@ -10,27 +10,45 @@ import "core:mem"
 import "core:time"
 
 MAX_CLICK_DELAY :: time.Millisecond * 450
-// The internal widget structure
+
 Widget :: struct {
-	id:                                              Id,
-	box:                                             Box,
-	layer:                                           ^Layer,
+	id:           Id,
+	box:          Box,
+	layer:        ^Layer,
+
 	// Interaction options
-	visible, disabled, dead:                         bool,
+	visible:      bool,
+	disabled:     bool,
+	dead:         bool,
+
 	// TODO: Replace this with chaining
-	is_field:                                        bool,
+	is_field:     bool,
+
 	// Interaction state
-	last_state, next_state, state:                   Widget_State,
-	focus_time, hover_time, open_time, disable_time: f32,
+	last_state:   Widget_State,
+	next_state:   Widget_State,
+	state:        Widget_State,
+	focus_time:   f32,
+	hover_time:   f32,
+	open_time:    f32,
+	disable_time: f32,
+
+	// Widget chaining for forms
+	// these values are transient
+	prev:         ^Widget,
+	next:         ^Widget,
+
 	// Click information
-	click_count:                                     int,
-	click_time:                                      time.Time,
-	click_button:                                    Mouse_Button,
-	desired_size:                                    [2]f32,
+	click_count:  int,
+	click_time:   time.Time,
+	click_button: Mouse_Button,
+	desired_size: [2]f32,
+
 	// Stores the number of the last frame on which this widget was updated
-	frames:                                          int,
-	on_death:                                        proc(_: ^Widget),
-	variant:                                         Widget_Kind,
+	frames:       int,
+	on_death:     proc(_: ^Widget),
+	variant:      Widget_Kind,
+
 	// using variant: struct #raw_union {
 	// 	menu: Menu_Widget_Kind,
 	// 	graph: Graph_Widget_Kind,
@@ -231,6 +249,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 
 	// Compute next frame's layout
 	layout := current_layout().?
+
 	// If the user set an explicit size with either `set_width()` or `set_height()` the widget's desired size should reflect that
 	// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
 	if layout.next_size.x == 0 || layout.next_size.x != box_width(layout.box) {
@@ -268,6 +287,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 		widget.state -= {.Pressed, .Hovered}
 		widget.click_count = 0
 	}
+
 	// Mouse press
 	if widget.state >= {.Pressed} {
 		// Check for released buttons
@@ -285,10 +305,24 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 			widget.click_count = 0
 		}
 	}
+
 	// Focus state
 	if core.focused_widget == widget.id {
 		widget.state += {.Focused}
 	}
+
+	// Update form
+	if core.form_active {
+		if core.form.first == nil {
+			core.form.first = widget
+		}
+		if core.form.last != nil {
+			widget.prev = core.form.last
+			core.form.last.next = widget
+		}
+		core.form.last = widget
+	}
+
 	// Reset next state
 	widget.state += widget.next_state
 	widget.next_state = {}

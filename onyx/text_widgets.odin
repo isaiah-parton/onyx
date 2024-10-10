@@ -27,7 +27,7 @@ init_label :: proc(using info: ^Label_Info, loc := #caller_location) -> bool {
 	) or_return
 	desired_size = text_job.size
 	fixed_size = true
-	id = hash(loc)
+	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	return true
 }
@@ -47,8 +47,9 @@ add_label :: proc(using info: ^Label_Info) -> bool {
 
 label :: proc(info: Label_Info, loc := #caller_location) -> Label_Info {
 	info := info
-	init_label(&info, loc)
-	add_label(&info)
+	if init_label(&info, loc) {
+		add_label(&info)
+	}
 	return info
 }
 
