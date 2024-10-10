@@ -147,6 +147,14 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 	kind := widget_kind(self, Color_Conversion_Widget_Kind)
 	PADDING :: 10
 	if .Open in self.state {
+		if .Open not_in self.last_state {
+			kind.hsva = hsva_from_color(value^)
+		}
+
+		// Salt the hash stack to avoid collisions with other color pickers
+		push_id(hash(uintptr(value)))
+		defer pop_id()
+
 		picker_info := HSVA_Picker_Info {
 			hsva = &kind.hsva,
 			mode = .Wheel,
@@ -193,16 +201,12 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			}
 		}
 
-		layer_box := get_menu_box(self.box, layer_size + input_size, .Right)
-
-		open_time := ease.quadratic_out(self.open_time)
-
-		if layer, ok := layer(
-			{id = self.id, origin = layer_box.lo, box = layer_box, opacity = open_time},
-		); ok {
-			draw_shadow(layer_box)
+		if layer, ok := layer(get_popup_layer_info(self, layer_size + input_size, side = .Right)); ok {
+			draw_shadow(layout_box(), self.open_time)
 			foreground()
+
 			shrink(PADDING)
+
 			set_height_auto()
 			set_width_auto()
 			set_side(.Left)
@@ -233,11 +237,13 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 					value^ = color_from_hsva(kind.hsva)
 				}
 			}
+
 			// Apply changes from wheel and slider
 			if picker_info.changed || slider_info.changed {
 				value^ = color_from_hsva(kind.hsva)
 				changed = true
 			}
+
 			// If the value was changed anywhere, clear all the inputs so they get reformatted next frame
 			if changed {
 				for format in Color_Format {
@@ -246,16 +252,12 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 					}
 				}
 			}
+
 			// If the layer is not focused or hovered and the widget loses focus: close the dialog
 			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
 				self.state -= {.Open}
 			}
 		}
-	} else {
-		if .Pressed in (self.state - self.last_state) {
-			self.state += {.Open}
-		}
-		kind.hsva = hsva_from_color(value^)
 	}
 
 	return true
@@ -299,8 +301,8 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 	if self.visible {
 		R :: 4
 		box := self.box
-		box.lo.y += R
-		box.hi.y -= R
+		box.lo[j] += R
+		box.hi[j] -= R
 		draw_checkerboard_pattern(
 			box,
 			(box.hi[j] - box.lo[j]) / 2,
@@ -383,6 +385,7 @@ init_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	desired_size = 200
 	fixed_size = true
 	sticky = true
+	id = hash(uintptr(hsva))
 	self = get_widget(id) or_return
 	return true
 }
@@ -446,18 +449,13 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	if self.visible {
 		// H wheel
 		STEP :: math.TAU / 48.0
-		prim_index := u32(len(core.gfx.shapes.data))
-		append(
-			&core.gfx.shapes.data,
-			Shape {
-				kind = .Circle,
-				cv0 = center,
-				stroke = true,
-				width = (outer - inner) - 4,
-				radius = (inner + outer) / 2,
-			},
-		)
-		set_vertex_shape(prim_index)
+		set_vertex_shape(add_shape(Shape {
+			kind = .Circle,
+			cv0 = center,
+			stroke = true,
+			width = (outer - inner) - 4,
+			radius = (inner + outer) / 2,
+		}))
 		for t: f32 = 0; t < math.TAU; t += STEP {
 			normal := [2]f32{math.cos(t), math.sin(t)}
 			next_normal := [2]f32{math.cos(t + STEP), math.sin(t + STEP)}

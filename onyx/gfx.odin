@@ -54,7 +54,7 @@ wgpu_buffer_bind_group_layout_entry :: proc(
 	return wgpu.BindGroupLayoutEntry {
 		binding = binding,
 		buffer = {type = .ReadOnlyStorage, minBindingSize = size_of(T)},
-		visibility = {.Fragment},
+		visibility = {.Fragment, .Vertex},
 	}
 }
 wgpu_buffer_bind_group_entry :: proc(self: ^WGPU_Buffer($T), binding: u32) -> wgpu.BindGroupEntry {
@@ -70,7 +70,7 @@ wgpu_buffer_destroy :: proc(self: ^WGPU_Buffer($T)) {
 }
 
 Shader_Uniforms :: struct {
-	proj_mtx: matrix[4, 4]f32,
+	size: [2]f32,
 }
 
 Graphics :: struct {
@@ -96,10 +96,10 @@ Graphics :: struct {
 	index_buffer:              wgpu.Buffer,
 	vertices:                  [dynamic]Vertex,
 	indices:                   [dynamic]u32,
-	shapes:              WGPU_Buffer(Shape),
-	paints:              WGPU_Buffer(Paint),
-	cvs:                WGPU_Buffer([2]f32),
-	xforms:              WGPU_Buffer(matrix[3, 2]f32),
+	shapes:                    WGPU_Buffer(Shape),
+	paints:                    WGPU_Buffer(Paint),
+	cvs:                       WGPU_Buffer([2]f32),
+	xforms:                    WGPU_Buffer(Matrix),
 }
 
 resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
@@ -111,7 +111,7 @@ resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
 	wgpu.SurfaceConfigure(gfx.surface, &gfx.surface_config)
 }
 
-@cold
+@(cold)
 init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: int) {
 
 	width, height := glfw.GetWindowSize(window)
@@ -244,7 +244,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 		wgpu_buffer_create(&gfx.shapes, gfx.device, "ShapeBuffer", 4096)
 		wgpu_buffer_create(&gfx.paints, gfx.device, "PaintBuffer", 128)
 		wgpu_buffer_create(&gfx.cvs, gfx.device, "ControlVertexBuffer", 1024)
-		wgpu_buffer_create(&gfx.xforms, gfx.device, "MatrixBuffer", 64)
+		wgpu_buffer_create(&gfx.xforms, gfx.device, "MatrixBuffer", 256)
 		// Create bind group layouts
 		uniform_bind_group_layout := wgpu.DeviceCreateBindGroupLayout(
 			gfx.device,
@@ -439,16 +439,8 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 		len(gfx.indices) * size_of(u32),
 	)
 
-	// Set view bounds
-	t := f32(0)
-	b := f32(core.view.y)
-	l := f32(0)
-	r := f32(core.view.x)
-	n := f32(1000)
-	f := f32(-1000)
-
 	uniform := Shader_Uniforms {
-		proj_mtx = linalg.matrix_ortho3d(l, r, b, t, n, f),
+		size = core.view,
 	}
 
 	// Sort draw calls by index
@@ -551,7 +543,7 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 		sampler := wgpu.DeviceCreateSampler(
 			gfx.device,
 			&{
-				magFilter = .Nearest,
+				magFilter = .Linear,
 				minFilter = .Linear,
 				addressModeU = .ClampToEdge,
 				addressModeV = .ClampToEdge,

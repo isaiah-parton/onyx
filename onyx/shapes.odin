@@ -13,8 +13,8 @@ add_shape_box :: proc(box: Box, corners: [4]f32) -> u32 {
 		Shape {
 			kind = .Box,
 			corners = corners,
-			cv0 = transform_point(box.lo),
-			cv1 = transform_point(box.hi),
+			cv0 = box.lo,
+			cv1 = box.hi,
 		},
 	)
 }
@@ -28,7 +28,12 @@ add_shape :: proc(shape: Shape) -> u32 {
 	shape := shape
 	shape.paint = core.draw_state.paint
 	shape.scissor = core.draw_state.scissor
-	shape.xform = core.draw_state.xform
+	if core.current_matrix != nil && core.current_matrix^ != core.last_matrix {
+		core.matrix_index = u32(len(core.gfx.xforms.data))
+		append(&core.gfx.xforms.data, core.current_matrix^)
+		core.last_matrix = core.current_matrix^
+	}
+	shape.xform = core.matrix_index
 	append(&core.gfx.shapes.data, shape)
 	return index
 }
@@ -166,29 +171,20 @@ fill_path :: proc(color: Color) {
 
 stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Center) {
 	path := get_path()
-
 	if path.count < 2 {
 		return
 	}
-
-	first_index := next_vertex_index()
-
 	left, right: f32
 	switch justify {
-
 	case .Center:
 		left = thickness / 2
 		right = left
-
 	case .Outer:
 		left = thickness
-
 	case .Inner:
 		right = thickness
 	}
-
 	v0, v1: [2]f32
-
 	for i in 0 ..< path.count {
 		a := i - 1
 		b := i
@@ -225,15 +221,13 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 			tangent1 := line if p0 == p1 else linalg.normalize(linalg.normalize(p1 - p0) + line)
 			miter1: [2]f32 = {-tangent1.y, tangent1.x}
 			dot1 := linalg.dot(normal, miter1)
-
 			v0 = p1 - (left / dot1) * miter1
 			v1 = p1 + (right / dot1) * miter1
 		}
-
 		// End of segment
 		nv0 := p2 - (left / dot2) * miter2
 		nv1 := p2 + (right / dot2) * miter2
-
+		// Add a polygon for each quad
 		draw_polygon_fill({v0, v1, nv1, nv0}, color)
 		v0, v1 = nv0, nv1
 	}
@@ -278,6 +272,7 @@ draw_glyph :: proc(source, target: Box, tint: Color) {
 		if target.lo.x >= target.hi.x || target.lo.y >= target.hi.y do return
 	}
 	size: [2]f32 = {f32(core.font_atlas.width), f32(core.font_atlas.height)}
+	set_paint(1)
 	set_vertex_shape(add_shape(Shape{kind = .Normal}))
 	set_vertex_uv(source.lo / size)
 	set_vertex_color(tint)
@@ -290,6 +285,7 @@ draw_glyph :: proc(source, target: Box, tint: Color) {
 	tr := add_vertex({target.hi.x, target.lo.y})
 	add_indices(tl, br, bl, tl, tr, br)
 	set_vertex_shape(0)
+	set_paint(0)
 }
 
 draw_triangle_fill :: proc(a, b, c: [2]f32, color: Color) {
@@ -428,6 +424,7 @@ draw_arc :: proc(
 }
 
 draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
+	set_vertex_shape(add_shape_box(box, 0))
 	set_vertex_uv({})
 	set_vertex_color(left)
 	tl := add_vertex(box.lo)
@@ -436,9 +433,11 @@ draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
 	br := add_vertex(box.hi)
 	tr := add_vertex({box.hi.x, box.lo.y})
 	add_indices(tl, br, bl, tl, tr, br)
+	set_vertex_shape(0)
 }
 
 draw_vertical_box_gradient :: proc(box: Box, top, bottom: Color) {
+	set_vertex_shape(add_shape(Shape{kind = .Normal}))
 	set_vertex_uv({})
 	set_vertex_color(top)
 	tl := add_vertex(box.lo)
@@ -447,6 +446,7 @@ draw_vertical_box_gradient :: proc(box: Box, top, bottom: Color) {
 	bl := add_vertex({box.lo.x, box.hi.y})
 	br := add_vertex(box.hi)
 	add_indices(tl, br, bl, tl, tr, br)
+	set_vertex_shape(0)
 }
 
 draw_circle_fill :: proc(center: [2]f32, radius: f32, color: Color) {
@@ -480,25 +480,17 @@ draw_rounded_box_shadow :: proc(box: Box, corner_radius, blur_radius: f32, color
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
-	corner_radius := min(corner_radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
-
-	shape_index := u32(len(core.gfx.shapes.data))
-	append(
-		&core.gfx.shapes.data,
-		Shape {
-			kind = .BlurredBox,
-			radius = corner_radius,
-			cv0 = transform_point(box.lo),
-			cv1 = transform_point(box.hi),
-			cv2 = {0 = blur_radius},
-		},
-	)
-
-	render_shape(shape_index, color)
+	render_shape(add_shape(Shape {
+		kind = .BlurredBox,
+		radius = corner_radius,
+		cv0 = box.lo,
+		cv1 = box.hi,
+		cv2 = {0 = blur_radius},
+	}), color)
 }
 
-draw_shadow :: proc(box: Box) {
-	draw_rounded_box_shadow(move_box(box, {0, 2}), core.style.rounding, 6, {0, 0, 0, 40})
+draw_shadow :: proc(box: Box, opacity: f32 = 1) {
+	draw_rounded_box_shadow(move_box(box, {0, 2}), core.style.rounding, 6, {0, 0, 0, u8(f32(40) * opacity)})
 }
 
 draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
@@ -506,21 +498,14 @@ draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
 		return
 	}
 	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
-
-	shape_index := u32(len(core.gfx.shapes.data))
-	append(
-		&core.gfx.shapes.data,
-		Shape {
-			kind = .Box,
-			corners = radius,
-			cv0 = transform_point(box.lo),
-			cv1 = transform_point(box.hi),
-			width = width,
-			stroke = true,
-		},
-	)
-
-	render_shape(shape_index, color)
+	render_shape(add_shape(Shape {
+		kind = .Box,
+		corners = radius,
+		cv0 = box.lo,
+		cv1 = box.hi,
+		width = width,
+		stroke = true,
+	}), color)
 }
 
 draw_spinner :: proc(center: [2]f32, radius: f32, color: Color) {

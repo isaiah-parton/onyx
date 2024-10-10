@@ -202,6 +202,9 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 				),
 			},
 		)
+		when ODIN_DEBUG {
+			fmt.printfln("Widget ID collision: %i", info.id)
+		}
 		return false
 	}
 	widget.frames = core.frames

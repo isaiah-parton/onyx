@@ -1,5 +1,5 @@
 struct Uniforms {
-    proj_mtx: mat4x4f,
+  size: vec2<f32>,
 };
 
 @group(0)
@@ -381,10 +381,10 @@ fn not(v: vec3<bool>) -> vec3<bool> {
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
-	let xform = xforms.xforms[shapes.shapes[in.shape].xform]
+	let xform = xforms.xforms[shapes.shapes[in.shape].xform];
   var out: VertexOutput;
-  out.p = uniforms.proj_mtx * vec4<f32>(in.pos, 0.0, 1.0);
-  out.pos = (xform * vec4<f32>(out.p, 0.0, 1.0)).xy;
+  out.p = in.pos.xy;
+  out.pos = vec4<f32>(vec2<f32>(2.0, -2.0) * (xform * vec4<f32>(in.pos, 0.0, 1.0)).xy / uniforms.size + vec2<f32>(-1.0, 1.0), 0.0, 1.0);
   out.uv = in.uv;
   out.col = in.col;
   out.shape = in.shape;
@@ -402,21 +402,25 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	var d = 0.0;
 
 	if (shape.kind > 0u) {
-		d = sd_shape(shape, in.pos.xy);
+		d = sd_shape(shape, in.p);
 	}
 
 	if (shape.scissor > 0u) {
-		d = max(d, sd_shape(shapes.shapes[shape.scissor], in.pos.xy));
+		d = max(d, sd_shape(shapes.shapes[shape.scissor], in.p));
 	}
 
 	// Get pixel color
 	switch (paint.kind) {
 		// User_Image
 		case 1u: {
+			out = textureSample(atlas_tex, samp, in.uv) * in.col;
+			out.a *= 1.1;
+		}
+		case 2u: {
 			out = textureSample(user_tex, samp, in.uv) * in.col;
 		}
 		default: {
-			out = textureSample(atlas_tex, samp, in.uv) * in.col;
+			out = in.col;
 		}
 	}
 

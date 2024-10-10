@@ -134,7 +134,6 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 		)
 	}
 
-
 	time := info.calendar_start
 
 	add_space(CALENDAR_WEEK_SPACING)
@@ -337,24 +336,8 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 		}
 		init_calendar(&calendar_info, {})
 
-		layer_box := get_menu_box(
-			self.box,
-			calendar_info.desired_size + core.style.menu_padding * 2,
-		)
-
-		open_time := ease.quadratic_out(self.open_time)
-		scale: f32 = 0.85 + 0.15 * open_time
-
-		if layer, ok := layer(
-			{
-				id = self.id,
-				origin = layer_box.lo,
-				box = layer_box,
-				opacity = open_time,
-				scale = [2]f32{scale, scale},
-			},
-		); ok {
-			draw_shadow(layer_box)
+		if layer, ok := layer(get_popup_layer_info(self, calendar_info.desired_size + core.style.menu_padding * 2, side = .Left)); ok {
+			draw_shadow(layout_box(), self.open_time)
 			foreground()
 			shrink(core.style.menu_padding)
 			set_width_auto()

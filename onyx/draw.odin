@@ -43,6 +43,7 @@ Stroke_Justify :: enum {
 
 Paint_Kind :: enum u32 {
 	Normal,
+	Glyph,
 	User_Image,
 	Linear_Gradient,
 	Radial_Gradient,
@@ -83,7 +84,7 @@ Shape :: struct #align (16) {
 	start:   u32,
 	count:   u32,
 	stroke:  b32,
-	xform: u32,
+	xform:   u32,
 }
 
 Vertex :: struct {
@@ -121,7 +122,7 @@ Draw_State :: struct {
 	scissor: u32,
 	paint:   u32,
 	shape:   u32,
-	xform:	u32,
+	xform:   u32,
 }
 
 set_scissor_shape :: proc(shape: u32) {
@@ -163,37 +164,13 @@ set_global_alpha :: proc(alpha: f32) {
 	core.vertex_state.alpha = alpha
 }
 
-transform_point :: proc(p: [2]f32) -> [2]f32 {
-	p := [2]f32 {
-		core.current_matrix[0, 0] * p.x +
-		core.current_matrix[0, 1] * p.y +
-		core.current_matrix[0, 2] +
-		core.current_matrix[0, 3],
-		core.current_matrix[1, 0] * p.x +
-		core.current_matrix[1, 1] * p.y +
-		core.current_matrix[1, 2] +
-		core.current_matrix[1, 3],
-	}
-	return p
-}
-
 // Append a vertex and return it's index
 add_vertex_2f32 :: proc(x, y: f32) -> (i: u32) {
-	pos: [2]f32 = {
-		core.current_matrix[0, 0] * x +
-		core.current_matrix[0, 1] * y +
-		core.current_matrix[0, 2] +
-		core.current_matrix[0, 3],
-		core.current_matrix[1, 0] * x +
-		core.current_matrix[1, 1] * y +
-		core.current_matrix[1, 2] +
-		core.current_matrix[1, 3],
-	}
 	i = next_vertex_index()
 	append(
 		&core.gfx.vertices,
 		Vertex {
-			pos = pos,
+			pos = {x, y},
 			uv = core.vertex_state.uv,
 			col = core.vertex_state.col,
 			shape = core.vertex_state.shape,
@@ -245,15 +222,6 @@ pop_matrix :: proc() {
 	core.current_matrix = &core.matrix_stack.items[max(0, core.matrix_stack.height - 1)]
 }
 
-append_draw_call :: proc(index: int, loc := #caller_location) {
-	append(&core.draw_calls, Draw_Call {
-		index        = index,
-		elem_offset  = len(core.gfx.indices),
-		user_texture = core.current_texture,
-	})
-	core.current_draw_call = &core.draw_calls[len(core.draw_calls) - 1]
-}
-
 matrix_identity :: proc() -> Matrix {
 	return {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
 }
@@ -269,12 +237,23 @@ rotate_matrix :: proc(angle, x, y, z: f32) {
 rotate_matrix_z :: proc(angle: f32) {
 	cosres := math.cos(angle)
 	sinres := math.sin(angle)
-
 	rotation_matrix: Matrix = {cosres, -sinres, 0, 0, sinres, cosres, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
-
 	core.current_matrix^ *= rotation_matrix
 }
 
 scale_matrix :: proc(x, y, z: f32) {
 	core.current_matrix^ *= linalg.matrix4_scale([3]f32{x, y, z})
+}
+
+// Add a new draw call at the given index with the currently bound user texture
+append_draw_call :: proc(index: int, loc := #caller_location) {
+	append(
+		&core.draw_calls,
+		Draw_Call {
+			index = index,
+			elem_offset = len(core.gfx.indices),
+			user_texture = core.current_texture,
+		},
+	)
+	core.current_draw_call = &core.draw_calls[len(core.draw_calls) - 1]
 }

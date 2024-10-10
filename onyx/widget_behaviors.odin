@@ -1,5 +1,9 @@
 package onyx
 
+import "core:math"
+import "core:math/ease"
+import "core:math/linalg"
+
 // Some generic behaviors for widgets
 
 button_behavior :: proc(widget: ^Widget) {
@@ -28,7 +32,7 @@ horizontal_slider_behavior :: proc(widget: ^Widget) {
 
 menu_behavior :: proc(widget: ^Widget) {
 	if .Open in widget.state {
-		widget.open_time = animate(widget.open_time, 0.2, true)
+		widget.open_time = animate(widget.open_time, 0.3, true)
 	} else {
 		widget.open_time = 0
 	}
@@ -48,13 +52,19 @@ menu_behavior :: proc(widget: ^Widget) {
 	}
 }
 
-get_menu_box :: proc(parent: Box, size: [2]f32, side: Side = .Bottom) -> Box {
-	box: Box
-	margin := core.style.menu_padding
+get_popup_scale :: proc(size: [2]f32, time: f32) -> f32 {
+	return math.lerp(math.lerp(f32(0.9), f32(1.0), linalg.length(size) / linalg.length(core.view)), f32(1.0), time)
+}
 
+get_popup_layer_info :: proc(widget: ^Widget, size: [2]f32, side: Side = .Bottom) -> (info: Layer_Info) {
+	if widget == nil do return
+	margin := core.style.popup_margin
 	view := view_box()
-
 	side := side
+	parent := widget.box
+	info.id = widget.id
+	scale := get_popup_scale(size, ease.quadratic_out(widget.open_time))
+	info.scale = [2]f32{scale, scale}
 
 	switch side {
 	case .Bottom:
@@ -77,25 +87,30 @@ get_menu_box :: proc(parent: Box, size: [2]f32, side: Side = .Bottom) -> Box {
 
 	switch side {
 	case .Bottom:
-		box = Box {
+		info.box = Box {
 			{parent.lo.x, parent.hi.y + margin},
 			{parent.lo.x + size.x, parent.hi.y + margin + size.y},
 		}
+		info.origin = info.box.lo
 	case .Top:
-		box = Box {
+		info.box = Box {
 			{parent.lo.x, parent.lo.y - (margin + size.y)},
 			{parent.lo.x + size.x, parent.lo.y - margin},
 		}
+		info.origin = {info.box.lo.x, info.box.hi.y}
 	case .Left:
-		box = Box {
+		info.box = Box {
 			{parent.lo.x - (margin + size.x), box_center_y(parent) - size.y / 2},
 			{parent.lo.x - margin, box_center_y(parent) + size.y / 2},
 		}
+		info.origin = {info.box.hi.x, box_center_y(info.box)}
 	case .Right:
-		box = Box {
+		info.box = Box {
 			{parent.hi.x + margin, box_center_y(parent) - size.y / 2},
 			{parent.hi.x + margin + size.x, box_center_y(parent) + size.y / 2},
 		}
+		info.origin = {info.box.lo.x, box_center_y(info.box)}
 	}
-	return box
+
+	return
 }

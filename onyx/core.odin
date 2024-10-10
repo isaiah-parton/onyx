@@ -71,6 +71,7 @@ Core :: struct {
 	debug:                 Debug_State,
 	view:                  [2]f32,
 	desired_fps:           int,
+	disable_frame_skip: bool,
 	last_second:           time.Time,
 	frames_so_far:         int,
 	frames_this_second:    int,
@@ -161,6 +162,8 @@ Core :: struct {
 	vertex_state:          Vertex_State,
 	matrix_stack:          Stack(Matrix, MAX_MATRICES),
 	current_matrix:        ^Matrix,
+	last_matrix:           Matrix,
+	matrix_index: u32,
 	current_texture:       wgpu.Texture,
 	scissor_stack:         Stack(Scissor, 100),
 	path_stack:            Stack(Path, 10),
@@ -298,14 +301,16 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 // Call before each new frame
 new_frame :: proc() {
 	// Timings
-	time.sleep(
-		max(
-			0,
-			time.Duration(time.Second) /
-				time.Duration(max(core.desired_fps, DEFAULT_DESIRED_FPS)) -
-			time.since(core.last_frame_time),
-		),
-	)
+	if !core.disable_frame_skip {
+		time.sleep(
+			max(
+				0,
+				time.Duration(time.Second) /
+					time.Duration(max(core.desired_fps, DEFAULT_DESIRED_FPS)) -
+				time.since(core.last_frame_time),
+			),
+		)
+	}
 
 	profiler_begin_scope(.New_Frame)
 
@@ -329,6 +334,11 @@ new_frame :: proc() {
 	core.draw_state = {}
 	core.vertex_state = {}
 	core.current_texture = {}
+	core.scissor_stack.height = 0
+	core.matrix_stack.height = 0
+	core.current_matrix = nil
+	core.matrix_index = 0
+	core.last_matrix = {}
 
 	// Clear inputs
 	core.last_mouse_bits = core.mouse_bits
@@ -376,8 +386,6 @@ new_frame :: proc() {
 	}
 
 	// Reset stuff
-	core.scissor_stack.height = 0
-	core.matrix_stack.height = 0
 	core.layer_stack.height = 0
 	core.layout_stack.height = 0
 	core.container_stack.height = 0
@@ -474,9 +482,13 @@ new_frame :: proc() {
 
 	reset(&core.gfx)
 
-	// Add default draw elements
-	// Index 0 acts like null
+	// For now, null paint lives at index 0
 	append(&core.gfx.paints.data, Paint{kind = .Normal})
+
+	// And glyph paint lives at index 1
+	append(&core.gfx.paints.data, Paint{kind = .Glyph})
+
+	// Default shape lives at index 0
 	append(&core.gfx.shapes.data, Shape{kind = .Normal})
 
 	// Make the default draw elements active
@@ -488,6 +500,9 @@ new_frame :: proc() {
 render :: proc() {
 	// Render debug info rq
 	if core.debug.enabled {
+		if key_pressed(.F6) {
+			core.disable_frame_skip = !core.disable_frame_skip
+		}
 		do_debug_layer()
 	}
 
@@ -534,30 +549,6 @@ uninit :: proc() {
 
 	destroy_atlas(&core.font_atlas)
 	uninit_graphics(&core.gfx)
-}
-
-key_down :: proc(key: Keyboard_Key) -> bool {
-	return core.keys[key]
-}
-
-key_pressed :: proc(key: Keyboard_Key) -> bool {
-	return core.keys[key] && !core.last_keys[key]
-}
-
-key_released :: proc(key: Keyboard_Key) -> bool {
-	return core.last_keys[key] && !core.keys[key]
-}
-
-mouse_down :: proc(button: Mouse_Button) -> bool {
-	return button in core.mouse_bits
-}
-
-mouse_pressed :: proc(button: Mouse_Button) -> bool {
-	return (core.mouse_bits - core.last_mouse_bits) >= {button}
-}
-
-mouse_released :: proc(button: Mouse_Button) -> bool {
-	return (core.last_mouse_bits - core.mouse_bits) >= {button}
 }
 
 __set_clipboard_string :: proc(_: rawptr, str: string) -> bool {

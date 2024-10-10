@@ -56,29 +56,8 @@ begin_selector :: proc(using info: ^Selector_Info) -> bool {
 	menu_behavior(self)
 
 	if .Open in self.state {
-		menu_box := get_menu_box(self.box, kind.size)
-		layer_origin := menu_box.lo
-
-		#partial switch info.menu_align {
-		case .Far:
-			layer_origin.x += box_width(menu_box)
-		case .Middle:
-			layer_origin.x += box_width(menu_box) / 2
-		}
-
-		open_time := ease.quadratic_out(self.open_time)
-		scale: f32 = 0.7 + 0.3 * open_time
-
-		begin_layer(
-			{
-				id = self.id,
-				box = menu_box,
-				origin = layer_origin,
-				scale = [2]f32{scale, scale},
-				opacity = open_time,
-			},
-		)
-		draw_shadow(menu_box)
+		begin_layer(get_popup_layer_info(self, kind.size))
+		draw_shadow(layout_box(), self.open_time)
 		foreground()
 		set_width_auto()
 		set_height_auto()
