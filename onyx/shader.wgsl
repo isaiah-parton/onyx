@@ -67,7 +67,7 @@ struct CVS {
 var<storage> cvs: CVS;
 
 struct XForms {
-	xforms: array<PackedMat3x2>,
+	xforms: array<mat4x4<f32>>,
 };
 
 @group(2)
@@ -86,6 +86,7 @@ struct VertexOutput {
   @location(0) uv: vec2<f32>,
   @location(1) col: vec4<f32>,
 	@location(2) shape: u32,
+	@location(3) p: vec2<f32>,
 };
 
 @group(1)
@@ -380,12 +381,14 @@ fn not(v: vec3<bool>) -> vec3<bool> {
 
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
-    var out: VertexOutput;
-    out.pos = uniforms.proj_mtx * vec4<f32>(in.pos, 0.0, 1.0);
-    out.uv = in.uv;
-    out.col = in.col;
-    out.shape = in.shape;
-    return out;
+	let xform = xforms.xforms[shapes.shapes[in.shape].xform]
+  var out: VertexOutput;
+  out.p = uniforms.proj_mtx * vec4<f32>(in.pos, 0.0, 1.0);
+  out.pos = (xform * vec4<f32>(out.p, 0.0, 1.0)).xy;
+  out.uv = in.uv;
+  out.col = in.col;
+  out.shape = in.shape;
+  return out;
 }
 
 @fragment

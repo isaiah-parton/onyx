@@ -77,7 +77,7 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: Co
 
 Color_Conversion_Widget_Kind :: struct {
 	// This value is used as a mediary while the value is being edited
-	hsva: [4]f32,
+	hsva:   [4]f32,
 	inputs: [Color_Format]strings.Builder,
 }
 
@@ -90,12 +90,12 @@ Color_Format :: enum {
 Color_Format_Set :: bit_set[Color_Format]
 
 Color_Button_Info :: struct {
-	using _:     Widget_Info,
-	value:       ^Color,
-	show_alpha:  bool,
+	using _:       Widget_Info,
+	value:         ^Color,
+	show_alpha:    bool,
 	input_formats: Color_Format_Set,
-	text_job:    Text_Job,
-	changed:     bool,
+	text_job:      Text_Job,
+	changed:       bool,
 }
 
 init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_location) -> bool {
@@ -140,10 +140,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			self.box,
 			core.style.rounding,
 			1,
-			fade(
-				core.style.color.accent,
-				self.hover_time,
-			),
+			fade(core.style.color.accent, self.hover_time),
 		)
 	}
 
@@ -172,7 +169,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 
 		for format, f in Color_Format {
 			if format in input_formats {
-			inputs[format].monospace = true
+				inputs[format].monospace = true
 				inputs[format].builder = &kind.inputs[format]
 				text: string
 				switch format {
@@ -196,18 +193,14 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			}
 		}
 
-		layer_box := get_menu_box(
-			self.box,
-			layer_size + input_size,
-			.Right,
-		)
+		layer_box := get_menu_box(self.box, layer_size + input_size, .Right)
 
 		open_time := ease.quadratic_out(self.open_time)
 
 		if layer, ok := layer(
 			{id = self.id, origin = layer_box.lo, box = layer_box, opacity = open_time},
 		); ok {
-		draw_shadow(layer_box)
+			draw_shadow(layer_box)
 			foreground()
 			shrink(PADDING)
 			set_height_auto()
@@ -248,7 +241,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			// If the value was changed anywhere, clear all the inputs so they get reformatted next frame
 			if changed {
 				for format in Color_Format {
-					if format in input_formats {
+					if format in input_formats && !inputs[format].changed {
 						strings.builder_reset(inputs[format].builder)
 					}
 				}

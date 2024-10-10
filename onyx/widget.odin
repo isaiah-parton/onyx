@@ -196,7 +196,10 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 				255,
 				0,
 				0,
-				u8(128.0 + math.sin(time.duration_seconds(time.since(core.start_time)) * 12.0) * 64.0),
+				u8(
+					128.0 +
+					math.sin(time.duration_seconds(time.since(core.start_time)) * 12.0) * 64.0,
+				),
 			},
 		)
 		return false
@@ -239,11 +242,6 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 		// Add hovered state
 		widget.state += {.Hovered}
 
-		// Reset click time if cursor is moved beyond a threshold
-		if linalg.length(core.mouse_pos - core.last_mouse_pos) > 2 {
-			widget.click_count = 0
-		}
-
 		// Clicking
 		pressed_buttons := core.mouse_bits - core.last_mouse_bits
 		if pressed_buttons != {} {
@@ -277,6 +275,11 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 				widget.state -= {.Pressed}
 				break
 			}
+		}
+	} else {
+		// Reset click time if cursor is moved beyond a threshold
+		if widget.click_count > 0 && linalg.length(core.mouse_pos - core.last_mouse_pos) > 2 {
+			widget.click_count = 0
 		}
 	}
 	// Focus state
