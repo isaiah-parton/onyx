@@ -76,9 +76,9 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: Co
 }
 
 Color_Conversion_Widget_Kind :: struct {
+	// This value is used as a mediary while the value is being edited
 	hsva: [4]f32,
 	inputs: [Color_Format]strings.Builder,
-	alpha_input: strings.Builder,
 }
 
 Color_Format :: enum {
@@ -224,19 +224,36 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 					add_space(10)
 				}
 				add_input(&inputs[format])
-				if picker_info.changed {
-					strings.builder_reset(inputs[format].builder)
+				// Detect change and update the value
+				if inputs[format].changed {
+					#partial switch format {
+					case .RGB:
+						if color, ok := parse_rgba(inputs[format].text); ok {
+							kind.hsva.xyz = hsva_from_color(color).xyz
+						}
+					case .HEX:
+						if hex, ok := strconv.parse_u64_of_base(inputs[format].text[1:], 16); ok {
+							kind.hsva.xyz = hsva_from_color(color_from_hex(u32(hex))).xyz
+							changed = true
+						}
+					}
+					value^ = color_from_hsva(kind.hsva)
 				}
-				// if hex_input.changed && strings.builder_len(kind.text) == 6 {
-				// 	if value, ok := strconv.parse_u64_of_base(strings.to_string(kind.text), 16); ok {
-				// 		kind.hsva = hsva_from_color(color_from_hex(u32(value)))
-				// 	}
-				// }
 			}
-
+			// Apply changes from wheel and slider
 			if picker_info.changed || slider_info.changed {
 				value^ = color_from_hsva(kind.hsva)
+				changed = true
 			}
+			// If the value was changed anywhere, clear all the inputs so they get reformatted next frame
+			if changed {
+				for format in Color_Format {
+					if format in input_formats {
+						strings.builder_reset(inputs[format].builder)
+					}
+				}
+			}
+			// If the layer is not focused or hovered and the widget loses focus: close the dialog
 			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
 				self.state -= {.Open}
 			}
@@ -411,7 +428,8 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 		if dist > inner {
 			self.state += {.Active}
 		}
-	} else if .Pressed in self.state {
+	}
+	if .Pressed in self.state {
 		if .Active in self.state {
 			// Hue assignment
 			hsva.x = math.atan2(diff.y, diff.x) / math.RAD_PER_DEG
@@ -435,9 +453,9 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	if self.visible {
 		// H wheel
 		STEP :: math.TAU / 48.0
-		prim_index := u32(len(core.draw_list.shapes))
+		prim_index := u32(len(core.gfx.shapes.data))
 		append(
-			&core.draw_list.shapes,
+			&core.gfx.shapes.data,
 			Shape {
 				kind = .Circle,
 				cv0 = center,

@@ -3,8 +3,24 @@ package onyx
 import "core:math"
 import "core:math/bits"
 import "core:math/linalg"
+import "core:strings"
+import "core:strconv"
 
 Color :: [4]u8
+
+parse_rgba :: proc(str: string) -> (res: Color, ok: bool) {
+	strs := strings.split(str, ", ")
+	defer delete(strs)
+	if len(strs) == 0 || len(strs) > 4 {
+		return
+	}
+	for s, i in strs {
+		num := strconv.parse_u64(s) or_return
+		res[i] = u8(min(num, 255))
+	}
+	ok = true
+	return
+}
 
 color_from_hex :: proc(hex: u32) -> Color {
 	return transmute(Color)bits.reverse_bits(hex << 8)

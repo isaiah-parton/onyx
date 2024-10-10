@@ -9,6 +9,7 @@ import "core:mem"
 import "core:slice"
 import "core:strconv"
 import "core:strings"
+import "core:unicode"
 import "core:time"
 
 import "tedit"
@@ -347,7 +348,10 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 					fade(core.style.color.foreground, self.disable_time * 0.5),
 				)
 			}
+		}
 
+		word_proc :: proc(r: rune) -> bool {
+			return !unicode.is_alpha(r) && !unicode.is_digit(r)
 		}
 
 		// Mouse selection
@@ -371,11 +375,11 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 					} else {
 						e.selection[0] = max(
 							0,
-							strings.last_index_any(text_info.text[:text_job.hovered_rune], " \n") +
+							strings.last_index_proc(text_info.text[:text_job.hovered_rune], word_proc) +
 							1,
 						)
 					}
-					e.selection[1] = strings.index_any(text_info.text[kind.anchor:], " \n")
+					e.selection[1] = strings.index_proc(text_info.text[kind.anchor:], word_proc)
 					if e.selection[1] == -1 {
 						e.selection[1] = len(text_info.text)
 					} else {
@@ -384,15 +388,15 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				} else {
 					e.selection[1] = max(
 						0,
-						strings.last_index_any(text_info.text[:kind.anchor], " \n") + 1,
+						strings.last_index_proc(text_info.text[:kind.anchor], word_proc) + 1,
 					)
 					if (text_job.hovered_rune > 0 &&
 						   text_info.text[text_job.hovered_rune - 1] == ' ') {
 						e.selection[0] = 0
 					} else {
-						e.selection[0] = strings.index_any(
+						e.selection[0] = strings.index_proc(
 							text_info.text[text_job.hovered_rune:],
-							" \n",
+							word_proc,
 						)
 					}
 					if e.selection[0] == -1 {

@@ -13,9 +13,61 @@ import "vendor:glfw"
 import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
 
-SHAPE_BUFFER_CAPACITY :: size_of(Shape) * 4096
-PAINT_BUFFER_CAPACITY :: size_of(Paint) * 512
-CVS_BUFFER_CAPACITY :: size_of([2]f32) * 512
+WGPU_Buffer :: struct($T: typeid) {
+	buffer:   wgpu.Buffer,
+	data:     [dynamic]T,
+	capacity: int,
+	label:    cstring,
+}
+
+wgpu_buffer_create :: proc(
+	self: ^WGPU_Buffer($T),
+	device: wgpu.Device,
+	label: cstring,
+	capacity: int,
+) -> bool {
+	self.label = label
+	self.capacity = capacity
+	self.buffer = wgpu.DeviceCreateBuffer(
+		device,
+		&{
+			label = self.label,
+			size = u64(self.capacity * size_of(T)),
+			usage = {.Storage, .CopyDst},
+		},
+	)
+	return true
+}
+wgpu_buffer_update :: proc(self: ^WGPU_Buffer($T), queue: wgpu.Queue) {
+	size := len(self.data) * size_of(T)
+	max_size := self.capacity * size_of(T)
+	if size > max_size {
+		fmt.printfln("Insufficient space in buffer '%s' (%i > %i)", self.label, size, max_size)
+		size = max_size
+	}
+	wgpu.QueueWriteBuffer(queue, self.buffer, 0, raw_data(self.data), uint(size))
+}
+wgpu_buffer_bind_group_layout_entry :: proc(
+	self: ^WGPU_Buffer($T),
+	binding: u32,
+) -> wgpu.BindGroupLayoutEntry {
+	return wgpu.BindGroupLayoutEntry {
+		binding = binding,
+		buffer = {type = .ReadOnlyStorage, minBindingSize = size_of(T)},
+		visibility = {.Fragment},
+	}
+}
+wgpu_buffer_bind_group_entry :: proc(self: ^WGPU_Buffer($T), binding: u32) -> wgpu.BindGroupEntry {
+	return wgpu.BindGroupEntry {
+		binding = binding,
+		size = u64(self.capacity * size_of(T)),
+		buffer = self.buffer,
+	}
+}
+wgpu_buffer_destroy :: proc(self: ^WGPU_Buffer($T)) {
+	delete(self.data)
+	wgpu.BufferDestroy(self.buffer)
+}
 
 Shader_Uniforms :: struct {
 	proj_mtx: matrix[4, 4]f32,
@@ -42,9 +94,12 @@ Graphics :: struct {
 	uniform_buffer:            wgpu.Buffer,
 	vertex_buffer:             wgpu.Buffer,
 	index_buffer:              wgpu.Buffer,
-	shape_buffer:              wgpu.Buffer,
-	paint_buffer:              wgpu.Buffer,
-	cvs_buffer:                wgpu.Buffer,
+	vertices:                  [dynamic]Vertex,
+	indices:                   [dynamic]u32,
+	shapes:              WGPU_Buffer(Shape),
+	paints:              WGPU_Buffer(Paint),
+	cvs:                WGPU_Buffer([2]f32),
+	xforms:              WGPU_Buffer(matrix[3, 2]f32),
 }
 
 resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
@@ -56,6 +111,7 @@ resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
 	wgpu.SurfaceConfigure(gfx.surface, &gfx.surface_config)
 }
 
+@cold
 init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: int) {
 
 	width, height := glfw.GetWindowSize(window)
@@ -185,22 +241,10 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			gfx.device,
 			&{label = "IndexBuffer", size = BUFFER_SIZE, usage = {.Index, .CopyDst}},
 		)
-		gfx.shape_buffer = wgpu.DeviceCreateBuffer(
-			gfx.device,
-			&{label = "ShapeBuffer", size = SHAPE_BUFFER_CAPACITY, usage = {.Storage, .CopyDst}},
-		)
-		gfx.paint_buffer = wgpu.DeviceCreateBuffer(
-			gfx.device,
-			&{label = "PaintBuffer", size = PAINT_BUFFER_CAPACITY, usage = {.Storage, .CopyDst}},
-		)
-		gfx.cvs_buffer = wgpu.DeviceCreateBuffer(
-			gfx.device,
-			&{
-				label = "ControlVertexBuffer",
-				size = CVS_BUFFER_CAPACITY,
-				usage = {.Storage, .CopyDst},
-			},
-		)
+		wgpu_buffer_create(&gfx.shapes, gfx.device, "ShapeBuffer", 4096)
+		wgpu_buffer_create(&gfx.paints, gfx.device, "PaintBuffer", 128)
+		wgpu_buffer_create(&gfx.cvs, gfx.device, "ControlVertexBuffer", 1024)
+		wgpu_buffer_create(&gfx.xforms, gfx.device, "MatrixBuffer", 64)
 		// Create bind group layouts
 		uniform_bind_group_layout := wgpu.DeviceCreateBindGroupLayout(
 			gfx.device,
@@ -238,33 +282,13 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			gfx.device,
 			&{
 				label = "StorageBindGroupLayout",
-				entryCount = 3,
+				entryCount = 4,
 				entries = ([^]wgpu.BindGroupLayoutEntry)(
 					&[?]wgpu.BindGroupLayoutEntry {
-						{
-							binding = 0,
-							buffer = wgpu.BufferBindingLayout {
-								type = .ReadOnlyStorage,
-								minBindingSize = size_of(Shape),
-							},
-							visibility = {.Fragment},
-						},
-						{
-							binding = 1,
-							buffer = wgpu.BufferBindingLayout {
-								type = .ReadOnlyStorage,
-								minBindingSize = size_of(Paint),
-							},
-							visibility = {.Fragment},
-						},
-						{
-							binding = 2,
-							buffer = wgpu.BufferBindingLayout {
-								type = .ReadOnlyStorage,
-								minBindingSize = size_of([2]f32),
-							},
-							visibility = {.Fragment},
-						},
+						wgpu_buffer_bind_group_layout_entry(&gfx.shapes, 0),
+						wgpu_buffer_bind_group_layout_entry(&gfx.paints, 1),
+						wgpu_buffer_bind_group_layout_entry(&gfx.cvs, 2),
+						wgpu_buffer_bind_group_layout_entry(&gfx.xforms, 3),
 					},
 				),
 			},
@@ -288,12 +312,13 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 			&{
 				label = "StorageBindGroup",
 				layout = storage_bind_group_layout,
-				entryCount = 3,
+				entryCount = 4,
 				entries = ([^]wgpu.BindGroupEntry)(
 					&[?]wgpu.BindGroupEntry {
-						{binding = 0, buffer = gfx.shape_buffer, size = SHAPE_BUFFER_CAPACITY},
-						{binding = 1, buffer = gfx.paint_buffer, size = PAINT_BUFFER_CAPACITY},
-						{binding = 2, buffer = gfx.cvs_buffer, size = CVS_BUFFER_CAPACITY},
+						wgpu_buffer_bind_group_entry(&gfx.shapes, 0),
+						wgpu_buffer_bind_group_entry(&gfx.paints, 1),
+						wgpu_buffer_bind_group_entry(&gfx.cvs, 2),
+						wgpu_buffer_bind_group_entry(&gfx.xforms, 3),
 					},
 				),
 			},
@@ -375,33 +400,43 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 }
 
 uninit_graphics :: proc(gfx: ^Graphics) {
+	wgpu_buffer_destroy(&gfx.shapes)
+	wgpu_buffer_destroy(&gfx.paints)
+	wgpu_buffer_destroy(&gfx.cvs)
+	wgpu_buffer_destroy(&gfx.xforms)
 	wgpu.SurfaceRelease(gfx.surface)
 	wgpu.BufferRelease(gfx.vertex_buffer)
 	wgpu.BufferRelease(gfx.index_buffer)
-	wgpu.BufferRelease(gfx.shape_buffer)
-	wgpu.BufferRelease(gfx.paint_buffer)
-	wgpu.BufferRelease(gfx.cvs_buffer)
 	wgpu.AdapterRelease(gfx.adapter)
 	wgpu.QueueRelease(gfx.queue)
 	wgpu.RenderPipelineRelease(gfx.pipeline)
 	wgpu.DeviceRelease(gfx.device)
 }
 
-draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
+reset :: proc(gfx: ^Graphics) {
+	clear(&gfx.vertices)
+	clear(&gfx.indices)
+	clear(&gfx.shapes.data)
+	clear(&gfx.paints.data)
+	clear(&gfx.cvs.data)
+	clear(&gfx.xforms.data)
+}
+
+draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 	// Write buffer data
 	wgpu.QueueWriteBuffer(
 		gfx.queue,
 		gfx.vertex_buffer,
 		0,
-		raw_data(draw_list.vertices),
-		len(draw_list.vertices) * size_of(Vertex),
+		raw_data(gfx.vertices),
+		len(gfx.vertices) * size_of(Vertex),
 	)
 	wgpu.QueueWriteBuffer(
 		gfx.queue,
 		gfx.index_buffer,
 		0,
-		raw_data(draw_list.indices),
-		len(draw_list.indices) * size_of(u32),
+		raw_data(gfx.indices),
+		len(gfx.indices) * size_of(u32),
 	)
 
 	// Set view bounds
@@ -456,24 +491,6 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		},
 	)
 	wgpu.RenderPassEncoderSetPipeline(rpass, gfx.pipeline)
-	wgpu.RenderPassEncoderSetVertexBuffer(
-		rpass,
-		0,
-		gfx.vertex_buffer,
-		0,
-		u64(len(draw_list.vertices) * size_of(Vertex)),
-	)
-	wgpu.RenderPassEncoderSetIndexBuffer(
-		rpass,
-		gfx.index_buffer,
-		.Uint32,
-		0,
-		u64(len(draw_list.indices) * size_of(u32)),
-	)
-
-	wgpu.RenderPassEncoderSetBindGroup(rpass, 0, gfx.uniform_bind_group)
-	wgpu.RenderPassEncoderSetBindGroup(rpass, 2, gfx.storage_bind_group)
-
 	wgpu.RenderPassEncoderSetViewport(
 		rpass,
 		0,
@@ -486,29 +503,30 @@ draw :: proc(gfx: ^Graphics, draw_list: ^Draw_List, draw_calls: []Draw_Call) {
 		0,
 	)
 
-	// Apply projection matrix
+	wgpu.RenderPassEncoderSetVertexBuffer(
+		rpass,
+		0,
+		gfx.vertex_buffer,
+		0,
+		u64(len(gfx.vertices) * size_of(Vertex)),
+	)
+	wgpu.RenderPassEncoderSetIndexBuffer(
+		rpass,
+		gfx.index_buffer,
+		.Uint32,
+		0,
+		u64(len(gfx.indices) * size_of(u32)),
+	)
+
+	wgpu.RenderPassEncoderSetBindGroup(rpass, 0, gfx.uniform_bind_group)
 	wgpu.QueueWriteBuffer(gfx.queue, gfx.uniform_buffer, 0, &uniform, size_of(uniform))
-	wgpu.QueueWriteBuffer(
-		gfx.queue,
-		gfx.shape_buffer,
-		0,
-		raw_data(core.draw_list.shapes),
-		size_of(Shape) * len(core.draw_list.shapes),
-	)
-	wgpu.QueueWriteBuffer(
-		gfx.queue,
-		gfx.paint_buffer,
-		0,
-		raw_data(core.draw_list.paints),
-		size_of(Paint) * len(core.draw_list.paints),
-	)
-	wgpu.QueueWriteBuffer(
-		gfx.queue,
-		gfx.cvs_buffer,
-		0,
-		raw_data(core.draw_list.cvs),
-		size_of([2]f32) * len(core.draw_list.cvs),
-	)
+
+	wgpu.RenderPassEncoderSetBindGroup(rpass, 2, gfx.storage_bind_group)
+	wgpu_buffer_update(&gfx.shapes, gfx.queue)
+	wgpu_buffer_update(&gfx.paints, gfx.queue)
+	wgpu_buffer_update(&gfx.cvs, gfx.queue)
+	wgpu_buffer_update(&gfx.xforms, gfx.queue)
+	wgpu.QueueSubmit(gfx.queue, {})
 
 	// Create transient texture view
 	atlas_texture_view := wgpu.TextureCreateView(core.font_atlas.texture.internal)

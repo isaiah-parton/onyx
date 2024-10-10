@@ -18,8 +18,6 @@ MIN_ATLAS_SIZE :: 1024
 MAX_ATLAS_SIZE :: 8192
 
 BUFFER_SIZE :: mem.Megabyte * 2
-MAX_VERTICES :: 65536
-MAX_INDICES :: 65536
 
 Gradient :: union {
 	Linear_Gradient,
@@ -85,6 +83,7 @@ Shape :: struct #align (16) {
 	start:   u32,
 	count:   u32,
 	stroke:  b32,
+	xform: u32,
 }
 
 Vertex :: struct {
@@ -105,14 +104,6 @@ Vertex_State :: struct {
 // Matrix used for vertex transforms
 Matrix :: matrix[4, 4]f32
 
-Draw_List :: struct {
-	vertices: [dynamic]Vertex,
-	indices:  [dynamic]u32,
-	shapes:   [dynamic]Shape,
-	paints:   [dynamic]Paint,
-	cvs:      [dynamic][2]f32,
-}
-
 Draw_Call :: struct {
 	user_texture: Maybe(wgpu.Texture),
 	elem_offset:  int,
@@ -130,24 +121,7 @@ Draw_State :: struct {
 	scissor: u32,
 	paint:   u32,
 	shape:   u32,
-}
-
-init_draw_list :: proc(draw_list: ^Draw_List) {
-	reserve(&draw_list.vertices, MAX_VERTICES)
-	reserve(&draw_list.indices, MAX_INDICES)
-}
-
-destroy_draw_list :: proc(draw_list: ^Draw_List) {
-	delete(draw_list.vertices)
-	delete(draw_list.indices)
-}
-
-clear_draw_list :: proc(draw_list: ^Draw_List) {
-	clear(&draw_list.vertices)
-	clear(&draw_list.indices)
-	clear(&draw_list.shapes)
-	clear(&draw_list.paints)
-	clear(&draw_list.cvs)
+	xform:	u32,
 }
 
 set_scissor_shape :: proc(shape: u32) {
@@ -159,8 +133,8 @@ set_paint :: proc(paint: u32) {
 }
 
 add_paint :: proc(paint: Paint) -> u32 {
-	index := u32(len(core.draw_list.paints))
-	append(&core.draw_list.paints, paint)
+	index := u32(len(core.gfx.paints.data))
+	append(&core.gfx.paints.data, paint)
 	return index
 }
 
@@ -217,7 +191,7 @@ add_vertex_2f32 :: proc(x, y: f32) -> (i: u32) {
 	}
 	i = next_vertex_index()
 	append(
-		&core.draw_list.vertices,
+		&core.gfx.vertices,
 		Vertex {
 			pos = pos,
 			uv = core.vertex_state.uv,
@@ -239,18 +213,18 @@ add_vertex :: proc {
 
 add_index :: proc(i: u32) {
 	assert(core.current_draw_call != nil)
-	append(&core.draw_list.indices, i)
+	append(&core.gfx.indices, i)
 	core.current_draw_call.elem_count += 1
 }
 
 add_indices :: proc(i: ..u32) {
 	assert(core.current_draw_call != nil)
-	append(&core.draw_list.indices, ..i)
+	append(&core.gfx.indices, ..i)
 	core.current_draw_call.elem_count += len(i)
 }
 
 next_vertex_index :: proc() -> u32 {
-	return u32(len(core.draw_list.vertices))
+	return u32(len(core.gfx.vertices))
 }
 
 current_matrix :: proc() -> Maybe(Matrix) {
@@ -274,7 +248,7 @@ pop_matrix :: proc() {
 append_draw_call :: proc(index: int, loc := #caller_location) {
 	append(&core.draw_calls, Draw_Call {
 		index        = index,
-		elem_offset  = len(core.draw_list.indices),
+		elem_offset  = len(core.gfx.indices),
 		user_texture = core.current_texture,
 	})
 	core.current_draw_call = &core.draw_calls[len(core.draw_calls) - 1]

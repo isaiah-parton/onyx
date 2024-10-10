@@ -1,9 +1,5 @@
 package onyx
 // Widgets are things you click on to do stuff.
-// Each has it's own allocator based on `core.scratch_allocator` for retained data
-// 	I have here a dilema:
-// 		Some widgets retain user data throughout their lifetime
-// 		Others retain data throughout the lifetime of the program
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
@@ -13,7 +9,7 @@ import "core:math/linalg"
 import "core:mem"
 import "core:time"
 
-DOUBLE_CLICK_TIME :: time.Millisecond * 450
+MAX_CLICK_DELAY :: time.Millisecond * 450
 // The internal widget structure
 Widget :: struct {
 	id:                                              Id,
@@ -47,6 +43,7 @@ Widget :: struct {
 	// },
 }
 // Widget variants
+// 	I'm using a union for safety, idk if it's really necessary
 Widget_Kind :: union {
 	Menu_Widget_Kind,
 	Graph_Widget_Kind,
@@ -65,6 +62,7 @@ Widget_Status :: enum {
 	Pressed,
 	Changed,
 	Clicked,
+	// Persistent
 	Open,
 	Active,
 }
@@ -240,6 +238,12 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	if core.hovered_widget == widget.id {
 		// Add hovered state
 		widget.state += {.Hovered}
+
+		// Reset click time if cursor is moved beyond a threshold
+		if linalg.length(core.mouse_pos - core.last_mouse_pos) > 2 {
+			widget.click_count = 0
+		}
+
 		// Clicking
 		pressed_buttons := core.mouse_bits - core.last_mouse_bits
 		if pressed_buttons != {} {
@@ -247,7 +251,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 				widget.click_button = core.mouse_button
 			}
 			if widget.click_button == core.mouse_button &&
-			   time.since(widget.click_time) <= DOUBLE_CLICK_TIME {
+			   time.since(widget.click_time) <= MAX_CLICK_DELAY {
 				widget.click_count = max((widget.click_count + 1) % 4, 1)
 			} else {
 				widget.click_count = 1
@@ -255,6 +259,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 			widget.click_button = core.mouse_button
 			widget.click_time = time.now()
 			widget.state += {.Pressed}
+			core.draw_this_frame = true
 			// Set the globally dragged widget
 			if info.sticky do core.dragged_widget = widget.id
 		}

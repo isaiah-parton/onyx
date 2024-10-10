@@ -24,11 +24,12 @@ add_shape_circle :: proc(center: [2]f32, radius: f32) -> u32 {
 }
 
 add_shape :: proc(shape: Shape) -> u32 {
-	index := u32(len(core.draw_list.shapes))
+	index := u32(len(core.gfx.shapes.data))
 	shape := shape
 	shape.paint = core.draw_state.paint
 	shape.scissor = core.draw_state.scissor
-	append(&core.draw_list.shapes, shape)
+	shape.xform = core.draw_state.xform
+	append(&core.gfx.shapes.data, shape)
 	return index
 }
 
@@ -45,14 +46,14 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 	case .Path:
 		for i in 0 ..< shape.count {
 			j := shape.start + i
-			box.lo = linalg.min(box.lo, core.draw_list.cvs[j])
-			box.hi = linalg.max(box.hi, core.draw_list.cvs[j])
+			box.lo = linalg.min(box.lo, core.gfx.cvs.data[j])
+			box.hi = linalg.max(box.hi, core.gfx.cvs.data[j])
 		}
 	case .Polygon:
 		for i in 0 ..< shape.count {
 			j := shape.start + i
-			box.lo = linalg.min(box.lo, core.draw_list.cvs[j])
-			box.hi = linalg.max(box.hi, core.draw_list.cvs[j])
+			box.lo = linalg.min(box.lo, core.gfx.cvs.data[j])
+			box.hi = linalg.max(box.hi, core.gfx.cvs.data[j])
 		}
 		box.lo -= 1
 		box.hi += 1
@@ -76,15 +77,15 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 	// This is subject to change.
 	if shape.kind != .BlurredBox {
 		if scissor, ok := current_scissor().?; ok {
-		box.lo = linalg.max(box.lo, scissor.box.lo)
-		box.hi = linalg.min(box.hi, scissor.box.hi)
+			box.lo = linalg.max(box.lo, scissor.box.lo)
+			box.hi = linalg.min(box.hi, scissor.box.hi)
 		}
 	}
 	return box
 }
 
 render_shape :: proc(shape: u32, color: Color) {
-	box := get_shape_bounding_box(core.draw_list.shapes[shape])
+	box := get_shape_bounding_box(core.gfx.shapes.data[shape])
 	if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
 	set_vertex_shape(shape)
 	set_vertex_color(color)
@@ -351,26 +352,24 @@ draw_cubic_bezier :: proc(a, b, c, d: [2]f32, width: f32, color: Color) {
 }
 
 add_polygon_shape :: proc(pts: ..[2]f32) -> u32 {
-	prim_index := u32(len(core.draw_list.shapes))
-	prim := Shape {
+	shape := Shape {
 		kind  = .Polygon,
-		start = u32(len(core.draw_list.cvs)),
+		start = u32(len(core.gfx.cvs.data)),
 	}
 	for p in pts {
-		append(&core.draw_list.cvs, p)
-		prim.count += 1
+		append(&core.gfx.cvs.data, p)
+		shape.count += 1
 	}
-	append(&core.draw_list.shapes, prim)
-	return prim_index
+	return add_shape(shape)
 }
 
 draw_polygon_fill :: proc(pts: [][2]f32, color: Color) {
 	shape := Shape {
 		kind  = .Polygon,
-		start = u32(len(core.draw_list.cvs)),
+		start = u32(len(core.gfx.cvs.data)),
 		count = u32(len(pts)),
 	}
-	append(&core.draw_list.cvs, ..pts)
+	append(&core.gfx.cvs.data, ..pts)
 	shape_index := add_shape(shape)
 	render_shape(shape_index, color)
 }
@@ -483,9 +482,9 @@ draw_rounded_box_shadow :: proc(box: Box, corner_radius, blur_radius: f32, color
 	}
 	corner_radius := min(corner_radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
 
-	shape_index := u32(len(core.draw_list.shapes))
+	shape_index := u32(len(core.gfx.shapes.data))
 	append(
-		&core.draw_list.shapes,
+		&core.gfx.shapes.data,
 		Shape {
 			kind = .BlurredBox,
 			radius = corner_radius,
@@ -508,9 +507,9 @@ draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
 	}
 	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
 
-	shape_index := u32(len(core.draw_list.shapes))
+	shape_index := u32(len(core.gfx.shapes.data))
 	append(
-		&core.draw_list.shapes,
+		&core.gfx.shapes.data,
 		Shape {
 			kind = .Box,
 			corners = radius,

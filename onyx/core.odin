@@ -3,12 +3,12 @@ package onyx
 import "vendor:glfw"
 
 import "base:runtime"
-import "core:os"
-import "core:path/filepath"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 import "core:mem"
+import "core:os"
+import "core:path/filepath"
 import "core:slice"
 import "core:strings"
 import "core:sys/windows"
@@ -57,7 +57,6 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 	stack.height = 0
 }
 
-// Private global core instance
 // @(private)
 core: Core
 
@@ -165,7 +164,6 @@ Core :: struct {
 	current_texture:       wgpu.Texture,
 	scissor_stack:         Stack(Scissor, 100),
 	path_stack:            Stack(Path, 10),
-	draw_list:             Draw_List,
 	draw_calls:            [dynamic]Draw_Call,
 	current_draw_call:     ^Draw_Call,
 	cursors:               [Mouse_Cursor]glfw.CursorHandle,
@@ -188,20 +186,27 @@ view_height :: proc() -> f32 {
 	return core.view.y
 }
 
-init :: proc(window: glfw.WindowHandle, style: ^Style = nil) -> bool {
+init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	if window == nil do return false
 
 	// Default style
 	if style == nil {
 		core.style.color = dark_color_scheme()
 		core.style.shape = default_style_shape()
-		fmt.printfln("No style provided by user, looking for default fonts in '%s'", filepath.abs(FONT_PATH) or_return)
-		core.style.default_font = load_font(fmt.tprintf("%s/Geist-Medium.ttf", FONT_PATH)) or_return
-		core.style.monospace_font = load_font(fmt.tprintf("%s/Recursive_Monospace-Regular.ttf", FONT_PATH)) or_return
+		fmt.printfln(
+			"No style provided by user, looking for default fonts in '%s'",
+			filepath.abs(FONT_PATH) or_return,
+		)
+		core.style.default_font = load_font(
+			fmt.tprintf("%s/Geist-Medium.ttf", FONT_PATH),
+		) or_return
+		core.style.monospace_font = load_font(
+			fmt.tprintf("%s/Recursive_Monospace-Regular.ttf", FONT_PATH),
+		) or_return
 		core.style.header_font = load_font(fmt.tprintf("%s/Lora-Medium.ttf", FONT_PATH)) or_return
 		core.style.icon_font = load_font(fmt.tprintf("%s/remixicon.ttf", FONT_PATH)) or_return
 	} else {
-		core.style = style^
+		core.style = style.?
 	}
 
 	core.window = window
@@ -266,7 +271,6 @@ init :: proc(window: glfw.WindowHandle, style: ^Style = nil) -> bool {
 		}
 	})
 	glfw.SetCursorPosCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
-		core.last_mouse_pos = core.mouse_pos
 		core.mouse_pos = {f32(x), f32(y)}
 	})
 	glfw.SetMouseButtonCallback(
@@ -284,8 +288,6 @@ init :: proc(window: glfw.WindowHandle, style: ^Style = nil) -> bool {
 	// Initialize graphics pipeline
 	init_graphics(&core.gfx, core.window, 1)
 
-	// Initalize draw list
-	init_draw_list(&core.draw_list)
 	// Init font atlas
 	atlas_size: int = min(cast(int)core.gfx.device_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
@@ -307,6 +309,7 @@ new_frame :: proc() {
 
 	profiler_begin_scope(.New_Frame)
 
+	// Update timings
 	now := time.now()
 	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
 	core.last_frame_time = now
@@ -317,6 +320,29 @@ new_frame :: proc() {
 		core.frames_this_second = core.frames_so_far
 		core.frames_so_far = 0
 	}
+
+	// Reset draw calls and draw list
+	clear(&core.draw_calls)
+	core.current_draw_call = nil
+
+	// Reset draw state
+	core.draw_state = {}
+	core.vertex_state = {}
+	core.current_texture = {}
+
+	// Clear inputs
+	core.last_mouse_bits = core.mouse_bits
+	core.last_mouse_pos = core.mouse_pos
+	core.last_keys = core.keys
+	core.mouse_scroll = {}
+	clear(&core.runes)
+
+	// Clear text job arrays
+	clear(&core.glyphs)
+	clear(&core.lines)
+
+	// Clear temp allocator
+	free_all(context.temp_allocator)
 
 	// Handle window events
 	glfw.PollEvents()
@@ -360,6 +386,8 @@ new_frame :: proc() {
 	// Update layer ids
 	core.highest_layer_index = 0
 	core.last_hovered_layer = core.hovered_layer
+	core.last_hovered_widget = core.hovered_widget
+	core.last_focused_widget = core.focused_widget
 	core.hovered_layer = core.next_hovered_layer
 	core.next_hovered_layer = 0
 
@@ -435,9 +463,8 @@ new_frame :: proc() {
 	// Decide if the next frame will be drawn
 	if (core.mouse_pos != core.last_mouse_pos ||
 		   core.mouse_bits != core.last_mouse_bits ||
-		   len(core.runes) > 0 ||
-		   core.last_focused_widget != core.focused_widget ||
-		   core.last_hovered_widget != core.hovered_widget) {
+		   core.keys != core.last_keys ||
+		   len(core.runes) > 0) {
 		core.draw_this_frame = true
 		core.draw_next_frame = true
 	}
@@ -445,10 +472,12 @@ new_frame :: proc() {
 	// Process widgets
 	process_widgets()
 
+	reset(&core.gfx)
+
 	// Add default draw elements
 	// Index 0 acts like null
-	append(&core.draw_list.paints, Paint{kind = .Normal})
-	append(&core.draw_list.shapes, Shape{kind = .Normal})
+	append(&core.gfx.paints.data, Paint{kind = .Normal})
+	append(&core.gfx.shapes.data, Shape{kind = .Normal})
 
 	// Make the default draw elements active
 	set_vertex_shape(0)
@@ -472,37 +501,11 @@ render :: proc() {
 
 	if core.draw_this_frame && core.visible {
 		profiler_begin_scope(.Render_Draw)
-		draw(&core.gfx, &core.draw_list, core.draw_calls[:])
+		draw(&core.gfx, core.draw_calls[:])
 
 		core.drawn_frames += 1
 		core.draw_this_frame = false
 	}
-
-	// Reset draw calls and draw list
-	clear(&core.draw_calls)
-	core.current_draw_call = nil
-
-	clear_draw_list(&core.draw_list)
-	core.current_texture = {}
-
-	// Reset draw state
-	core.draw_state = {}
-
-	// Reset vertex state
-	core.vertex_state = {}
-
-	// Reset input values
-	core.last_mouse_bits = core.mouse_bits
-	core.last_keys = core.keys
-	core.mouse_scroll = {}
-	clear(&core.runes)
-
-	// Clear text job arrays
-	clear(&core.glyphs)
-	clear(&core.lines)
-
-	// Clear temp allocator
-	free_all(context.temp_allocator)
 }
 
 uninit :: proc() {
@@ -530,7 +533,6 @@ uninit :: proc() {
 	delete(core.runes)
 
 	destroy_atlas(&core.font_atlas)
-	destroy_draw_list(&core.draw_list)
 	uninit_graphics(&core.gfx)
 }
 

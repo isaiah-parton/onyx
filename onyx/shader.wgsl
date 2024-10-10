@@ -19,6 +19,7 @@ struct Shape {
 	start: u32,
 	count: u32,
 	stroke: u32,
+	xform: u32,
 };
 
 struct Shapes {
@@ -64,6 +65,14 @@ struct CVS {
 @group(2)
 @binding(2)
 var<storage> cvs: CVS;
+
+struct XForms {
+	xforms: array<PackedMat3x2>,
+};
+
+@group(2)
+@binding(3)
+var<storage> xforms: XForms;
 
 struct VertexInput {
 	@location(0) pos: vec2<f32>,
@@ -183,7 +192,7 @@ fn sd_bezier(pos: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32> ) -> f32 {
     // the third root cannot be the closest
     // res = min(res,dot2(d+(c+b*t.z)*t.z));
   }
-  return sqrt( res );
+  return sqrt( res ) + 1;
 }
 
 fn rounded_box_shadow_x(x: f32, y: f32, sigma: f32, corner: f32, half_size: vec2<f32>) -> f32 {
