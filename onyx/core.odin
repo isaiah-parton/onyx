@@ -205,6 +205,7 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		) or_return
 		core.style.monospace_font = load_font(
 			fmt.tprintf("%s/Recursive_Monospace-Regular.ttf", FONT_PATH),
+			monospace = true,
 		) or_return
 		core.style.header_font = load_font(fmt.tprintf("%s/Lora-Medium.ttf", FONT_PATH)) or_return
 		core.style.icon_font = load_font(fmt.tprintf("%s/remixicon.ttf", FONT_PATH)) or_return

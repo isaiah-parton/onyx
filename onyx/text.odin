@@ -80,10 +80,11 @@ Font_Size :: struct {
 }
 
 Font :: struct {
-	name, path: string,
+	name: 			string,
 	data:       ttf.fontinfo,
 	sizes:      map[f32]Font_Size,
 	spacing:    f32,
+	monospace: bool,
 }
 
 Glyph :: struct {
@@ -305,7 +306,6 @@ destroy_font :: proc(font: ^Font) {
 	}
 	delete(font.sizes)
 	delete(font.name)
-	delete(font.path)
 }
 
 destroy_font_size :: proc(font_size: ^Font_Size) {
@@ -325,8 +325,8 @@ make_text_iterator :: proc(info: Text_Info) -> (iter: Text_Iterator, ok: bool) {
 }
 
 get_glyph_from_fallback_font :: proc(codepoint: rune, size: f32) -> (glyph: Glyph, ok: bool) {
-	font := &core.fonts[core.style.icon_font].?
-	return get_glyph(font, get_font_size(font, size) or_return, codepoint)
+	font := core.fonts[core.style.icon_font].? or_return
+	return get_glyph(&font, get_font_size(&font, size) or_return, codepoint)
 }
 
 iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
@@ -345,12 +345,15 @@ iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 	if it.codepoint == '\n' || it.codepoint == '\r' {
 		it.glyph = {}
 	} else {
-		codepoint := '•' if it.info.hidden else it.codepoint
-		it.glyph =
-			get_glyph(it.font, it.size, codepoint) or_else (get_glyph_from_fallback_font(
-					codepoint,
-					it.info.size,
-				) or_return)
+		r := '•' if it.info.hidden else it.codepoint
+		ok: bool
+		it.glyph, ok = get_glyph(it.font, it.size, r)
+		if !ok && r > unicode.MAX_LATIN1 {
+			it.glyph, ok = get_glyph_from_fallback_font(
+				r,
+				it.info.size,
+			)
+		}
 	}
 	return true
 }
@@ -464,13 +467,14 @@ measure_text :: proc(info: Text_Info) -> [2]f32 {
 	return job.size
 }
 
-load_font :: proc(file_path: string) -> (handle: int, success: bool) {
+load_font :: proc(file_path: string, monospace: bool = false) -> (handle: int, success: bool) {
 	font: Font
 
 	file_data := os.read_entire_file(file_path) or_return
 
 	if ttf.InitFont(&font.data, raw_data(file_data), 0) {
 		font.spacing = 1
+		font.monospace = monospace
 		for i in 0 ..< MAX_FONTS {
 			if core.fonts[i] == nil {
 				core.fonts[i] = font
@@ -512,13 +516,13 @@ get_font_size :: proc(font: ^Font, size: f32) -> (data: ^Font_Size, ok: bool) {
 }
 
 // First creates the glyph if it doesn't exist, then returns its data
-get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (glyph: Glyph, ok: bool) {
+get_glyph :: proc(font: ^Font, size: ^Font_Size, r: rune) -> (glyph: Glyph, ok: bool) {
 	// Try fetching from map
-	glyph, ok = size.glyphs[codepoint]
+	glyph, ok = size.glyphs[r]
 	// If the glyph doesn't exist, we create and render it
 	if !ok {
 		// Get codepoint index
-		index := ttf.FindGlyphIndex(&font.data, codepoint)
+		index := ttf.FindGlyphIndex(&font.data, r)
 		if index == 0 {
 			return
 		}
@@ -547,9 +551,15 @@ get_glyph :: proc(font: ^Font, size: ^Font_Size, codepoint: rune) -> (glyph: Gly
 				&core.gfx,
 			),
 			offset  = {f32(glyph_offset_x), f32(glyph_offset_y) + size.ascent},
-			advance = f32((f32(advance) - f32(left_side_bearing)) * size.scale),
+			advance = f32(advance),
 		}
-		size.glyphs[codepoint] = glyph
+		if !font.monospace {
+			glyph.advance -= f32(left_side_bearing)
+		}
+		glyph.advance *= size.scale
+
+		// Assign the new glyph
+		size.glyphs[r] = glyph
 		ok = true
 	}
 	return

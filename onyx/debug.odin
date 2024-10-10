@@ -29,24 +29,46 @@ __profiler_end_scope :: proc(scope: Profiler_Scope) {
 @(private)
 do_debug_layer :: proc() {
 	begin_layer({box = view_box(), sorting = .Above, kind = .Debug})
-	draw_text(
-		{},
-		{
+	offset: f32
+	offset += draw_text({}, {
 			text = fmt.tprintf(
-				"fps: %i\nframes drawn: %i\ndraw calls: %i (minus debug layer)",
-				core.frames_this_second,
-				core.drawn_frames,
-				// Debug layer not included
-				len(core.draw_calls) - 1,
-			),
-			font = core.style.default_font,
-			size = 20,
-		},
-		{255, 255, 255, 255},
-	)
+`fps: %i
+
+frames drawn: %i
+draw calls:   %i (- debug layer)
+
+vertices: %i/%i
+indices:  %i/%i
+shapes:   %i/%i
+paints:   %i/%i
+cvs:      %i/%i
+xforms:   %i/%i`,
+core.frames_this_second,
+core.drawn_frames,
+len(core.draw_calls) - 1,
+len(core.gfx.vertices),
+(BUFFER_SIZE / size_of(Vertex)),
+len(core.gfx.indices),
+(BUFFER_SIZE / size_of(u32)),
+len(core.gfx.shapes.data),
+core.gfx.shapes.capacity,
+len(core.gfx.paints.data),
+core.gfx.shapes.capacity,
+len(core.gfx.cvs.data),
+core.gfx.cvs.capacity,
+len(core.gfx.xforms.data),
+core.gfx.xforms.capacity,
+), // Debug layer not included
+			font = core.style.monospace_font,
+			size = 14,
+		}, {255, 255, 255, 255}).y + 10
+	for id, layer in core.layer_map {
+		offset +=
+			draw_text({0, f32(offset)}, {text = fmt.tprintf("%i - %i", layer.id, layer.index), font = core.style.monospace_font, size = 14}, 255).y
+	}
 	for scope, s in Profiler_Scope {
 		draw_text(
-			{0, core.view.y - f32(20 * (s + 1))},
+			{0, core.view.y - f32(14 * (s + 1))},
 			{
 				text = fmt.tprintf(
 					"%v: %.2fms",
@@ -54,7 +76,7 @@ do_debug_layer :: proc() {
 					time.duration_milliseconds(__prof.d[scope]),
 				),
 				font = core.style.default_font,
-				size = 20,
+				size = 14,
 			},
 			{255, 255, 255, 255},
 		)

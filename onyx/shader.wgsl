@@ -382,9 +382,11 @@ fn not(v: vec3<bool>) -> vec3<bool> {
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
 	let xform = xforms.xforms[shapes.shapes[in.shape].xform];
+  var pos = (xform * vec4<f32>(in.pos, 0.0, 1.0)).xy;
+  pos = vec2<f32>(2.0, -2.0) * pos / uniforms.size + vec2<f32>(-1.0, 1.0);
   var out: VertexOutput;
-  out.p = in.pos.xy;
-  out.pos = vec4<f32>(vec2<f32>(2.0, -2.0) * (xform * vec4<f32>(in.pos, 0.0, 1.0)).xy / uniforms.size + vec2<f32>(-1.0, 1.0), 0.0, 1.0);
+  out.p = in.pos;
+  out.pos = vec4<f32>(pos, 0.0, 1.0);
   out.uv = in.uv;
   out.col = in.col;
   out.shape = in.shape;
