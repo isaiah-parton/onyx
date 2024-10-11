@@ -381,3 +381,29 @@ foreground :: proc(loc := #caller_location) {
 		}
 	}
 }
+
+Spinner_Info :: Widget_Info
+
+init_spinner :: proc(using info: ^Spinner_Info, loc := #caller_location) -> bool {
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
+	desired_size = core.style.visual_size.y
+	return true
+}
+
+add_spinner :: proc(using info: ^Spinner_Info) -> bool {
+	begin_widget(info) or_return
+	defer end_widget()
+
+	draw_spinner(box_center(self.box), box_height(self.box) * 0.5, core.style.color.substance)
+
+	return true
+}
+
+spinner :: proc(info: Spinner_Info, loc := #caller_location) -> Spinner_Info {
+	info := info
+	if init_spinner(&info) {
+		add_spinner(&info)
+	}
+	return info
+}

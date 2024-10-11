@@ -76,6 +76,11 @@ end_selector :: proc() -> bool {
 		if .Hovered not_in layer.state && .Focused not_in self.state {
 			self.state -= {.Open}
 		}
+		draw_rounded_box_fill(
+			current_layer().?.box,
+			core.style.rounding,
+			fade(core.style.color.foreground, 1 - self.open_time),
+		)
 		end_layer()
 	}
 	end_widget()

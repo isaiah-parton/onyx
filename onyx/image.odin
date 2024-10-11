@@ -42,8 +42,13 @@ draw_texture :: proc(texture: wgpu.Texture, box: Box, tint: Color) {
 	// last_texture := get_current_texture()
 	set_texture(texture)
 
-	set_vertex_color(tint)
+	set_paint(add_paint({kind = .User_Image}))
+	defer set_paint(0)
 
+	set_vertex_shape(add_shape(Shape{kind = .Normal}))
+	defer set_vertex_shape(0)
+
+	set_vertex_color(tint)
 	set_vertex_uv(0)
 	tl := add_vertex(box.lo)
 	set_vertex_uv({0, 1})
@@ -54,8 +59,6 @@ draw_texture :: proc(texture: wgpu.Texture, box: Box, tint: Color) {
 	tr := add_vertex({box.hi.x, box.lo.y})
 
 	add_indices(tl, br, bl, tl, tr, br)
-
-	// set_texture(last_texture)
 }
 
 draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color) {

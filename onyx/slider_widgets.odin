@@ -10,7 +10,7 @@ Slider_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	lo, hi:  T,
 }
 
-init_slider :: proc(info: ^Slider_Info($T), loc := #caller_location) -> bool {
+init_slider :: proc(using info: ^Slider_Info($T), loc := #caller_location) -> bool {
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	sticky = true

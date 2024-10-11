@@ -17,7 +17,7 @@ import "tedit"
 import "vendor:fontstash"
 import "vendor:wgpu"
 
-FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx/fonts")
+EMBED_DEFAULT_FONTS :: #config(ONYX_EMBED_FONTS, false)
 MAX_IDS :: 32
 MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
@@ -71,7 +71,7 @@ Core :: struct {
 	debug:                 Debug_State,
 	view:                  [2]f32,
 	desired_fps:           int,
-	disable_frame_skip: bool,
+	disable_frame_skip:    bool,
 	last_second:           time.Time,
 	frames_so_far:         int,
 	frames_this_second:    int,
@@ -96,8 +96,8 @@ Core :: struct {
 	drag_offset:           [2]f32,
 
 	// Form
-	form: Form,
-	form_active: bool,
+	form:                  Form,
+	form_active:           bool,
 
 	// Layout
 	layout_stack:          Stack(Layout, MAX_LAYOUTS),
@@ -167,7 +167,7 @@ Core :: struct {
 	matrix_stack:          Stack(Matrix, MAX_MATRICES),
 	current_matrix:        ^Matrix,
 	last_matrix:           Matrix,
-	matrix_index: u32,
+	matrix_index:          u32,
 	current_texture:       wgpu.Texture,
 	scissor_stack:         Stack(Scissor, 100),
 	path_stack:            Stack(Path, 10),
@@ -200,19 +200,41 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	if style == nil {
 		core.style.color = dark_color_scheme()
 		core.style.shape = default_style_shape()
-		fmt.printfln(
-			"No style provided by user, looking for default fonts in '%s'",
-			filepath.abs(FONT_PATH) or_return,
-		)
-		core.style.default_font = load_font(
-			fmt.tprintf("%s/Geist-Medium.ttf", FONT_PATH),
+		fmt.printfln("No style provided by user, using default theme and fonts")
+
+		DEFAULT_FONT :: "fonts/Geist-Medium.ttf"
+		MONOSPACE_FONT :: "fonts/iAWriterMonoS-Regular.ttf"
+		HEADER_FONT :: "fonts/Lora-Medium.ttf"
+		ICON_FONT :: "fonts/remixicon.ttf"
+
+		DEFAULT_FONT_DATA: Maybe([]u8) =
+			#load(DEFAULT_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+		MONOSPACE_FONT_DATA: Maybe([]u8) =
+			#load(MONOSPACE_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+		HEADER_FONT_DATA: Maybe([]u8) = #load(HEADER_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+		ICON_FONT_DATA: Maybe([]u8) = #load(ICON_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+
+		core.style.default_font = load_font_from_memory(
+			DEFAULT_FONT_DATA.? or_else os.read_entire_file(
+				fmt.tprintf("../onyx/%s", DEFAULT_FONT),
+			) or_return,
 		) or_return
-		core.style.monospace_font = load_font(
-			fmt.tprintf("%s/Recursive_Monospace-Regular.ttf", FONT_PATH),
+		core.style.monospace_font = load_font_from_memory(
+			MONOSPACE_FONT_DATA.? or_else os.read_entire_file(
+				fmt.tprintf("../onyx/%s", MONOSPACE_FONT),
+			) or_return,
 			monospace = true,
 		) or_return
-		core.style.header_font = load_font(fmt.tprintf("%s/Lora-Medium.ttf", FONT_PATH)) or_return
-		core.style.icon_font = load_font(fmt.tprintf("%s/remixicon.ttf", FONT_PATH)) or_return
+		core.style.header_font = load_font_from_memory(
+			HEADER_FONT_DATA.? or_else os.read_entire_file(
+				fmt.tprintf("../onyx/%s", HEADER_FONT),
+			) or_return,
+		) or_return
+		core.style.icon_font = load_font_from_memory(
+			ICON_FONT_DATA.? or_else os.read_entire_file(
+				fmt.tprintf("../onyx/%s", ICON_FONT),
+			) or_return,
+		) or_return
 	} else {
 		core.style = style.?
 	}
@@ -294,7 +316,7 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	)
 
 	// Initialize graphics pipeline
-	init_graphics(&core.gfx, core.window, 1)
+	init_graphics(&core.gfx, core.window)
 
 	// Init font atlas
 	atlas_size: int = min(cast(int)core.gfx.device_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)

@@ -22,14 +22,8 @@ Atlas :: struct {
 
 init_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics, width, height: int) {
 	atlas.width, atlas.height = width, height
-	pixels := make([]u8, width * height * 4)
-	defer delete(pixels)
-	assert(len(pixels) > 0)
-	pixels[0] = 255
-	pixels[1] = 255
-	pixels[2] = 255
-	pixels[3] = 255
-	atlas.offset = {1, 1}
+
+	resize(&atlas.image.pixels.buf, width * height * 4)
 
 	atlas.texture = {
 		width    = width,
@@ -46,9 +40,6 @@ init_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics, width, height: int) {
 			},
 		),
 	}
-	bytes.buffer_init(&atlas.image.pixels, pixels)
-	atlas.modified = true
-	atlas.modified_box = {0, 1}
 }
 
 destroy_atlas :: proc(atlas: ^Atlas) {

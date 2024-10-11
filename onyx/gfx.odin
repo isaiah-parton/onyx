@@ -83,7 +83,6 @@ Graphics :: struct {
 	device:                    wgpu.Device,
 	queue:                     wgpu.Queue,
 	// Settings
-	sample_count:              int,
 	surface_config:            wgpu.SurfaceConfiguration,
 	device_limits:             wgpu.Limits,
 	// Resources
@@ -112,11 +111,10 @@ resize_graphics :: proc(gfx: ^Graphics, width, height: int) {
 }
 
 @(cold)
-init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: int) {
+init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 
 	width, height := glfw.GetWindowSize(window)
 	gfx.width, gfx.height = u32(width), u32(height)
-	gfx.sample_count = sample_count
 
 	// Create the wgpu instance
 	when ODIN_OS == .Windows {
@@ -393,7 +391,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle, sample_count: i
 					},
 				},
 				primitive = {topology = .TriangleList},
-				multisample = {count = u32(gfx.sample_count), mask = 0xffffffff},
+				multisample = {count = u32(1), mask = 0xffffffff},
 			},
 		)
 	}
@@ -495,20 +493,24 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 		0,
 	)
 
-	wgpu.RenderPassEncoderSetVertexBuffer(
-		rpass,
-		0,
-		gfx.vertex_buffer,
-		0,
-		u64(len(gfx.vertices) * size_of(Vertex)),
-	)
-	wgpu.RenderPassEncoderSetIndexBuffer(
-		rpass,
-		gfx.index_buffer,
-		.Uint32,
-		0,
-		u64(len(gfx.indices) * size_of(u32)),
-	)
+	if len(gfx.vertices) > 0 {
+		wgpu.RenderPassEncoderSetVertexBuffer(
+			rpass,
+			0,
+			gfx.vertex_buffer,
+			0,
+			u64(len(gfx.vertices) * size_of(Vertex)),
+		)
+	}
+	if len(gfx.indices) > 0 {
+		wgpu.RenderPassEncoderSetIndexBuffer(
+			rpass,
+			gfx.index_buffer,
+			.Uint32,
+			0,
+			u64(len(gfx.indices) * size_of(u32)),
+		)
+	}
 
 	wgpu.RenderPassEncoderSetBindGroup(rpass, 0, gfx.uniform_bind_group)
 	wgpu.QueueWriteBuffer(gfx.queue, gfx.uniform_buffer, 0, &uniform, size_of(uniform))

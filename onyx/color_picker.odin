@@ -204,6 +204,13 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		if layer, ok := layer(get_popup_layer_info(self, layer_size + input_size, side = .Right)); ok {
 			draw_shadow(layout_box(), self.open_time)
 			foreground()
+			defer {
+				draw_rounded_box_fill(
+					current_layer().?.box,
+					core.style.rounding,
+					fade(core.style.color.foreground, 1 - self.open_time),
+				)
+			}
 
 			shrink(PADDING)
 

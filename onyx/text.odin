@@ -300,7 +300,6 @@ draw_text_cursor :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 }
 
 destroy_font :: proc(font: ^Font) {
-	free(font.data.data)
 	for _, &size in font.sizes {
 		destroy_font_size(&size)
 	}
@@ -467,25 +466,30 @@ measure_text :: proc(info: Text_Info) -> [2]f32 {
 	return job.size
 }
 
-load_font :: proc(file_path: string, monospace: bool = false) -> (handle: int, success: bool) {
-	font: Font
+load_font_from_file :: proc(path: string, monospace: bool = false) -> (handle: int, ok: bool) {
+	data := os.read_entire_file(path) or_return
+	defer delete(data)
 
-	file_data := os.read_entire_file(file_path) or_return
+	return load_font_from_memory(data, monospace)
+}
 
-	if ttf.InitFont(&font.data, raw_data(file_data), 0) {
-		font.spacing = 1
-		font.monospace = monospace
-		for i in 0 ..< MAX_FONTS {
-			if core.fonts[i] == nil {
-				core.fonts[i] = font
-				handle = int(i)
-				success = true
-				break
-			}
-		}
-	} else {
-		fmt.printf("[onyx] Failed to initialize font '%s'\n", file_path)
+load_font_from_memory :: proc(data: []u8, monospace: bool = false) -> (handle: int, ok: bool) {
+	font := Font{
+		spacing = 1,
+		monospace = monospace,
 	}
+
+	ttf.InitFont(&font.data, raw_data(data), 0) or_return
+
+	for i in 0 ..< MAX_FONTS {
+		if core.fonts[i] == nil {
+			core.fonts[i] = font
+			handle = int(i)
+			ok = true
+			break
+		}
+	}
+
 	return
 }
 

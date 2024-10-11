@@ -413,11 +413,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
 	// Get pixel color
 	switch (paint.kind) {
-		// User_Image
+		// Glyph
 		case 1u: {
 			out = textureSample(atlas_tex, samp, in.uv) * in.col;
-			out.a *= 1.125;
+			out.a *= 1.0 + 0.125 * out.r;
 		}
+		// User_Image
 		case 2u: {
 			out = textureSample(user_tex, samp, in.uv) * in.col;
 		}
