@@ -102,9 +102,6 @@ Core :: struct {
 	// Layout
 	layout_stack:          Stack(Layout, MAX_LAYOUTS),
 
-	// Containers
-	container_map:         map[Id]^Container,
-	container_stack:       Stack(^Container, 200),
 	active_container:      Id,
 	next_active_container: Id,
 
@@ -163,7 +160,6 @@ Core :: struct {
 	frames:                int,
 	drawn_frames:          int,
 	draw_state:            Draw_State,
-	vertex_state:          Vertex_State,
 	matrix_stack:          Stack(Matrix, MAX_MATRICES),
 	current_matrix:        ^Matrix,
 	last_matrix:           Matrix,
@@ -359,7 +355,6 @@ new_frame :: proc() {
 
 	// Reset draw state
 	core.draw_state = {}
-	core.vertex_state = {}
 	core.current_texture = {}
 	core.scissor_stack.height = 0
 	core.matrix_stack.height = 0
@@ -415,8 +410,8 @@ new_frame :: proc() {
 	// Reset stuff
 	core.layer_stack.height = 0
 	core.layout_stack.height = 0
-	core.container_stack.height = 0
 	core.widget_stack.height = 0
+	core.panel_stack.height = 0
 
 	// Update layer ids
 	core.highest_layer_index = 0
@@ -479,16 +474,6 @@ new_frame :: proc() {
 		}
 	}
 
-	// Free unused containers
-	for id, container in core.container_map {
-		if container.dead {
-			delete_key(&core.container_map, id)
-			free(container)
-		} else {
-			container.dead = true
-		}
-	}
-
 	// Decide if this frame will be drawn
 	if core.draw_next_frame {
 		core.draw_next_frame = false
@@ -517,10 +502,6 @@ new_frame :: proc() {
 
 	// Default shape lives at index 0
 	append(&core.gfx.shapes.data, Shape{kind = .Normal})
-
-	// Make the default draw elements active
-	set_vertex_shape(0)
-	set_paint(0)
 }
 
 // Render queued draw calls and reset draw state

@@ -205,7 +205,6 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer
 	// Set vertex z position
 	push_scissor(layer.box)
 	append_draw_call(current_layer().?.index)
-	set_global_alpha(layer.opacity)
 
 	// Transform matrix
 	scale: [2]f32 = info.scale.? or_else 1
@@ -240,7 +239,6 @@ end_layer :: proc() {
 	// Append a new draw call for the previous layer if there is one and reset the global alpha
 	if layer, ok := current_layer().?; ok {
 		append_draw_call(layer.index)
-		set_global_alpha(layer.opacity)
 	}
 }
 

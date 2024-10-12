@@ -39,48 +39,35 @@ destroy_image :: proc(image: ^Image) {
 }
 
 draw_texture :: proc(texture: wgpu.Texture, box: Box, tint: Color) {
-	// last_texture := get_current_texture()
 	set_texture(texture)
 
 	set_paint(add_paint({kind = .User_Image}))
 	defer set_paint(0)
 
-	set_vertex_shape(add_shape(Shape{kind = .Normal}))
-	defer set_vertex_shape(0)
+	shape := add_shape(Shape{kind = .Normal})
 
-	set_vertex_color(tint)
-	set_vertex_uv(0)
-	tl := add_vertex(box.lo)
-	set_vertex_uv({0, 1})
-	bl := add_vertex({box.lo.x, box.hi.y})
-	set_vertex_uv(1)
-	br := add_vertex(box.hi)
-	set_vertex_uv({1, 0})
-	tr := add_vertex({box.hi.x, box.lo.y})
+	a := add_vertex({pos = box.lo, col = tint})
+	b := add_vertex({pos = {box.lo.x, box.hi.y}, col = tint, uv = {0, 1}})
+	c := add_vertex({pos = box.hi, col = tint, uv = 1})
+	d := add_vertex({pos = {box.hi.x, box.lo.y}, col = tint, uv = {1, 0}})
 
-	add_indices(tl, br, bl, tl, tr, br)
+	add_indices(a, b, c, a, c, d)
 }
 
 draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color) {
 	last_texture := get_current_texture()
 	set_texture(texture.internal)
-	set_vertex_color(tint)
 
 	size: [2]f32 = {f32(texture.width), f32(texture.height)}
 
-	set_vertex_shape(add_shape(Shape{kind = .Normal}))
-	set_vertex_uv(source.lo / size)
-	tl := add_vertex(target.lo)
-	set_vertex_uv({source.lo.x, source.hi.y} / size)
-	bl := add_vertex({target.lo.x, target.hi.y})
-	set_vertex_uv(source.hi / size)
-	br := add_vertex(target.hi)
-	set_vertex_uv({source.hi.x, source.lo.y} / size)
-	tr := add_vertex({target.hi.x, target.lo.y})
+	shape := add_shape(Shape{kind = .Normal})
 
-	add_indices(tl, br, bl, tl, tr, br)
-	set_vertex_shape(0)
-	set_texture(last_texture)
+	a := add_vertex({pos = target.lo, uv = source.lo / size, col = tint})
+	b := add_vertex({pos = {target.lo.x, target.hi.y}, col = tint, uv = [2]f32{source.lo.x, source.hi.y} / size})
+	c := add_vertex({pos = target.hi, col = tint, uv = source.hi / size})
+	d := add_vertex({pos = {target.hi.x, target.lo.y}, col = tint, uv = [2]f32{source.hi.x, source.lo.y} / size})
+
+	add_indices(a, b, c, a, c, d)
 }
 
 set_texture :: proc(texture: wgpu.Texture) {

@@ -49,15 +49,6 @@ Paint_Kind :: enum u32 {
 	Radial_Gradient,
 }
 
-Paint :: struct #align (16) {
-	kind:    Paint_Kind,
-	padding: [3]u32,
-	col0:    [4]f32,
-	col1:    [4]f32,
-	size:    f32,
-	image:   u32,
-}
-
 Shape_Kind :: enum u32 {
 	Normal,
 	Circle,
@@ -68,6 +59,18 @@ Shape_Kind :: enum u32 {
 	Pie,
 	Path,
 	Polygon,
+}
+
+// `Paint` and `Shape` get sent to the GPU
+// Biggest field [4]f32 = 16 bytes... beats me why these gotta have `padding`
+
+Paint :: struct #align (16) {
+	kind:    Paint_Kind,
+	padding: [3]u32,
+	col0:    [4]f32,
+	col1:    [4]f32,
+	size:    f32,
+	image:   u32,
 }
 
 Shape :: struct #align (16) {
@@ -87,23 +90,14 @@ Shape :: struct #align (16) {
 	xform:   u32,
 }
 
+Matrix :: matrix[4, 4]f32
+
 Vertex :: struct {
 	pos:   [2]f32,
 	uv:    [2]f32,
 	col:   [4]u8,
 	shape: u32,
 }
-
-Vertex_State :: struct {
-	uv:      [2]f32,
-	col:     [4]u8,
-	shape:   u32,
-	alpha:   f32,
-	padding: u64,
-}
-
-// Matrix used for vertex transforms
-Matrix :: matrix[4, 4]f32
 
 Draw_Call :: struct {
 	user_texture: Maybe(wgpu.Texture),
@@ -125,6 +119,37 @@ Draw_State :: struct {
 	xform:   u32,
 }
 
+// The current scissor state has a box for mathematical clipping done by the CPU
+// and an optional shape for fragment shader clipping
+// Scissor shapes currently do not stack
+Scissor :: struct {
+	box:   Box,
+	shape: u32,
+}
+
+push_scissor :: proc(box: Box, shape: u32 = 0) {
+	box := box
+	if scissor, ok := current_scissor().?; ok {
+		box = clamp_box(box, scissor.box)
+	}
+	push_stack(&core.scissor_stack, Scissor{box = box, shape = shape})
+	set_scissor_shape(shape)
+}
+
+pop_scissor :: proc() {
+	pop_stack(&core.scissor_stack)
+	if scissor, ok := current_scissor().?; ok {
+		set_scissor_shape(scissor.shape)
+	}
+}
+
+current_scissor :: proc() -> Maybe(Scissor) {
+	if core.scissor_stack.height > 0 {
+		return core.scissor_stack.items[core.scissor_stack.height - 1]
+	}
+	return nil
+}
+
 set_scissor_shape :: proc(shape: u32) {
 	core.draw_state.scissor = shape
 }
@@ -133,59 +158,22 @@ set_paint :: proc(paint: u32) {
 	core.draw_state.paint = paint
 }
 
+// Add a paint to the the shader buffer and return its index
 add_paint :: proc(paint: Paint) -> u32 {
 	index := u32(len(core.gfx.paints.data))
 	append(&core.gfx.paints.data, paint)
 	return index
 }
 
-set_vertex_shape :: proc(shape: u32) {
-	core.vertex_state.shape = shape
-}
-
-set_vertex_uv :: proc(uv: [2]f32) {
-	core.vertex_state.uv = uv
-}
-
-set_vertex_color :: proc(color: Color) {
-	if core.vertex_state.alpha == 1 {
-		core.vertex_state.col = color
-		return
-	}
-	core.vertex_state.col = {
-		color.r,
-		color.g,
-		color.b,
-		u8((f32(color.a) / 255) * core.vertex_state.alpha * 255),
-	}
-}
-
-set_global_alpha :: proc(alpha: f32) {
-	core.vertex_state.alpha = alpha
+set_shape :: proc(shape: u32) {
+	core.draw_state.shape = shape
 }
 
 // Append a vertex and return it's index
-add_vertex_2f32 :: proc(x, y: f32) -> (i: u32) {
-	i = next_vertex_index()
-	append(
-		&core.gfx.vertices,
-		Vertex {
-			pos = {x, y},
-			uv = core.vertex_state.uv,
-			col = core.vertex_state.col,
-			shape = core.vertex_state.shape,
-		},
-	)
-	return
-}
-
-add_vertex_point :: proc(point: [2]f32) -> u32 {
-	return add_vertex_2f32(point.x, point.y)
-}
-
-add_vertex :: proc {
-	add_vertex_2f32,
-	add_vertex_point,
+add_vertex :: proc(v: Vertex) -> u32 {
+	index := u32(len(core.gfx.vertices))
+	append(&core.gfx.vertices, v)
+	return index
 }
 
 add_index :: proc(i: u32) {
@@ -246,7 +234,7 @@ scale_matrix :: proc(x, y, z: f32) {
 }
 
 // Add a new draw call at the given index with the currently bound user texture
-append_draw_call :: proc(index: int, loc := #caller_location) {
+append_draw_call :: proc(index: int) {
 	append(
 		&core.draw_calls,
 		Draw_Call {

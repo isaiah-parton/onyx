@@ -175,7 +175,7 @@ component_showcase :: proc(state: ^State) {
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if container({size = {0, 2000}}) {
+		if container(&{size = {0, 2000}}) {
 			set_width_fill()
 			set_height_auto()
 			for i in 0 ..< 50 {
@@ -190,7 +190,7 @@ component_showcase :: proc(state: ^State) {
 		add_space(50)
 		set_width(500)
 		set_height(300)
-		if container({size = {1000, 0}}) {
+		if container(&{size = {1000, 0}}) {
 			set_side(.Left)
 			set_height_fill()
 			set_width(200)

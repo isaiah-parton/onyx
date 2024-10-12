@@ -9,14 +9,7 @@ import "core:time"
 ANGLE_TOLERANCE :: 0.01
 
 add_shape_box :: proc(box: Box, corners: [4]f32) -> u32 {
-	return add_shape(
-		Shape {
-			kind = .Box,
-			corners = corners,
-			cv0 = box.lo,
-			cv1 = box.hi,
-		},
-	)
+	return add_shape(Shape{kind = .Box, corners = corners, cv0 = box.lo, cv1 = box.hi})
 }
 
 add_shape_circle :: proc(center: [2]f32, radius: f32) -> u32 {
@@ -92,15 +85,11 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 render_shape :: proc(shape: u32, color: Color) {
 	box := get_shape_bounding_box(core.gfx.shapes.data[shape])
 	if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
-	set_vertex_shape(shape)
-	set_vertex_color(color)
-	set_vertex_uv({})
-	a := add_vertex(box.lo)
-	b := add_vertex({box.lo.x, box.hi.y})
-	c := add_vertex(box.hi)
-	d := add_vertex({box.hi.x, box.lo.y})
+	a := add_vertex(Vertex{pos = box.lo, col = color, shape = shape})
+	b := add_vertex(Vertex{pos = {box.lo.x, box.hi.y}, col = color, shape = shape})
+	c := add_vertex(Vertex{pos = box.hi, col = color, shape = shape})
+	d := add_vertex(Vertex{pos = {box.hi.x, box.lo.y}, col = color, shape = shape})
 	add_indices(a, b, c, a, c, d)
-	set_vertex_shape(0)
 }
 
 clear_path :: proc(path: ^Path) {
@@ -156,17 +145,18 @@ arc :: proc(center: [2]f32, radius, from, to: f32) {
 }
 
 fill_path :: proc(color: Color) {
-	path := get_path()
-	if path.count < 3 {
-		return
-	}
-	index := add_vertex(path.points[0])
-	for i in 1 ..< path.count {
-		add_vertex(path.points[i])
-		if i < path.count - 1 {
-			add_indices(index, index + u32(i), index + u32(i) + 1)
-		}
-	}
+
+	// path := get_path()
+	// if path.count < 3 {
+	// 	return
+	// }
+	// index := add_vertex(path.points[0])
+	// for i in 1 ..< path.count {
+	// 	add_vertex(path.points[i])
+	// 	if i < path.count - 1 {
+	// 		add_indices(index, index + u32(i), index + u32(i) + 1)
+	// 	}
+	// }
 }
 
 stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Center) {
@@ -273,18 +263,30 @@ draw_glyph :: proc(source, target: Box, tint: Color) {
 	}
 	size: [2]f32 = {f32(core.font_atlas.width), f32(core.font_atlas.height)}
 	set_paint(1)
-	set_vertex_shape(add_shape(Shape{kind = .Normal}))
-	set_vertex_uv(source.lo / size)
-	set_vertex_color(tint)
-	tl := add_vertex(target.lo)
-	set_vertex_uv({source.lo.x, source.hi.y} / size)
-	bl := add_vertex({target.lo.x, target.hi.y})
-	set_vertex_uv(source.hi / size)
-	br := add_vertex(target.hi)
-	set_vertex_uv({source.hi.x, source.lo.y} / size)
-	tr := add_vertex({target.hi.x, target.lo.y})
-	add_indices(tl, br, bl, tl, tr, br)
-	set_vertex_shape(0)
+	shape_index := add_shape(Shape{kind = .Normal})
+	a := add_vertex(
+		Vertex{pos = target.lo, col = tint, uv = source.lo / size, shape = shape_index},
+	)
+	b := add_vertex(
+		Vertex {
+			pos = [2]f32{target.lo.x, target.hi.y},
+			col = tint,
+			uv = [2]f32{source.lo.x, source.hi.y} / size,
+			shape = shape_index,
+		},
+	)
+	c := add_vertex(
+		Vertex{pos = target.hi, col = tint, uv = source.hi / size, shape = shape_index},
+	)
+	d := add_vertex(
+		Vertex {
+			pos = [2]f32{target.hi.x, target.lo.y},
+			col = tint,
+			uv = [2]f32{source.hi.x, source.lo.y} / size,
+			shape = shape_index,
+		},
+	)
+	add_indices(a, b, c, a, c, d)
 	set_paint(0)
 }
 
@@ -398,12 +400,7 @@ draw_pie :: proc(center: [2]f32, from, to, radius: f32, color: Color) {
 	)
 }
 
-draw_arc :: proc(
-	center: [2]f32,
-	from, to: f32,
-	radius, width: f32,
-	color: Color,
-) {
+draw_arc :: proc(center: [2]f32, from, to: f32, radius, width: f32, color: Color) {
 	from, to := from, to
 	if from > to do from, to = to, from
 	th0 := -(from + (to - from) * 0.5) + math.PI
@@ -424,29 +421,21 @@ draw_arc :: proc(
 }
 
 draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
-	set_vertex_shape(add_shape_box(box, 0))
-	set_vertex_uv({})
-	set_vertex_color(left)
-	tl := add_vertex(box.lo)
-	bl := add_vertex({box.lo.x, box.hi.y})
-	set_vertex_color(right)
-	br := add_vertex(box.hi)
-	tr := add_vertex({box.hi.x, box.lo.y})
-	add_indices(tl, br, bl, tl, tr, br)
-	set_vertex_shape(0)
+	shape := add_shape(Shape{kind = .Normal})
+	a := add_vertex(Vertex{pos = box.lo, col = left, shape = shape})
+	b := add_vertex(Vertex{pos = {box.lo.x, box.hi.y}, col = left, shape = shape})
+	c := add_vertex(Vertex{pos = {box.hi.x, box.lo.y}, col = right, shape = shape})
+	d := add_vertex(Vertex{pos = box.hi, col = right, shape = shape})
+	add_indices(a, b, c, a, c, d)
 }
 
 draw_vertical_box_gradient :: proc(box: Box, top, bottom: Color) {
-	set_vertex_shape(add_shape(Shape{kind = .Normal}))
-	set_vertex_uv({})
-	set_vertex_color(top)
-	tl := add_vertex(box.lo)
-	tr := add_vertex({box.hi.x, box.lo.y})
-	set_vertex_color(bottom)
-	bl := add_vertex({box.lo.x, box.hi.y})
-	br := add_vertex(box.hi)
-	add_indices(tl, br, bl, tl, tr, br)
-	set_vertex_shape(0)
+	shape := add_shape(Shape{kind = .Normal})
+	a := add_vertex(Vertex{pos = box.lo, col = top, shape = shape})
+	b := add_vertex(Vertex{pos = {box.hi.x, box.lo.y}, col = top, shape = shape})
+	c := add_vertex(Vertex{pos = box.hi, col = bottom, shape = shape})
+	d := add_vertex(Vertex{pos = {box.lo.x, box.hi.y}, col = bottom, shape = shape})
+	add_indices(a, b, c, a, c, d)
 }
 
 draw_circle_fill :: proc(center: [2]f32, radius: f32, color: Color) {
@@ -480,17 +469,27 @@ draw_rounded_box_shadow :: proc(box: Box, corner_radius, blur_radius: f32, color
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
 	}
-	render_shape(add_shape(Shape {
-		kind = .BlurredBox,
-		radius = corner_radius,
-		cv0 = box.lo,
-		cv1 = box.hi,
-		cv2 = {0 = blur_radius},
-	}), color)
+	render_shape(
+		add_shape(
+			Shape {
+				kind = .BlurredBox,
+				radius = corner_radius,
+				cv0 = box.lo,
+				cv1 = box.hi,
+				cv2 = {0 = blur_radius},
+			},
+		),
+		color,
+	)
 }
 
 draw_shadow :: proc(box: Box, opacity: f32 = 1) {
-	draw_rounded_box_shadow(move_box(box, {0, 2}), core.style.rounding, 6, {0, 0, 0, u8(f32(40) * opacity)})
+	draw_rounded_box_shadow(
+		move_box(box, {0, 2}),
+		core.style.rounding,
+		6,
+		{0, 0, 0, u8(f32(40) * opacity)},
+	)
 }
 
 draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
@@ -498,14 +497,19 @@ draw_rounded_box_stroke :: proc(box: Box, radius, width: f32, color: Color) {
 		return
 	}
 	radius := min(radius, (box.hi.x - box.lo.x) / 2, (box.hi.y - box.lo.y) / 2)
-	render_shape(add_shape(Shape {
-		kind = .Box,
-		corners = radius,
-		cv0 = box.lo,
-		cv1 = box.hi,
-		width = width,
-		stroke = true,
-	}), color)
+	render_shape(
+		add_shape(
+			Shape {
+				kind = .Box,
+				corners = radius,
+				cv0 = box.lo,
+				cv1 = box.hi,
+				width = width,
+				stroke = true,
+			},
+		),
+		color,
+	)
 }
 
 draw_spinner :: proc(center: [2]f32, radius: f32, color: Color) {

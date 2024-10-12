@@ -12,6 +12,8 @@ import "core:time"
 MAX_CLICK_DELAY :: time.Millisecond * 450
 
 Widget :: struct {
+
+	// Essential
 	id:           Id,
 	box:          Box,
 	layer:        ^Layer,
@@ -21,13 +23,16 @@ Widget :: struct {
 	disabled:     bool,
 	dead:         bool,
 
-	// TODO: Replace this with chaining
-	is_field:     bool,
-
 	// Interaction state
 	last_state:   Widget_State,
 	next_state:   Widget_State,
 	state:        Widget_State,
+	click_count:  int,
+	click_time:   time.Time,
+	click_button: Mouse_Button,
+	desired_size: [2]f32,
+
+	// Generic animations
 	focus_time:   f32,
 	hover_time:   f32,
 	open_time:    f32,
@@ -38,27 +43,28 @@ Widget :: struct {
 	prev:         ^Widget,
 	next:         ^Widget,
 
-	// Click information
-	click_count:  int,
-	click_time:   time.Time,
-	click_button: Mouse_Button,
-	desired_size: [2]f32,
-
 	// Stores the number of the last frame on which this widget was updated
+	// This is to avoid calling the same widget more than once per frame
+	// Also protects the `variant` field from being misused.
 	frames:       int,
+
+	// Any cleanup that needs to be done
 	on_death:     proc(_: ^Widget),
+
+	// TODO: Remove this
 	variant:      Widget_Kind,
 
-	// using variant: struct #raw_union {
-	// 	menu: Menu_Widget_Kind,
-	// 	graph: Graph_Widget_Kind,
-	// 	tooltip: Tooltip_Widget_Kind,
-	// 	tabs: Tabs_Widget_Kind,
-	// 	input: Input_Widget_Kind,
-	// 	boolean: Boolean_Widget_Kind,
-	// 	date: Date_Picker_Widget_Kind,
-	// 	table: Table_Widget_Kind,
-	// },
+	using var: struct #raw_union {
+		cont: Container,
+		menu: Menu_Widget_Kind,
+		graph: Graph_Widget_Kind,
+		tooltip: Tooltip_Widget_Kind,
+		tabs: Tabs_Widget_Kind,
+		input: Input_Widget_Kind,
+		boolean: Boolean_Widget_Kind,
+		date: Date_Picker_Widget_Kind,
+		table: Table_Widget_Kind,
+	},
 }
 // Widget variants
 // 	I'm using a union for safety, idk if it's really necessary

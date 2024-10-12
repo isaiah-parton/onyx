@@ -201,7 +201,8 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			}
 		}
 
-		if layer, ok := layer(get_popup_layer_info(self, layer_size + input_size, side = .Right)); ok {
+		if layer, ok := layer(get_popup_layer_info(self, layer_size + input_size, side = .Right));
+		   ok {
 			draw_shadow(layout_box(), self.open_time)
 			foreground()
 			defer {
@@ -457,13 +458,15 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	if self.visible {
 		// H wheel
 		STEP :: math.TAU / 48.0
-		set_vertex_shape(add_shape(Shape {
-			kind = .Circle,
-			cv0 = center,
-			stroke = true,
-			width = (outer - inner) - 4,
-			radius = (inner + outer) / 2,
-		}))
+		wheel_shape := add_shape(
+			Shape {
+				kind = .Circle,
+				cv0 = center,
+				stroke = true,
+				width = (outer - inner) - 4,
+				radius = (inner + outer) / 2,
+			},
+		)
 		for t: f32 = 0; t < math.TAU; t += STEP {
 			normal := [2]f32{math.cos(t), math.sin(t)}
 			next_normal := [2]f32{math.cos(t + STEP), math.sin(t + STEP)}
@@ -471,15 +474,23 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			inner_radius := inner - 2
 			outer_radius := outer + 2
 
-			set_vertex_color(color_from_hsva({t * math.DEG_PER_RAD, 1, 1, 1}))
-			index_0, index_1 :=
-				add_vertex(center + normal * outer_radius),
-				add_vertex(center + normal * inner_radius)
-			set_vertex_color(color_from_hsva({(t + STEP) * math.DEG_PER_RAD, 1, 1, 1}))
-			index_2, index_3 :=
-				add_vertex(center + next_normal * inner_radius),
-				add_vertex(center + next_normal * outer_radius)
-			add_indices(index_0, index_1, index_2, index_0, index_2, index_3)
+			col0 := color_from_hsva({t * math.DEG_PER_RAD, 1, 1, 1})
+			col1 := color_from_hsva({(t + STEP) * math.DEG_PER_RAD, 1, 1, 1})
+
+			a := add_vertex(
+				{pos = center + normal * outer_radius, col = col0, shape = wheel_shape},
+			)
+			b := add_vertex(
+				{pos = center + normal * inner_radius, col = col0, shape = wheel_shape},
+			)
+			c := add_vertex(
+				{pos = center + next_normal * inner_radius, col = col1, shape = wheel_shape},
+			)
+			d := add_vertex(
+				{pos = center + next_normal * outer_radius, col = col1, shape = wheel_shape},
+			)
+
+			add_indices(a, b, c, a, c, d)
 		}
 
 		angle := hsva.x * math.RAD_PER_DEG
@@ -493,21 +504,31 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			center + {math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * inner
 
 		// SV triangle
-		set_vertex_shape(add_polygon_shape(point_a, point_b, point_c))
-		set_vertex_color(color_from_hsva({hsva.x, 1, 1, 1}))
-		index_a := add_vertex(center + {math.cos(angle), math.sin(angle)} * (inner + 2))
-		set_vertex_color({0, 0, 0, 255})
-		index_b := add_vertex(
-			center +
-			{math.cos(angle - TRIANGLE_STEP), math.sin(angle - TRIANGLE_STEP)} * (inner + 2),
+		tri_shape := add_polygon_shape(point_a, point_b, point_c)
+		a := add_vertex(
+			{
+				pos = center + {math.cos(angle), math.sin(angle)} * (inner + 2),
+				col = color_from_hsva({hsva.x, 1, 1, 1}),
+				shape = tri_shape,
+			},
 		)
-		set_vertex_color(255)
-		index_c := add_vertex(
-			center +
-			{math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * (inner + 2),
+		b := add_vertex(
+			{
+				pos = center +
+				{math.cos(angle - TRIANGLE_STEP), math.sin(angle - TRIANGLE_STEP)} * (inner + 2),
+				col = {0, 0, 0, 255},
+				shape = tri_shape,
+			},
 		)
-		add_indices(index_a, index_b, index_c)
-		set_vertex_shape(0)
+		c := add_vertex(
+			{
+				pos = center +
+				{math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * (inner + 2),
+				col = 255,
+				shape = tri_shape,
+			},
+		)
+		add_indices(a, b, c)
 
 		// SV circle
 		point := linalg.lerp(

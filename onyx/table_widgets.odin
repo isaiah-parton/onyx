@@ -50,6 +50,7 @@ Table_Info :: struct {
 	widths_len:         int,
 	first, last:        int,
 	sorted:             bool,
+	cont_info:               Container_Info,
 }
 
 Table_Widget_Kind :: struct {
@@ -140,15 +141,12 @@ begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 	init_table(info, loc) or_return
 	begin_widget(info) or_return
 
-	begin_container(
-		{
-			id = info.id,
-			box = self.box,
-			size = {1 = core.style.table_row_height * f32(info.row_count + 1)},
-		},
-	) or_return
-
-	container := current_container().? or_return
+	cont_info = Container_Info {
+		id = info.id,
+		box = self.box,
+		size = {1 = core.style.table_row_height * f32(info.row_count + 1)},
+	}
+	begin_container(&cont_info) or_return
 
 	first = 0
 	last = row_count - 1
@@ -164,15 +162,12 @@ begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 	return true
 }
 // End the current table
-end_table :: proc(info: ^Table_Info) {
-	container := current_container().?
-	box := container.layout.bounds
-
+end_table :: proc(using info: ^Table_Info) {
 	// Header
 	header_box := get_box_cut_top(
 		{
-			{container.layout.bounds.lo.x, container.box.lo.y},
-			{container.layout.bounds.hi.x, container.box.hi.y},
+			{cont_info.layout.bounds.lo.x, cont_info.self.box.lo.y},
+			{cont_info.layout.bounds.hi.x, cont_info.self.box.hi.y},
 		},
 		core.style.table_row_height,
 	)
@@ -227,7 +222,6 @@ end_table :: proc(info: ^Table_Info) {
 		}
 	}
 	end_layout()
-	end_container()
 	end_widget()
 	pop_id()
 }
