@@ -22,7 +22,6 @@ Container_Info :: struct {
 
 Container :: struct {
 	active:                   bool,
-	no_scroll_x, no_scroll_y: bool,
 	scroll_x, scroll_y:       bool,
 	zoom:                     f32,
 	desired_scroll:           [2]f32,
@@ -39,9 +38,8 @@ init_container :: proc(info: ^Container_Info, loc := #caller_location) -> bool {
 	return true
 }
 
-begin_container :: proc(using info: ^Container_Info, loc := #caller_location) -> bool {
+begin_container :: proc(using info: ^Container_Info) -> bool {
 	begin_widget(info) or_return
-	defer end_widget()
 
 	if point_in_box(core.mouse_pos, self.box) && core.hovered_layer == current_layer().?.id {
 		core.next_active_container = self.id
@@ -84,8 +82,8 @@ end_container :: proc(using info: ^Container_Info) {
 	delta_scroll := (self.cont.desired_scroll - self.cont.scroll) * core.delta_time * 15
 	self.cont.scroll += delta_scroll
 
-	self.cont.scroll_x = self.cont.size.x > box_width(self.box) && !self.cont.no_scroll_x
-	self.cont.scroll_y = self.cont.size.y > box_height(self.box) && !self.cont.no_scroll_y
+	self.cont.scroll_x = self.cont.size.x > box_width(self.box)
+	self.cont.scroll_y = self.cont.size.y > box_height(self.box)
 
 	self.cont.scroll_time.x = animate(self.cont.scroll_time.x, 0.2, self.cont.scroll_x)
 	self.cont.scroll_time.y = animate(self.cont.scroll_time.y, 0.2, self.cont.scroll_y)
@@ -128,12 +126,13 @@ end_container :: proc(using info: ^Container_Info) {
 	// Table outline
 	draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 
+	end_widget()
 	pop_scissor()
 }
 
 @(deferred_in_out = __container)
 container :: proc(info: ^Container_Info, loc := #caller_location) -> bool {
-	return begin_container(info, loc)
+	return init_container(info, loc) && begin_container(info)
 }
 
 @(private)

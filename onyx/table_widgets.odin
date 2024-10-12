@@ -141,8 +141,11 @@ begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 	init_table(info, loc) or_return
 	begin_widget(info) or_return
 
+	push_id(info.id)
+	defer pop_id()
+
 	cont_info = Container_Info {
-		id = info.id,
+		id = hash("cont"),
 		box = self.box,
 		size = {1 = core.style.table_row_height * f32(info.row_count + 1)},
 	}
@@ -222,6 +225,7 @@ end_table :: proc(using info: ^Table_Info) {
 		}
 	}
 	end_layout()
+	end_container(&cont_info)
 	end_widget()
 	pop_id()
 }
