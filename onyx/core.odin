@@ -18,6 +18,7 @@ import "vendor:fontstash"
 import "vendor:wgpu"
 
 EMBED_DEFAULT_FONTS :: #config(ONYX_EMBED_FONTS, false)
+FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx/%s")
 MAX_IDS :: 32
 MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
@@ -67,6 +68,7 @@ Debug_State :: struct {
 
 // The global core data
 Core :: struct {
+	ready: bool,
 	window:                glfw.WindowHandle,
 	debug:                 Debug_State,
 	view:                  [2]f32,
@@ -189,6 +191,44 @@ view_height :: proc() -> f32 {
 	return core.view.y
 }
 
+load_default_fonts :: proc() -> bool {
+	DEFAULT_FONT :: "fonts/Geist-Medium.ttf"
+	MONOSPACE_FONT :: "fonts/iAWriterMonoS-Regular.ttf"
+	HEADER_FONT :: "fonts/Lora-Medium.ttf"
+	ICON_FONT :: "fonts/remixicon.ttf"
+
+	DEFAULT_FONT_DATA: Maybe([]u8) =
+		#load(DEFAULT_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	MONOSPACE_FONT_DATA: Maybe([]u8) =
+		#load(MONOSPACE_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	HEADER_FONT_DATA: Maybe([]u8) = #load(HEADER_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	ICON_FONT_DATA: Maybe([]u8) = #load(ICON_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+
+	core.style.default_font = load_font_from_memory(
+		DEFAULT_FONT_DATA.? or_else os.read_entire_file(
+			fmt.tprintf("%s/%s", FONT_PATH, DEFAULT_FONT),
+		) or_return,
+	) or_return
+	core.style.monospace_font = load_font_from_memory(
+		MONOSPACE_FONT_DATA.? or_else os.read_entire_file(
+			fmt.tprintf("%s/%s", FONT_PATH, MONOSPACE_FONT),
+		) or_return,
+		monospace = true,
+	) or_return
+	core.style.header_font = load_font_from_memory(
+		HEADER_FONT_DATA.? or_else os.read_entire_file(
+			fmt.tprintf("%s/%s", FONT_PATH, HEADER_FONT),
+		) or_return,
+	) or_return
+	core.style.icon_font = load_font_from_memory(
+		ICON_FONT_DATA.? or_else os.read_entire_file(
+			fmt.tprintf("%s/%s", FONT_PATH, ICON_FONT),
+		) or_return,
+	) or_return
+
+	return true
+}
+
 init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	if window == nil do return false
 
@@ -198,39 +238,11 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		core.style.shape = default_style_shape()
 		fmt.printfln("No style provided by user, using default theme and fonts")
 
-		DEFAULT_FONT :: "fonts/Geist-Medium.ttf"
-		MONOSPACE_FONT :: "fonts/iAWriterMonoS-Regular.ttf"
-		HEADER_FONT :: "fonts/Lora-Medium.ttf"
-		ICON_FONT :: "fonts/remixicon.ttf"
+		if !load_default_fonts() {
+			fmt.printfln("Fatal: failed to load default fonts from '%s'", FONT_PATH)
+			return false
+		}
 
-		DEFAULT_FONT_DATA: Maybe([]u8) =
-			#load(DEFAULT_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-		MONOSPACE_FONT_DATA: Maybe([]u8) =
-			#load(MONOSPACE_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-		HEADER_FONT_DATA: Maybe([]u8) = #load(HEADER_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-		ICON_FONT_DATA: Maybe([]u8) = #load(ICON_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-
-		core.style.default_font = load_font_from_memory(
-			DEFAULT_FONT_DATA.? or_else os.read_entire_file(
-				fmt.tprintf("../onyx/%s", DEFAULT_FONT),
-			) or_return,
-		) or_return
-		core.style.monospace_font = load_font_from_memory(
-			MONOSPACE_FONT_DATA.? or_else os.read_entire_file(
-				fmt.tprintf("../onyx/%s", MONOSPACE_FONT),
-			) or_return,
-			monospace = true,
-		) or_return
-		core.style.header_font = load_font_from_memory(
-			HEADER_FONT_DATA.? or_else os.read_entire_file(
-				fmt.tprintf("../onyx/%s", HEADER_FONT),
-			) or_return,
-		) or_return
-		core.style.icon_font = load_font_from_memory(
-			ICON_FONT_DATA.? or_else os.read_entire_file(
-				fmt.tprintf("../onyx/%s", ICON_FONT),
-			) or_return,
-		) or_return
 	} else {
 		core.style = style.?
 	}
@@ -317,6 +329,8 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	// Init font atlas
 	atlas_size: int = min(cast(int)core.gfx.device_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
 	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
+
+	core.ready = true
 
 	return true
 }
@@ -532,6 +546,10 @@ render :: proc() {
 }
 
 uninit :: proc() {
+	if !core.ready {
+		return
+	}
+
 	for _, widget in core.widget_map {
 		if widget.on_death != nil {
 			widget.on_death(widget)
@@ -554,7 +572,6 @@ uninit :: proc() {
 	delete(core.glyphs)
 	delete(core.lines)
 	delete(core.runes)
-
 	destroy_atlas(&core.font_atlas)
 	uninit_graphics(&core.gfx)
 }
