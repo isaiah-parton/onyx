@@ -201,8 +201,8 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			}
 		}
 
-		if layer, ok := layer(get_popup_layer_info(self, layer_size + input_size, side = .Right));
-		   ok {
+		menu_layer := get_popup_layer_info(self, layer_size + input_size, side = .Right)
+		if layer(&menu_layer) {
 			draw_shadow(layout_box(), self.open_time)
 			foreground()
 			defer {
@@ -263,7 +263,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			}
 
 			// If the layer is not focused or hovered and the widget loses focus: close the dialog
-			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
+			if menu_layer.self.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
 				self.state -= {.Open}
 			}
 		}

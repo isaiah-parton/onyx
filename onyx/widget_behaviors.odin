@@ -62,8 +62,9 @@ get_popup_layer_info :: proc(widget: ^Widget, size: [2]f32, side: Side = .Bottom
 	view := view_box()
 	side := side
 	parent := widget.box
-	info.id = widget.id
 	scale := get_popup_scale(size, ease.quadratic_out(widget.open_time))
+	info.id = widget.id
+	info.kind = .Floating
 	info.scale = [2]f32{scale, scale}
 
 	switch side {

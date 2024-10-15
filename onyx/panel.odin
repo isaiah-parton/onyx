@@ -81,8 +81,9 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	panel.min_size = {}
 
 	// Begin the panel layer
-	begin_layer({id = id, box = expand_box(panel.box, 10)})
-	panel.layer = current_layer().? or_return
+	layer_info := Layer_Info{id = id, box = expand_box(panel.box, 10)}
+	begin_layer(&layer_info)
+	panel.layer = layer_info.self
 
 	// Background
 	background_widget := Widget_Info {

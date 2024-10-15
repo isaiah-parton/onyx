@@ -85,16 +85,16 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 
 	if info.shake > 0 {
 		core.draw_next_frame = true
+		self.box = move_box(
+			self.box,
+			{
+				info.shake *
+				cast(f32)math.sin(time.duration_seconds(time.since(core.start_time)) * 50) *
+				5,
+				0,
+			},
+		)
 	}
-	self.box = move_box(
-		self.box,
-		{
-			info.shake *
-			cast(f32)math.sin(time.duration_seconds(time.since(core.start_time)) * 50) *
-			5,
-			0,
-		},
-	)
 
 	if self.visible && !undecorated {
 		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.background)

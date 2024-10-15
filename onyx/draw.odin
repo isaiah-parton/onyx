@@ -205,7 +205,6 @@ push_matrix :: proc() {
 }
 
 pop_matrix :: proc() {
-	assert(core.matrix_stack.height > 0)
 	pop_stack(&core.matrix_stack)
 	core.current_matrix = &core.matrix_stack.items[max(0, core.matrix_stack.height - 1)]
 }

@@ -332,6 +332,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	// Reset next state
 	widget.state += widget.next_state
 	widget.next_state = {}
+
 	return true
 }
 // Ends the current widget
@@ -347,6 +348,9 @@ end_widget :: proc() {
 			)
 		}
 		pop_stack(&core.widget_stack)
+		if last_widget, ok := current_widget().?; ok {
+			last_widget.next_state += widget.state
+		}
 	}
 }
 // Try make this widget hovered

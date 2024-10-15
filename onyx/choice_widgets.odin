@@ -56,7 +56,12 @@ begin_selector :: proc(using info: ^Selector_Info) -> bool {
 	menu_behavior(self)
 
 	if .Open in self.state {
-		begin_layer(get_popup_layer_info(self, kind.size))
+		menu_layer := get_popup_layer_info(self, kind.size)
+		if !begin_layer(&menu_layer) {
+			self.state -= {.Open}
+		}
+	}
+	if .Open in self.state {
 		draw_shadow(layout_box(), self.open_time)
 		foreground()
 		set_width_auto()

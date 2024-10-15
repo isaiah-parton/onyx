@@ -108,36 +108,35 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 			open_time := ease.quadratic_out(kind.open_time)
 			layer_scale: f32 = 0.7 + 0.3 * open_time
 			// Begin the menu layer
-			begin_layer(
-				{
-					id = self.id,
-					box = box,
-					origin = {box_center_x(box), box.lo.y},
-					scale = ([2]f32)(layer_scale),
-					parent = current_layer().?,
-					opacity = open_time,
-				},
-			)
-			layer := current_layer().?
-			if .Focused in layer.state {
-				self.next_state += {.Focused}
+			layer_info := Layer_Info {
+				id      = self.id,
+				box     = box,
+				origin  = {box_center_x(box), box.lo.y},
+				scale   = ([2]f32)(layer_scale),
+				parent  = current_layer().?,
+				opacity = open_time,
 			}
-			foreground()
-			shrink(5)
-			set_side(.Top)
-			set_width_fill()
-			for &button, b in buttons[:len(info.options)] {
-				if b == info.index^ do continue
-				if add_button(&button) && button.clicked {
-					index^ = b
+			if begin_layer(&layer_info) {
+				defer end_layer()
+				if .Focused in layer_info.self.state {
+					self.next_state += {.Focused}
+				}
+				foreground()
+				shrink(5)
+				set_side(.Top)
+				set_width_fill()
+				for &button, b in buttons[:len(info.options)] {
+					if b == info.index^ do continue
+					if add_button(&button) && button.clicked {
+						index^ = b
+						self.state -= {.Open}
+					}
+				}
+				if .Hovered not_in layer_info.self.state && .Focused not_in self.state {
 					self.state -= {.Open}
 				}
 			}
-			end_layer()
 
-			if .Hovered not_in layer.state && .Focused not_in self.state {
-				self.state -= {.Open}
-			}
 		}
 	}
 	return true

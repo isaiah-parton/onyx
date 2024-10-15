@@ -1,7 +1,7 @@
 package onyx
 
 Color_Scheme :: struct {
-	background, foreground, substance, accent, accent_content, content: Color,
+	background, foreground, substance, accent, accent_content, content, shadow: Color,
 }
 
 Style :: struct {
@@ -58,6 +58,7 @@ light_color_scheme :: proc() -> Color_Scheme {
 		accent = {59, 130, 246, 255},
 		accent_content = {25, 25, 25, 255},
 		content = {25, 25, 25, 255},
+		shadow = {0, 0, 0, 40},
 	}
 }
 
@@ -69,6 +70,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		accent = {59, 130, 246, 255},
 		accent_content = {255, 255, 255, 255},
 		content = {255, 255, 255, 255},
+		shadow = {0, 0, 0, 40},
 	}
 }
 

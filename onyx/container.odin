@@ -21,28 +21,30 @@ Container_Info :: struct {
 }
 
 Container :: struct {
-	active:                   bool,
-	scroll_x, scroll_y:       bool,
-	zoom:                     f32,
-	desired_scroll:           [2]f32,
-	scroll:                   [2]f32,
-	scroll_time:              [2]f32,
-	size:                     [2]f32,
+	active:             bool,
+	scroll_x, scroll_y: bool,
+	zoom:               f32,
+	desired_scroll:     [2]f32,
+	scroll:             [2]f32,
+	scroll_time:        [2]f32,
+	size:               [2]f32,
 }
 
-init_container :: proc(info: ^Container_Info, loc := #caller_location) -> bool {
-	if info.id == 0 do info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
-	info.is_active = core.active_container == info.id
-
+init_container :: proc(using info: ^Container_Info, loc := #caller_location) -> bool {
+	if info == nil do return false
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
 	return true
 }
 
 begin_container :: proc(using info: ^Container_Info) -> bool {
+	if info == nil do return false
 	begin_widget(info) or_return
 
-	if point_in_box(core.mouse_pos, self.box) && core.hovered_layer == current_layer().?.id {
-		core.next_active_container = self.id
+	is_active = .Hovered in self.state
+
+	if point_in_box(core.mouse_pos, self.box) {
+		hover_widget(self)
 	}
 
 	// Minimum size
@@ -69,10 +71,7 @@ begin_container :: proc(using info: ^Container_Info) -> bool {
 }
 
 end_container :: proc(using info: ^Container_Info) {
-	self.cont.size = linalg.max(
-		layout.content_size + layout.spacing_size,
-		self.cont.size,
-	)
+	self.cont.size = linalg.max(layout.content_size + layout.spacing_size, self.cont.size)
 
 	// Clamp scroll
 	self.cont.desired_scroll = linalg.max(
@@ -104,8 +103,14 @@ end_container :: proc(using info: ^Container_Info) {
 		if self.cont.scroll_x {
 			box.hi.y -= self.cont.scroll_time.x * core.style.shape.scrollbar_thickness
 		}
-		if scrollbar({make_visible = self.cont.active || abs(delta_scroll.y) > 0.1, vertical = true, box = box, pos = &self.cont.scroll.y, travel = self.cont.size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / self.cont.size.y}).self.state >=
-		   {.Pressed} {
+		if scrollbar({
+			make_visible = self.cont.active || abs(delta_scroll.y) > 0.1,
+			vertical = true,
+			box = box,
+			pos = &self.cont.scroll.y,
+			travel = self.cont.size.y - box_height(self.box),
+			handle_size = box_height(box) * box_height(self.box) / self.cont.size.y,
+		}).changed {
 			self.cont.desired_scroll.y = self.cont.scroll.y
 		}
 	}
@@ -117,8 +122,13 @@ end_container :: proc(using info: ^Container_Info) {
 		if self.cont.scroll_y {
 			box.hi.x -= self.cont.scroll_time.y * core.style.shape.scrollbar_thickness
 		}
-		if scrollbar({make_visible = self.cont.active || abs(delta_scroll.x) > 0.1, box = box, pos = &self.cont.scroll.x, travel = self.cont.size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / self.cont.size.x}).self.state >=
-		   {.Pressed} {
+		if scrollbar({
+			make_visible = self.cont.active || abs(delta_scroll.x) > 0.1,
+			box = box,
+			pos = &self.cont.scroll.x,
+			travel = self.cont.size.x - box_width(self.box),
+			handle_size = box_width(box) * box_width(self.box) / self.cont.size.x,
+		}).changed {
 			self.cont.desired_scroll.x = self.cont.scroll.x
 		}
 	}
@@ -132,7 +142,8 @@ end_container :: proc(using info: ^Container_Info) {
 
 @(deferred_in_out = __container)
 container :: proc(info: ^Container_Info, loc := #caller_location) -> bool {
-	return init_container(info, loc) && begin_container(info)
+	init_container(info, loc) or_return
+	return begin_container(info)
 }
 
 @(private)

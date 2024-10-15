@@ -68,10 +68,14 @@ Table_Entry :: struct {
 	location:    string,
 }
 
-component_showcase :: proc(state: ^State) {
+component_showcase :: proc(state: ^State) -> bool {
 	using onyx
 
-	begin_layer({box = view_box(), kind = .Background})
+	layer_info := Layer_Info{box = view_box(), kind = .Background}
+
+	begin_layer(&layer_info) or_return
+	defer end_layer()
+
 	draw_box_fill(current_layout().?.box, core.style.color.background)
 	shrink(100)
 	foreground()
@@ -338,7 +342,7 @@ component_showcase :: proc(state: ^State) {
 			)
 		}
 	}
-	end_layer()
+	return true
 }
 
 allocator: runtime.Allocator

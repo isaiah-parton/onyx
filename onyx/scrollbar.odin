@@ -9,6 +9,7 @@ Scrollbar_Info :: struct {
 	travel:       f32,
 	handle_size:  f32,
 	make_visible: bool,
+	changed:      bool,
 }
 
 init_scrollbar :: proc(info: ^Scrollbar_Info, loc := #caller_location) -> bool {
@@ -52,8 +53,16 @@ add_scrollbar :: proc(using info: ^Scrollbar_Info) -> bool {
 
 	if self.visible {
 		rounding := (_box.hi[j] - _box.lo[j]) / 2
-		draw_rounded_box_fill(_box, rounding, fade(core.style.color.substance, 0.7 * self.focus_time))
-		draw_rounded_box_fill(handle_box, rounding, fade(core.style.color.content, 0.7 * self.focus_time))
+		draw_rounded_box_fill(
+			_box,
+			rounding,
+			fade(core.style.color.substance, 0.7 * self.focus_time),
+		)
+		draw_rounded_box_fill(
+			handle_box,
+			rounding,
+			fade(core.style.color.content, 0.7 * self.focus_time),
+		)
 	}
 
 	if .Pressed in self.state {
@@ -63,6 +72,7 @@ add_scrollbar :: proc(using info: ^Scrollbar_Info) -> bool {
 		pos^ =
 			clamp(((core.mouse_pos[i] - core.drag_offset[i]) - _box.lo[i]) / _travel, 0, 1) *
 			travel
+		changed = true
 	}
 
 	return true
@@ -70,7 +80,8 @@ add_scrollbar :: proc(using info: ^Scrollbar_Info) -> bool {
 
 scrollbar :: proc(info: Scrollbar_Info, loc := #caller_location) -> Scrollbar_Info {
 	info := info
-	init_scrollbar(&info, loc)
-	add_scrollbar(&info)
+	if init_scrollbar(&info, loc) {
+		add_scrollbar(&info)
+	}
 	return info
 }

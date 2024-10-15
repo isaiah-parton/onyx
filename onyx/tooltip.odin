@@ -52,8 +52,8 @@ begin_tooltip :: proc(using info: Tooltip_Info, loc := #caller_location) -> bool
 	}
 
 	draw_shadow(box)
-	begin_layer({box = box}, loc)
-	draw_rounded_box_fill(box, core.style.rounding, fade(core.style.color.background, 0.9))
+	begin_layer(&{box = box, kind = .Topmost}, loc)
+	draw_rounded_box_fill(box, core.style.rounding, fade(core.style.color.background, 0.8))
 
 	return true
 }

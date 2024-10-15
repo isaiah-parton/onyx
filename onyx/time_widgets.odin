@@ -336,7 +336,8 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 		}
 		init_calendar(&calendar_info, {})
 
-		if layer, ok := layer(get_popup_layer_info(self, calendar_info.desired_size + core.style.menu_padding * 2, side = .Left)); ok {
+		menu_layer := get_popup_layer_info(self, calendar_info.desired_size + core.style.menu_padding * 2, side = .Left)
+		if layer(&menu_layer) {
 			draw_shadow(layout_box(), self.open_time)
 			foreground()
 			shrink(core.style.menu_padding)
@@ -352,7 +353,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 					info.second^ = calendar_info.selection[0]
 				}
 			}
-			if layer.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
+			if menu_layer.self.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
 				self.state -= {.Open}
 			}
 		}

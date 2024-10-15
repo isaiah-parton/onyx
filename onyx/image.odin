@@ -44,28 +44,32 @@ draw_texture :: proc(texture: wgpu.Texture, box: Box, tint: Color) {
 	set_paint(add_paint({kind = .User_Image}))
 	defer set_paint(0)
 
-	shape := add_shape(Shape{kind = .Normal})
+	shape := add_shape_box(box, {})
 
-	a := add_vertex({pos = box.lo, col = tint})
-	b := add_vertex({pos = {box.lo.x, box.hi.y}, col = tint, uv = {0, 1}})
-	c := add_vertex({pos = box.hi, col = tint, uv = 1})
-	d := add_vertex({pos = {box.hi.x, box.lo.y}, col = tint, uv = {1, 0}})
-
+	a := add_vertex({pos = box.lo, col = tint, shape = shape})
+	b := add_vertex({pos = {box.lo.x, box.hi.y}, col = tint, uv = {0, 1}, shape = shape})
+	c := add_vertex({pos = box.hi, col = tint, uv = 1, shape = shape})
+	d := add_vertex({pos = {box.hi.x, box.lo.y}, col = tint, uv = {1, 0}, shape = shape})
 	add_indices(a, b, c, a, c, d)
 }
 
-draw_texture_portion :: proc(texture: Texture, source, target: Box, tint: Color) {
-	last_texture := get_current_texture()
-	set_texture(texture.internal)
+draw_texture_portion :: proc(texture: wgpu.Texture, source, target: Box, tint: Color) {
+	set_texture(texture)
 
-	size: [2]f32 = {f32(texture.width), f32(texture.height)}
+	width := wgpu.TextureGetWidth(texture)
+	height := wgpu.TextureGetHeight(texture)
 
-	shape := add_shape(Shape{kind = .Normal})
+	set_paint(add_paint({kind = .User_Image}))
+	defer set_paint(0)
 
-	a := add_vertex({pos = target.lo, uv = source.lo / size, col = tint})
-	b := add_vertex({pos = {target.lo.x, target.hi.y}, col = tint, uv = [2]f32{source.lo.x, source.hi.y} / size})
-	c := add_vertex({pos = target.hi, col = tint, uv = source.hi / size})
-	d := add_vertex({pos = {target.hi.x, target.lo.y}, col = tint, uv = [2]f32{source.hi.x, source.lo.y} / size})
+	size: [2]f32 = {f32(width), f32(height)}
+
+	shape := add_shape_box(target, {})
+
+	a := add_vertex({pos = target.lo, uv = source.lo / size, col = tint, shape = shape})
+	b := add_vertex({pos = {target.lo.x, target.hi.y}, col = tint, uv = [2]f32{source.lo.x, source.hi.y} / size, shape = shape})
+	c := add_vertex({pos = target.hi, col = tint, uv = source.hi / size, shape = shape})
+	d := add_vertex({pos = {target.hi.x, target.lo.y}, col = tint, uv = [2]f32{source.hi.x, source.lo.y} / size, shape = shape})
 
 	add_indices(a, b, c, a, c, d)
 }

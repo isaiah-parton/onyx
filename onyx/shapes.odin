@@ -488,7 +488,7 @@ draw_shadow :: proc(box: Box, opacity: f32 = 1) {
 		move_box(box, {0, 2}),
 		core.style.rounding,
 		6,
-		{0, 0, 0, u8(f32(40) * opacity)},
+		fade(core.style.color.shadow, opacity),
 	)
 }
 

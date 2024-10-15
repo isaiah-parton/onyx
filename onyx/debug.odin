@@ -28,14 +28,13 @@ __profiler_end_scope :: proc(scope: Profiler_Scope) {
 
 @(private)
 do_debug_layer :: proc() {
-	begin_layer({box = view_box(), sorting = .Above, kind = .Debug})
 	offset: f32
 	offset += draw_text({}, {
 			text = fmt.tprintf(
 `fps: %i
 
 frames drawn: %i
-draw calls:   %i (- debug layer)
+draw calls:   %i
 
 vertices: %i/%i
 indices:  %i/%i
@@ -45,7 +44,7 @@ cvs:      %i/%i
 xforms:   %i/%i`,
 core.frames_this_second,
 core.drawn_frames,
-len(core.draw_calls) - 1,
+len(core.draw_calls),
 len(core.gfx.vertices),
 (BUFFER_SIZE / size_of(Vertex)),
 len(core.gfx.indices),
@@ -58,7 +57,7 @@ len(core.gfx.cvs.data),
 core.gfx.cvs.capacity,
 len(core.gfx.xforms.data),
 core.gfx.xforms.capacity,
-), // Debug layer not included
+),
 			font = core.style.monospace_font,
 			size = 14,
 		}, {255, 255, 255, 255}).y + 10
@@ -81,5 +80,4 @@ core.gfx.xforms.capacity,
 			{255, 255, 255, 255},
 		)
 	}
-	end_layer()
 }

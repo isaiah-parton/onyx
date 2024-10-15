@@ -102,14 +102,15 @@ table_cell :: proc(column, row: int, value: any, type: Table_Column_Type) {
 }
 // Make a new table
 // 	This proc looks at the provided columns and decides the desired size of the table
-init_table :: proc(info: ^Table_Info, loc := #caller_location) -> bool {
-	info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
-	for &column, c in info.columns {
+init_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
+	if info == nil do return false
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
+	for &column, c in columns {
 		text: string = column.name
-		if info.sorted_column != nil && info.sorted_column^ == c {
-			if info.sort_order != nil {
-				switch info.sort_order^ {
+		if sorted_column != nil && sorted_column^ == c {
+			if sort_order != nil {
+				switch sort_order^ {
 				case .Ascending:
 					text = fmt.tprintf("%s \uEA78", column.name)
 				case .Descending:
@@ -128,12 +129,12 @@ init_table :: proc(info: ^Table_Info, loc := #caller_location) -> bool {
 			},
 		) or_continue
 		column.width = max(column.width, column.label_text_job.size.x + 20)
-		info.widths[c] = column.width
-		info.desired_size.x += column.width
+		widths[c] = column.width
+		desired_size.x += column.width
 	}
-	info.widths_len = len(info.columns)
-	info.desired_size.y =
-		core.style.shape.table_row_height * f32(min(info.row_count, info.max_displayed_rows))
+	widths_len = len(columns)
+	desired_size.y =
+		core.style.shape.table_row_height * f32(min(row_count, max_displayed_rows))
 	return true
 }
 // Begin a table

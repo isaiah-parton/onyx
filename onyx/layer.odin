@@ -56,6 +56,7 @@ Layer :: struct {
 
 Layer_Info :: struct {
 	id:       Id,
+	self:     ^Layer,
 	parent:   ^Layer,
 	options:  Layer_Options,
 	box:      Box,
@@ -65,7 +66,7 @@ Layer_Info :: struct {
 	rotation: f32,
 	opacity:  Maybe(f32),
 	sorting:  Layer_Sorting,
-	index: Maybe(int),
+	index:    Maybe(int),
 }
 
 destroy_layer :: proc(layer: ^Layer) {
@@ -142,15 +143,15 @@ create_layer :: proc(id: Id) -> (result: ^Layer, ok: bool) {
 	return
 }
 
-begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer, ok: bool) {
-	id := info.id if info.id != 0 else hash(loc)
-	kind := info.kind.? or_else .Floating
-
-	// Get a layer with `id` or create one
-	layer, ok = get_layer_by_id(id)
+get_layer :: proc(info: ^Layer_Info) -> (layer: ^Layer, ok: bool) {
+	assert(info != nil)
+	layer, ok = get_layer_by_id(info.id)
 	if !ok {
-		layer = create_layer(id) or_return
+		layer, ok = create_layer(info.id)
 
+		if !ok {
+			return
+		}
 		if info.parent != nil {
 			set_layer_parent(layer, info.parent)
 		}
@@ -162,48 +163,61 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer
 				set_layer_index(layer, layer.parent.index + 1)
 			} else {
 				if info.sorting == .Above {
-					set_layer_index(layer, get_highest_layer_of_kind(kind) + 1)
+					set_layer_index(layer, get_highest_layer_of_kind(info.kind.? or_return) + 1)
 				} else {
-					set_layer_index(layer, get_lowest_layer_of_kind(kind))
+					set_layer_index(layer, get_lowest_layer_of_kind(info.kind.? or_return))
 				}
 			}
 		}
 	}
+	return
+}
 
-	if layer.frames == core.frames {
-		return
+begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
+	assert(info != nil)
+	if info.id == 0 do info.id = hash(loc)
+
+	info.self = get_layer(info) or_return
+
+	if info.self.frames == core.frames {
+		when ODIN_DEBUG {
+			fmt.println("Layer ID collision: %i", info.id)
+		}
+		return false
 	}
-	layer.frames = core.frames
+	info.self.frames = core.frames
 
-	// Push layer
-	push_stack(&core.layer_stack, layer)
+	// Push info.self
+	push_stack(&core.layer_stack, info.self)
 
 	// Set parameters
-	layer.dead = false
-	layer.id = id
-	layer.box = info.box
-	layer.options = info.options
-	layer.kind = kind
-	layer.opacity = info.opacity.? or_else 1
+	info.self.dead = false
+	info.self.id = info.id
+	info.self.box = info.box
+	info.self.options = info.options
+	info.self.kind = info.kind.? or_else .Floating
+	info.self.opacity = info.opacity.? or_else 1
 
-	layer.last_state = layer.state
-	layer.state = {}
+	info.self.last_state = info.self.state
+	info.self.state = {}
 
 	// Set input state
-	if core.hovered_layer == layer.id {
-		layer.state += {.Hovered}
+	if core.hovered_layer == info.self.id {
+		info.self.state += {.Hovered}
 		// Re-order layers if clicked
-		if mouse_pressed(.Left) && layer.kind == .Floating && .No_Sorting not_in layer.options {
-			bring_layer_to_front(layer)
+		if mouse_pressed(.Left) &&
+		   info.self.kind == .Floating &&
+		   .No_Sorting not_in info.self.options {
+			bring_layer_to_front(info.self)
 		}
 	}
 
-	if core.focused_layer == layer.id {
-		layer.state += {.Focused}
+	if core.focused_layer == info.self.id {
+		info.self.state += {.Focused}
 	}
 
 	// Set vertex z position
-	push_scissor(layer.box)
+	push_scissor(info.self.box)
 	append_draw_call(current_layer().?.index)
 
 	// Transform matrix
@@ -215,40 +229,35 @@ begin_layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer
 	translate_matrix(-info.origin.x, -info.origin.y, 0)
 
 	// Push layout
-	ok = push_layout(
+	push_layout(
 		Layout {
-			box = {linalg.floor(layer.box.lo), linalg.floor(layer.box.hi)},
-			bounds = layer.box,
+			box = {linalg.floor(info.self.box.lo), linalg.floor(info.self.box.hi)},
+			bounds = info.self.box,
 			next_cut_side = .Top,
 		},
-	)
+	) or_return
 
-	return
+	return true
 }
 
 end_layer :: proc() {
 	pop_matrix()
-
-	layer := current_layer().?
-
 	pop_layout()
 	pop_stack(&core.layer_stack)
-
 	pop_scissor()
-
-	// Append a new draw call for the previous layer if there is one and reset the global alpha
 	if layer, ok := current_layer().?; ok {
 		append_draw_call(layer.index)
 	}
 }
 
 @(deferred_out = __layer)
-layer :: proc(info: Layer_Info, loc := #caller_location) -> (layer: ^Layer, ok: bool) {
+layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
+	info := info
 	return begin_layer(info, loc)
 }
 
 @(private)
-__layer :: proc(_: ^Layer, ok: bool) {
+__layer :: proc(ok: bool) {
 	if ok {
 		end_layer()
 	}
