@@ -1,5 +1,6 @@
 struct Uniforms {
   size: vec2<f32>,
+  time: f32,
 };
 
 @group(0)
@@ -29,19 +30,6 @@ struct Shapes {
 @group(2)
 @binding(0)
 var<storage> shapes: Shapes;
-
-struct PackedMat3x2 {
-    m11: f32,
-    m12: f32,
-    m21: f32,
-    m22: f32,
-    m31: f32,
-    m32: f32,
-};
-
-fn unpack_mat3x2(m: PackedMat3x2) -> mat3x2<f32> {
-    return mat3x2<f32>(m.m11, m.m12, m.m21, m.m22, m.m31, m.m32);
-}
 
 struct Paint {
 	kind: u32,
@@ -209,7 +197,7 @@ fn gaussian(x: f32, sigma: f32) -> f32 {
 }
 
 fn dot2(v: vec2<f32>) -> f32 {
-    return dot(v,v);
+    return dot(v, v);
 }
 
 fn get_distance_vector(b0: vec2<f32>, b1: vec2<f32>, b2: vec2<f32>) -> vec2<f32> {
@@ -379,6 +367,26 @@ fn not(v: vec3<bool>) -> vec3<bool> {
 	return vec3<bool>(!v.x, !v.y, !v.z);
 }
 
+fn hash(p: vec2<f32>) -> vec2<f32> {
+	var pp = vec2<f32>( dot(p,vec2<f32>(127.1,311.7)), dot(p,vec2<f32>(269.5,183.3)) );
+	return -1.0 + 2.0*fract(sin(pp)*43758.5453123);
+}
+
+fn noise(p: vec2<f32>) -> f32 {
+  let K1: f32 = 0.366025404; // (sqrt(3)-1)/2;
+  let K2: f32 = 0.211324865; // (3-sqrt(3))/6;
+
+	let i: vec2<f32> = floor(p + (p.x + p.y) * K1);
+  let a: vec2<f32> = p - i + (i.x + i.y) * K2;
+  let m: f32 = step(a.y, a.x);
+  let o: vec2<f32> = vec2(m, 1.0 - m);
+  let b: vec2<f32> = a - o + K2;
+	let c: vec2<f32> = a - 1.0 + 2.0 * K2;
+  let h: vec3<f32> = max(vec3<f32>(0.5) - vec3<f32>(dot2(a), dot2(b), dot2(c)), vec3<f32>(0.0));
+	let n: vec3<f32> = h * h * h * h * vec3(dot(a, hash(i + 0.0)), dot(b, hash(i+o)), dot(c, hash(i + 1.0)));
+  return dot(n, vec3<f32>(70.0));
+}
+
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
 	let xform = xforms.xforms[shapes.shapes[in.shape].xform];
@@ -421,6 +429,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 		// User_Image
 		case 2u: {
 			out = textureSample(user_tex, samp, in.uv) * in.col;
+		}
+		// Skeleton
+		case 3u: {
+			var uv = in.p;
+			var f = 0.5 * noise(uv * 0.0025 + uniforms.time * 0.2);
+			uv = mat2x2<f32>(1.6, 1.2, -1.2, 1.6) * uv;
+			f += 0.5 * noise(uv * 0.0025 - uniforms.time * 0.2);
+			// out = (paint.col0 + (paint.col1 - paint.col0) * f) * in.col;
+			out = vec4<f32>(1.0, 1.0, 1.0, clamp(f, 0.0, 1.0)) * in.col;
 		}
 		default: {
 			out = in.col;

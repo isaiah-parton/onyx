@@ -1,7 +1,5 @@
 package onyx
 
-import "vendor:glfw"
-
 import "base:runtime"
 import "core:fmt"
 import "core:math"
@@ -15,10 +13,11 @@ import "core:sys/windows"
 import "core:time"
 import "tedit"
 import "vendor:fontstash"
+import "vendor:glfw"
 import "vendor:wgpu"
 
 EMBED_DEFAULT_FONTS :: #config(ONYX_EMBED_FONTS, false)
-FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx/%s")
+FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx")
 MAX_IDS :: 32
 MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
@@ -68,7 +67,7 @@ Debug_State :: struct {
 
 // The global core data
 Core :: struct {
-	ready: bool,
+	ready:                 bool,
 	window:                glfw.WindowHandle,
 	debug:                 Debug_State,
 	view:                  [2]f32,
@@ -103,7 +102,6 @@ Core :: struct {
 
 	// Layout
 	layout_stack:          Stack(Layout, MAX_LAYOUTS),
-
 	active_container:      Id,
 	next_active_container: Id,
 
@@ -197,8 +195,7 @@ load_default_fonts :: proc() -> bool {
 	HEADER_FONT :: "fonts/Lora-Medium.ttf"
 	ICON_FONT :: "fonts/remixicon.ttf"
 
-	DEFAULT_FONT_DATA: Maybe([]u8) =
-		#load(DEFAULT_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	DEFAULT_FONT_DATA: Maybe([]u8) = #load(DEFAULT_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
 	MONOSPACE_FONT_DATA: Maybe([]u8) =
 		#load(MONOSPACE_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
 	HEADER_FONT_DATA: Maybe([]u8) = #load(HEADER_FONT, []u8) when EMBED_DEFAULT_FONTS else nil

@@ -393,9 +393,16 @@ main :: proc() {
 	onyx.init(window)
 
 	for !glfw.WindowShouldClose(onyx.core.window) {
-		onyx.new_frame()
+		using onyx
+		new_frame()
 		component_showcase(&state)
-		onyx.render()
+		box := Box{core.view / 2 - 100, core.view / 2 + 100}
+		draw_rounded_box_fill(box, 10, core.style.color.substance)
+		set_paint(add_paint({kind = .Skeleton, col0 = {0, 0, 255, 255}, col1 = {255, 0, 0, 255}}))
+		draw_rounded_box_fill(box, 10, {255, 255, 255, 50})
+		set_paint(0)
+		core.draw_this_frame = true
+		render()
 	}
 
 	onyx.uninit()

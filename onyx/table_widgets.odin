@@ -50,7 +50,7 @@ Table_Info :: struct {
 	widths_len:         int,
 	first, last:        int,
 	sorted:             bool,
-	cont_info:               Container_Info,
+	cont_info:          Container_Info,
 }
 
 Table_Widget_Kind :: struct {
@@ -133,8 +133,7 @@ init_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 		desired_size.x += column.width
 	}
 	widths_len = len(columns)
-	desired_size.y =
-		core.style.shape.table_row_height * f32(min(row_count, max_displayed_rows))
+	desired_size.y = core.style.shape.table_row_height * f32(min(row_count, max_displayed_rows))
 	return true
 }
 // Begin a table

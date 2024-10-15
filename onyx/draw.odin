@@ -45,6 +45,7 @@ Paint_Kind :: enum u32 {
 	Normal,
 	Glyph,
 	User_Image,
+	Skeleton,
 	Linear_Gradient,
 	Radial_Gradient,
 }

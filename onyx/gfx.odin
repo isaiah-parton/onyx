@@ -69,8 +69,9 @@ wgpu_buffer_destroy :: proc(self: ^WGPU_Buffer($T)) {
 	wgpu.BufferDestroy(self.buffer)
 }
 
-Shader_Uniforms :: struct {
+Shader_Uniforms :: struct #align(8) {
 	size: [2]f32,
+	time: f32,
 }
 
 Graphics :: struct {
@@ -252,7 +253,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 				entries = &wgpu.BindGroupLayoutEntry {
 					binding = 0,
 					buffer = wgpu.BufferBindingLayout{type = .Uniform},
-					visibility = {.Vertex},
+					visibility = {.Vertex, .Fragment},
 				},
 			},
 		)
@@ -439,6 +440,7 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 
 	uniform := Shader_Uniforms {
 		size = core.view,
+		time = f32(time.duration_seconds(time.since(core.start_time))),
 	}
 
 	// Sort draw calls by index
