@@ -56,6 +56,13 @@ box_size :: proc(box: Box) -> [2]f32 {
 	return box.hi - box.lo
 }
 
+size_ratio :: proc(size: [2]f32, ratio: [2]f32) -> [2]f32 {
+	return [2]f32{
+		max(size.x, size.y * (ratio.x / ratio.y)),
+		max(size.y, size.x * (ratio.y / ratio.x)),
+	}
+}
+
 // If `a` is inside of `b`
 point_in_box :: proc(a: [2]f32, b: Box) -> bool {
 	return (a.x >= b.lo.x) && (a.x < b.hi.x) && (a.y >= b.lo.y) && (a.y < b.hi.y)

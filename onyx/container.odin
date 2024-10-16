@@ -11,14 +11,15 @@ Container_Mode :: enum {
 }
 
 Container_Info :: struct {
-	using _:   Widget_Info,
-	max_zoom:  f32,
-	size:      [2]f32,
-	exact_size: bool,
-	enable_zoom: bool,
-	mode:      Container_Mode,
-	layout:    ^Layout,
-	is_active: bool,
+	using _:            Widget_Info,
+	max_zoom:           f32,
+	size:               [2]f32,
+	force_aspect_ratio: bool,
+	exact_size:         bool,
+	enable_zoom:        bool,
+	mode:               Container_Mode,
+	layout:             ^Layout,
+	is_active:          bool,
 }
 
 Container :: struct {
@@ -42,20 +43,21 @@ init_container :: proc(using info: ^Container_Info, loc := #caller_location) -> 
 	return true
 }
 
-zoom_container_anchored :: proc(self: ^Widget, new_zoom: f32, anchor: [2]f32) {
-	assert(self != nil)
-	content_top_left := self.box.lo - self.cont.scroll
+zoom_container_anchored :: proc(using info: ^Container_Info, new_zoom: f32, anchor: [2]f32) {
+	assert(info != nil)
+	content_top_left := layout.bounds.lo
+	content_size := box_size(layout.bounds)
 	// For readability
 	view_top_left := self.box.lo
 	view_size := box_size(self.box)
 	// UV of cursor in viewport space
 	uv_view := (anchor - view_top_left) / view_size
 	// UV of cursor in content space
-	uv_content := (anchor - content_top_left) / (view_size * self.cont.zoom)
+	uv_content := (anchor - content_top_left) / content_size
 	// Divide em
 	uv_quotient := uv_view / uv_content
 	// Get the difference in displayed content area between both zoom levels
-	area_difference := (view_size * new_zoom) - (view_size * self.cont.target_zoom)
+	area_difference := (self.cont.size * new_zoom) - (self.cont.size * self.cont.target_zoom)
 	// Update the target values
 	self.cont.target_scroll += (area_difference / uv_quotient) * uv_view
 	self.cont.target_zoom = new_zoom
@@ -67,17 +69,21 @@ begin_container :: proc(using info: ^Container_Info) -> bool {
 
 	is_active = .Hovered in self.state
 
+	if force_aspect_ratio {
+		size = size_ratio(size, box_size(self.box))
+	}
+
 	if point_in_box(core.mouse_pos, self.box) {
 		hover_widget(self)
 	}
 
 	// Minimum size
-	self.cont.size = size if exact_size else linalg.max(self.cont.size, size)
+	self.cont.size = size if exact_size else linalg.max(box_size(self.box), self.cont.size, size)
 	self.cont.zoom = max(self.cont.zoom, 1)
 
 	// Determine layout box
 	layout_origin := self.box.lo - self.cont.scroll
-	layout_size := linalg.max(box_size(self.box), self.cont.size)
+	layout_size := self.cont.size
 	if enable_zoom {
 		layout_size *= self.cont.zoom
 	} else {
@@ -111,7 +117,7 @@ end_container :: proc(using info: ^Container_Info) {
 			new_zoom := clamp(old_zoom + core.mouse_scroll.y * 0.1, 1, max_zoom)
 			// Change needed?
 			if new_zoom != old_zoom {
-				zoom_container_anchored(self, new_zoom, core.mouse_pos)
+				zoom_container_anchored(info, new_zoom, core.mouse_pos)
 			}
 		} else {
 			delta_scroll := core.mouse_scroll
@@ -134,11 +140,12 @@ end_container :: proc(using info: ^Container_Info) {
 	// Update scroll
 	content_size := self.cont.size * self.cont.zoom
 	target_content_size := self.cont.size * self.cont.target_zoom
+	view_size := box_size(self.box)
 	// Clamp target scroll
 	self.cont.target_scroll = linalg.clamp(
 		self.cont.target_scroll,
 		0,
-		target_content_size - (self.box.hi - self.box.lo),
+		target_content_size - view_size,
 	)
 	delta_scroll := (self.cont.target_scroll - self.cont.scroll) * core.delta_time * 15
 	self.cont.scroll += delta_scroll
