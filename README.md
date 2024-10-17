@@ -1,40 +1,43 @@
 # Onyx
-
 Beautiful immediate-mode gui that runs as fast as your monitor.
 
-As of October 2024, I've completely done away with rasterized shapes and now all rendering is done with signed-distance fields in the shader this has taken a great load off of the CPU, and made the sky the limit for visual fidelity.
+## What?
+This library is designed by me, for me, based on what I like, but I expect that it will end up being very customizable visually.
 
-This is my immediate-mode ui library that I'm making for some desktop apps I have in mind.  It's currently nowhere near production-ready (though it lives up to its title), I'm still working out the core functionality, but it already has a lot of widgets.
-It is not renderer or platform agnostic, but by using GLFW and WGPU, I hope to bring it to every desktop platform.  It's not meant to be integrated into existing projects like dear imgui, but rather for creating tools and desktop apps.
-I'm currently finalizing the layout functionality before I move ahead with more widgets and things.
+## How?
+Windowing is *currently* handled by GLFW, the code for this is very minimal and is subject to change as I develop on different platforms in the future.
 
-## Here's the gist of how it works:
+Rendering is and will always be done with WGPU; because of this, all WGPU resources are exposed and allowed to be used by the rest of the app.
 
-Layer -> Something you render to, it has a z-index for ordered rendering and it's own root layout.
+A somewhat complex SDF shader is used for drawing shapes with limited support for custom scissors and paints.  This results in really pretty graphics while taking a massive load off of the CPU.  So far, I've seen framerates as high as 2000+ on integrated Intel UHD 630 graphics running the demo.
 
-Layout -> A box from which you cut other boxes for more layouts, widgets, etc...
+Widgets are immediate, but their functionality can be split apart to allow for advanced layouts.
 
-Container -> A scrollable area
+**Example**:
+```odin
+// You can just call
+button(&{text = "do segfault"})
 
-Widget -> Something you click on (sometimes not, example: calendars)
-
-Panel -> A decorated layer you can drag around and resize.
-
-## How can I center something?
-
-Widgets are transient objects that are initialized and added every frame.  Initializing something will always compute it's desired size, which can be used to center the layout it will be displayed in.
-For example, this is what happens when you call the `button` proc:
+// Or you can do it like this
+btn := Button_Info{text = "clickest thou me?"}
+init_button(&btn)
+// Not you have the button's desired size based on it's text
+fmt.println(btn.desired_size)
+// And when you want to display the button just call
+add_button(&btn)
 ```
-info := info
-if init_button(&info, loc) {
-	add_button(&info)
-}
-return info
-```
-The info passed to the procedure is made mutable, then initialized and added.  The modified info is then returned.
 
-## Todo
+In this example, the `btn` value is obviously **transient** and should not be used outside of it's GUI scope.  The same goes for any widget info value
 
+Layouts use the dead simple rect-cut method, give it a side to cut from and just add widgets.  You optionally specify widget size or margin.
+
+## Can I use it?
+It's not nearly production ready yet, has no docs and calling it stable is still a stretch, but do as you will, I can't stop you.
+
+## Ok, and?
+
+Stuff i'm working on:
 - [ ] Popups
+- [ ] Helpers for retaining container scroll/zoom and other things
 - [ ] Forms for tab focusing
 - [ ] Better control over layer sorting
