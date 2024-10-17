@@ -424,7 +424,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 		// Glyph
 		case 1u: {
 			out = textureSample(atlas_tex, samp, in.uv) * in.col;
-			out.a *= 1.0 + 0.125 * out.r;
+			// out.a *= 1.0 + 0.125 * out.r;
 		}
 		// User_Image
 		case 2u: {

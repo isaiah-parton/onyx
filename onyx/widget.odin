@@ -417,3 +417,21 @@ spinner :: proc(info: Spinner_Info, loc := #caller_location) -> Spinner_Info {
 	}
 	return info
 }
+
+skeleton :: proc(loc := #caller_location) {
+	info := Widget_Info{
+		id = hash(loc),
+	}
+	if begin_widget(&info) {
+		defer end_widget()
+		draw_skeleton(info.self.box, core.style.rounding)
+	}
+}
+
+draw_skeleton :: proc(box: Box, rounding: f32) {
+	draw_rounded_box_fill(box, rounding, core.style.color.substance)
+	set_paint(add_paint({kind = .Skeleton}))
+	draw_rounded_box_fill(box, rounding, {255, 255, 255, 50})
+	set_paint(0)
+	core.draw_this_frame = true
+}

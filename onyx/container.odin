@@ -161,6 +161,7 @@ end_container :: proc(using info: ^Container_Info) {
 	self.cont.scroll_time.y = animate(self.cont.scroll_time.y, 0.2, enable_scroll_y)
 	// Scrollbars
 	inner_box := shrink_box(self.box, 4)
+	push_id(self.id)
 	if enable_scroll_y {
 		box := get_box_cut_right(
 			inner_box,
@@ -169,7 +170,7 @@ end_container :: proc(using info: ^Container_Info) {
 		if enable_scroll_x {
 			box.hi.y -= self.cont.scroll_time.x * core.style.shape.scrollbar_thickness
 		}
-		if scrollbar({make_visible = self.cont.active || abs(delta_scroll.y) > 0.1, vertical = true, box = box, pos = &self.cont.scroll.y, travel = content_size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / content_size.y}).changed {
+		if scrollbar({make_visible = (self.cont.active || abs(delta_scroll.y) > 0.1), vertical = true, box = box, pos = &self.cont.scroll.y, travel = content_size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / content_size.y}).changed {
 			self.cont.target_scroll.y = self.cont.scroll.y
 		}
 	}
@@ -181,10 +182,11 @@ end_container :: proc(using info: ^Container_Info) {
 		if enable_scroll_y {
 			box.hi.x -= self.cont.scroll_time.y * core.style.shape.scrollbar_thickness
 		}
-		if scrollbar({make_visible = self.cont.active || abs(delta_scroll.x) > 0.1, box = box, pos = &self.cont.scroll.x, travel = content_size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / content_size.x}).changed {
+		if scrollbar({make_visible = (self.cont.active || abs(delta_scroll.x) > 0.1), box = box, pos = &self.cont.scroll.x, travel = content_size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / content_size.x}).changed {
 			self.cont.target_scroll.x = self.cont.scroll.x
 		}
 	}
+	pop_id()
 	// Table outline
 	draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 	pop_scissor()

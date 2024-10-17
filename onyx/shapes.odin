@@ -92,6 +92,31 @@ render_shape :: proc(shape: u32, color: Color) {
 	add_indices(a, b, c, a, c, d)
 }
 
+render_shape_uv :: proc(shape: u32, source: Box, color: Color) {
+	box := get_shape_bounding_box(core.gfx.shapes.data[shape])
+	if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
+	size := [2]f32{f32(core.font_atlas.width), f32(core.font_atlas.height)}
+	a := add_vertex(Vertex{pos = box.lo, col = color, uv = source.lo / size, shape = shape})
+	b := add_vertex(
+		Vertex {
+			pos = [2]f32{box.lo.x, box.hi.y},
+			col = color,
+			uv = [2]f32{source.lo.x, source.hi.y} / size,
+			shape = shape,
+		},
+	)
+	c := add_vertex(Vertex{pos = box.hi, col = color, uv = source.hi / size, shape = shape})
+	d := add_vertex(
+		Vertex {
+			pos = [2]f32{box.hi.x, box.lo.y},
+			col = color,
+			uv = [2]f32{source.hi.x, source.lo.y} / size,
+			shape = shape,
+		},
+	)
+	add_indices(a, b, c, a, c, d)
+}
+
 clear_path :: proc(path: ^Path) {
 	path.count = 0
 }

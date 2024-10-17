@@ -101,13 +101,14 @@ add_image_to_atlas :: proc(image: img.Image, atlas: ^Atlas, gfx: ^Graphics) -> B
 	pixel_size := 4
 	for y in 0 ..< image.height {
 		target_row_offset := (y + int(box.lo.y)) * atlas.width * pixel_size
-		source_row_offset := y * image.width
+		source_row_offset := y * image.width * pixel_size
 		for x in 0 ..< image.width {
 			target_offset := target_row_offset + (x + int(box.lo.x)) * pixel_size
-			atlas.image.pixels.buf[target_offset] = image.pixels.buf[source_row_offset + x]
-			atlas.image.pixels.buf[target_offset + 1] = image.pixels.buf[source_row_offset + x + 1]
-			atlas.image.pixels.buf[target_offset + 2] = image.pixels.buf[source_row_offset + x + 2]
-			atlas.image.pixels.buf[target_offset + 3] = image.pixels.buf[source_row_offset + x + 3]
+			source_offset := source_row_offset + x * pixel_size
+			atlas.image.pixels.buf[target_offset] = image.pixels.buf[source_offset]
+			atlas.image.pixels.buf[target_offset + 1] = image.pixels.buf[source_offset + 1]
+			atlas.image.pixels.buf[target_offset + 2] = image.pixels.buf[source_offset + 2]
+			atlas.image.pixels.buf[target_offset + 3] = image.pixels.buf[source_offset + 3]
 		}
 	}
 	atlas.modified = true

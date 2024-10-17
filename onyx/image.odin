@@ -23,7 +23,10 @@ upload_image :: proc(image: img.Image) -> (index: int, ok: bool) {
 		if core.user_images[i] == nil {
 			index = i
 			ok = true
-			core.user_images[i] = Image{}
+			core.user_images[i] = Image {
+				image     = image,
+				atlas_src = add_image_to_atlas(image, &core.font_atlas, &core.gfx),
+			}
 			break
 		}
 	}
@@ -67,9 +70,23 @@ draw_texture_portion :: proc(texture: wgpu.Texture, source, target: Box, tint: C
 	shape := add_shape_box(target, {})
 
 	a := add_vertex({pos = target.lo, uv = source.lo / size, col = tint, shape = shape})
-	b := add_vertex({pos = {target.lo.x, target.hi.y}, col = tint, uv = [2]f32{source.lo.x, source.hi.y} / size, shape = shape})
+	b := add_vertex(
+		{
+			pos = {target.lo.x, target.hi.y},
+			col = tint,
+			uv = [2]f32{source.lo.x, source.hi.y} / size,
+			shape = shape,
+		},
+	)
 	c := add_vertex({pos = target.hi, col = tint, uv = source.hi / size, shape = shape})
-	d := add_vertex({pos = {target.hi.x, target.lo.y}, col = tint, uv = [2]f32{source.hi.x, source.lo.y} / size, shape = shape})
+	d := add_vertex(
+		{
+			pos = {target.hi.x, target.lo.y},
+			col = tint,
+			uv = [2]f32{source.hi.x, source.lo.y} / size,
+			shape = shape,
+		},
+	)
 
 	add_indices(a, b, c, a, c, d)
 }
@@ -88,32 +105,31 @@ get_current_texture :: proc() -> wgpu.Texture {
 	return core.current_texture
 }
 
-create_texture_from_image :: proc(gfx: ^Graphics, image: ^img.Image) -> (texture: wgpu.Texture, ok: bool) {
-	texture = wgpu.DeviceCreateTexture(gfx.device, &{
-		usage = {.CopySrc, .CopyDst, .TextureBinding},
-		dimension = ._2D,
-		format = .RGBA8Unorm,
-		size = {
-			width = u32(image.width),
-			height = u32(image.height),
-			depthOrArrayLayers = 1,
+create_texture_from_image :: proc(
+	gfx: ^Graphics,
+	image: ^img.Image,
+) -> (
+	texture: wgpu.Texture,
+	ok: bool,
+) {
+	texture = wgpu.DeviceCreateTexture(
+		gfx.device,
+		&{
+			usage = {.CopySrc, .CopyDst, .TextureBinding},
+			dimension = ._2D,
+			format = .RGBA8Unorm,
+			size = {width = u32(image.width), height = u32(image.height), depthOrArrayLayers = 1},
+			mipLevelCount = 1,
+			sampleCount = 1,
 		},
-		mipLevelCount = 1,
-		sampleCount = 1,
-	})
+	)
 	wgpu.QueueWriteTexture(
 		gfx.queue,
-		&{
-			texture = texture,
-		},
+		&{texture = texture},
 		raw_data(image.pixels.buf),
 		len(image.pixels.buf),
 		&{bytesPerRow = u32(image.width * image.channels), rowsPerImage = u32(image.height)},
-		&{
-			width = u32(image.width),
-			height = u32(image.height),
-			depthOrArrayLayers = 1,
-		},
+		&{width = u32(image.width), height = u32(image.height), depthOrArrayLayers = 1},
 	)
 	wgpu.QueueSubmit(gfx.queue, {})
 	ok = true

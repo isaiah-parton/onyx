@@ -135,3 +135,68 @@ button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
 	}
 	return info
 }
+
+Image_Button_Info :: struct {
+	using _: Widget_Info,
+	image: Maybe(int),
+	clicked: bool,
+	hovered: bool,
+}
+
+init_image_button :: proc(using info: ^Image_Button_Info, loc := #caller_location) -> bool {
+	if info == nil do return false
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
+	return true
+}
+
+add_image_button :: proc(using info: ^Image_Button_Info) -> bool {
+	begin_widget(info) or_return
+	defer end_widget()
+
+	button_behavior(self)
+
+	if self.visible {
+		if image, ok := image.?; ok {
+			if image_data, ok := core.user_images[image].?; ok {
+				if source, ok := image_data.atlas_src.?; ok {
+					view_size := box_size(self.box)
+					image_size := box_size(source)
+					j := 0 if image_size.x < image_size.y else 1
+					for i in 0..=1 {
+						image_size *= min(1, view_size[j] / image_size[j])
+						j = 1 - j
+					}
+					center := box_center(self.box)
+					set_paint(add_paint({kind = .Glyph}))
+					defer set_paint(0)
+					shape := add_shape_box({center - image_size / 2, center + image_size / 2}, core.style.rounding)
+					h_overlap := max(0, image_size.x - view_size.x)
+					source.lo.x += h_overlap / 2
+					source.hi.x -= h_overlap / 2
+					v_overlap := max(0, image_size.y - view_size.y)
+					source.lo.y += v_overlap / 2
+					source.hi.y -= v_overlap / 2
+					render_shape_uv(shape, source, 255)
+				}
+			}
+		} else {
+			draw_skeleton(self.box, core.style.rounding)
+		}
+		draw_rounded_box_fill(self.box, core.style.rounding, fade(core.style.color.substance, self.hover_time * 0.5))
+		// draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
+	}
+
+	clicked = .Clicked in self.state
+	hovered = .Hovered in self.state
+
+	return true
+}
+
+image_button :: proc(info: Image_Button_Info) -> Image_Button_Info {
+	info := info
+	if init_image_button(&info) {
+		add_image_button(&info)
+	}
+	return info
+}

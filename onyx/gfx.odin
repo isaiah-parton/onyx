@@ -551,6 +551,9 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 				minFilter = .Linear,
 				addressModeU = .ClampToEdge,
 				addressModeV = .ClampToEdge,
+				mipmapFilter = .Linear,
+				lodMinClamp = 0,
+				// lodMaxClamp = 4,
 				maxAnisotropy = 1,
 			},
 		)
