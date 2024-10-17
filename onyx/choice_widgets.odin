@@ -62,6 +62,7 @@ begin_selector :: proc(using info: ^Selector_Info) -> bool {
 		}
 	}
 	if .Open in self.state {
+		push_id(self.id)
 		draw_shadow(layout_box(), self.open_time)
 		foreground()
 		set_width_auto()
@@ -74,11 +75,13 @@ begin_selector :: proc(using info: ^Selector_Info) -> bool {
 end_selector :: proc() -> bool {
 	self := current_widget().? or_return
 	if .Open in self.state {
+		pop_id()
+
 		layout := current_layout().?
 		kind := widget_kind(self, Menu_Widget_Kind)
 		kind.size = layout.content_size + layout.spacing_size
 		layer := current_layer().?
-		if .Hovered not_in layer.state && .Focused not_in self.state {
+		if (.Hovered not_in layer.state && .Focused not_in self.state) || .Clicked in layer.state {
 			self.state -= {.Open}
 		}
 		draw_rounded_box_fill(

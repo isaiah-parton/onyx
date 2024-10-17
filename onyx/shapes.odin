@@ -70,7 +70,38 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 		box.lo -= shape.width / 2
 		box.hi += shape.width / 2
 	}
+	return box
+}
 
+apply_scissor_box :: proc(target, source: ^Box, clip: Box) {
+	left := clip.lo.x - target.lo.x
+	source_factor := box_size(source^) / box_size(target^)
+	if left > 0 {
+		target.lo.x += left
+		source.lo.x += left * source_factor.x
+	}
+	top := clip.lo.y - target.lo.y
+	if top > 0 {
+		target.lo.y += top
+		source.lo.y += top * source_factor.y
+	}
+	right := target.hi.x - clip.hi.x
+	if right > 0 {
+		target.hi.x -= right
+		source.hi.x -= right * source_factor.x
+	}
+	bottom := target.hi.y - clip.hi.y
+	if bottom > 0 {
+		target.hi.y -= bottom
+		source.hi.y -= bottom * source_factor.y
+	}
+}
+
+render_shape :: proc(shape_index: u32, color: Color) {
+	shape := core.gfx.shapes.data[shape_index]
+	// Get full bounding box
+	box := get_shape_bounding_box(shape)
+	// Apply scissor clipping
 	// Shadows are not clipped like other shapes since they are currently only drawn below new layers
 	// This is subject to change.
 	if shape.kind != .BlurredBox {
@@ -79,39 +110,47 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 			box.hi = linalg.min(box.hi, scissor.box.hi)
 		}
 	}
-	return box
-}
-
-render_shape :: proc(shape: u32, color: Color) {
-	box := get_shape_bounding_box(core.gfx.shapes.data[shape])
+	// Discard fully clipped shapes
 	if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
-	a := add_vertex(Vertex{pos = box.lo, col = color, shape = shape})
-	b := add_vertex(Vertex{pos = {box.lo.x, box.hi.y}, col = color, shape = shape})
-	c := add_vertex(Vertex{pos = box.hi, col = color, shape = shape})
-	d := add_vertex(Vertex{pos = {box.hi.x, box.lo.y}, col = color, shape = shape})
+	// Add vertices
+	a := add_vertex(Vertex{pos = box.lo, col = color, shape = shape_index})
+	b := add_vertex(Vertex{pos = {box.lo.x, box.hi.y}, col = color, shape = shape_index})
+	c := add_vertex(Vertex{pos = box.hi, col = color, shape = shape_index})
+	d := add_vertex(Vertex{pos = {box.hi.x, box.lo.y}, col = color, shape = shape_index})
 	add_indices(a, b, c, a, c, d)
 }
 
-render_shape_uv :: proc(shape: u32, source: Box, color: Color) {
-	box := get_shape_bounding_box(core.gfx.shapes.data[shape])
+render_shape_uv :: proc(shape_index: u32, source: Box, color: Color) {
+	shape := core.gfx.shapes.data[shape_index]
+	box := get_shape_bounding_box(shape)
+	source := source
+	// Apply scissor clipping
+	// Shadows are not clipped like other shapes since they are currently only drawn below new layers
+	// This is subject to change.
+	if scissor, ok := current_scissor().?; ok {
+		apply_scissor_box(&box, &source, scissor.box)
+	}
+	// Discard fully clipped shapes
 	if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
+	// Get texture size
 	size := [2]f32{f32(core.font_atlas.width), f32(core.font_atlas.height)}
-	a := add_vertex(Vertex{pos = box.lo, col = color, uv = source.lo / size, shape = shape})
+	// Add vertices
+	a := add_vertex(Vertex{pos = box.lo, col = color, uv = source.lo / size, shape = shape_index})
 	b := add_vertex(
 		Vertex {
 			pos = [2]f32{box.lo.x, box.hi.y},
 			col = color,
 			uv = [2]f32{source.lo.x, source.hi.y} / size,
-			shape = shape,
+			shape = shape_index,
 		},
 	)
-	c := add_vertex(Vertex{pos = box.hi, col = color, uv = source.hi / size, shape = shape})
+	c := add_vertex(Vertex{pos = box.hi, col = color, uv = source.hi / size, shape = shape_index})
 	d := add_vertex(
 		Vertex {
 			pos = [2]f32{box.hi.x, box.lo.y},
 			col = color,
 			uv = [2]f32{source.hi.x, source.lo.y} / size,
-			shape = shape,
+			shape = shape_index,
 		},
 	)
 	add_indices(a, b, c, a, c, d)
@@ -449,8 +488,8 @@ draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
 	shape := add_shape(Shape{kind = .Normal})
 	a := add_vertex(Vertex{pos = box.lo, col = left, shape = shape})
 	b := add_vertex(Vertex{pos = {box.lo.x, box.hi.y}, col = left, shape = shape})
-	c := add_vertex(Vertex{pos = {box.hi.x, box.lo.y}, col = right, shape = shape})
-	d := add_vertex(Vertex{pos = box.hi, col = right, shape = shape})
+	c := add_vertex(Vertex{pos = box.hi, col = right, shape = shape})
+	d := add_vertex(Vertex{pos = {box.hi.x, box.lo.y}, col = right, shape = shape})
 	add_indices(a, b, c, a, c, d)
 }
 

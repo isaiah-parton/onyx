@@ -101,10 +101,11 @@ Vertex :: struct {
 }
 
 Draw_Call :: struct {
-	user_texture: Maybe(wgpu.Texture),
-	elem_offset:  int,
-	elem_count:   int,
-	index:        int,
+	user_texture:      Maybe(wgpu.Texture),
+	user_sampler_desc: Maybe(wgpu.SamplerDescriptor),
+	elem_offset:       int,
+	elem_count:        int,
+	index:             int,
 }
 
 Path :: struct {
@@ -231,6 +232,31 @@ rotate_matrix_z :: proc(angle: f32) {
 
 scale_matrix :: proc(x, y, z: f32) {
 	core.current_matrix^ *= linalg.matrix4_scale([3]f32{x, y, z})
+}
+
+// Lets the user provide a custom sampler descriptor for the user texture
+set_sampler_descriptor :: proc(desc: wgpu.SamplerDescriptor) {
+	if core.current_draw_call == nil do return
+	if core.current_draw_call.user_sampler_desc != nil {
+		append_draw_call(current_layer().?.index)
+	}
+	core.current_draw_call.user_sampler_desc = desc
+}
+
+// Set the texture to be used for `draw_texture()`
+set_texture :: proc(texture: wgpu.Texture) {
+	core.current_texture = texture
+	if core.current_draw_call == nil do return
+	if core.current_draw_call.user_texture == core.current_texture do return
+	if core.current_draw_call.user_texture != nil {
+		append_draw_call(current_layer().?.index)
+	}
+	core.current_draw_call.user_texture = texture
+}
+
+// Returns the current user texture
+get_current_texture :: proc() -> wgpu.Texture {
+	return core.current_texture
 }
 
 // Add a new draw call at the given index with the currently bound user texture

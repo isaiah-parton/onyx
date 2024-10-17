@@ -1,6 +1,7 @@
 package onyx
 
 import "base:intrinsics"
+import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
@@ -8,6 +9,7 @@ Slider_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	using _: Widget_Info,
 	value:   ^T,
 	lo, hi:  T,
+	format: Maybe(string),
 }
 
 init_slider :: proc(using info: ^Slider_Info($T), loc := #caller_location) -> bool {
@@ -61,7 +63,20 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 
 	if (.Pressed in self.state) && value != nil {
 		new_time := clamp((core.mouse_pos.x - _box.lo.x - radius) / range_width, 0, 1)
-		value^ = lo + T(new_time) * (hi - lo)
+		value^ = T(f32(lo) + new_time * f32(hi - lo))
+
+		if text_job, ok := make_text_job({
+			text = fmt.tprintf(format.? or_else "%v", value^),
+			font = core.style.default_font,
+			size = 16,
+			align_h = .Middle,
+			align_v = .Middle,
+		}); ok {
+			if tooltip({size = text_job.size + 10}) {
+				draw_text_glyphs(text_job, box_center(layout_box()), core.style.color.content)
+			}
+		}
+
 		core.draw_next_frame = true
 	}
 

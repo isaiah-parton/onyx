@@ -79,7 +79,7 @@ struct VertexOutput {
 
 @group(1)
 @binding(0)
-var samp: sampler;
+var atlas_samp: sampler;
 
 @group(1)
 @binding(1)
@@ -87,6 +87,10 @@ var atlas_tex: texture_2d<f32>;
 
 @group(1)
 @binding(2)
+var user_samp: sampler;
+
+@group(1)
+@binding(3)
 var user_tex: texture_2d<f32>;
 
 fn sd_subtract(d1: f32, d2: f32) -> f32 {
@@ -423,12 +427,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	switch (paint.kind) {
 		// Glyph
 		case 1u: {
-			out = textureSample(atlas_tex, samp, in.uv) * in.col;
+			out = textureSample(atlas_tex, atlas_samp, in.uv) * in.col;
 			// out.a *= 1.0 + 0.125 * out.r;
 		}
 		// User_Image
 		case 2u: {
-			out = textureSample(user_tex, samp, in.uv) * in.col;
+			out = textureSample(user_tex, user_samp, in.uv) * in.col;
 		}
 		// Skeleton
 		case 3u: {

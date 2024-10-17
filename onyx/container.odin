@@ -16,9 +16,11 @@ Container_Info :: struct {
 	size:               [2]f32,
 	force_aspect_ratio: bool,
 	exact_size:         bool,
-	enable_zoom:        bool,
+	swap_axis:          bool,
+	hide_scrollbars:    bool,
 	mode:               Container_Mode,
 	layout:             ^Layout,
+	enable_zoom:        bool,
 	is_active:          bool,
 }
 
@@ -124,6 +126,9 @@ end_container :: proc(using info: ^Container_Info) {
 			if key_down(.Left_Shift) || key_down(.Right_Shift) {
 				delta_scroll.xy = delta_scroll.yx
 			}
+			if swap_axis {
+				delta_scroll.xy = delta_scroll.yx
+			}
 			self.cont.target_scroll -= delta_scroll * 100
 		}
 	}
@@ -154,8 +159,8 @@ end_container :: proc(using info: ^Container_Info) {
 		core.draw_next_frame = true
 	}
 	// Enable/disable scrollbars
-	enable_scroll_x := content_size.x > box_width(self.box)
-	enable_scroll_y := content_size.y > box_height(self.box)
+	enable_scroll_x := content_size.x > box_width(self.box) && !hide_scrollbars
+	enable_scroll_y := content_size.y > box_height(self.box) && !hide_scrollbars
 	// Animate scrollbars
 	self.cont.scroll_time.x = animate(self.cont.scroll_time.x, 0.2, enable_scroll_x)
 	self.cont.scroll_time.y = animate(self.cont.scroll_time.y, 0.2, enable_scroll_y)
@@ -188,7 +193,7 @@ end_container :: proc(using info: ^Container_Info) {
 	}
 	pop_id()
 	// Table outline
-	draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
+	// draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 	pop_scissor()
 	end_widget()
 }

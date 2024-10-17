@@ -41,8 +41,11 @@ destroy_image :: proc(image: ^Image) {
 	img.destroy(image)
 }
 
-draw_texture :: proc(texture: wgpu.Texture, box: Box, tint: Color) {
+draw_texture :: proc(texture: wgpu.Texture, box: Box, tint: Color, sampler_descriptor: Maybe(wgpu.SamplerDescriptor) = nil) {
 	set_texture(texture)
+	if sampler_descriptor != nil {
+		set_sampler_descriptor(sampler_descriptor.?)
+	}
 
 	set_paint(add_paint({kind = .User_Image}))
 	defer set_paint(0)
@@ -56,8 +59,11 @@ draw_texture :: proc(texture: wgpu.Texture, box: Box, tint: Color) {
 	add_indices(a, b, c, a, c, d)
 }
 
-draw_texture_portion :: proc(texture: wgpu.Texture, source, target: Box, tint: Color) {
+draw_texture_portion :: proc(texture: wgpu.Texture, source, target: Box, tint: Color, sampler_descriptor: Maybe(wgpu.SamplerDescriptor) = nil) {
 	set_texture(texture)
+	if sampler_descriptor != nil {
+		set_sampler_descriptor(sampler_descriptor.?)
+	}
 
 	width := wgpu.TextureGetWidth(texture)
 	height := wgpu.TextureGetHeight(texture)
@@ -91,19 +97,7 @@ draw_texture_portion :: proc(texture: wgpu.Texture, source, target: Box, tint: C
 	add_indices(a, b, c, a, c, d)
 }
 
-set_texture :: proc(texture: wgpu.Texture) {
-	core.current_texture = texture
-	if core.current_draw_call == nil do return
-	if core.current_draw_call.user_texture == core.current_texture do return
-	if core.current_draw_call.user_texture != nil {
-		append_draw_call(current_layer().?.index)
-	}
-	core.current_draw_call.user_texture = texture
-}
 
-get_current_texture :: proc() -> wgpu.Texture {
-	return core.current_texture
-}
 
 create_texture_from_image :: proc(
 	gfx: ^Graphics,

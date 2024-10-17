@@ -261,7 +261,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 			gfx.device,
 			&{
 				label = "TextureBindGroupLayout",
-				entryCount = 3,
+				entryCount = 4,
 				entries = transmute([^]wgpu.BindGroupLayoutEntry)&[?]wgpu.BindGroupLayoutEntry {
 					{binding = 0, sampler = {type = .Filtering}, visibility = {.Fragment}},
 					{
@@ -269,8 +269,9 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 						texture = {sampleType = .Float, viewDimension = ._2D},
 						visibility = {.Fragment},
 					},
+					{binding = 2, sampler = {type = .Filtering}, visibility = {.Fragment}},
 					{
-						binding = 2,
+						binding = 3,
 						texture = {sampleType = .Float, viewDimension = ._2D},
 						visibility = {.Fragment},
 					},
@@ -536,28 +537,46 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 			continue
 		}
 
+		// User sampler descriptor
+		user_sampler_desc := call.user_sampler_desc.? or_else wgpu.SamplerDescriptor{
+			magFilter = .Linear,
+			minFilter = .Linear,
+			addressModeU = .ClampToEdge,
+			addressModeV = .ClampToEdge,
+			mipmapFilter = .Linear,
+			lodMinClamp = 0,
+			maxAnisotropy = 4,
+		}
+
 		// Create view for user texture
 		user_texture_view: wgpu.TextureView = atlas_texture_view
 		defer if user_texture_view != atlas_texture_view do wgpu.TextureViewRelease(user_texture_view)
 		if user_texture, ok := call.user_texture.?; ok {
 			user_texture_view = wgpu.TextureCreateView(user_texture)
+			if call.user_sampler_desc == nil {
+				user_sampler_desc.lodMaxClamp = cast(f32)wgpu.TextureGetMipLevelCount(user_texture)
+			}
 		}
 
 		// Create transient sampler
-		sampler := wgpu.DeviceCreateSampler(
+		atlas_sampler := wgpu.DeviceCreateSampler(
 			gfx.device,
 			&{
-				magFilter = .Linear,
+				magFilter = .Nearest,
 				minFilter = .Linear,
 				addressModeU = .ClampToEdge,
 				addressModeV = .ClampToEdge,
-				mipmapFilter = .Linear,
-				lodMinClamp = 0,
-				// lodMaxClamp = 4,
 				maxAnisotropy = 1,
 			},
 		)
-		defer wgpu.SamplerRelease(sampler)
+		defer wgpu.SamplerRelease(atlas_sampler)
+
+		// Create transient sampler
+		user_sampler := wgpu.DeviceCreateSampler(
+			gfx.device,
+			&user_sampler_desc,
+		)
+		defer wgpu.SamplerRelease(user_sampler)
 
 		// Create transient bind group
 		texture_bind_group := wgpu.DeviceCreateBindGroup(
@@ -565,11 +584,12 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 			&{
 				label = "TextureBindGroup",
 				layout = gfx.texture_bind_group_layout,
-				entryCount = 3,
+				entryCount = 4,
 				entries = transmute([^]wgpu.BindGroupEntry)&[?]wgpu.BindGroupEntry {
-					{binding = 0, sampler = sampler},
+					{binding = 0, sampler = atlas_sampler},
 					{binding = 1, textureView = atlas_texture_view},
-					{binding = 2, textureView = user_texture_view},
+					{binding = 2, sampler = user_sampler},
+					{binding = 3, textureView = user_texture_view},
 				},
 			},
 		)

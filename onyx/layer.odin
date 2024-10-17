@@ -20,14 +20,6 @@ Layer_Sorting :: enum {
 	Below,
 }
 
-Layer_Status :: enum {
-	Hovered,
-	Focused,
-	Pressed,
-}
-
-Layer_State :: bit_set[Layer_Status]
-
 Layer_Option :: enum {
 	Isolated,
 	Attached,
@@ -40,7 +32,7 @@ Layer :: struct {
 	id:                Id,
 	parent:            ^Layer,
 	children:          [dynamic]^Layer,
-	last_state, state: Layer_State,
+	last_state, state: Widget_State,
 	options:           Layer_Options,
 	kind:              Layer_Order,
 	// Contents are clipped to this box

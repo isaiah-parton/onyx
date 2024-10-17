@@ -367,6 +367,7 @@ new_frame :: proc() {
 	// Reset draw state
 	core.draw_state = {}
 	core.current_texture = {}
+
 	core.scissor_stack.height = 0
 	core.matrix_stack.height = 0
 	core.current_matrix = nil

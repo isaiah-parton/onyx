@@ -44,7 +44,7 @@ default_style_shape :: proc() -> Style_Shape {
 		rounding = 5,
 		menu_padding = 5,
 		popup_margin = 7,
-		scrollbar_thickness = 12,
+		scrollbar_thickness = 8,
 		table_row_height = 40,
 		visual_size = {200, 30},
 	}
