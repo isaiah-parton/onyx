@@ -72,7 +72,7 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 			align_h = .Middle,
 			align_v = .Middle,
 		}); ok {
-			if tooltip({size = text_job.size + 10}) {
+			if tooltip({size = text_job.size + 10, snap = true}) {
 				draw_text_glyphs(text_job, box_center(layout_box()), core.style.color.content)
 			}
 		}

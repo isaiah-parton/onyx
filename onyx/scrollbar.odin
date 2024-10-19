@@ -39,8 +39,8 @@ add_scrollbar :: proc(using info: ^Scrollbar_Info) -> bool {
 	_travel := (_box.hi[i] - _box.lo[i]) - handle_size
 
 	handle_box := Box{}
-	handle_box.lo[i] = _box.lo[i] + clamp(info.pos^ / info.travel, 0, 1) * _travel
-	handle_box.hi[i] = handle_box.lo[i] + _handle_size
+	handle_box.lo[i] = clamp(_box.lo[i] + (info.pos^ / info.travel) * _travel, _box.lo[i], _box.hi[i])
+	handle_box.hi[i] = clamp(handle_box.lo[i] + _handle_size, _box.lo[i], _box.hi[i])
 
 	handle_box.lo[j] = _box.lo[j]
 	handle_box.hi[j] = _box.hi[j]

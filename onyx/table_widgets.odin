@@ -147,7 +147,7 @@ begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 	cont_info = Container_Info {
 		id = hash("cont"),
 		box = self.box,
-		size = {1 = core.style.table_row_height * f32(info.row_count + 1)},
+		space = [2]f32{1 = core.style.table_row_height * f32(info.row_count + 1)},
 	}
 	begin_container(&cont_info) or_return
 

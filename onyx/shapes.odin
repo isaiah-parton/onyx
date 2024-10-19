@@ -515,6 +515,7 @@ draw_box_stroke :: proc(box: Box, width: f32, color: Color) {
 	draw_rounded_box_stroke(box, 0, width, color)
 }
 
+// TODO: document corner order
 draw_rounded_box_corners_fill :: proc(box: Box, corners: [4]f32, color: Color) {
 	if box.hi.x <= box.lo.x || box.hi.y <= box.lo.y {
 		return
@@ -547,10 +548,10 @@ draw_rounded_box_shadow :: proc(box: Box, corner_radius, blur_radius: f32, color
 	)
 }
 
-draw_shadow :: proc(box: Box, opacity: f32 = 1) {
+draw_shadow :: proc(box: Box, rounding: f32, opacity: f32 = 1) {
 	draw_rounded_box_shadow(
 		move_box(box, {0, 2}),
-		core.style.rounding,
+		rounding,
 		6,
 		fade(core.style.color.shadow, opacity),
 	)

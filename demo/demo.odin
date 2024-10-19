@@ -81,7 +81,7 @@ component_showcase :: proc(state: ^State) -> bool {
 	foreground()
 	if layout({size = 65, side = .Top}) {
 		shrink(15)
-		tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Component)})
+		box_tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Component)})
 		breadcrumb({index = (^int)(&state.component), options = {"bruh"}})
 		set_side(.Right)
 		if toggle_switch({state = &state.light_mode, text = "\uf1bc" if state.light_mode else "\uef72", text_side = .Left}).toggled {
@@ -113,7 +113,6 @@ component_showcase :: proc(state: ^State) -> bool {
 			)
 			pop_id()
 		}
-
 	case .Tables:
 		set_side(.Left)
 		rows_active: [dynamic]bool
@@ -174,12 +173,11 @@ component_showcase :: proc(state: ^State) -> bool {
 			}
 			core.draw_next_frame = true
 		}
-
 	case .Scroll_Zone:
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if container(&{size = {0, 2000}}) {
+		if container(&{space = [2]f32{0, 2000}}) {
 			set_width_fill()
 			set_height_auto()
 			for i in 0 ..< 50 {
@@ -194,7 +192,7 @@ component_showcase :: proc(state: ^State) -> bool {
 		add_space(50)
 		set_width(500)
 		set_height(300)
-		if container(&{size = {1000, 0}}) {
+		if container(&{space = [2]f32{1000, 0}}) {
 			set_side(.Left)
 			set_height_fill()
 			set_width(200)
@@ -205,17 +203,15 @@ component_showcase :: proc(state: ^State) -> bool {
 				pop_id()
 			}
 		}
-
 	case .Slider:
 		set_side(.Top)
 		label({text = "From"})
-		box_slider(Slider_Info(f32){value = &state.from_angle, hi = math.TAU})
+		slider(Slider_Info(f32){value = &state.from_angle, hi = math.TAU})
 		add_space(10)
 		label({text = "To"})
-		box_slider(Slider_Info(f32){value = &state.to_angle, hi = math.TAU})
+		slider(Slider_Info(f32){value = &state.to_angle, hi = math.TAU})
 		draw_arc(core.view / 2, state.from_angle, state.to_angle, 10, 4, {255, 255, 255, 255})
 		draw_pie(core.view / 2 + 100, state.from_angle, state.to_angle, 15, {255, 255, 255, 255})
-
 	case .Button:
 		set_side(.Top)
 		label({text = "Fit to label"})
@@ -233,7 +229,6 @@ component_showcase :: proc(state: ^State) -> bool {
 		}
 		add_space(10)
 		enum_selector(&state.option)
-
 	case .Boolean:
 		set_side(.Top)
 		label({text = "Checkboxes"})
@@ -260,7 +255,6 @@ component_showcase :: proc(state: ^State) -> bool {
 			}
 			pop_id()
 		}
-
 	case .Data_Input:
 		set_side(.Top)
 		set_width(250)
@@ -277,7 +271,6 @@ component_showcase :: proc(state: ^State) -> bool {
 		add_space(10)
 		set_height(120)
 		string_input({value = &state.bio, placeholder = "Bio", multiline = true})
-
 	case .Graph:
 		set_side(.Left)
 		set_width_percent(50)

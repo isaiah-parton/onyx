@@ -12,7 +12,6 @@ import "core:time"
 MAX_CLICK_DELAY :: time.Millisecond * 450
 
 Widget :: struct {
-
 	// Essential
 	id:           Id,
 	box:          Box,
@@ -27,6 +26,7 @@ Widget :: struct {
 	last_state:   Widget_State,
 	next_state:   Widget_State,
 	state:        Widget_State,
+	state_mask:   Widget_State,
 	click_count:  int,
 	click_time:   time.Time,
 	click_button: Mouse_Button,
@@ -53,17 +53,16 @@ Widget :: struct {
 
 	// TODO: Remove this
 	variant:      Widget_Kind,
-
-	using var: struct #raw_union {
-		cont: Container,
-		menu: Menu_Widget_Kind,
-		graph: Graph_Widget_Kind,
+	using var:    struct #raw_union {
+		cont:    Container,
+		menu:    Menu_Widget_Kind,
+		graph:   Graph_Widget_Kind,
 		tooltip: Tooltip_Widget_Kind,
-		tabs: Tabs_Widget_Kind,
-		input: Input_Widget_Kind,
+		tabs:    Tabs_Widget_Kind,
+		input:   Input_Widget_Kind,
 		boolean: Boolean_Widget_Kind,
-		date: Date_Picker_Widget_Kind,
-		table: Table_Widget_Kind,
+		date:    Date_Picker_Widget_Kind,
+		table:   Table_Widget_Kind,
 	},
 }
 // Widget variants
@@ -97,8 +96,13 @@ Widget_Info :: struct {
 	id:           Id,
 	// Optional box to be used instead of cutting from the layout
 	box:          Maybe(Box),
+	// Can not receive input if true
 	disabled:     bool,
+	// If the mouse sticks to the widget
 	sticky:       bool,
+	// Which state will NOT transfer to the parent widget
+	state_mask:   Widget_State,
+	// Forces widget to occupy no more than its desired space
 	fixed_size:   bool,
 	// Size required by the user
 	// required_size: [2]f32,
@@ -239,6 +243,9 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	// Widget must have a valid layer
 	widget.layer = current_layer().? or_return
 
+	// TODO: Make this better
+	widget.state_mask = info.state_mask
+
 	// Keep alive
 	widget.dead = false
 
@@ -338,22 +345,33 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 // Ends the current widget
 end_widget :: proc() {
 	if widget, ok := current_widget().?; ok {
-		if core.debug.enabled {
-			draw_box_stroke(widget.box, 1, {0, 255, 0, 255})
+		// Draw debug box
+		when ODIN_DEBUG {
+			if core.debug.enabled {
+				draw_box_stroke(widget.box, 1, {0, 255, 0, 255})
+			}
 		}
+		// Transfer state to layer
 		{
 			assert(widget.layer != nil)
 			widget.layer.state += widget.state
 		}
+		// Update layout
 		if layout, ok := current_layout().?; ok {
 			add_layout_content_size(
 				layout,
 				box_size(widget.box) if layout.fixed else widget.desired_size,
 			)
 		}
+		// Pop the stack
 		pop_stack(&core.widget_stack)
+		// Transfer state to parent
 		if last_widget, ok := current_widget().?; ok {
-			last_widget.next_state += widget.state
+			state_mask := widget.state_mask
+			if .Pressed in widget.state && widget.id == core.dragged_widget {
+				state_mask += {.Pressed}
+			}
+			last_widget.next_state += widget.state - state_mask
 		}
 	}
 }
@@ -423,7 +441,7 @@ spinner :: proc(info: Spinner_Info, loc := #caller_location) -> Spinner_Info {
 }
 
 skeleton :: proc(loc := #caller_location) {
-	info := Widget_Info{
+	info := Widget_Info {
 		id = hash(loc),
 	}
 	if begin_widget(&info) {

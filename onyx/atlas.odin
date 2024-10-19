@@ -7,6 +7,7 @@ import "core:math"
 import "core:math/linalg"
 import "core:mem"
 import "core:slice"
+import "core:sync"
 
 import "vendor:wgpu"
 
@@ -18,6 +19,7 @@ Atlas :: struct {
 	row_height:     f32,
 	full, modified: bool,
 	modified_box:   Box,
+	mutex: 					sync.Mutex,
 }
 
 init_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics, width, height: int) {
@@ -96,7 +98,15 @@ add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas, gfx: 
 	return box
 }
 
-add_image_to_atlas :: proc(image: img.Image, atlas: ^Atlas, gfx: ^Graphics) -> Box {
+// Copy an image to the atlas
+// Mutex protected
+add_image_to_atlas :: proc(image: img.Image) -> Box {
+	atlas := &core.font_atlas
+	gfx := &core.gfx
+
+	sync.mutex_lock(&atlas.mutex)
+	defer sync.mutex_unlock(&atlas.mutex)
+
 	box := get_next_atlas_box(atlas, gfx, {f32(image.width), f32(image.height)})
 	pixel_size := 4
 	for y in 0 ..< image.height {

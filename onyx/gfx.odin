@@ -479,7 +479,7 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 				view = surface_view,
 				loadOp = .Clear,
 				storeOp = .Store,
-				clearValue = {0, 0, 0, 0},
+				clearValue = linalg.array_cast(core.style.color.background, f64) / 255.0,
 			},
 		},
 	)

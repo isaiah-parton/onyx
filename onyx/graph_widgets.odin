@@ -304,7 +304,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				pos = tooltip_pos,
 				bounds = self.box,
 				size = tooltip_size,
-				time = ease.cubic_in_out(self.hover_time),
+				// time = ease.cubic_in_out(self.hover_time),
 			},
 		)
 		shrink(3)

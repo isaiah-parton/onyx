@@ -27,7 +27,7 @@ Style_Shape :: struct {
 	popup_margin: f32,
 	stroke_width:                                                         f32,
 	title_margin:                                                         f32,
-	title_padding:                                                        f32,
+	label_padding:                                                        f32,
 	menu_padding:                                                         f32,
 	scrollbar_thickness:                                                  f32,
 	table_row_height:                                                     f32,
@@ -37,6 +37,7 @@ default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
 		tooltip_padding = 3,
 		panel_padding = 10,
+		label_padding = 5,
 		header_text_size = 36,
 		button_text_size = 18,
 		tab_text_size = 18,
@@ -64,8 +65,8 @@ light_color_scheme :: proc() -> Color_Scheme {
 
 dark_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
-		background = {0, 0, 0, 255},
-		foreground = {25, 25, 32, 255},
+		background = {12, 10, 17, 255},
+		foreground = {25, 24, 32, 255},
 		substance = {55, 55, 60, 255},
 		accent = {59, 130, 246, 255},
 		accent_content = {255, 255, 255, 255},

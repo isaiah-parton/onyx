@@ -25,7 +25,7 @@ upload_image :: proc(image: img.Image) -> (index: int, ok: bool) {
 			ok = true
 			core.user_images[i] = Image {
 				image     = image,
-				atlas_src = add_image_to_atlas(image, &core.font_atlas, &core.gfx),
+				atlas_src = add_image_to_atlas(image),
 			}
 			break
 		}
@@ -96,8 +96,6 @@ draw_texture_portion :: proc(texture: wgpu.Texture, source, target: Box, tint: C
 
 	add_indices(a, b, c, a, c, d)
 }
-
-
 
 create_texture_from_image :: proc(
 	gfx: ^Graphics,
