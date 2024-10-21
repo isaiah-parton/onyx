@@ -13,56 +13,57 @@ MAX_CLICK_DELAY :: time.Millisecond * 450
 
 Widget :: struct {
 	// Essential
-	id:           Id,
-	box:          Box,
-	layer:        ^Layer,
-
-	// Interaction options
-	visible:      bool,
-	disabled:     bool,
-	dead:         bool,
-
+	id:             Id,
+	box:            Box,
+	layer:          ^Layer,
+	// If the widget would be visible and should be displayed
+	visible:        bool,
+	// This only disables interaction
+	disabled:       bool,
+	// When this is true, the widget will be destroyed next time
+	// `new_frame()` is called.
+	dead:           bool,
 	// Interaction state
-	last_state:   Widget_State,
-	next_state:   Widget_State,
-	state:        Widget_State,
-	state_mask:   Widget_State,
-	click_count:  int,
-	click_time:   time.Time,
-	click_button: Mouse_Button,
-	desired_size: [2]f32,
-
+	last_state:     Widget_State,
+	next_state:     Widget_State,
+	state:          Widget_State,
+	// Which widget states can be passed to this widget
+	in_state_mask:  Widget_State,
+	// Which widget states will be passed to the parent widget
+	out_state_mask: Widget_State,
+	// Click information
+	click_count:    int,
+	click_time:     time.Time,
+	click_button:   Mouse_Button,
+	// Desired size stored to be passed to the layout
+	desired_size:   [2]f32,
 	// Generic animations
-	focus_time:   f32,
-	hover_time:   f32,
-	open_time:    f32,
-	disable_time: f32,
-
+	focus_time:     f32,
+	hover_time:     f32,
+	open_time:      f32,
+	disable_time:   f32,
 	// Widget chaining for forms
 	// these values are transient
-	prev:         ^Widget,
-	next:         ^Widget,
-
+	prev:           ^Widget,
+	next:           ^Widget,
 	// Stores the number of the last frame on which this widget was updated
 	// This is to avoid calling the same widget more than once per frame
 	// Also protects the `variant` field from being misused.
-	frames:       int,
-
+	frames:         int,
 	// Any cleanup that needs to be done
-	on_death:     proc(_: ^Widget),
-
+	on_death:       proc(_: ^Widget),
 	// TODO: Remove this
-	variant:      Widget_Kind,
-	using var:    struct #raw_union {
+	variant:        Widget_Kind,
+	using __state:  struct #raw_union {
 		cont:    Container,
 		menu:    Menu_Widget_Kind,
 		graph:   Graph_Widget_Kind,
-		tooltip: Tooltip_Widget_Kind,
 		tabs:    Tabs_Widget_Kind,
 		input:   Input_Widget_Kind,
 		boolean: Boolean_Widget_Kind,
 		date:    Date_Picker_Widget_Kind,
 		table:   Table_Widget_Kind,
+		slider:  Slider_State,
 	},
 }
 // Widget variants
@@ -70,7 +71,6 @@ Widget :: struct {
 Widget_Kind :: union {
 	Menu_Widget_Kind,
 	Graph_Widget_Kind,
-	Tooltip_Widget_Kind,
 	Tabs_Widget_Kind,
 	Input_Widget_Kind,
 	Boolean_Widget_Kind,
@@ -90,24 +90,27 @@ Widget_Status :: enum {
 	Active,
 }
 Widget_State :: bit_set[Widget_Status;u8]
+WIDGET_STATE_ALL :: Widget_State{.Hovered, .Focused, .Pressed, .Changed, .Clicked, .Open, .Active}
 // A generic descriptor for all widgets
 Widget_Info :: struct {
-	self:         ^Widget,
-	id:           Id,
+	self:           ^Widget,
+	id:             Id,
 	// Optional box to be used instead of cutting from the layout
-	box:          Maybe(Box),
+	box:            Maybe(Box),
 	// Can not receive input if true
-	disabled:     bool,
+	disabled:       bool,
 	// If the mouse sticks to the widget
-	sticky:       bool,
-	// Which state will NOT transfer to the parent widget
-	state_mask:   Widget_State,
+	sticky:         bool,
+	// Which widget states can be passed to this widget
+	in_state_mask:  Maybe(Widget_State),
+	// Which widget states will be passed to the parent widget
+	out_state_mask: Maybe(Widget_State),
 	// Forces widget to occupy no more than its desired space
-	fixed_size:   bool,
+	fixed_size:     bool,
 	// Size required by the user
 	// required_size: [2]f32,
 	// Size desired by the widget
-	desired_size: [2]f32,
+	desired_size:   [2]f32,
 }
 // Animation
 animate :: proc(value, duration: f32, condition: bool) -> f32 {
@@ -152,17 +155,6 @@ process_widgets :: proc() {
 
 	// Reset next hover id so if nothing is hovered nothing will be hovered
 	core.next_hovered_widget = 0
-
-	// Press whatever is hovered and focus what is pressed
-	if mouse_pressed(.Left) {
-		core.focused_widget = core.hovered_widget
-		core.draw_this_frame = true
-	}
-
-	// Reset drag state
-	if mouse_released(.Left) {
-		core.dragged_widget = 0
-	}
 }
 
 enable_widgets :: proc(enabled: bool = true) {
@@ -244,7 +236,8 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	widget.layer = current_layer().? or_return
 
 	// TODO: Make this better
-	widget.state_mask = info.state_mask
+	widget.in_state_mask = info.in_state_mask.? or_else {}
+	widget.out_state_mask = info.out_state_mask.? or_else WIDGET_STATE_ALL
 
 	// Keep alive
 	widget.dead = false
@@ -293,9 +286,16 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 			widget.click_time = time.now()
 			widget.state += {.Pressed}
 			core.draw_this_frame = true
+			core.focused_widget = widget.id
 			// Set the globally dragged widget
 			if info.sticky do core.dragged_widget = widget.id
 		}
+
+		// TODO: Lose click if mouse moved too much (allow for dragging containers by their contents)
+		// if !info.sticky && linalg.length(core.click_mouse_pos - core.mouse_pos) > 8 {
+		// 	widget.state -= {.Pressed}
+		// 	widget.click_count = 0
+		// }
 	} else if core.dragged_widget != widget.id  /* Keep hover and press state if dragged */{
 		widget.state -= {.Pressed, .Hovered}
 		widget.click_count = 0
@@ -309,6 +309,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 			if button == widget.click_button {
 				widget.state += {.Clicked}
 				widget.state -= {.Pressed}
+				core.dragged_widget = 0
 				break
 			}
 		}
@@ -367,11 +368,11 @@ end_widget :: proc() {
 		pop_stack(&core.widget_stack)
 		// Transfer state to parent
 		if last_widget, ok := current_widget().?; ok {
-			state_mask := widget.state_mask
+			state_mask := widget.out_state_mask & last_widget.in_state_mask
 			if .Pressed in widget.state && widget.id == core.dragged_widget {
-				state_mask += {.Pressed}
+				state_mask -= {.Pressed}
 			}
-			last_widget.next_state += widget.state - state_mask
+			last_widget.next_state += widget.state & state_mask
 		}
 	}
 }

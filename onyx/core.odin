@@ -17,7 +17,7 @@ import "vendor:glfw"
 import "vendor:wgpu"
 
 EMBED_DEFAULT_FONTS :: #config(ONYX_EMBED_FONTS, false)
-FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx")
+FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx/fonts")
 MAX_IDS :: 32
 MAX_LAYERS :: 100
 MAX_WIDGETS :: 4000
@@ -125,6 +125,7 @@ Core :: struct {
 	mouse_button:          Mouse_Button,
 	last_mouse_pos:        [2]f32,
 	mouse_pos:             [2]f32,
+	click_mouse_pos:       [2]f32,
 	mouse_delta:           [2]f32,
 	mouse_scroll:          [2]f32,
 	mouse_bits:            Mouse_Bits,
@@ -190,16 +191,22 @@ view_height :: proc() -> f32 {
 }
 
 load_default_fonts :: proc() -> bool {
-	DEFAULT_FONT :: "fonts/Geist-Medium.ttf"
-	MONOSPACE_FONT :: "fonts/iAWriterMonoS-Regular.ttf"
-	HEADER_FONT :: "fonts/Lora-Medium.ttf"
-	ICON_FONT :: "fonts/remixicon.ttf"
 
-	DEFAULT_FONT_DATA: Maybe([]u8) = #load(DEFAULT_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	DEFAULT_FONT :: "Geist-Medium.ttf"
+	MONOSPACE_FONT :: "iAWriterMonoS-Regular.ttf"
+	HEADER_FONT :: "Lora-Medium.ttf"
+	ICON_FONT :: "remixicon.ttf"
+
+	DEFAULT_FONT_PATH :: "fonts/" + DEFAULT_FONT
+	MONOSPACE_FONT_PATH :: "fonts/" + MONOSPACE_FONT
+	HEADER_FONT_PATH :: "fonts/" + HEADER_FONT
+	ICON_FONT_PATH :: "fonts/" + ICON_FONT
+
+	DEFAULT_FONT_DATA: Maybe([]u8) = #load(DEFAULT_FONT_PATH, []u8) when EMBED_DEFAULT_FONTS else nil
 	MONOSPACE_FONT_DATA: Maybe([]u8) =
-		#load(MONOSPACE_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-	HEADER_FONT_DATA: Maybe([]u8) = #load(HEADER_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-	ICON_FONT_DATA: Maybe([]u8) = #load(ICON_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+		#load(MONOSPACE_FONT_PATH, []u8) when EMBED_DEFAULT_FONTS else nil
+	HEADER_FONT_DATA: Maybe([]u8) = #load(HEADER_FONT_PATH, []u8) when EMBED_DEFAULT_FONTS else nil
+	ICON_FONT_DATA: Maybe([]u8) = #load(ICON_FONT_PATH, []u8) when EMBED_DEFAULT_FONTS else nil
 
 	core.style.default_font = load_font_from_memory(
 		DEFAULT_FONT_DATA.? or_else os.read_entire_file(
@@ -257,6 +264,7 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 
 	// Create cursors
 	core.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
+	core.cursors[.Crosshair] = glfw.CreateStandardCursor(glfw.CROSSHAIR_CURSOR)
 	core.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(glfw.POINTING_HAND_CURSOR)
 	core.cursors[.I_Beam] = glfw.CreateStandardCursor(glfw.IBEAM_CURSOR)
 	core.cursors[.Resize_EW] = glfw.CreateStandardCursor(glfw.RESIZE_EW_CURSOR)
@@ -311,9 +319,11 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	glfw.SetMouseButtonCallback(
 		core.window,
 		proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
+			core.mouse_button = Mouse_Button(button)
 			switch action {
 			case glfw.PRESS:
 				core.mouse_bits += {Mouse_Button(button)}
+				core.click_mouse_pos = core.mouse_pos
 			case glfw.RELEASE:
 				core.mouse_bits -= {Mouse_Button(button)}
 			}
@@ -407,7 +417,12 @@ new_frame :: proc() {
 	}
 
 	// Set and reset cursor
-	glfw.SetCursor(core.window, core.cursors[core.cursor_type])
+	if core.cursor_type == .None {
+		glfw.SetInputMode(core.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+	} else {
+		glfw.SetInputMode(core.window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+		glfw.SetCursor(core.window, core.cursors[core.cursor_type])
+	}
 	core.cursor_type = .Normal
 
 	if key_pressed(.Escape) {
@@ -436,7 +451,7 @@ new_frame :: proc() {
 	core.active_container = core.next_active_container
 	core.next_active_container = 0
 
-	if mouse_pressed(.Left) {
+	if (core.mouse_bits - core.last_mouse_bits) > {} {
 		core.focused_layer = core.hovered_layer
 	}
 
@@ -479,7 +494,7 @@ new_frame :: proc() {
 				widget.on_death(widget)
 			}
 			delete_key(&core.widget_map, id)
-			(transmute(^Maybe(Widget))widget)^ = nil
+			(^Maybe(Widget))(widget)^ = nil
 			core.draw_this_frame = true
 		} else {
 			widget.dead = true

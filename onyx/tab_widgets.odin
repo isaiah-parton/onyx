@@ -44,6 +44,7 @@ add_tabs :: proc(using info: ^Tabs_Info) -> bool {
 
 			tab_info := Widget_Info {
 				id = hash("tab"),
+				in_state_mask = Widget_State{.Hovered},
 			}
 			if begin_widget(&tab_info) {
 				tab_info.self.open_time = animate(tab_info.self.open_time, 0.15, index^ == o)
@@ -94,7 +95,6 @@ add_tabs :: proc(using info: ^Tabs_Info) -> bool {
 						text = "\ueb99",
 						style = .Ghost,
 						box = shrink_box(get_box_cut_right(tab_info.self.box, box_height(tab_info.self.box)), 4),
-						state_mask = {.Clicked},
 					}).clicked {
 						closed_index = o
 					}

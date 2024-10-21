@@ -563,7 +563,7 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 			gfx.device,
 			&{
 				magFilter = .Nearest,
-				minFilter = .Linear,
+				minFilter = .Nearest,
 				addressModeU = .ClampToEdge,
 				addressModeV = .ClampToEdge,
 				maxAnisotropy = 1,

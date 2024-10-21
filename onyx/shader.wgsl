@@ -185,7 +185,7 @@ fn sd_bezier(pos: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32> ) -> f32 {
     // the third root cannot be the closest
     // res = min(res,dot2(d+(c+b*t.z)*t.z));
   }
-  return sqrt( res ) + 1;
+  return sqrt( res );
 }
 
 fn rounded_box_shadow_x(x: f32, y: f32, sigma: f32, corner: f32, half_size: vec2<f32>) -> f32 {
@@ -259,7 +259,6 @@ fn bezierTest(p: vec2<f32>, A: vec2<f32>, B: vec2<f32>, C: vec2<f32>) -> bool {
 
 fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
 	var d = 1e10;
-	var s = 1.0;
 	switch (shape.kind) {
 		case 0u: {
 
@@ -300,7 +299,7 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
 		}
 		// Bezier
 		case 5u: {
-			d = sd_bezier(p, shape.cv0, shape.cv1, shape.cv2) - shape.width;
+			d = sd_bezier(p, shape.cv0, shape.cv1, shape.cv2) + 1.0 - shape.width;
 		}
 		// Pie
 		case 6u: {
@@ -308,9 +307,10 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
 		}
 		// Quad Path
 		case 7u: {
+			var s = 1.0;
 			let filterWidth = 1.0;
       for(var i = 0; i < i32(shape.count); i = i + 1) {
-      let j = i32(shape.start) + 3 * i;
+      	let j = i32(shape.start) + 3 * i;
         let a = cvs.cvs[j];
         let b = cvs.cvs[j + 1];
         let c = cvs.cvs[j + 2];
@@ -337,7 +337,7 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
           }
         }
       }
-      d = d * s;
+      d = d * s + 1;
       break;
     }
     // Arbitrary Polygon

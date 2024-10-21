@@ -19,14 +19,17 @@ add_shape_circle :: proc(center: [2]f32, radius: f32) -> u32 {
 add_shape :: proc(shape: Shape) -> u32 {
 	index := u32(len(core.gfx.shapes.data))
 	shape := shape
+	// Assign current shape defaults
 	shape.paint = core.draw_state.paint
 	shape.scissor = core.draw_state.scissor
+	// Try use the current matrix
 	if core.current_matrix != nil && core.current_matrix^ != core.last_matrix {
 		core.matrix_index = u32(len(core.gfx.xforms.data))
 		append(&core.gfx.xforms.data, core.current_matrix^)
 		core.last_matrix = core.current_matrix^
 	}
 	shape.xform = core.matrix_index
+	// Append the shape
 	append(&core.gfx.shapes.data, shape)
 	return index
 }
@@ -42,7 +45,7 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 		box.lo = shape.cv0 - shape.radius
 		box.hi = shape.cv0 + shape.radius
 	case .Path:
-		for i in 0 ..< shape.count {
+		for i in 0 ..< shape.count * 3 {
 			j := shape.start + i
 			box.lo = linalg.min(box.lo, core.gfx.cvs.data[j])
 			box.hi = linalg.max(box.hi, core.gfx.cvs.data[j])
@@ -507,6 +510,11 @@ draw_circle_fill :: proc(center: [2]f32, radius: f32, color: Color) {
 	render_shape(shape_index, color)
 }
 
+draw_circle_stroke :: proc(center: [2]f32, radius, width: f32, color: Color) {
+	shape_index := add_shape(Shape{kind = .Circle, cv0 = center, radius = radius, width = width, stroke = true})
+	render_shape(shape_index, color)
+}
+
 draw_box_fill :: proc(box: Box, color: Color) {
 	render_shape(add_shape_box(box, {}), color)
 }
@@ -550,7 +558,7 @@ draw_rounded_box_shadow :: proc(box: Box, corner_radius, blur_radius: f32, color
 
 draw_shadow :: proc(box: Box, rounding: f32, opacity: f32 = 1) {
 	draw_rounded_box_shadow(
-		move_box(box, {0, 2}),
+		move_box(box, {0, 1}),
 		rounding,
 		6,
 		fade(core.style.color.shadow, opacity),

@@ -17,6 +17,7 @@ import "core:strings"
 import "core:time"
 import "vendor:glfw"
 import "vendor:wgpu"
+import "core:sys/windows"
 
 Option :: enum {
 	Process,
@@ -81,7 +82,7 @@ component_showcase :: proc(state: ^State) -> bool {
 	foreground()
 	if layout({size = 65, side = .Top}) {
 		shrink(15)
-		box_tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Component)})
+		box_tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Component), tab_width = 100})
 		breadcrumb({index = (^int)(&state.component), options = {"bruh"}})
 		set_side(.Right)
 		if toggle_switch({state = &state.light_mode, text = "\uf1bc" if state.light_mode else "\uef72", text_side = .Left}).toggled {
@@ -206,10 +207,10 @@ component_showcase :: proc(state: ^State) -> bool {
 	case .Slider:
 		set_side(.Top)
 		label({text = "From"})
-		slider(Slider_Info(f32){value = &state.from_angle, hi = math.TAU})
+		slider(Slider_Info(f32){value = &state.from_angle, hi = math.TAU, format = "%.2f"})
 		add_space(10)
 		label({text = "To"})
-		slider(Slider_Info(f32){value = &state.to_angle, hi = math.TAU})
+		slider(Slider_Info(f32){value = &state.to_angle, hi = math.TAU, format = "%.2f"})
 		draw_arc(core.view / 2, state.from_angle, state.to_angle, 10, 4, {255, 255, 255, 255})
 		draw_pie(core.view / 2 + 100, state.from_angle, state.to_angle, 15, {255, 255, 255, 255})
 	case .Button:

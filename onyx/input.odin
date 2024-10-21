@@ -83,7 +83,9 @@ Keyboard_Key :: enum i32 {
 }
 
 Mouse_Cursor :: enum {
+	None,
 	Normal,
+	Crosshair,
 	Pointing_Hand,
 	Resize_NS,
 	Resize_EW,

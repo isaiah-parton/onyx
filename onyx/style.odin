@@ -35,7 +35,7 @@ Style_Shape :: struct {
 
 default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
-		tooltip_padding = 3,
+		tooltip_padding = 4,
 		panel_padding = 10,
 		label_padding = 5,
 		header_text_size = 36,

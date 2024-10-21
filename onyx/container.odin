@@ -62,6 +62,7 @@ init_container :: proc(using info: ^Container_Info, loc := #caller_location) -> 
 		self.cont.target_zoom = self.cont.zoom
 		self.cont.target_scroll = self.cont.scroll
 	}
+	in_state_mask = WIDGET_STATE_ALL
 	return true
 }
 

@@ -9,7 +9,11 @@ Slider_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	using _: Widget_Info,
 	value:   ^T,
 	lo, hi:  T,
-	format: Maybe(string),
+	format:  Maybe(string),
+}
+
+Slider_State :: struct {
+	tooltip_size: [2]f32,
 }
 
 init_slider :: proc(using info: ^Slider_Info($T), loc := #caller_location) -> bool {
@@ -41,8 +45,15 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 		return false
 	}
 
-	time := clamp(f32(value^ - lo) / f32(hi - lo), 0, 1)
 	range_width := box_width(_box) - radius * 2
+
+	if (.Pressed in self.state) && value != nil {
+		new_time := clamp((core.mouse_pos.x - _box.lo.x - radius) / range_width, 0, 1)
+		value^ = T(f32(lo) + new_time * f32(hi - lo))
+		core.draw_this_frame = true
+	}
+
+	time := clamp(f32(value^ - lo) / f32(hi - lo), 0, 1)
 
 	knob_center := _box.lo + radius + {time * range_width, 0}
 	knob_radius := h / 2
@@ -61,23 +72,32 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 		draw_circle_fill(knob_center, knob_radius, core.style.color.accent)
 	}
 
-	if (.Pressed in self.state) && value != nil {
-		new_time := clamp((core.mouse_pos.x - _box.lo.x - radius) / range_width, 0, 1)
-		value^ = T(f32(lo) + new_time * f32(hi - lo))
-
-		if text_job, ok := make_text_job({
-			text = fmt.tprintf(format.? or_else "%v", value^),
-			font = core.style.default_font,
-			size = 16,
-			align_h = .Middle,
-			align_v = .Middle,
-		}); ok {
-			if tooltip({size = text_job.size + 10, snap = true}) {
+	if .Pressed in self.state {
+		if text_job, ok := make_text_job(
+			{
+				text = fmt.tprintf(format.? or_else "%v", value^),
+				font = core.style.monospace_font,
+				size = 18,
+				align_h = .Middle,
+				align_v = .Middle,
+			},
+		); ok {
+			tooltip_size := linalg.max(text_job.size + 10, [2]f32{50, 0})
+			if self.slider.tooltip_size == {} {
+				self.slider.tooltip_size = tooltip_size
+			} else {
+				self.slider.tooltip_size += (tooltip_size - self.slider.tooltip_size) * 10 * core.delta_time
+			}
+			if tooltip(
+				{
+					origin = Box{knob_center - knob_radius, knob_center + knob_radius},
+					size = self.slider.tooltip_size,
+					side = .Top,
+				},
+			) {
 				draw_text_glyphs(text_job, box_center(layout_box()), core.style.color.content)
 			}
 		}
-
-		core.draw_next_frame = true
 	}
 
 	return true

@@ -112,6 +112,7 @@ init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_locatio
 	id = hash(loc)
 	self = get_widget(id) or_return
 	desired_size = core.style.visual_size
+	in_state_mask = Widget_State{}
 	return true
 }
 

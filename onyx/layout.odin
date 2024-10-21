@@ -262,6 +262,14 @@ set_padding_y :: proc(amount: f32) {
 set_padding :: proc(amount: f32) {
 	current_layout().?.next_padding = amount
 }
+set_width_to_height :: proc() {
+	layout := current_layout().?
+	layout.next_size.x = layout.next_size.y
+}
+set_height_to_width :: proc() {
+	layout := current_layout().?
+	layout.next_size.y = layout.next_size.x
+}
 
 // Procedures that directly modify the current layout
 // **These are all assertive**

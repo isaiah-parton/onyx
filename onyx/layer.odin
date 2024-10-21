@@ -24,6 +24,7 @@ Layer_Option :: enum {
 	Isolated,
 	Attached,
 	No_Sorting,
+	No_Scissor,
 }
 
 Layer_Options :: bit_set[Layer_Option]
@@ -209,7 +210,9 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 	}
 
 	// Set vertex z position
-	push_scissor(info.self.box)
+	if .No_Scissor not_in info.self.options {
+		push_scissor(info.self.box)
+	}
 	append_draw_call(current_layer().?.index)
 
 	// Transform matrix
@@ -235,11 +238,13 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 end_layer :: proc() {
 	pop_matrix()
 	pop_layout()
-	pop_stack(&core.layer_stack)
-	pop_scissor()
 	if layer, ok := current_layer().?; ok {
+		if .No_Scissor not_in layer.options {
+			pop_scissor()
+		}
 		append_draw_call(layer.index)
 	}
+	pop_stack(&core.layer_stack)
 }
 
 @(deferred_out = __layer)
