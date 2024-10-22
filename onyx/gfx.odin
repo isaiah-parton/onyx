@@ -562,8 +562,8 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 		atlas_sampler := wgpu.DeviceCreateSampler(
 			gfx.device,
 			&{
-				magFilter = .Nearest,
-				minFilter = .Nearest,
+				magFilter = .Linear,
+				minFilter = .Linear,
 				addressModeU = .ClampToEdge,
 				addressModeV = .ClampToEdge,
 				maxAnisotropy = 1,

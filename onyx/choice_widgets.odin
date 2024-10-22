@@ -13,7 +13,7 @@ Selector_Info :: struct {
 	text_job:   Text_Job,
 }
 
-Menu_Widget_Kind :: struct {
+Menu_State :: struct {
 	size:      [2]f32,
 	open_time: f32,
 }
@@ -36,7 +36,7 @@ init_selector :: proc(using info: ^Selector_Info, loc := #caller_location) -> bo
 begin_selector :: proc(using info: ^Selector_Info) -> bool {
 	begin_widget(info) or_return
 
-	kind := widget_kind(self, Menu_Widget_Kind)
+	kind := widget_kind(self, Menu_State)
 	if self.visible {
 		draw_rounded_box_fill(
 			self.box,
@@ -78,7 +78,7 @@ end_selector :: proc() -> bool {
 		pop_id()
 
 		layout := current_layout().?
-		kind := widget_kind(self, Menu_Widget_Kind)
+		kind := widget_kind(self, Menu_State)
 		kind.size = layout.content_size + layout.spacing_size
 		layer := current_layer().?
 		if (.Hovered not_in layer.state && .Focused not_in self.state) || .Clicked in layer.state {

@@ -213,7 +213,7 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 	if .No_Scissor not_in info.self.options {
 		push_scissor(info.self.box)
 	}
-	append_draw_call(current_layer().?.index)
+	append_draw_call(info.self.index)
 
 	// Transform matrix
 	scale: [2]f32 = info.scale.? or_else 1
@@ -242,9 +242,11 @@ end_layer :: proc() {
 		if .No_Scissor not_in layer.options {
 			pop_scissor()
 		}
-		append_draw_call(layer.index)
 	}
 	pop_stack(&core.layer_stack)
+	if layer, ok := current_layer().?; ok {
+		append_draw_call(layer.index)
+	}
 }
 
 @(deferred_out = __layer)

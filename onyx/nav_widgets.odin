@@ -45,7 +45,7 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 		return false
 	}
 
-	kind := widget_kind(self, Menu_Widget_Kind)
+	kind := widget_kind(self, Menu_State)
 	menu_behavior(self)
 
 	if self.visible {

@@ -59,11 +59,11 @@ len(core.gfx.xforms.data),
 core.gfx.xforms.capacity,
 ),
 			font = core.style.monospace_font,
-			size = 14,
+			size = 16,
 		}, {255, 255, 255, 255}).y + 10
 	for id, layer in core.layer_map {
 		offset +=
-			draw_text({0, f32(offset)}, {text = fmt.tprintf("%i - %i", layer.id, layer.index), font = core.style.monospace_font, size = 14}, 255).y
+			draw_text({0, f32(offset)}, {text = fmt.tprintf("%i - %i", layer.id, layer.index), font = core.style.monospace_font, size = 16}, 255).y
 	}
 	for scope, s in Profiler_Scope {
 		draw_text(
@@ -75,7 +75,7 @@ core.gfx.xforms.capacity,
 					time.duration_milliseconds(__prof.d[scope]),
 				),
 				font = core.style.default_font,
-				size = 14,
+				size = 16,
 			},
 			{255, 255, 255, 255},
 		)

@@ -56,7 +56,7 @@ Widget :: struct {
 	variant:        Widget_Kind,
 	using __state:  struct #raw_union {
 		cont:    Container,
-		menu:    Menu_Widget_Kind,
+		menu:    Menu_State,
 		graph:   Graph_Widget_Kind,
 		tabs:    Tabs_Widget_Kind,
 		input:   Input_Widget_Kind,
@@ -69,7 +69,7 @@ Widget :: struct {
 // Widget variants
 // 	I'm using a union for safety, idk if it's really necessary
 Widget_Kind :: union {
-	Menu_Widget_Kind,
+	Menu_State,
 	Graph_Widget_Kind,
 	Tabs_Widget_Kind,
 	Input_Widget_Kind,
@@ -398,17 +398,31 @@ focus_widget :: proc(widget: ^Widget) {
 foreground :: proc(loc := #caller_location) {
 	layout, ok := current_layout().?
 	if !ok do return
-
-	using info := Widget_Info {
-		id  = hash(loc),
-		box = layout.box,
+	info := Widget_Info {
+		id            = hash(loc),
+		box           = layout.box,
+		in_state_mask = WIDGET_STATE_ALL,
 	}
 	if begin_widget(&info) {
 		defer end_widget()
-
 		draw_rounded_box_fill(info.self.box, core.style.rounding, core.style.color.foreground)
-		// draw_rounded_box_stroke(info.self.box, core.style.rounding, 1, core.style.color.substance)
+		if point_in_box(core.mouse_pos, info.self.box) {
+			hover_widget(info.self)
+		}
+	}
+}
 
+background :: proc(loc := #caller_location) {
+	layout, ok := current_layout().?
+	if !ok do return
+	info := Widget_Info {
+		id            = hash(loc),
+		box           = layout.box,
+		in_state_mask = WIDGET_STATE_ALL,
+	}
+	if begin_widget(&info) {
+		defer end_widget()
+		draw_rounded_box_fill(info.self.box, core.style.rounding, core.style.color.background)
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)
 		}
