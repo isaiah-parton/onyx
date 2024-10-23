@@ -71,7 +71,7 @@ add_tabs :: proc(using info: ^Tabs_Info) -> bool {
 					); ok {
 						draw_text_glyphs(
 							text_job,
-							{tab_info.self.box.lo.x + core.style.label_padding.x, box_center_y(tab_info.self.box)},
+							{tab_info.self.box.lo.x + core.style.text_padding.x, box_center_y(tab_info.self.box)},
 							fade(
 								core.style.color.content,
 								math.lerp(f32(0.5), f32(1.0), tab_info.self.open_time),

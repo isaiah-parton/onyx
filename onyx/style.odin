@@ -27,7 +27,7 @@ Style_Shape :: struct {
 	popup_margin: f32,
 	stroke_width:                                                         f32,
 	title_margin:                                                         f32,
-	label_padding:                                                        [2]f32,
+	text_padding:                                                        [2]f32,
 	menu_padding:                                                         f32,
 	scrollbar_thickness:                                                  f32,
 	table_row_height:                                                     f32,
@@ -37,7 +37,7 @@ default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
 		tooltip_padding = 4,
 		panel_padding = 10,
-		label_padding = {7, 5},
+		text_padding = {7, 5},
 		header_text_size = 36,
 		button_text_size = 18,
 		tab_text_size = 18,

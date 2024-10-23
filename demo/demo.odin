@@ -131,8 +131,8 @@ component_showcase :: proc(state: ^State) -> bool {
 			slider(Slider_Info(f32){value = &core.style.visual_size.y, lo = 0, hi = 50, format = "%.1f"})
 			add_space(10)
 			label({text = "label padding x/y"})
-			slider(Slider_Info(f32){value = &core.style.label_padding.x, lo = 0, hi = 10, format = "%.1f"})
-			slider(Slider_Info(f32){value = &core.style.label_padding.y, lo = 0, hi = 10, format = "%.1f"})
+			slider(Slider_Info(f32){value = &core.style.text_padding.x, lo = 0, hi = 10, format = "%.1f"})
+			slider(Slider_Info(f32){value = &core.style.text_padding.y, lo = 0, hi = 10, format = "%.1f"})
 			add_space(10)
 			label({text = "menu padding"})
 			slider(Slider_Info(f32){value = &core.style.menu_padding, lo = 0, hi = 10, format = "%.1f"})
@@ -424,6 +424,13 @@ main :: proc() {
 		using onyx
 		new_frame()
 		component_showcase(&state)
+
+		seconds := cast(f32)time.duration_seconds(time.since(core.start_time))
+		center := core.view / 2 + [2]f32{math.cos(seconds), math.sin(seconds)} * 200
+		box := Box{center - 100, center + 100}
+		set_paint(add_paint_linear_gradient(100, 200, {255, 87, 51, 255}, {160, 51, 255, 255}))
+		render_shape(add_shape_box(view_box(), 0), 255)
+		core.draw_this_frame = true
 		render()
 	}
 

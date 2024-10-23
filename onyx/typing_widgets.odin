@@ -332,7 +332,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	}
 
 	// Offset text origin based on font size
-	info.text_pos.x += core.style.label_padding.x
+	info.text_pos.x += core.style.text_padding.x
 	if font, ok := &core.fonts[text_info.font].?; ok {
 		if font_size, ok := get_font_size(font, text_info.size); ok {
 			if info.multiline {

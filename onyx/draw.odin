@@ -70,8 +70,7 @@ Paint :: struct #align (16) {
 	padding: [3]u32,
 	col0:    [4]f32,
 	col1:    [4]f32,
-	size:    f32,
-	image:   u32,
+	xform:   u32,
 }
 
 Shape :: struct #align (16) {
@@ -154,6 +153,28 @@ current_scissor :: proc() -> Maybe(Scissor) {
 
 set_scissor_shape :: proc(shape: u32) {
 	core.draw_state.scissor = shape
+}
+
+add_paint_linear_gradient :: proc(p0, p1: [2]f32, col0, col1: [4]u8) -> u32 {
+	d := p1 - p0
+	xform_index := u32(len(core.gfx.xforms.data))
+	append(
+		&core.gfx.xforms.data,
+		linalg.inverse(Matrix{
+			d.x, d.y, 0.0, 0.0,
+			-d.y, d.x, 0.0, 0.0,
+			p0.x, p0.y, 0.0, 0.0,
+			0.0, 0.0, 0.0, 1.0,
+		}),
+	)
+	return add_paint(
+		{
+			kind = .Linear_Gradient,
+			xform = xform_index,
+			col0 = normalize_color(col0),
+			col1 = normalize_color(col1),
+		},
+	)
 }
 
 set_paint :: proc(paint: u32) {

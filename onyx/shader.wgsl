@@ -35,7 +35,7 @@ struct Paint {
 	kind: u32,
 	col0: vec4<f32>,
 	col1: vec4<f32>,
-	image: u32,
+	xform: u32,
 };
 
 struct Paints {
@@ -441,6 +441,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 			f += 0.5 * noise(uv * 0.0025 - uniforms.time * 0.2);
 			// out = (paint.col0 + (paint.col1 - paint.col0) * f) * in.col;
 			out = vec4<f32>(1.0, 1.0, 1.0, clamp(f, 0.0, 1.0)) * in.col;
+		}
+		// Gradient
+		case 4u: {
+	    let d = clamp((xforms.xforms[paint.xform] * vec4<f32>(in.p, 0.0, 1.0)).y, 0.0, 1.0);
+	    out = mix(paint.col0, paint.col1, d) * in.col;
 		}
 		default: {
 			out = in.col;

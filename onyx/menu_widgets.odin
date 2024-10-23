@@ -39,7 +39,7 @@ init_menu :: proc(using info: ^Menu_Info, loc := #caller_location) -> bool {
 		align_h = .Middle,
 	}
 	text_job, _ = make_text_job(text_info)
-	desired_size = text_job.size + core.style.label_padding
+	desired_size = text_job.size + core.style.text_padding
 	return true
 }
 
@@ -135,7 +135,7 @@ init_menu_item :: proc(info: ^Menu_Item_Info) -> bool {
 			align_v = .Middle,
 		},
 	) or_return
-	info.desired_size = info.text_job.size + core.style.label_padding * 2
+	info.desired_size = info.text_job.size + core.style.text_padding * 2
 	return true
 }
 

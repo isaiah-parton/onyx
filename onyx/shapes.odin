@@ -116,10 +116,14 @@ render_shape :: proc(shape_index: u32, color: Color) {
 	// Discard fully clipped shapes
 	if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
 	// Add vertices
-	a := add_vertex(Vertex{pos = box.lo, col = color, shape = shape_index})
-	b := add_vertex(Vertex{pos = {box.lo.x, box.hi.y}, col = color, shape = shape_index})
-	c := add_vertex(Vertex{pos = box.hi, col = color, shape = shape_index})
-	d := add_vertex(Vertex{pos = {box.hi.x, box.lo.y}, col = color, shape = shape_index})
+	a := add_vertex(Vertex{pos = box.lo, col = color, uv = 0, shape = shape_index})
+	b := add_vertex(
+		Vertex{pos = {box.lo.x, box.hi.y}, col = color, uv = {0, 1}, shape = shape_index},
+	)
+	c := add_vertex(Vertex{pos = box.hi, col = color, uv = 1, shape = shape_index})
+	d := add_vertex(
+		Vertex{pos = {box.hi.x, box.lo.y}, col = color, uv = {1, 0}, shape = shape_index},
+	)
 	add_indices(a, b, c, a, c, d)
 }
 
@@ -513,7 +517,9 @@ draw_circle_fill :: proc(center: [2]f32, radius: f32, color: Color) {
 }
 
 draw_circle_stroke :: proc(center: [2]f32, radius, width: f32, color: Color) {
-	shape_index := add_shape(Shape{kind = .Circle, cv0 = center, radius = radius, width = width, stroke = true})
+	shape_index := add_shape(
+		Shape{kind = .Circle, cv0 = center, radius = radius, width = width, stroke = true},
+	)
 	render_shape(shape_index, color)
 }
 
@@ -562,7 +568,7 @@ draw_shadow :: proc(box: Box, rounding: f32, opacity: f32 = 1) {
 	draw_rounded_box_shadow(
 		move_box(box, {0, 1}),
 		rounding,
-		6,
+		16,
 		fade(core.style.color.shadow, opacity),
 	)
 }
