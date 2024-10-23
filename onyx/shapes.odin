@@ -39,8 +39,8 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 	switch shape.kind {
 	case .Normal:
 	case .Box:
-		box.lo = shape.cv0 - 1
-		box.hi = shape.cv1 + 1
+		box.lo = shape.cv0
+		box.hi = shape.cv1
 	case .Circle:
 		box.lo = shape.cv0 - shape.radius
 		box.hi = shape.cv0 + shape.radius
@@ -163,76 +163,8 @@ render_shape_uv :: proc(shape_index: u32, source: Box, color: Color) {
 	add_indices(a, b, c, a, c, d)
 }
 
-clear_path :: proc(path: ^Path) {
-	path.count = 0
-}
-
-get_path :: proc() -> ^Path {
-	return &core.path_stack.items[core.path_stack.height - 1]
-}
-
-begin_path :: proc() {
-	push_stack(&core.path_stack, Path{})
-}
-
-end_path :: proc() {
-	pop_stack(&core.path_stack)
-}
-
-close_path :: proc() {
-	get_path().closed = true
-}
-
-point :: proc(point: [2]f32) {
-	path := get_path()
-	if path.count >= MAX_PATH_POINTS {
-		return
-	}
-	path.points[path.count] = point
-	path.count += 1
-}
-
-bezier :: proc(p0, p1, p2, p3: [2]f32, segments: int) {
-	step: f32 = 1.0 / f32(segments)
-	for t: f32 = step; t <= 1; t += step {
-		times: matrix[1, 4]f32 = {1, t, t * t, t * t * t}
-		weights: matrix[4, 4]f32 = {1, 0, 0, 0, -3, 3, 0, 0, 3, -6, 3, 0, -1, 3, -3, 1}
-		point(
-			{
-				(times * weights * (matrix[4, 1]f32){p0.x, p1.x, p2.x, p3.x})[0][0],
-				(times * weights * (matrix[4, 1]f32){p0.y, p1.y, p2.y, p3.y})[0][0],
-			},
-		)
-	}
-}
-
-arc :: proc(center: [2]f32, radius, from, to: f32) {
-	da := to - from
-	nsteps := int(abs(da) / ANGLE_TOLERANCE)
-	for n in 1 ..< nsteps {
-		a := from + da * f32(n) / f32(nsteps)
-		point(center + {math.cos(a), math.sin(a)} * radius)
-	}
-}
-
-fill_path :: proc(color: Color) {
-
-	// path := get_path()
-	// if path.count < 3 {
-	// 	return
-	// }
-	// index := add_vertex(path.points[0])
-	// for i in 1 ..< path.count {
-	// 	add_vertex(path.points[i])
-	// 	if i < path.count - 1 {
-	// 		add_indices(index, index + u32(i), index + u32(i) + 1)
-	// 	}
-	// }
-}
-
-stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Center) {
-	path := get_path()
-	if path.count < 2 {
+draw_joined_lines :: proc(points: [][2]f32, thickness: f32, color: Color, closed: bool = false, justify: Stroke_Justify = .Center) {
+	if len(points) < 2 {
 		return
 	}
 	left, right: f32
@@ -246,29 +178,29 @@ stroke_path :: proc(thickness: f32, color: Color, justify: Stroke_Justify = .Cen
 		right = thickness
 	}
 	v0, v1: [2]f32
-	for i in 0 ..< path.count {
+	for i in 0 ..< len(points) {
 		a := i - 1
 		b := i
 		c := i + 1
 		d := i + 2
 		if a < 0 {
-			if path.closed {
-				a = path.count - 1
+			if closed {
+				a = len(points) - 1
 			} else {
 				a = 0
 			}
 		}
-		if path.closed {
-			c = c % path.count
-			d = d % path.count
+		if closed {
+			c = c % len(points)
+			d = d % len(points)
 		} else {
-			c = min(path.count - 1, c)
-			d = min(path.count - 1, d)
+			c = min(len(points) - 1, c)
+			d = min(len(points) - 1, d)
 		}
-		p0 := path.points[a]
-		p1 := path.points[b]
-		p2 := path.points[c]
-		p3 := path.points[d]
+		p0 := points[a]
+		p1 := points[b]
+		p2 := points[c]
+		p3 := points[d]
 		if p1 == p2 {
 			continue
 		}
@@ -605,19 +537,19 @@ draw_spinner :: proc(center: [2]f32, radius: f32, color: Color) {
 }
 
 draw_arrow :: proc(pos: [2]f32, scale: f32, color: Color) {
-	begin_path()
-	point(pos + {-1, -0.5} * scale)
-	point(pos + {0, 0.5} * scale)
-	point(pos + {1, -0.5} * scale)
-	stroke_path(2, color)
-	end_path()
+	// begin_path()
+	// point(pos + {-1, -0.5} * scale)
+	// point(pos + {0, 0.5} * scale)
+	// point(pos + {1, -0.5} * scale)
+	// stroke_path(2, color)
+	// end_path()
 }
 
 draw_check :: proc(pos: [2]f32, scale: f32, color: Color) {
-	begin_path()
-	point(pos + {-1, -0.047} * scale)
-	point(pos + {-0.333, 0.619} * scale)
-	point(pos + {1, -0.713} * scale)
-	stroke_path(2, color)
-	end_path()
+	// begin_path()
+	// point(pos + {-1, -0.047} * scale)
+	// point(pos + {-0.333, 0.619} * scale)
+	// point(pos + {1, -0.713} * scale)
+	// stroke_path(2, color)
+	// end_path()
 }

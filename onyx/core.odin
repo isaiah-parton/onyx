@@ -158,7 +158,6 @@ Core :: struct {
 	current_texture:       wgpu.Texture,
 	// Scissors
 	scissor_stack:         Stack(Scissor, 100),
-	path_stack:            Stack(Path, 10),
 	draw_calls:            [dynamic]Draw_Call,
 	current_draw_call:     ^Draw_Call,
 	cursors:               [Mouse_Cursor]glfw.CursorHandle,

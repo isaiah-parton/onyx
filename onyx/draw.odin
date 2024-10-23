@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 import "core:mem"
+import "core:reflect"
 
 import "vendor:wgpu"
 
@@ -19,27 +20,40 @@ MAX_ATLAS_SIZE :: 8192
 
 BUFFER_SIZE :: mem.Megabyte * 2
 
-Gradient :: union {
-	Linear_Gradient,
-	Radial_Gradient,
-}
+// Glyph_Paint :: struct {}
 
-Linear_Gradient :: struct {
-	points: [2][2]f32,
-	colors: [2]Color,
-}
+// Atlas_Paint :: struct {
+// 	alpha_correction: f32,
+// }
 
-Radial_Gradient :: struct {
-	center: [2]f32,
-	radius: f32,
-	colors: [2]Color,
-}
+// User_Texture_Paint :: struct {
+// 	texture: wgpu.Texture,
+// }
 
-Stroke_Justify :: enum {
-	Inner,
-	Center,
-	Outer,
-}
+// Linear_Gradient :: struct {
+// 	points: [2][2]f32,
+// 	colors: [2]Color,
+// }
+
+// Radial_Gradient :: struct {
+// 	center: [2]f32,
+// 	radius: f32,
+// 	colors: [2]Color,
+// }
+
+// Simplex_Noise_Gradient :: struct {
+// 	colors: [2]Color,
+// }
+
+// Paint option passed to draw procedures
+// Shape_Paint :: union #no_nil {
+// 	Color,
+// 	Glyph_Paint,
+// 	User_Texture_Paint,
+// 	Linear_Gradient,
+// 	Radial_Gradient,
+// 	Simplex_Noise_Gradient,
+// }
 
 Paint_Kind :: enum u32 {
 	Normal,
@@ -48,6 +62,12 @@ Paint_Kind :: enum u32 {
 	Skeleton,
 	Linear_Gradient,
 	Radial_Gradient,
+}
+
+Stroke_Justify :: enum {
+	Inner,
+	Center,
+	Outer,
 }
 
 Shape_Kind :: enum u32 {
@@ -63,19 +83,20 @@ Shape_Kind :: enum u32 {
 }
 
 // `Paint` and `Shape` get sent to the GPU
-// Biggest field [4]f32 = 16 bytes... beats me why these gotta have `padding`
 
-Paint :: struct #align (16) {
-	kind:    Paint_Kind,
-	padding: [3]u32,
-	col0:    [4]f32,
-	col1:    [4]f32,
-	xform:   u32,
+Paint :: struct #align (8) {
+	kind: Paint_Kind,
+	pad0: [1]u32,
+	cv0:  [2]f32,
+	cv1:  [2]f32,
+	pad1: [2]u32,
+	col0: [4]f32,
+	col1: [4]f32,
 }
 
 Shape :: struct #align (16) {
 	kind:    Shape_Kind,
-	padding: u32,
+	pad0:    u32,
 	cv0:     [2]f32,
 	cv1:     [2]f32,
 	cv2:     [2]f32,
@@ -114,15 +135,17 @@ Path :: struct {
 }
 
 Draw_State :: struct {
-	scissor: u32,
-	paint:   u32,
-	shape:   u32,
-	xform:   u32,
+	scissor:    u32,
+	paint:      u32,
+	shape:      u32,
+	xform:      u32,
+	path_start: u32,
+	path_point: [2]f32,
 }
 
 // The current scissor state has a box for mathematical clipping done by the CPU
 // and an optional shape for fragment shader clipping
-// Scissor shapes currently do not stack
+// The effect of scissor shapes currently do not stack in the shader
 Scissor :: struct {
 	box:   Box,
 	shape: u32,
@@ -156,21 +179,11 @@ set_scissor_shape :: proc(shape: u32) {
 }
 
 add_paint_linear_gradient :: proc(p0, p1: [2]f32, col0, col1: [4]u8) -> u32 {
-	d := p1 - p0
-	xform_index := u32(len(core.gfx.xforms.data))
-	append(
-		&core.gfx.xforms.data,
-		linalg.inverse(Matrix{
-			d.x, d.y, 0.0, 0.0,
-			-d.y, d.x, 0.0, 0.0,
-			p0.x, p0.y, 0.0, 0.0,
-			0.0, 0.0, 0.0, 1.0,
-		}),
-	)
 	return add_paint(
 		{
 			kind = .Linear_Gradient,
-			xform = xform_index,
+			cv0 = p0,
+			cv1 = p1,
 			col0 = normalize_color(col0),
 			col1 = normalize_color(col1),
 		},
@@ -181,10 +194,39 @@ set_paint :: proc(paint: u32) {
 	core.draw_state.paint = paint
 }
 
+path_begin :: proc() {
+	core.draw_state.path_start = u32(len(core.gfx.cvs.data))
+}
+path_move_to :: proc(p: [2]f32) {
+	core.draw_state.path_point = p
+}
+path_quad_to :: proc(cp, p: [2]f32) {
+	append(&core.gfx.cvs.data, core.draw_state.path_point, cp, p)
+	path_move_to(p)
+}
+path_line_to :: proc(p: [2]f32) {
+	path_quad_to(linalg.lerp(core.draw_state.path_point, p, 0.5), p)
+}
+path_fill :: proc() {
+	vertex_count := u32(len(core.gfx.cvs.data)) - core.draw_state.path_start
+	render_shape(
+		add_shape(
+			Shape{kind = .Path, start = core.draw_state.path_start, count = vertex_count / 3},
+		),
+		255,
+	)
+}
+
 // Add a paint to the the shader buffer and return its index
 add_paint :: proc(paint: Paint) -> u32 {
 	index := u32(len(core.gfx.paints.data))
 	append(&core.gfx.paints.data, paint)
+	return index
+}
+
+add_xform :: proc(xform: Matrix) -> u32 {
+	index := u32(len(core.gfx.xforms.data))
+	append(&core.gfx.xforms.data, xform)
 	return index
 }
 

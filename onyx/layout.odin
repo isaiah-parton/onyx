@@ -278,7 +278,7 @@ set_height_to_width :: proc() {
 // Procedures that directly modify the current layout
 // **These are all assertive**
 
-shrink_layout :: proc(amount: f32) {
+shrink_layout :: proc(amount: [2]f32) {
 	layout := current_layout().?
 	layout.box.lo += amount
 	layout.box.hi -= amount

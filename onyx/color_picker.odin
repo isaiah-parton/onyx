@@ -129,7 +129,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			6,
 			fade({0, 0, 0, 40}, max(self.hover_time, self.open_time)),
 		)
-		draw_rounded_box_fill(shrink_box(self.box, 3), core.style.rounding * 0.75, value^)
+		draw_rounded_box_fill(self.box, core.style.rounding, value^)
 		set_scissor_shape(add_shape_box(self.box, core.style.rounding))
 		draw_text_glyphs(
 			text_job,
@@ -466,7 +466,7 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 				cv0 = center,
 				stroke = true,
 				width = (outer - inner) - 4,
-				radius = (inner + outer) / 2,
+				radius = (inner + outer) * 0.5,
 			},
 		)
 		for t: f32 = 0; t < math.TAU; t += STEP {

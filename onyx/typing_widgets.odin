@@ -60,7 +60,7 @@ init_input :: proc(info: ^Input_Info, loc := #caller_location) -> bool {
 	info.desired_size = core.style.visual_size
 	//
 	info.text_info = Text_Info {
-		font   = core.style.monospace_font,// if info.monospace else core.style.default_font,
+		font   = core.style.monospace_font if info.monospace else core.style.default_font,
 		size   = core.style.content_text_size,
 		hidden = info.hidden && len(info.text_info.text) > 0,
 	}
@@ -396,12 +396,12 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				break
 			case .Check:
 				scale := [2]f32{1 + 4 * self.input.icon_time, 5}
-				begin_path()
-				point(center + {-1, -0.047} * scale)
-				point(center + {-0.333, 0.619} * scale)
-				point(center + {1, -0.713} * scale)
-				stroke_path(2, {0, 255, 120, 255})
-				end_path()
+				// begin_path()
+				// point(center + {-1, -0.047} * scale)
+				// point(center + {-0.333, 0.619} * scale)
+				// point(center + {1, -0.713} * scale)
+				// stroke_path(2, {0, 255, 120, 255})
+				// end_path()
 			case .Spinner:
 				draw_spinner(center, 5, core.style.color.content)
 			}

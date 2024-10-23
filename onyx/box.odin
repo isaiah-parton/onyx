@@ -102,6 +102,10 @@ clamp_box :: proc(a, b: Box) -> Box {
 	return {linalg.clamp(a.lo, b.lo, b.hi), linalg.clamp(a.hi, b.lo, b.hi)}
 }
 
+snapped_box :: proc(box: Box) -> Box {
+	return Box{linalg.floor(box.lo), linalg.floor(box.hi)}
+}
+
 box_center :: proc(a: Box) -> [2]f32 {
 	return {(a.lo.x + a.hi.x) * 0.5, (a.lo.y + a.hi.y) * 0.5}
 }

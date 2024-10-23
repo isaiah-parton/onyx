@@ -1,11 +1,12 @@
 package onyx
 
+import "base:intrinsics"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 
-@(deferred_out=__menu_bar)
+@(deferred_out = __menu_bar)
 menu_bar :: proc() -> bool {
 	begin_layout({}) or_return
 	box := layout_box()
@@ -28,6 +29,11 @@ Menu_Info :: struct {
 	text_job:   Text_Job,
 }
 
+Menu_State :: struct {
+	size:      [2]f32,
+	open_time: f32,
+}
+
 init_menu :: proc(using info: ^Menu_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
 	self = get_widget(id) or_return
@@ -35,11 +41,11 @@ init_menu :: proc(using info: ^Menu_Info, loc := #caller_location) -> bool {
 		text    = text,
 		size    = core.style.button_text_size,
 		font    = core.style.default_font,
+		align_h = .Left,
 		align_v = .Middle,
-		align_h = .Middle,
 	}
 	text_job, _ = make_text_job(text_info)
-	desired_size = text_job.size + core.style.text_padding
+	desired_size = {text_job.size.x + 20 + core.style.text_padding.x * 2, core.style.visual_size.y}
 	return true
 }
 
@@ -50,13 +56,20 @@ begin_menu :: proc(info: ^Menu_Info) -> bool {
 		draw_rounded_box_fill(
 			info.self.box,
 			core.style.rounding,
-			alpha_blend_colors(core.style.color.background, core.style.color.substance, info.self.hover_time * 0.5),
+			alpha_blend_colors(
+				core.style.color.background,
+				core.style.color.substance,
+				info.self.hover_time * 0.5,
+			),
 		)
 		draw_rounded_box_stroke(info.self.box, core.style.rounding, 1, core.style.color.substance)
-		text_pos := box_center(info.self.box) + [2]f32{-10, 0}
+		text_pos := [2]f32 {
+			info.self.box.lo.x + core.style.text_padding.x,
+			box_center_y(info.self.box),
+		}
 		draw_text_glyphs(info.text_job, text_pos, core.style.color.content)
 		draw_arrow(
-			{text_pos.x + info.text_job.size.x / 2 + 10, text_pos.y},
+			{text_pos.x + info.text_job.size.x + 10, text_pos.y},
 			5,
 			core.style.color.content,
 		)
@@ -117,9 +130,16 @@ __menu :: proc() {
 	end_menu()
 }
 
+Menu_Item_Decal :: enum {
+	None,
+	Check,
+	Dot,
+}
+
 Menu_Item_Info :: struct {
 	using _:  Widget_Info,
 	text:     string,
+	decal:    Menu_Item_Decal,
 	text_job: Text_Job,
 	clicked:  bool,
 }
@@ -131,11 +151,12 @@ init_menu_item :: proc(info: ^Menu_Item_Info) -> bool {
 			text = info.text,
 			font = core.style.default_font,
 			size = core.style.button_text_size,
-			align_h = .Middle,
+			align_h = .Left,
 			align_v = .Middle,
 		},
 	) or_return
 	info.desired_size = info.text_job.size + core.style.text_padding * 2
+	info.desired_size.x += info.desired_size.y
 	return true
 }
 
@@ -159,9 +180,27 @@ menu_item :: proc(info: Menu_Item_Info, loc := #caller_location) -> Menu_Item_In
 				}
 				draw_text_glyphs(
 					info.text_job,
-					box_center(info.self.box),
+					{
+						info.self.box.lo.x + box_height(info.self.box) + core.style.text_padding.x,
+						box_center_y(info.self.box),
+					},
 					core.style.color.content,
 				)
+				switch info.decal {
+				case .None:
+				case .Check:
+					draw_check(
+						info.self.box.lo + box_height(info.self.box) / 2,
+						5,
+						core.style.color.content,
+					)
+				case .Dot:
+					draw_circle_fill(
+						info.self.box.lo + box_height(info.self.box) / 2,
+						5,
+						core.style.color.content,
+					)
+				}
 			}
 
 			info.clicked = .Clicked in info.self.state
@@ -169,4 +208,20 @@ menu_item :: proc(info: Menu_Item_Info, loc := #caller_location) -> Menu_Item_In
 	}
 
 	return info
+}
+
+enum_selector :: proc(value: ^$T, loc := #caller_location) where intrinsics.type_is_enum(T) {
+	if value == nil do return
+	if menu({text = fmt.tprintf("%v \ue14e", value^)}) {
+		shrink_layout(core.style.menu_padding)
+		set_side(.Top)
+		set_width_fill()
+		for member, m in T {
+			push_id(m)
+			if menu_item({text = fmt.tprint(member), decal = .Dot if value^ == member else .None}).clicked {
+				value^ = member
+			}
+			pop_id()
+		}
+	}
 }

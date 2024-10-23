@@ -56,11 +56,7 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 		}
 		if !info.is_tail {
 			origin: [2]f32 = {math.floor(self.box.hi.x - 10), box_center_y(self.box)}
-			begin_path()
-			point(origin + {-2, 6})
-			point(origin + {2, -6})
-			stroke_path(2, fade(core.style.color.content, 0.5))
-			end_path()
+			draw_line(origin + {-2, 6}, origin + {2, -6}, 2, fade(core.style.color.content, 0.5))
 		}
 	}
 

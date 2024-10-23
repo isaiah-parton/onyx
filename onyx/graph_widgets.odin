@@ -89,31 +89,31 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 			}
 
 			for &field, f in fields {
-				begin_path()
-				for &entry, e in entries {
-					point(
-						{
-							inner_box.lo.x +
-							(f32(e) / f32(len(entries) - 1)) * (inner_box.hi.x - inner_box.lo.x),
-							inner_box.hi.y +
-							(f32(entry.values[f] - lo) / f32(hi - lo)) *
-								(inner_box.lo.y - inner_box.hi.y),
-						},
-					)
-				}
-				path := get_path()
-				for i in 0 ..< path.count - 1 {
-					// Points
-					p0 := path.points[max(i - 1, 0)]
-					p1 := path.points[i]
-					p2 := path.points[min(i + 1, path.count - 1)]
-					p3 := path.points[min(i + 2, path.count - 1)]
-					// Control points
-					c1 := p1 + (p2 - p0) / 6
-					c2 := p2 - (p3 - p1) / 6
-					draw_cubic_bezier(p1, c1, c2, p2, 2, field.color)
-				}
-				end_path()
+				// begin_path()
+				// for &entry, e in entries {
+				// 	point(
+				// 		{
+				// 			inner_box.lo.x +
+				// 			(f32(e) / f32(len(entries) - 1)) * (inner_box.hi.x - inner_box.lo.x),
+				// 			inner_box.hi.y +
+				// 			(f32(entry.values[f] - lo) / f32(hi - lo)) *
+				// 				(inner_box.lo.y - inner_box.hi.y),
+				// 		},
+				// 	)
+				// }
+				// path := get_path()
+				// for i in 0 ..< path.count - 1 {
+				// 	// Points
+				// 	p0 := path.points[max(i - 1, 0)]
+				// 	p1 := path.points[i]
+				// 	p2 := path.points[min(i + 1, path.count - 1)]
+				// 	p3 := path.points[min(i + 2, path.count - 1)]
+				// 	// Control points
+				// 	c1 := p1 + (p2 - p0) / 6
+				// 	c2 := p2 - (p3 - p1) / 6
+				// 	draw_cubic_bezier(p1, c1, c2, p2, 2, field.color)
+				// }
+				// end_path()
 			}
 
 			if .Hovered in self.state && hn >= 0 && hn < len(entries) {

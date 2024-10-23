@@ -69,7 +69,7 @@ wgpu_buffer_destroy :: proc(self: ^WGPU_Buffer($T)) {
 	wgpu.BufferDestroy(self.buffer)
 }
 
-Shader_Uniforms :: struct #align(8) {
+Shader_Uniforms :: struct #align (8) {
 	size: [2]f32,
 	time: f32,
 }
@@ -538,15 +538,16 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 		}
 
 		// User sampler descriptor
-		user_sampler_desc := call.user_sampler_desc.? or_else wgpu.SamplerDescriptor{
-			magFilter = .Linear,
-			minFilter = .Linear,
-			addressModeU = .ClampToEdge,
-			addressModeV = .ClampToEdge,
-			mipmapFilter = .Linear,
-			lodMinClamp = 0,
-			maxAnisotropy = 4,
-		}
+		user_sampler_desc :=
+			call.user_sampler_desc.? or_else wgpu.SamplerDescriptor {
+				magFilter = .Linear,
+				minFilter = .Linear,
+				addressModeU = .ClampToEdge,
+				addressModeV = .ClampToEdge,
+				mipmapFilter = .Linear,
+				lodMinClamp = 0,
+				maxAnisotropy = 4,
+			}
 
 		// Create view for user texture
 		user_texture_view: wgpu.TextureView = atlas_texture_view
@@ -572,10 +573,7 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 		defer wgpu.SamplerRelease(atlas_sampler)
 
 		// Create transient sampler
-		user_sampler := wgpu.DeviceCreateSampler(
-			gfx.device,
-			&user_sampler_desc,
-		)
+		user_sampler := wgpu.DeviceCreateSampler(gfx.device, &user_sampler_desc)
 		defer wgpu.SamplerRelease(user_sampler)
 
 		// Create transient bind group
@@ -585,12 +583,14 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 				label = "TextureBindGroup",
 				layout = gfx.texture_bind_group_layout,
 				entryCount = 4,
-				entries = transmute([^]wgpu.BindGroupEntry)&[?]wgpu.BindGroupEntry {
-					{binding = 0, sampler = atlas_sampler},
-					{binding = 1, textureView = atlas_texture_view},
-					{binding = 2, sampler = user_sampler},
-					{binding = 3, textureView = user_texture_view},
-				},
+				entries = ([^]wgpu.BindGroupEntry)(
+					&[?]wgpu.BindGroupEntry {
+						{binding = 0, sampler = atlas_sampler},
+						{binding = 1, textureView = atlas_texture_view},
+						{binding = 2, sampler = user_sampler},
+						{binding = 3, textureView = user_texture_view},
+					},
+				),
 			},
 		)
 		defer wgpu.BindGroupRelease(texture_bind_group)

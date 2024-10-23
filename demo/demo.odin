@@ -26,19 +26,19 @@ Option :: enum {
 	Function,
 }
 
-Component :: enum {
-	Colors,
+Section :: enum {
+	Primitives,
+	Style,
 	Tables,
 	Button,
 	Data_Input,
 	Boolean,
 	Graph,
-	Slider,
 	Scroll_Zone,
 }
 
 State :: struct {
-	component:     Component,
+	component:     Section,
 	light_mode:    bool,
 	checkboxes:    [Option]bool,
 	bio:           string,
@@ -81,7 +81,7 @@ component_showcase :: proc(state: ^State) -> bool {
 	foreground()
 	if layout({size = 65, side = .Top}) {
 		shrink_layout(15)
-		box_tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Component), tab_width = 100})
+		box_tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Section), tab_width = 100})
 		set_side(.Right)
 		if toggle_switch({state = &state.light_mode, text = "\uf1bc" if state.light_mode else "\uef72", text_side = .Left}).toggled {
 			if state.light_mode {
@@ -94,7 +94,7 @@ component_showcase :: proc(state: ^State) -> bool {
 	shrink_layout(40)
 
 	#partial switch state.component {
-	case .Colors:
+	case .Style:
 
 		set_width_percent(100 / 3)
 		set_side(.Left)
@@ -238,15 +238,66 @@ component_showcase :: proc(state: ^State) -> bool {
 				pop_id()
 			}
 		}
-	case .Slider:
-		set_side(.Top)
-		label({text = "From"})
-		slider(Slider_Info(f32){value = &state.from_angle, hi = math.TAU, format = "%.2f"})
+	// Small showcase of drawing capabilities
+	case .Primitives:
+		gradient_colors := [2]Color{
+			{0, 182, 255, 255},
+			{244, 0, 255, 255},
+		}
+		draw_box_stroke(layout_box(), 1, {255, 0, 0, 255})
+		{
+			box := cut_current_layout(.Top, [2]f32{0, 40})
+			shape_box := cut_box_left(&box, box_height(box))
+			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			draw_rounded_box_fill(shape_box, 10, 255)
+			set_paint(0)
+		}
 		add_space(10)
-		label({text = "To"})
-		slider(Slider_Info(f32){value = &state.to_angle, hi = math.TAU, format = "%.2f"})
-		draw_arc(core.view / 2, state.from_angle, state.to_angle, 10, 4, {255, 255, 255, 255})
-		draw_pie(core.view / 2 + 100, state.from_angle, state.to_angle, 15, {255, 255, 255, 255})
+		{
+			box := cut_current_layout(.Top, [2]f32{0, 40})
+			shape_box := cut_box_left(&box, box_height(box))
+			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			draw_circle_fill(box_center(shape_box), 20, 255)
+			set_paint(0)
+		}
+		add_space(10)
+		{
+			box := cut_current_layout(.Top, [2]f32{0, 40})
+			shape_box := cut_box_left(&box, box_height(box))
+			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			draw_arc(box_center(shape_box), math.TAU * 0.25, math.TAU * 0.75, 18, 2, 255)
+			set_paint(0)
+		}
+		add_space(10)
+		{
+			box := cut_current_layout(.Top, [2]f32{0, 40})
+			shape_box := cut_box_left(&box, box_height(box))
+			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			draw_pie(box_center(shape_box), math.TAU * 0.1, math.TAU * 0.9, 20, 255)
+			set_paint(0)
+		}
+		add_space(10)
+		{
+			box := cut_current_layout(.Top, [2]f32{0, 40})
+			shape_box := cut_box_left(&box, box_height(box))
+			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			path_begin()
+			path_move_to(shape_box.lo)
+			path_line_to(shape_box.hi)
+			path_quad_to({shape_box.lo.x, shape_box.hi.y}, box_center(shape_box))
+			path_quad_to({shape_box.hi.x, shape_box.lo.y}, shape_box.lo)
+			path_fill()
+			set_paint(0)
+		}
+		add_space(10)
+		{
+			box := cut_current_layout(.Top, [2]f32{0, 40})
+			shape_box := cut_box_left(&box, box_height(box))
+			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			draw_cubic_bezier(shape_box.lo, {shape_box.hi.x, shape_box.lo.y}, {shape_box.lo.x, shape_box.hi.y}, shape_box.hi, 2, 255)
+			set_paint(0)
+		}
+	// Buttons of all shapes and sizes
 	case .Button:
 		set_side(.Top)
 		label({text = "Fit to label"})
@@ -264,6 +315,7 @@ component_showcase :: proc(state: ^State) -> bool {
 		}
 		add_space(10)
 		enum_selector(&state.option)
+	// Boolean controls
 	case .Boolean:
 		set_side(.Top)
 		label({text = "Checkboxes"})
@@ -290,6 +342,7 @@ component_showcase :: proc(state: ^State) -> bool {
 			}
 			pop_id()
 		}
+	// Data input (text, numbers, sliders)
 	case .Data_Input:
 		set_side(.Top)
 		set_width(250)
@@ -306,6 +359,7 @@ component_showcase :: proc(state: ^State) -> bool {
 		add_space(10)
 		set_height(120)
 		string_input({value = &state.bio, placeholder = "Bio", multiline = true})
+	// Graph and chart showcase
 	case .Graph:
 		set_side(.Left)
 		set_width_percent(50)
@@ -424,13 +478,6 @@ main :: proc() {
 		using onyx
 		new_frame()
 		component_showcase(&state)
-
-		seconds := cast(f32)time.duration_seconds(time.since(core.start_time))
-		center := core.view / 2 + [2]f32{math.cos(seconds), math.sin(seconds)} * 200
-		box := Box{center - 100, center + 100}
-		set_paint(add_paint_linear_gradient(100, 200, {255, 87, 51, 255}, {160, 51, 255, 255}))
-		render_shape(add_shape_box(view_box(), 0), 255)
-		core.draw_this_frame = true
 		render()
 	}
 

@@ -7,8 +7,8 @@ import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 import "core:mem"
-import "core:time"
 import "core:strings"
+import "core:time"
 import "tedit"
 
 // Delay for compound clicking
@@ -54,51 +54,51 @@ WIDGET_STATE_ALL :: Widget_State{.Hovered, .Focused, .Pressed, .Changed, .Clicke
 
 Widget :: struct {
 	// Unique hashed id
-	id:             Id,
+	id:                 Id,
 	// This should be the total visually occupied space
-	box:            Box,
+	box:                Box,
 	// Home layer
-	layer:          ^Layer,
+	layer:              ^Layer,
 	// If the widget is visible and should be displayed
-	visible:        bool,
+	visible:            bool,
 	// This only disables interaction
-	disabled:       bool,
+	disabled:           bool,
 	// When this is true, the widget will be destroyed next time
 	// `new_frame()` is called.
-	dead:           bool,
+	dead:               bool,
 	// Internally handled bit flags
-	flags: 	Widget_Flags,
+	flags:              Widget_Flags,
 	// Interaction state
-	last_state:     Widget_State,
-	next_state:     Widget_State,
-	state:          Widget_State,
+	last_state:         Widget_State,
+	next_state:         Widget_State,
+	state:              Widget_State,
 	// Which widget states can be passed to this widget
-	in_state_mask:  Widget_State,
+	in_state_mask:      Widget_State,
 	// Which widget states will be passed to the parent widget
-	out_state_mask: Widget_State,
+	out_state_mask:     Widget_State,
 	// Click information
-	click_count:    int,
-	click_time:     time.Time,
-	click_button:   Mouse_Button,
+	click_count:        int,
+	click_time:         time.Time,
+	click_button:       Mouse_Button,
 	// Desired size stored to be passed to the layout
-	desired_size:   [2]f32,
+	desired_size:       [2]f32,
 	// Widget chaining for forms
 	// these values are transient
-	prev:           ^Widget,
-	next:           ^Widget,
+	prev:               ^Widget,
+	next:               ^Widget,
 	// Stores the number of the last frame on which this widget was updated
 	// This is to avoid calling the same widget more than once per frame
 	// Also protects the `variant` field from being misused.
-	frames:         int,
+	frames:             int,
 	// TODO: Remove this
-	variant:        Widget_Kind,
+	variant:            Widget_Kind,
 	// Generic state used by most widgets
-	focus_time:     f32,
-	hover_time:     f32,
-	open_time:      f32,
-	disable_time:   f32,
+	focus_time:         f32,
+	hover_time:         f32,
+	open_time:          f32,
+	disable_time:       f32,
 	// Unique state used by different widget types
-	using unique_state:  struct #raw_union {
+	using unique_state: struct #raw_union {
 		cont:    Container,
 		menu:    Menu_State,
 		graph:   Graph_Widget_Kind,
@@ -236,6 +236,9 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	widget := info.self
 	// Place widget
 	widget.box = info.box.? or_else next_widget_box(info)
+
+	widget.box = snapped_box(widget.box)
+
 	if widget.frames >= core.frames {
 		draw_box_fill(
 			widget.box,
@@ -415,7 +418,16 @@ foreground :: proc(loc := #caller_location) {
 	}
 	if begin_widget(&info) {
 		defer end_widget()
-		draw_rounded_box_fill(info.self.box, core.style.rounding, core.style.color.foreground)
+		set_paint(
+			add_paint_linear_gradient(
+				info.self.box.lo,
+				info.self.box.hi,
+				alpha_blend_colors(core.style.color.foreground, 255, 0.01),
+				core.style.color.foreground,
+			),
+		)
+		draw_rounded_box_fill(info.self.box, core.style.rounding, 255)
+		set_paint(0)
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)
 		}

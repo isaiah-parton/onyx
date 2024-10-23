@@ -136,7 +136,7 @@ begin_container :: proc(using info: ^Container_Info) -> bool {
 	}
 
 	// Determine layout box
-	layout_origin := self.box.lo - linalg.max(self.cont.scroll, 0)
+	layout_origin := self.box.lo - linalg.max(linalg.floor(self.cont.scroll), 0)
 	layout_box := Box{layout_origin, layout_origin + linalg.max(layout_size, box_size(self.box))}
 
 	begin_layout({box = layout_box, isolated = true}) or_return

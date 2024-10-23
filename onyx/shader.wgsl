@@ -33,9 +33,10 @@ var<storage> shapes: Shapes;
 
 struct Paint {
 	kind: u32,
+	cv0: vec2<f32>,
+	cv1: vec2<f32>,
 	col0: vec4<f32>,
 	col1: vec4<f32>,
-	xform: u32,
 };
 
 struct Paints {
@@ -98,7 +99,7 @@ fn sd_subtract(d1: f32, d2: f32) -> f32 {
 }
 
 fn sd_circle(p: vec2<f32>, r: f32) -> f32 {
-	return length(p) - r;
+	return length(p) - r + 1;
 }
 
 fn sd_pie(p: vec2<f32>, sca: vec2<f32>, scb: vec2<f32>, r: f32) -> f32 {
@@ -128,7 +129,7 @@ fn sd_arc(p: vec2<f32>, sca: vec2<f32>, scb: vec2<f32>, ra: f32, rb: f32) -> f32
   } else {
       k = length(pp);
   }
-  return sqrt( dot(pp,pp) + ra*ra - 2.0*ra*k ) - rb + 1;
+  return sqrt( dot(pp,pp) + ra*ra - 2.0*ra*k ) - rb + 0.5;
 }
 
 fn sd_box(p: vec2<f32>, b: vec2<f32>, rr: vec4<f32>) -> f32 {
@@ -265,7 +266,7 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
 		}
 		// Circle
 		case 1u: {
-			d = sd_circle(p - shape.cv0, shape.radius) + 1;
+			d = sd_circle(p - shape.cv0, shape.radius);
 		}
 		// Box
 		case 2u: {
@@ -337,7 +338,7 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
           }
         }
       }
-      d = d * s + 1;
+      d = d * s;
     }
     // Arbitrary Polygon
     case 8u {
@@ -356,7 +357,7 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
         	 s *= -1.0;
         }
       }
-      return s * sqrt(d) + 0.5;
+      return s * sqrt(d);
     }
 		default: {}
 	}
@@ -404,6 +405,10 @@ fn vs_main(in: VertexInput) -> VertexOutput {
   return out;
 }
 
+fn random(coords: vec2<f32>) -> f32 {
+	return fract(sin(dot(coords.xy, vec2<f32>(12.9898, 78.233))) * 43758.5453);
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	let shape = shapes.shapes[in.shape];
@@ -427,7 +432,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 		// Glyph
 		case 1u: {
 			out = textureSample(atlas_tex, atlas_samp, in.uv) * in.col;
-			out.a *= 1.0 + 0.25 * out.r;
+			out.a *= 1.0 + 0.15 * out.r;
 		}
 		// User_Image
 		case 2u: {
@@ -442,11 +447,21 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 			// out = (paint.col0 + (paint.col1 - paint.col0) * f) * in.col;
 			out = vec4<f32>(1.0, 1.0, 1.0, clamp(f, 0.0, 1.0)) * in.col;
 		}
-		// Gradient
+		// Linear Gradient
 		case 4u: {
-	    let d = clamp((xforms.xforms[paint.xform] * vec4<f32>(in.p, 0.0, 1.0)).y, 0.0, 1.0);
-	    out = mix(paint.col0, paint.col1, d) * in.col;
+			let d = paint.cv1 - paint.cv0;
+			var det = 1.0 / ((d.x * d.x) - (-d.y * d.y));
+			let xform = mat2x2<f32>(
+				det * d.x, det * d.y,
+				det * -d.y, det * d.x,
+			);
+	    var t = clamp((xform * (in.p - paint.cv0)).y, 0.0, 1.0);
+			// Dithering?
+			let df = length(d / uniforms.size) / 64.0;
+			t += mix(-df, df, random(in.p));
+	    out = mix(paint.col0, paint.col1, t) * in.col;
 		}
+		// Default case
 		default: {
 			out = in.col;
 		}

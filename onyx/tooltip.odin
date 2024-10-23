@@ -94,24 +94,24 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 	#partial switch info.side {
 	case .Top:
 		center := box_center_x(box)
-		left := box.lo.x
-		right := box.hi.x
+		left := box.lo.x + core.style.rounding
+		right := box.hi.x - core.style.rounding
 		append(
 			&core.gfx.cvs.data,
+			[2]f32{center, box.hi.y + offset},
+			[2]f32{center, box.hi.y},
+			[2]f32{right, box.hi.y},
 			[2]f32{right, box.hi.y},
 			[2]f32{center, box.hi.y},
 			[2]f32{left, box.hi.y},
 			[2]f32{left, box.hi.y},
 			[2]f32{center, box.hi.y},
 			[2]f32{center, box.hi.y + offset},
-			[2]f32{center, box.hi.y + offset},
-			[2]f32{center, box.hi.y},
-			[2]f32{right, box.hi.y},
 		)
 	case .Bottom:
 		center := box_center_x(box)
-		left := box.lo.x
-		right := box.hi.x
+		left := box.lo.x + core.style.rounding
+		right := box.hi.x - core.style.rounding
 		append(
 			&core.gfx.cvs.data,
 			[2]f32{right, box.lo.y},
@@ -126,8 +126,8 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		)
 	case .Right:
 		center := box_center_y(box)
-		top := box.lo.y
-		bottom := box.hi.y
+		top := box.lo.y + core.style.rounding
+		bottom := box.hi.y - core.style.rounding
 		append(
 			&core.gfx.cvs.data,
 			[2]f32{box.lo.x, bottom},
@@ -142,19 +142,19 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		)
 	case .Left:
 		center := box_center_y(box)
-		top := box.lo.y
-		bottom := box.hi.y
+		top := box.lo.y + core.style.rounding
+		bottom := box.hi.y - core.style.rounding
 		append(
 			&core.gfx.cvs.data,
-			[2]f32{box.hi.x, bottom},
+			[2]f32{box.hi.x, top},
 			[2]f32{box.hi.x, center},
-			[2]f32{box.hi.x, top},
-			[2]f32{box.hi.x, top},
+			[2]f32{box.hi.x, bottom},
+			[2]f32{box.hi.x, bottom},
 			[2]f32{box.hi.x, center},
 			[2]f32{box.hi.x + offset, center},
 			[2]f32{box.hi.x + offset, center},
 			[2]f32{box.hi.x, center},
-			[2]f32{box.hi.x, bottom},
+			[2]f32{box.hi.x, top},
 		)
 	}
 	render_shape(add_shape({kind = .Path, start = start, count = 3}), background_color)
