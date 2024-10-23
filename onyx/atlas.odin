@@ -101,7 +101,7 @@ add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas, gfx: 
 // Copy an image to the atlas
 // Mutex protected
 add_image_to_atlas :: proc(image: img.Image) -> Box {
-	atlas := &core.font_atlas
+	atlas := &core.atlas
 	gfx := &core.gfx
 
 	sync.mutex_lock(&atlas.mutex)

@@ -361,7 +361,7 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 
 	// Update horizontal offset with last glyph
 	if iter.codepoint != 0 {
-		iter.glyph_pos.x += iter.glyph.advance
+		iter.glyph_pos.x += math.floor(iter.glyph.advance)
 	}
 
 	// Get the next glyph
@@ -431,7 +431,7 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 		}
 		iter.glyph_pos.y += iter.size.ascent - iter.size.descent + iter.size.line_gap
 	}
-	iter.line_size.x += iter.glyph.advance
+	iter.line_size.x += math.floor(iter.glyph.advance)
 	if ok && iter.last_codepoint != 0 {
 		iter.line_size.x += iter.font.spacing
 	}
@@ -475,7 +475,7 @@ load_font_from_file :: proc(path: string, monospace: bool = false) -> (handle: i
 
 load_font_from_memory :: proc(data: []u8, monospace: bool = false) -> (handle: int, ok: bool) {
 	font := Font{
-		spacing = 1,
+		spacing = 0 if monospace else 1,
 		monospace = monospace,
 	}
 
@@ -551,7 +551,7 @@ get_glyph :: proc(font: ^Font, size: ^Font_Size, r: rune) -> (glyph: Glyph, ok: 
 				image_data,
 				int(image_width),
 				int(image_height),
-				&core.font_atlas,
+				&core.atlas,
 				&core.gfx,
 			),
 			offset  = {f32(glyph_offset_x), f32(glyph_offset_y) + size.ascent},

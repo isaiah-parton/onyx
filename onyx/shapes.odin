@@ -39,8 +39,8 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 	switch shape.kind {
 	case .Normal:
 	case .Box:
-		box.lo = shape.cv0
-		box.hi = shape.cv1
+		box.lo = shape.cv0 - 1
+		box.hi = shape.cv1 + 1
 	case .Circle:
 		box.lo = shape.cv0 - shape.radius
 		box.hi = shape.cv0 + shape.radius
@@ -136,7 +136,7 @@ render_shape_uv :: proc(shape_index: u32, source: Box, color: Color) {
 	// Discard fully clipped shapes
 	if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
 	// Get texture size
-	size := [2]f32{f32(core.font_atlas.width), f32(core.font_atlas.height)}
+	size := [2]f32{f32(core.atlas.width), f32(core.atlas.height)}
 	// Add vertices
 	a := add_vertex(Vertex{pos = box.lo, col = color, uv = source.lo / size, shape = shape_index})
 	b := add_vertex(
@@ -328,7 +328,7 @@ draw_glyph :: proc(source, target: Box, tint: Color) {
 		}
 		if target.lo.x >= target.hi.x || target.lo.y >= target.hi.y do return
 	}
-	size: [2]f32 = {f32(core.font_atlas.width), f32(core.font_atlas.height)}
+	size: [2]f32 = {f32(core.atlas.width), f32(core.atlas.height)}
 	set_paint(1)
 	shape_index := add_shape(Shape{kind = .Normal})
 	a := add_vertex(
@@ -488,7 +488,8 @@ draw_arc :: proc(center: [2]f32, from, to: f32, radius, width: f32, color: Color
 }
 
 draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
-	shape := add_shape(Shape{kind = .Normal})
+	set_paint(0)
+	shape := add_shape_box(box, {})
 	a := add_vertex(Vertex{pos = box.lo, col = left, shape = shape})
 	b := add_vertex(Vertex{pos = {box.lo.x, box.hi.y}, col = left, shape = shape})
 	c := add_vertex(Vertex{pos = box.hi, col = right, shape = shape})
@@ -497,7 +498,8 @@ draw_horizontal_box_gradient :: proc(box: Box, left, right: Color) {
 }
 
 draw_vertical_box_gradient :: proc(box: Box, top, bottom: Color) {
-	shape := add_shape(Shape{kind = .Normal})
+	set_paint(0)
+	shape := add_shape_box(box, {})
 	a := add_vertex(Vertex{pos = box.lo, col = top, shape = shape})
 	b := add_vertex(Vertex{pos = {box.hi.x, box.lo.y}, col = top, shape = shape})
 	c := add_vertex(Vertex{pos = box.hi, col = bottom, shape = shape})

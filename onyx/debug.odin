@@ -5,9 +5,8 @@ import "core:time"
 
 Profiler_Scope :: enum {
 	New_Frame,
-	Render_Prepare,
-	Render_Draw,
-	Render_Present,
+	Construct,
+	Render,
 }
 
 Profiler :: struct {
@@ -18,11 +17,18 @@ Profiler :: struct {
 @(private = "file")
 __prof: Profiler
 
-@(deferred_in = __profiler_end_scope)
+@(deferred_in = __profiler_scope)
+profiler_scope :: proc(scope: Profiler_Scope) {
+	profiler_begin_scope(scope)
+}
+__profiler_scope :: proc(scope: Profiler_Scope) {
+	profiler_end_scope(scope)
+}
+
 profiler_begin_scope :: proc(scope: Profiler_Scope) {
 	__prof.t[scope] = time.now()
 }
-__profiler_end_scope :: proc(scope: Profiler_Scope) {
+profiler_end_scope :: proc(scope: Profiler_Scope) {
 	__prof.d[scope] = time.since(__prof.t[scope])
 }
 
@@ -65,19 +71,36 @@ core.gfx.xforms.capacity,
 		offset +=
 			draw_text({0, f32(offset)}, {text = fmt.tprintf("%i - %i", layer.id, layer.index), font = core.style.monospace_font, size = 16}, 255).y
 	}
+
+	total: time.Duration
 	for scope, s in Profiler_Scope {
+		total += __prof.d[scope]
 		draw_text(
-			{0, core.view.y - f32(14 * (s + 1))},
+			{0, core.view.y - f32(16 * (s + 1))},
 			{
 				text = fmt.tprintf(
-					"%v: %.2fms",
+					"%v: %.3fms",
 					scope,
 					time.duration_milliseconds(__prof.d[scope]),
 				),
-				font = core.style.default_font,
+				font = core.style.monospace_font,
 				size = 16,
+				align_v = .Bottom,
 			},
-			{255, 255, 255, 255},
+			{225, 225, 225, 255},
 		)
 	}
+	draw_text(
+		{0, core.view.y},
+		{
+			text = fmt.tprintf(
+				"Total: %.3fms",
+				time.duration_milliseconds(total),
+			),
+			font = core.style.monospace_font,
+			size = 16,
+			align_v = .Bottom,
+		},
+		{255, 255, 255, 255},
+	)
 }

@@ -140,7 +140,7 @@ set_color_brightness :: proc(color: Color, value: f32) -> Color {
 }
 
 get_color_brightness :: proc(color: Color) -> f32 {
-	return f32(color.r / 255) * 0.3 + f32(color.g / 255) * 0.59 + f32(color.b / 255) * 0.11
+	return (f32(color.r) / 255) * 0.3 + (f32(color.g) / 255) * 0.59 + (f32(color.b) / 255) * 0.11
 }
 
 color_to_hsl :: proc(color: Color) -> [4]f32 {

@@ -50,7 +50,7 @@ Layout :: struct {
 	fixed:         bool,
 	// Isolated from previous layout?
 	isolated:      bool,
-	mode: Layout_Mode,
+	mode:          Layout_Mode,
 }
 // Queue the next size to be cut from this layout
 queue_layout_size :: proc(layout: ^Layout, size: f32) {
@@ -77,8 +77,8 @@ pop_layout :: proc() {
 // Begin a layout
 begin_layout :: proc(info: Layout_Info) -> bool {
 	layout := Layout {
-		isolated      = info.isolated,
-		side          = info.side,
+		isolated = info.isolated,
+		side     = info.side,
 	}
 	if layout.isolated {
 		layout.box = info.box.? or_return
@@ -87,8 +87,8 @@ begin_layout :: proc(info: Layout_Info) -> bool {
 			side := info.side.? or_else last_layout.next_cut_side
 			size := info.size.? or_else last_layout.next_size[int(side) / 2]
 			layout.box = info.box.? or_else cut_box(&last_layout.box, side, size)
-			layout.next_size     = last_layout.next_size
-			layout.next_padding  = last_layout.next_padding
+			layout.next_size = last_layout.next_size
+			layout.next_padding = last_layout.next_padding
 			layout.next_cut_side = .Left if int(side) > 1 else .Top
 		}
 	}
@@ -156,8 +156,12 @@ cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32)
 cut_current_layout :: proc(side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -> Box {
 	return cut_layout(current_layout().?, side, size)
 }
+// Size of the next widget
+next_widget_size :: proc(info: ^Widget_Info) -> [2]f32 {
+
+return {}
+}
 // Get the next widget box
-// TODO: Rename this as it isn't used exclusively for singular widgets
 next_widget_box :: proc(info: ^Widget_Info) -> Box {
 	non_fixed_size :: proc(layout: ^Layout, desired_size: [2]f32) -> [2]f32 {
 		if layout.mode == .Maximum {
@@ -213,7 +217,7 @@ next_widget_box :: proc(info: ^Widget_Info) -> Box {
 	box.lo += layout.next_padding
 	box.hi -= layout.next_padding
 	// Result is rounded for pixel perfect rendering
-	return {linalg.floor(box.lo), linalg.floor(box.hi)}
+	return {box.lo, box.hi}
 }
 
 // Procedures for setting the cut parameters of the current layout
@@ -274,18 +278,18 @@ set_height_to_width :: proc() {
 // Procedures that directly modify the current layout
 // **These are all assertive**
 
-shrink :: proc(amount: f32) {
+shrink_layout :: proc(amount: f32) {
 	layout := current_layout().?
 	layout.box.lo += amount
 	layout.box.hi -= amount
 	layout.spacing_size += amount * 2
 }
-shrink_x :: proc(amount: f32) {
+shrink_layout_x :: proc(amount: f32) {
 	layout := current_layout().?
 	layout.box.lo.x += amount
 	layout.box.hi.x -= amount
 }
-shrink_y :: proc(amount: f32) {
+shrink_layout_y :: proc(amount: f32) {
 	layout := current_layout().?
 	layout.box.lo.y += amount
 	layout.box.hi.y -= amount

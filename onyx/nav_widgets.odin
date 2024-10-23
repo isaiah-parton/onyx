@@ -122,7 +122,7 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 					self.next_state += {.Focused}
 				}
 				foreground()
-				shrink(5)
+				shrink_layout(5)
 				set_side(.Top)
 				set_width_fill()
 				for &button, b in buttons[:len(info.options)] {

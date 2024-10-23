@@ -158,30 +158,28 @@ add_image_button :: proc(using info: ^Image_Button_Info) -> bool {
 
 	if self.visible {
 		if image, ok := image.?; ok {
-			if image_data, ok := core.user_images[image].?; ok {
-				if source, ok := image_data.atlas_src.?; ok {
-					view_size := box_size(self.box)
-					image_size := box_size(source)
-					j := 0 if image_size.x < image_size.y else 1
-					for i in 0 ..= 1 {
-						image_size *= min(1, view_size[j] / image_size[j])
-						j = 1 - j
-					}
-					center := box_center(self.box)
-					set_paint(add_paint({kind = .Glyph}))
-					defer set_paint(0)
-					shape := add_shape_box(
-						{center - image_size / 2, center + image_size / 2},
-						core.style.rounding,
-					)
-					h_overlap := max(0, image_size.x - view_size.x)
-					source.lo.x += h_overlap / 2
-					source.hi.x -= h_overlap / 2
-					v_overlap := max(0, image_size.y - view_size.y)
-					source.lo.y += v_overlap / 2
-					source.hi.y -= v_overlap / 2
-					render_shape_uv(shape, source, 255)
+			if source, ok := core.user_images[image].?; ok {
+				view_size := box_size(self.box)
+				image_size := box_size(source)
+				j := 0 if image_size.x < image_size.y else 1
+				for i in 0 ..= 1 {
+					image_size *= min(1, view_size[j] / image_size[j])
+					j = 1 - j
 				}
+				center := box_center(self.box)
+				set_paint(add_paint({kind = .Glyph}))
+				defer set_paint(0)
+				shape := add_shape_box(
+					{center - image_size / 2, center + image_size / 2},
+					core.style.rounding,
+				)
+				h_overlap := max(0, image_size.x - view_size.x)
+				source.lo.x += h_overlap / 2
+				source.hi.x -= h_overlap / 2
+				v_overlap := max(0, image_size.y - view_size.y)
+				source.lo.y += v_overlap / 2
+				source.hi.y -= v_overlap / 2
+				render_shape_uv(shape, source, 255)
 			}
 		} else {
 			draw_skeleton(self.box, core.style.rounding)

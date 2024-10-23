@@ -305,7 +305,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				size = tooltip_size,
 			},
 		)
-		shrink(3)
+		shrink_layout(3)
 		if label_tooltip {
 			box := cut_current_layout(.Top, [2]f32{0, 26})
 			draw_text(

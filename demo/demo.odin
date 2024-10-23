@@ -56,7 +56,6 @@ State :: struct {
 	hsva:          [4]f32,
 	hex:           strings.Builder,
 	texture:       wgpu.Texture,
-	images:        [4]onyx.Image,
 }
 
 state: State
@@ -78,17 +77,11 @@ component_showcase :: proc(state: ^State) -> bool {
 	defer end_layer()
 
 	draw_box_fill(current_layout().?.box, core.style.color.background)
-	shrink(100)
+	shrink_layout(100)
 	foreground()
 	if layout({size = 65, side = .Top}) {
-		shrink(15)
-		if menu({text = "File"}) {
-			menu_item({text = "PISS OFF!"})
-			menu_item({text = "MAKE SAMMICH"})
-			menu_item({text = "PET KITTY CAT"})
-		}
-		// box_tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Component), tab_width = 100})
-		// breadcrumb({index = (^int)(&state.component), options = {"bruh"}})
+		shrink_layout(15)
+		box_tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Component), tab_width = 100})
 		set_side(.Right)
 		if toggle_switch({state = &state.light_mode, text = "\uf1bc" if state.light_mode else "\uef72", text_side = .Left}).toggled {
 			if state.light_mode {
@@ -98,26 +91,62 @@ component_showcase :: proc(state: ^State) -> bool {
 			}
 		}
 	}
-	shrink(40)
+	shrink_layout(40)
 
 	#partial switch state.component {
 	case .Colors:
-		header({text = "Bruh Moment"})
-		si := runtime.type_info_base(type_info_of(Color_Scheme)).variant.(runtime.Type_Info_Struct)
-		for i in 0 ..< si.field_count {
-			if i > 0 {
-				add_space(10)
+
+		set_width_percent(100 / 3)
+		set_side(.Left)
+		if layout({}) {
+			shrink_layout_x(50)
+			header({text = "Color"})
+			add_space(20)
+			si := runtime.type_info_base(type_info_of(Color_Scheme)).variant.(runtime.Type_Info_Struct)
+			for i in 0 ..< si.field_count {
+				if i > 0 {
+					add_space(10)
+				}
+				push_id(int(i + 1))
+				label({text = si.names[i]})
+				color_button(
+					{
+						value = (^Color)(rawptr(uintptr(&core.style.color) + si.offsets[i])),
+						show_alpha = true,
+						input_formats = {.RGB, .HSL, .HEX},
+					},
+				)
+				pop_id()
 			}
-			push_id(int(i + 1))
-			label({text = si.names[i]})
-			color_button(
-				{
-					value = (^Color)(rawptr(uintptr(&core.style.color) + si.offsets[i])),
-					show_alpha = true,
-					input_formats = {.RGB, .HSL, .HEX},
-				},
-			)
-			pop_id()
+		}
+		if layout({}) {
+			shrink_layout_x(50)
+			header({text = "Shape"})
+			add_space(20)
+			label({text = "rounding"})
+			slider(Slider_Info(f32){value = &core.style.rounding, lo = 0, hi = 10, format = "%.1f"})
+			add_space(10)
+			label({text = "size x/y"})
+			slider(Slider_Info(f32){value = &core.style.visual_size.x, lo = 0, hi = 200, format = "%.1f"})
+			slider(Slider_Info(f32){value = &core.style.visual_size.y, lo = 0, hi = 50, format = "%.1f"})
+			add_space(10)
+			label({text = "label padding x/y"})
+			slider(Slider_Info(f32){value = &core.style.label_padding.x, lo = 0, hi = 10, format = "%.1f"})
+			slider(Slider_Info(f32){value = &core.style.label_padding.y, lo = 0, hi = 10, format = "%.1f"})
+			add_space(10)
+			label({text = "menu padding"})
+			slider(Slider_Info(f32){value = &core.style.menu_padding, lo = 0, hi = 10, format = "%.1f"})
+			add_space(10)
+			label({text = "tooltip padding"})
+			slider(Slider_Info(f32){value = &core.style.tooltip_padding, lo = 0, hi = 10, format = "%.1f"})
+			add_space(10)
+			label({text = "button text size"})
+			slider(Slider_Info(f32){value = &core.style.button_text_size, lo = 14, hi = 48, format = "%.1f"})
+		}
+		if layout({}) {
+			shrink_layout_x(50)
+			header({text = "Fonts"})
+			add_space(20)
 		}
 	case .Tables:
 		set_side(.Left)
@@ -281,7 +310,7 @@ component_showcase :: proc(state: ^State) -> bool {
 		set_side(.Left)
 		set_width_percent(50)
 		if layout({}) {
-			shrink(30)
+			shrink_layout(30)
 			set_width_fill()
 			set_height_fill()
 			graph(
@@ -312,7 +341,7 @@ component_showcase :: proc(state: ^State) -> bool {
 			)
 		}
 		if layout({}) {
-			shrink(30)
+			shrink_layout(30)
 			set_width_fill()
 			set_height_fill()
 			graph(
@@ -398,5 +427,5 @@ main :: proc() {
 		render()
 	}
 
-	onyx.uninit()
+	onyx.destroy()
 }

@@ -340,7 +340,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 		if layer(&menu_layer) {
 			draw_shadow(layout_box(), self.open_time)
 			foreground()
-			shrink(core.style.menu_padding)
+			shrink_layout(core.style.menu_padding)
 			set_width_auto()
 			set_height_auto()
 			add_calendar(&calendar_info)

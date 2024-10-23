@@ -103,7 +103,7 @@ init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_locatio
 	text_job = make_text_job(
 		{
 			text = fmt.tprintf("%6x", hex_from_color(value^)),
-			font = core.style.default_font,
+			font = core.style.monospace_font,
 			size = 20,
 			align_h = .Middle,
 			align_v = .Middle,
@@ -134,13 +134,13 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		draw_text_glyphs(
 			text_job,
 			box_center(self.box),
-			{0, 0, 0, 255} if get_color_brightness(value^) > 0.5 else 255,
+			{0, 0, 0, 255} if get_color_brightness(value^) > 0.45 else 255,
 		)
 		set_scissor_shape(0)
 		draw_rounded_box_stroke(
 			self.box,
 			core.style.rounding,
-			1,
+			2,
 			fade(core.style.color.accent, self.hover_time),
 		)
 	}
@@ -214,7 +214,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 				)
 			}
 
-			shrink(PADDING)
+			shrink_layout(PADDING)
 
 			set_height_auto()
 			set_width_auto()
@@ -235,11 +235,11 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 				if inputs[format].changed {
 					#partial switch format {
 					case .RGB:
-						if color, ok := parse_rgba(inputs[format].text); ok {
+						if color, ok := parse_rgba(inputs[format].text_info.text); ok {
 							kind.hsva.xyz = hsva_from_color(color).xyz
 						}
 					case .HEX:
-						if hex, ok := strconv.parse_u64_of_base(inputs[format].text[1:], 16); ok {
+						if hex, ok := strconv.parse_u64_of_base(inputs[format].text_info.text[1:], 16); ok {
 							kind.hsva.xyz = hsva_from_color(color_from_hex(u32(hex))).xyz
 							changed = true
 						}
@@ -308,11 +308,20 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 	i := int(info.vertical)
 	j := 1 - i
 
+	if .Pressed in self.state {
+		value^ = clamp(
+			(core.mouse_pos[i] - self.box.lo[i]) / (self.box.hi[i] - self.box.lo[i]),
+			0,
+			1,
+		)
+		changed = true
+	}
+
 	if self.visible {
 		R :: 4
 		box := self.box
-		box.lo[j] += R
-		box.hi[j] -= R
+		// box.lo[j] += R * 1.5
+		// box.hi[j] -= R * 1.5
 		draw_checkerboard_pattern(
 			box,
 			(box.hi[j] - box.lo[j]) / 2,
@@ -324,18 +333,19 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 		pos := box.lo[i] + (box.hi[i] - box.lo[i]) * time
 		if vertical {
 			draw_vertical_box_gradient(box, fade(color, 0), color)
-			draw_triangle_fill(
-				{box.lo.x - 1.5 * R, pos - 0.866025 * R},
-				{box.lo.x, pos},
-				{box.lo.x - 1.5 * R, pos + 0.866025 * R},
-				core.style.color.content,
-			)
-			draw_triangle_fill(
-				{box.hi.x + 1.5 * R, pos - 0.866025 * R},
-				{box.hi.x, pos},
-				{box.hi.x + 1.5 * R, pos + 0.866025 * R},
-				core.style.color.content,
-			)
+			draw_box_fill({{box.lo.x, pos - 1}, {box.hi.x, pos + 1}}, core.style.color.content)
+			// draw_triangle_fill(
+			// 	{box.lo.x - 1.5 * R, pos - 0.866025 * R},
+			// 	{box.lo.x, pos},
+			// 	{box.lo.x - 1.5 * R, pos + 0.866025 * R},
+			// 	core.style.color.content,
+			// )
+			// draw_triangle_fill(
+			// 	{box.hi.x + 1.5 * R, pos - 0.866025 * R},
+			// 	{box.hi.x, pos},
+			// 	{box.hi.x + 1.5 * R, pos + 0.866025 * R},
+			// 	core.style.color.content,
+			// )
 		} else {
 			draw_horizontal_box_gradient(box, fade(color, 0), color)
 			draw_triangle_fill(
@@ -355,15 +365,6 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 
 	if point_in_box(core.mouse_pos, self.box) {
 		hover_widget(self)
-	}
-
-	if .Pressed in self.state {
-		value^ = clamp(
-			(core.mouse_pos[i] - self.box.lo[i]) / (self.box.hi[i] - self.box.lo[i]),
-			0,
-			1,
-		)
-		changed = true
 	}
 
 	return true

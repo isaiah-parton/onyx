@@ -8,11 +8,6 @@ import img "core:image"
 import png "core:image/png"
 import "vendor:wgpu"
 
-Image :: struct {
-	using image: img.Image,
-	atlas_src:   Maybe(Box),
-}
-
 Texture :: struct {
 	internal:      wgpu.Texture,
 	width, height: int,
@@ -23,10 +18,7 @@ upload_image :: proc(image: img.Image) -> (index: int, ok: bool) {
 		if core.user_images[i] == nil {
 			index = i
 			ok = true
-			core.user_images[i] = Image {
-				image     = image,
-				atlas_src = add_image_to_atlas(image),
-			}
+			core.user_images[i] = add_image_to_atlas(image)
 			break
 		}
 	}
@@ -37,11 +29,12 @@ drop_image :: proc(index: int) {
 	core.user_images[index] = nil
 }
 
-destroy_image :: proc(image: ^Image) {
-	img.destroy(image)
-}
-
-draw_texture :: proc(texture: wgpu.Texture, box: Box, tint: Color, sampler_descriptor: Maybe(wgpu.SamplerDescriptor) = nil) {
+draw_texture :: proc(
+	texture: wgpu.Texture,
+	box: Box,
+	tint: Color,
+	sampler_descriptor: Maybe(wgpu.SamplerDescriptor) = nil,
+) {
 	set_texture(texture)
 	if sampler_descriptor != nil {
 		set_sampler_descriptor(sampler_descriptor.?)
@@ -59,7 +52,12 @@ draw_texture :: proc(texture: wgpu.Texture, box: Box, tint: Color, sampler_descr
 	add_indices(a, b, c, a, c, d)
 }
 
-draw_texture_portion :: proc(texture: wgpu.Texture, source, target: Box, tint: Color, sampler_descriptor: Maybe(wgpu.SamplerDescriptor) = nil) {
+draw_texture_portion :: proc(
+	texture: wgpu.Texture,
+	source, target: Box,
+	tint: Color,
+	sampler_descriptor: Maybe(wgpu.SamplerDescriptor) = nil,
+) {
 	set_texture(texture)
 	if sampler_descriptor != nil {
 		set_sampler_descriptor(sampler_descriptor.?)

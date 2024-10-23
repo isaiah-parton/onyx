@@ -5,6 +5,22 @@ import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 
+@(deferred_out=__menu_bar)
+menu_bar :: proc() -> bool {
+	begin_layout({}) or_return
+	box := layout_box()
+	draw_rounded_box_fill(box, core.style.rounding, core.style.color.background)
+	draw_rounded_box_stroke(box, core.style.rounding, 1, core.style.color.substance)
+	shrink_layout(core.style.menu_padding)
+	return true
+}
+@(private)
+__menu_bar :: proc(ok: bool) {
+	if ok {
+		end_layout()
+	}
+}
+
 Menu_Info :: struct {
 	using _:    Widget_Info,
 	text:       string,
@@ -23,7 +39,7 @@ init_menu :: proc(using info: ^Menu_Info, loc := #caller_location) -> bool {
 		align_h = .Middle,
 	}
 	text_job, _ = make_text_job(text_info)
-	desired_size = text_job.size + {40, 10}
+	desired_size = text_job.size + core.style.label_padding
 	return true
 }
 
@@ -50,6 +66,9 @@ begin_menu :: proc(info: ^Menu_Info) -> bool {
 
 	if .Open in info.self.state {
 		menu_layer := get_popup_layer_info(info.self, info.self.menu.size)
+		if .Open not_in info.self.last_state {
+			menu_layer.options += {.Invisible}
+		}
 		if !begin_layer(&menu_layer) {
 			info.self.state -= {.Open}
 		}
@@ -58,7 +77,7 @@ begin_menu :: proc(info: ^Menu_Info) -> bool {
 		push_id(info.self.id)
 		draw_shadow(layout_box(), info.self.open_time)
 		background()
-		shrink(core.style.menu_padding)
+		shrink_layout(core.style.menu_padding)
 		set_width_fill()
 		set_height_auto()
 	}
@@ -77,6 +96,9 @@ end_menu :: proc() -> bool {
 		if (.Hovered not_in layer.state && .Focused not_in self.state) || .Clicked in layer.state {
 			self.state -= {.Open}
 		}
+
+		draw_rounded_box_stroke(layer.box, core.style.rounding, 1, core.style.color.substance)
+
 		end_layer()
 	}
 	end_widget()

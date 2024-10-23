@@ -338,7 +338,6 @@ fn sd_shape(shape: Shape, p: vec2<f32>) -> f32 {
         }
       }
       d = d * s + 1;
-      break;
     }
     // Arbitrary Polygon
     case 8u {
@@ -428,11 +427,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 		// Glyph
 		case 1u: {
 			out = textureSample(atlas_tex, atlas_samp, in.uv) * in.col;
-			// out.a *= 1.0 + 0.125 * out.r;
+			out.a *= 1.0 + 0.25 * out.r;
 		}
 		// User_Image
 		case 2u: {
-			out = textureSample(user_tex, user_samp, in.uv) * in.col;
+			out = textureSampleBias(user_tex, user_samp, in.uv, -0.5) * in.col;
 		}
 		// Skeleton
 		case 3u: {

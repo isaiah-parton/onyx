@@ -179,11 +179,10 @@ end_container :: proc(using info: ^Container_Info) {
 		   (key_down(.Left_Control) || key_down(.Right_Control)) {
 			// Determine old and new zoom levels
 			old_zoom := self.cont.target_zoom
-			new_zoom := clamp(old_zoom + core.mouse_scroll.y * 0.1, 1, max_zoom)
+			new_zoom := clamp((math.round(old_zoom / 0.1) * 0.1) + core.mouse_scroll.y * 0.1, 1, max_zoom)
 			// Change needed?
 			if new_zoom != old_zoom {
 				zoom_container_anchored(info, new_zoom, core.mouse_pos)
-				was_zoomed = true
 			}
 		} else {
 			delta_scroll := core.mouse_scroll
@@ -194,10 +193,6 @@ end_container :: proc(using info: ^Container_Info) {
 				delta_scroll.xy = delta_scroll.yx
 			}
 			self.cont.target_scroll -= delta_scroll * 100
-			//
-			if delta_scroll != {} {
-				was_scrolled = true
-			}
 		}
 	}
 	// Update zoom
@@ -206,6 +201,7 @@ end_container :: proc(using info: ^Container_Info) {
 		delta_zoom := self.cont.target_zoom - self.cont.zoom
 		// Hint next frame to be drawn if delta sufficient
 		if abs(delta_zoom) > 0.001 {
+			was_zoomed = true
 			core.draw_next_frame = true
 		}
 		self.cont.zoom += delta_zoom * 15 * core.delta_time
@@ -225,6 +221,7 @@ end_container :: proc(using info: ^Container_Info) {
 	// Hint next frame to be drawn if delta sufficient
 	if abs(delta_scroll.x) > 0.01 || abs(delta_scroll.y) > 0.01 {
 		core.draw_next_frame = true
+		was_scrolled = true
 	}
 
 	// Enable/disable scrollbars

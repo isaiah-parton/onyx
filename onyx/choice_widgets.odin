@@ -190,7 +190,7 @@ enum_selector :: proc(value: ^$T, loc := #caller_location) where intrinsics.type
 	}
 	if !init_selector(&info, loc) do return
 	if begin_selector(&info) {
-		shrink(3)
+		shrink_layout(3)
 		set_side(.Top)
 		set_width_fill()
 		for member, m in T {

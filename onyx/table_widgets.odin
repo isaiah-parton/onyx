@@ -154,7 +154,7 @@ begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 
 	first = 0
 	last = row_count - 1
-	// first = int(container.scroll.y / core.style.table_row_height)
+	// first = int(cont_info.self.cont.scroll.y / core.style.table_row_height)
 	// last = min(
 	// 	first + int(math.ceil(box_height(self.box) / core.style.table_row_height)),
 	// 	info.row_count - 1,

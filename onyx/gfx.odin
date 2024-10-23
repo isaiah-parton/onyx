@@ -399,7 +399,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 	}
 }
 
-uninit_graphics :: proc(gfx: ^Graphics) {
+destroy_graphics :: proc(gfx: ^Graphics) {
 	wgpu_buffer_destroy(&gfx.shapes)
 	wgpu_buffer_destroy(&gfx.paints)
 	wgpu_buffer_destroy(&gfx.cvs)
@@ -526,7 +526,7 @@ draw :: proc(gfx: ^Graphics, draw_calls: []Draw_Call) {
 	wgpu.QueueSubmit(gfx.queue, {})
 
 	// Create transient texture view
-	atlas_texture_view := wgpu.TextureCreateView(core.font_atlas.texture.internal)
+	atlas_texture_view := wgpu.TextureCreateView(core.atlas.texture.internal)
 	defer wgpu.TextureViewRelease(atlas_texture_view)
 
 	// Render them

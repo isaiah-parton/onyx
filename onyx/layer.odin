@@ -25,6 +25,7 @@ Layer_Option :: enum {
 	Attached,
 	No_Sorting,
 	No_Scissor,
+	Invisible,
 }
 
 Layer_Options :: bit_set[Layer_Option]
@@ -45,6 +46,7 @@ Layer :: struct {
 	// Render order
 	index:             int,
 	frames:            int,
+	draw_call_index:   int,
 }
 
 Layer_Info :: struct {
@@ -213,6 +215,8 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 	if .No_Scissor not_in info.self.options {
 		push_scissor(info.self.box)
 	}
+
+	info.self.draw_call_index = len(core.draw_calls)
 	append_draw_call(info.self.index)
 
 	// Transform matrix
@@ -225,11 +229,7 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 
 	// Push layout
 	push_layout(
-		Layout {
-			box = {linalg.floor(info.self.box.lo), linalg.floor(info.self.box.hi)},
-			bounds = info.self.box,
-			next_cut_side = .Top,
-		},
+		Layout{box = info.self.box, bounds = info.self.box, next_cut_side = .Top},
 	) or_return
 
 	return true
@@ -241,6 +241,10 @@ end_layer :: proc() {
 	if layer, ok := current_layer().?; ok {
 		if .No_Scissor not_in layer.options {
 			pop_scissor()
+		}
+		// Remove draw calls if invisible
+		if .Invisible in layer.options {
+			remove_range(&core.draw_calls, layer.draw_call_index, len(core.draw_calls))
 		}
 	}
 	pop_stack(&core.layer_stack)

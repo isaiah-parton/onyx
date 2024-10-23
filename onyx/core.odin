@@ -72,17 +72,17 @@ Core :: struct {
 	debug:                 Debug_State,
 	view:                  [2]f32,
 	desired_fps:           int,
+	// Disable frame rate limit
 	disable_frame_skip:    bool,
+	// Timings
+	delta_time:            f32,
+	last_frame_time:       time.Time,
+	start_time:            time.Time,
 	last_second:           time.Time,
 	frames_so_far:         int,
 	frames_this_second:    int,
-
 	// Hashing
 	id_stack:              Stack(Id, MAX_IDS),
-
-	// Popups
-	// popup_map: map[Id]^Popup,
-
 	// Widgets
 	widgets:               [MAX_WIDGETS]Maybe(Widget),
 	widget_map:            map[Id]^Widget,
@@ -95,21 +95,17 @@ Core :: struct {
 	dragged_widget:        Id,
 	disable_widgets:       bool,
 	drag_offset:           [2]f32,
-
 	// Form
 	form:                  Form,
 	form_active:           bool,
-
 	// Layout
 	layout_stack:          Stack(Layout, MAX_LAYOUTS),
 	active_container:      Id,
 	next_active_container: Id,
-
 	// Panels
 	panels:                [MAX_PANELS]Maybe(Panel),
 	panel_map:             map[Id]^Panel,
 	panel_stack:           Stack(^Panel, MAX_PANELS),
-
 	// Layers
 	layers:                [MAX_LAYERS]Layer,
 	layer_map:             map[Id]^Layer,
@@ -119,7 +115,6 @@ Core :: struct {
 	last_hovered_layer:    Id,
 	hovered_layer:         Id,
 	next_hovered_layer:    Id,
-
 	// IO
 	cursor_type:           Mouse_Cursor,
 	mouse_button:          Mouse_Button,
@@ -134,38 +129,34 @@ Core :: struct {
 	runes:                 [dynamic]rune,
 	visible:               bool,
 	focused:               bool,
-	window_moving:         bool,
-	window_move_offset:    [2]f32,
-
 	// Style
 	style:                 Style,
-
-	// Timings
-	delta_time:            f32,
-	last_frame_time:       time.Time,
-	start_time:            time.Time,
-	render_duration:       time.Duration,
-
 	// Text
 	fonts:                 [MAX_FONTS]Maybe(Font),
+	// Texture atlas
+	atlas:                 Atlas,
+	// Source boxes of user images on the texture atlas
+	user_images:           [100]Maybe(Box),
+	// Scratch text editor
+	text_editor:           tedit.Editor,
+	// Global arrays referenced by text jobs
+	// their contents are transient
 	glyphs:                [dynamic]Text_Job_Glyph,
 	lines:                 [dynamic]Text_Job_Line,
-	font_atlas:            Atlas,
-	current_font:          int,
-	text_editor:           tedit.Editor,
-	user_images:           [100]Maybe(Image),
-
 	// Drawing
 	draw_this_frame:       bool,
 	draw_next_frame:       bool,
 	frames:                int,
 	drawn_frames:          int,
 	draw_state:            Draw_State,
+	// Transform matrices
 	matrix_stack:          Stack(Matrix, MAX_MATRICES),
 	current_matrix:        ^Matrix,
 	last_matrix:           Matrix,
 	matrix_index:          u32,
+	// Currently bound user texture
 	current_texture:       wgpu.Texture,
+	// Scissors
 	scissor_stack:         Stack(Scissor, 100),
 	path_stack:            Stack(Path, 10),
 	draw_calls:            [dynamic]Draw_Call,
@@ -191,22 +182,17 @@ view_height :: proc() -> f32 {
 }
 
 load_default_fonts :: proc() -> bool {
-
 	DEFAULT_FONT :: "Geist-Medium.ttf"
-	MONOSPACE_FONT :: "iAWriterMonoS-Regular.ttf"
+	MONOSPACE_FONT :: "Recursive_Monospace-Medium.ttf"
 	HEADER_FONT :: "Lora-Medium.ttf"
 	ICON_FONT :: "remixicon.ttf"
 
-	DEFAULT_FONT_PATH :: "fonts/" + DEFAULT_FONT
-	MONOSPACE_FONT_PATH :: "fonts/" + MONOSPACE_FONT
-	HEADER_FONT_PATH :: "fonts/" + HEADER_FONT
-	ICON_FONT_PATH :: "fonts/" + ICON_FONT
-
-	DEFAULT_FONT_DATA: Maybe([]u8) = #load(DEFAULT_FONT_PATH, []u8) when EMBED_DEFAULT_FONTS else nil
+	DEFAULT_FONT_DATA: Maybe([]u8) =
+		#load("fonts/" + DEFAULT_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
 	MONOSPACE_FONT_DATA: Maybe([]u8) =
-		#load(MONOSPACE_FONT_PATH, []u8) when EMBED_DEFAULT_FONTS else nil
-	HEADER_FONT_DATA: Maybe([]u8) = #load(HEADER_FONT_PATH, []u8) when EMBED_DEFAULT_FONTS else nil
-	ICON_FONT_DATA: Maybe([]u8) = #load(ICON_FONT_PATH, []u8) when EMBED_DEFAULT_FONTS else nil
+		#load("fonts/" + MONOSPACE_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	HEADER_FONT_DATA: Maybe([]u8) = #load("fonts/" + HEADER_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	ICON_FONT_DATA: Maybe([]u8) = #load("fonts/" + ICON_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
 
 	core.style.default_font = load_font_from_memory(
 		DEFAULT_FONT_DATA.? or_else os.read_entire_file(
@@ -287,6 +273,8 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	)
 	glfw.SetScrollCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
 		core.mouse_scroll = {f32(x), f32(y)}
+		core.draw_this_frame = true
+		core.draw_next_frame = true
 	})
 	glfw.SetWindowSizeCallback(core.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
 		context = runtime.default_context()
@@ -294,12 +282,18 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		core.draw_next_frame = true
 		core.view = {f32(width), f32(height)}
 		resize_graphics(&core.gfx, int(width), int(height))
+		core.draw_this_frame = true
+		core.draw_next_frame = true
 	})
 	glfw.SetCharCallback(core.window, proc "c" (_: glfw.WindowHandle, char: rune) {
 		context = runtime.default_context()
 		append(&core.runes, char)
+		core.draw_this_frame = true
+		core.draw_next_frame = true
 	})
 	glfw.SetKeyCallback(core.window, proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
+		core.draw_this_frame = true
+		core.draw_next_frame = true
 		if key < 0 {
 			return
 		}
@@ -315,11 +309,14 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	})
 	glfw.SetCursorPosCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
 		core.mouse_pos = {f32(x), f32(y)}
+		core.draw_this_frame = true
 	})
 	glfw.SetMouseButtonCallback(
 		core.window,
 		proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
 			core.mouse_button = Mouse_Button(button)
+			core.draw_this_frame = true
+			core.draw_next_frame = true
 			switch action {
 			case glfw.PRESS:
 				core.mouse_bits += {Mouse_Button(button)}
@@ -335,7 +332,7 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 
 	// Init font atlas
 	atlas_size: int = min(cast(int)core.gfx.device_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
-	init_atlas(&core.font_atlas, &core.gfx, atlas_size, atlas_size)
+	init_atlas(&core.atlas, &core.gfx, atlas_size, atlas_size)
 
 	core.ready = true
 
@@ -356,7 +353,7 @@ new_frame :: proc() {
 		)
 	}
 
-	profiler_begin_scope(.New_Frame)
+	profiler_scope(.New_Frame)
 
 	// Update timings
 	now := time.now()
@@ -398,23 +395,14 @@ new_frame :: proc() {
 	// Clear temp allocator
 	free_all(context.temp_allocator)
 
+	// Decide if this frame will be drawn
+	if core.draw_next_frame {
+		core.draw_next_frame = false
+		core.draw_this_frame = true
+	}
+
 	// Handle window events
 	glfw.PollEvents()
-
-	when ODIN_OS == .Windows {
-		if core.window_moving {
-			core.window_moving = false
-			point: windows.POINT
-			if windows.GetCursorPos(&point) {
-				glfw.SetWindowPos(
-					core.window,
-					point.x + i32(core.window_move_offset.x),
-					point.y + i32(core.window_move_offset.y),
-				)
-			}
-			core.mouse_pos = core.last_mouse_pos
-		}
-	}
 
 	// Set and reset cursor
 	if core.cursor_type == .None {
@@ -485,35 +473,24 @@ new_frame :: proc() {
 		} else {
 			layer.dead = true
 		}
+
 	}
 
 	// Free unused widgets
 	for id, widget in core.widget_map {
 		if widget.dead {
-			if widget.on_death != nil {
-				widget.on_death(widget)
+			if .Persistent not_in widget.flags {
+				// Cleanup
+				destroy_widget(widget)
+				// Removal
+				delete_key(&core.widget_map, id)
+				(^Maybe(Widget))(widget)^ = nil
+				// Redraw
+				core.draw_this_frame = true
 			}
-			delete_key(&core.widget_map, id)
-			(^Maybe(Widget))(widget)^ = nil
-			core.draw_this_frame = true
 		} else {
 			widget.dead = true
 		}
-	}
-
-	// Decide if this frame will be drawn
-	if core.draw_next_frame {
-		core.draw_next_frame = false
-		core.draw_this_frame = true
-	}
-
-	// Decide if the next frame will be drawn
-	if (core.mouse_pos != core.last_mouse_pos ||
-		   core.mouse_bits != core.last_mouse_bits ||
-		   core.keys != core.last_keys ||
-		   len(core.runes) > 0) {
-		core.draw_this_frame = true
-		core.draw_next_frame = true
 	}
 
 	// Process widgets
@@ -529,10 +506,16 @@ new_frame :: proc() {
 
 	// Default shape lives at index 0
 	append(&core.gfx.shapes.data, Shape{kind = .Normal})
+
+	// User code profiler scope
+	profiler_begin_scope(.Construct)
 }
 
 // Render queued draw calls and reset draw state
 render :: proc() {
+	profiler_end_scope(.Construct)
+	profiler_scope(.Render)
+
 	// Render debug info rq
 	if core.debug.enabled {
 		if key_pressed(.F6) {
@@ -542,31 +525,26 @@ render :: proc() {
 	}
 
 	// Update the atlas if needed
-	if core.font_atlas.modified {
-		profiler_begin_scope(.Render_Prepare)
+	if core.atlas.modified {
 		t := time.now()
-		update_atlas(&core.font_atlas, &core.gfx)
-		core.font_atlas.modified = false
+		update_atlas(&core.atlas, &core.gfx)
+		core.atlas.modified = false
 	}
 
 	if core.draw_this_frame && core.visible {
-		profiler_begin_scope(.Render_Draw)
 		draw(&core.gfx, core.draw_calls[:])
-
 		core.drawn_frames += 1
 		core.draw_this_frame = false
 	}
 }
 
-uninit :: proc() {
+destroy :: proc() {
 	if !core.ready {
 		return
 	}
 
 	for _, widget in core.widget_map {
-		if widget.on_death != nil {
-			widget.on_death(widget)
-		}
+		destroy_widget(widget)
 	}
 
 	for _, &layer in core.layer_map {
@@ -585,8 +563,8 @@ uninit :: proc() {
 	delete(core.glyphs)
 	delete(core.lines)
 	delete(core.runes)
-	destroy_atlas(&core.font_atlas)
-	uninit_graphics(&core.gfx)
+	destroy_atlas(&core.atlas)
+	destroy_graphics(&core.gfx)
 }
 
 __set_clipboard_string :: proc(_: rawptr, str: string) -> bool {

@@ -8,21 +8,66 @@ import "core:math/ease"
 import "core:math/linalg"
 import "core:mem"
 import "core:time"
+import "core:strings"
+import "tedit"
 
+// Delay for compound clicking
 MAX_CLICK_DELAY :: time.Millisecond * 450
 
+Widget_Flag :: enum {
+	Is_Input,
+	Persistent,
+}
+
+Widget_Flags :: bit_set[Widget_Flag;u8]
+
+// Widget variants
+// 	I'm using a union for safety, idk if it's really necessary
+//
+// **TODO: Remove this**
+Widget_Kind :: union {
+	Menu_State,
+	Graph_Widget_Kind,
+	Tabs_Widget_Kind,
+	Boolean_Widget_Kind,
+	Date_Picker_Widget_Kind,
+	Table_Widget_Kind,
+	Color_Conversion_Widget_Kind,
+}
+
+// Interaction state
+Widget_Status :: enum {
+	// Transient
+	Hovered,
+	Focused,
+	Pressed,
+	Changed,
+	Clicked,
+	// Persistent
+	Open,
+	Active,
+}
+
+Widget_State :: bit_set[Widget_Status;u8]
+
+WIDGET_STATE_ALL :: Widget_State{.Hovered, .Focused, .Pressed, .Changed, .Clicked, .Open, .Active}
+
 Widget :: struct {
-	// Essential
+	// Unique hashed id
 	id:             Id,
+	// This should be the total visually occupied space
 	box:            Box,
+	// Home layer
 	layer:          ^Layer,
-	// If the widget would be visible and should be displayed
+	// If the widget is visible and should be displayed
 	visible:        bool,
 	// This only disables interaction
 	disabled:       bool,
 	// When this is true, the widget will be destroyed next time
 	// `new_frame()` is called.
 	dead:           bool,
+	// Internally handled bit flags
+	flags: 	Widget_Flags,
 	// Interaction state
 	last_state:     Widget_State,
 	next_state:     Widget_State,
@@ -37,11 +82,6 @@ Widget :: struct {
 	click_button:   Mouse_Button,
 	// Desired size stored to be passed to the layout
 	desired_size:   [2]f32,
-	// Generic animations
-	focus_time:     f32,
-	hover_time:     f32,
-	open_time:      f32,
-	disable_time:   f32,
 	// Widget chaining for forms
 	// these values are transient
 	prev:           ^Widget,
@@ -50,47 +90,27 @@ Widget :: struct {
 	// This is to avoid calling the same widget more than once per frame
 	// Also protects the `variant` field from being misused.
 	frames:         int,
-	// Any cleanup that needs to be done
-	on_death:       proc(_: ^Widget),
 	// TODO: Remove this
 	variant:        Widget_Kind,
-	using __state:  struct #raw_union {
+	// Generic state used by most widgets
+	focus_time:     f32,
+	hover_time:     f32,
+	open_time:      f32,
+	disable_time:   f32,
+	// Unique state used by different widget types
+	using unique_state:  struct #raw_union {
 		cont:    Container,
 		menu:    Menu_State,
 		graph:   Graph_Widget_Kind,
 		tabs:    Tabs_Widget_Kind,
-		input:   Input_Widget_Kind,
+		input:   Input_State,
 		boolean: Boolean_Widget_Kind,
 		date:    Date_Picker_Widget_Kind,
 		table:   Table_Widget_Kind,
 		slider:  Slider_State,
 	},
 }
-// Widget variants
-// 	I'm using a union for safety, idk if it's really necessary
-Widget_Kind :: union {
-	Menu_State,
-	Graph_Widget_Kind,
-	Tabs_Widget_Kind,
-	Input_Widget_Kind,
-	Boolean_Widget_Kind,
-	Date_Picker_Widget_Kind,
-	Table_Widget_Kind,
-	Color_Conversion_Widget_Kind,
-}
-// Interaction state
-Widget_Status :: enum {
-	Hovered,
-	Focused,
-	Pressed,
-	Changed,
-	Clicked,
-	// Persistent
-	Open,
-	Active,
-}
-Widget_State :: bit_set[Widget_Status;u8]
-WIDGET_STATE_ALL :: Widget_State{.Hovered, .Focused, .Pressed, .Changed, .Clicked, .Open, .Active}
+
 // A generic descriptor for all widgets
 Widget_Info :: struct {
 	self:           ^Widget,
@@ -155,6 +175,10 @@ process_widgets :: proc() {
 
 	// Reset next hover id so if nothing is hovered nothing will be hovered
 	core.next_hovered_widget = 0
+
+	if (core.mouse_bits - core.last_mouse_bits) > {} {
+		core.focused_widget = core.hovered_widget
+	}
 }
 
 enable_widgets :: proc(enabled: bool = true) {
@@ -187,6 +211,13 @@ create_widget :: proc(id: Id) -> (widget: ^Widget, ok: bool) {
 	return
 }
 
+destroy_widget :: proc(self: ^Widget) {
+	if .Is_Input in self.flags {
+		tedit.destroy_editor(&self.input.editor)
+		strings.builder_destroy(&self.input.builder)
+	}
+}
+
 get_widget :: proc(id: Id) -> (widget: ^Widget, ok: bool) {
 	widget, ok = core.widget_map[id]
 	if !ok {
@@ -199,16 +230,12 @@ get_widget :: proc(id: Id) -> (widget: ^Widget, ok: bool) {
 // This proc is way too long!
 begin_widget :: proc(info: ^Widget_Info) -> bool {
 	assert(info != nil)
-
 	if info.self == nil {
 		info.self = get_widget(info.id) or_return
 	}
-
 	widget := info.self
-
 	// Place widget
 	widget.box = info.box.? or_else next_widget_box(info)
-
 	if widget.frames >= core.frames {
 		draw_box_fill(
 			widget.box,
@@ -228,34 +255,25 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 		return false
 	}
 	widget.frames = core.frames
-
 	// Push to the stack
 	push_stack(&core.widget_stack, widget) or_return
-
 	// Widget must have a valid layer
 	widget.layer = current_layer().? or_return
-
 	// TODO: Make this better
 	widget.in_state_mask = info.in_state_mask.? or_else {}
 	widget.out_state_mask = info.out_state_mask.? or_else WIDGET_STATE_ALL
-
 	// Keep alive
 	widget.dead = false
-
 	// Set visible flag
 	widget.visible = core.visible && get_clip(current_scissor().?.box, widget.box) != .Full
-
 	// Reset state
 	widget.last_state = widget.state
 	widget.state -= {.Clicked, .Focused, .Changed}
-
 	// Disabled?
 	widget.disabled = core.disable_widgets || info.disabled
 	widget.disable_time = animate(widget.disable_time, 0.25, widget.disabled)
-
 	// Compute next frame's layout
 	layout := current_layout().?
-
 	// If the user set an explicit size with either `set_width()` or `set_height()` the widget's desired size should reflect that
 	// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
 	if layout.next_size.x == 0 || layout.next_size.x != box_width(layout.box) {
@@ -264,12 +282,10 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	if layout.next_size.y == 0 || layout.next_size.y != box_height(layout.box) {
 		widget.desired_size.y = max(info.desired_size.y, layout.next_size.y)
 	}
-
 	// Mouse hover
 	if core.hovered_widget == widget.id {
 		// Add hovered state
 		widget.state += {.Hovered}
-
 		// Clicking
 		pressed_buttons := core.mouse_bits - core.last_mouse_bits
 		if pressed_buttons != {} {
@@ -290,7 +306,6 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 			// Set the globally dragged widget
 			if info.sticky do core.dragged_widget = widget.id
 		}
-
 		// TODO: Lose click if mouse moved too much (allow for dragging containers by their contents)
 		// if !info.sticky && linalg.length(core.click_mouse_pos - core.mouse_pos) > 8 {
 		// 	widget.state -= {.Pressed}
@@ -300,7 +315,6 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 		widget.state -= {.Pressed, .Hovered}
 		widget.click_count = 0
 	}
-
 	// Mouse press
 	if widget.state >= {.Pressed} {
 		// Check for released buttons
@@ -319,12 +333,10 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 			widget.click_count = 0
 		}
 	}
-
 	// Focus state
 	if core.focused_widget == widget.id {
 		widget.state += {.Focused}
 	}
-
 	// Update form
 	if core.form_active {
 		if core.form.first == nil {
@@ -336,11 +348,9 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 		}
 		core.form.last = widget
 	}
-
 	// Reset next state
 	widget.state += widget.next_state
 	widget.next_state = {}
-
 	return true
 }
 // Ends the current widget
