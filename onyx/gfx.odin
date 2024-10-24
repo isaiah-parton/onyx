@@ -357,6 +357,7 @@ init_graphics :: proc(gfx: ^Graphics, window: glfw.WindowHandle) {
 			{format = .Float32x2, offset = u64(offset_of(Vertex, uv)), shaderLocation = 1},
 			{format = .Unorm8x4, offset = u64(offset_of(Vertex, col)), shaderLocation = 2},
 			{format = .Uint32, offset = u64(offset_of(Vertex, shape)), shaderLocation = 3},
+			{format = .Uint32, offset = u64(offset_of(Vertex, paint)), shaderLocation = 4},
 		}
 		// Create the pipeline
 		gfx.pipeline = wgpu.DeviceCreateRenderPipeline(

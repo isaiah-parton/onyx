@@ -167,7 +167,7 @@ add_image_button :: proc(using info: ^Image_Button_Info) -> bool {
 					j = 1 - j
 				}
 				center := box_center(self.box)
-				set_paint(add_paint({kind = .Glyph}))
+				set_paint(add_paint({kind = .Atlas_Sample}))
 				defer set_paint(0)
 				shape := add_shape_box(
 					{center - image_size / 2, center + image_size / 2},

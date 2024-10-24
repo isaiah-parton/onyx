@@ -9,18 +9,18 @@ var<uniform> uniforms: Uniforms;
 
 struct Shape {
 	kind: u32,
+	next: u32,
 	cv0: vec2<f32>,
 	cv1: vec2<f32>,
 	cv2: vec2<f32>,
 	corners: vec4<f32>,
 	radius: f32,
 	width: f32,
-	paint: u32,
-	scissor: u32,
 	start: u32,
 	count: u32,
 	stroke: u32,
 	xform: u32,
+	mode: u32,
 };
 
 struct Shapes {
@@ -68,6 +68,7 @@ struct VertexInput {
 	@location(1) uv: vec2<f32>,
 	@location(2) col: vec4<f32>,
 	@location(3) shape: u32,
+	@location(4) paint: u32,
 };
 
 struct VertexOutput {
@@ -75,7 +76,8 @@ struct VertexOutput {
   @location(0) uv: vec2<f32>,
   @location(1) col: vec4<f32>,
 	@location(2) shape: u32,
-	@location(3) p: vec2<f32>,
+	@location(3) paint: u32,
+	@location(4) p: vec2<f32>,
 };
 
 @group(1)
@@ -402,6 +404,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
   out.uv = in.uv;
   out.col = in.col;
   out.shape = in.shape;
+  out.paint = in.paint;
   return out;
 }
 
@@ -411,35 +414,59 @@ fn random(coords: vec2<f32>) -> f32 {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-	let shape = shapes.shapes[in.shape];
-	let paint = paints.paints[shape.paint];
-
 	var out: vec4<f32>;
-	var alpha: f32 = 1.0;
-
 	var d = 0.0;
 
+	var shape = shapes.shapes[in.shape];
 	if (shape.kind > 0u) {
 		d = sd_shape(shape, in.p);
 	}
-
-	if (shape.scissor > 0u) {
-		d = max(d, sd_shape(shapes.shapes[shape.scissor], in.p));
+	while (shape.next != 0u) {
+		shape = shapes.shapes[shape.next];
+		if (shape.kind > 0u) {
+			switch (shape.mode) {
+				// Union
+				case 0u: {
+					d = min(d, sd_shape(shape, in.p));
+				}
+				// Subtraction
+				case 1u: {
+					d = max(-d, sd_shape(shape, in.p));
+				}
+				// Intersection
+				case 2u: {
+					d = max(d, sd_shape(shape, in.p));
+				}
+				// Xor
+				case 3u: {
+					let d1 = sd_shape(shape, in.p);
+					d = max(min(d, d1), -max(d, d1));
+				}
+				default: {
+					d = sd_shape(shape, in.p);
+				}
+			}
+		}
 	}
+
+	let paint = paints.paints[in.paint];
 
 	// Get pixel color
 	switch (paint.kind) {
-		// Glyph
 		case 1u: {
+			out = paint.col0 * in.col;
+		}
+		// Atlas sampler
+		case 2u: {
 			out = textureSample(atlas_tex, atlas_samp, in.uv) * in.col;
 			out.a *= 1.0 + 0.15 * out.r;
 		}
-		// User_Image
-		case 2u: {
+		// User texture sampler
+		case 3u: {
 			out = textureSampleBias(user_tex, user_samp, in.uv, -0.5) * in.col;
 		}
-		// Skeleton
-		case 3u: {
+		// Simplex noise gradient
+		case 4u: {
 			var uv = in.p;
 			var f = 0.5 * noise(uv * 0.0025 + uniforms.time * 0.2);
 			uv = mat2x2<f32>(1.6, 1.2, -1.2, 1.6) * uv;
@@ -448,7 +475,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 			out = vec4<f32>(1.0, 1.0, 1.0, clamp(f, 0.0, 1.0)) * in.col;
 		}
 		// Linear Gradient
-		case 4u: {
+		case 5u: {
 			let d = paint.cv1 - paint.cv0;
 			var det = 1.0 / ((d.x * d.x) - (-d.y * d.y));
 			let xform = mat2x2<f32>(

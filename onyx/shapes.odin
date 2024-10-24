@@ -19,9 +19,9 @@ add_shape_circle :: proc(center: [2]f32, radius: f32) -> u32 {
 add_shape :: proc(shape: Shape) -> u32 {
 	index := u32(len(core.gfx.shapes.data))
 	shape := shape
-	// Assign current shape defaults
-	shape.paint = core.draw_state.paint
-	shape.scissor = core.draw_state.scissor
+	if scissor, ok := current_scissor().?; ok && scissor.shape != 0 {
+		shape.next = scissor.shape
+	}
 	// Try use the current matrix
 	if core.current_matrix != nil && core.current_matrix^ != core.last_matrix {
 		core.matrix_index = u32(len(core.gfx.xforms.data))
@@ -104,6 +104,12 @@ render_shape :: proc(shape_index: u32, color: Color) {
 	shape := core.gfx.shapes.data[shape_index]
 	// Get full bounding box
 	box := get_shape_bounding_box(shape)
+	next := shape.next
+	for next != 0 {
+		next_shape := core.gfx.shapes.data[next]
+		box = update_bounding(box, get_shape_bounding_box(next_shape))
+		next = next_shape.next
+	}
 	// Apply scissor clipping
 	// Shadows are not clipped like other shapes since they are currently only drawn below new layers
 	// This is subject to change.
@@ -116,13 +122,41 @@ render_shape :: proc(shape_index: u32, color: Color) {
 	// Discard fully clipped shapes
 	if box.lo.x >= box.hi.x || box.lo.y >= box.hi.y do return
 	// Add vertices
-	a := add_vertex(Vertex{pos = box.lo, col = color, uv = 0, shape = shape_index})
-	b := add_vertex(
-		Vertex{pos = {box.lo.x, box.hi.y}, col = color, uv = {0, 1}, shape = shape_index},
+	a := add_vertex(
+		Vertex {
+			pos = box.lo,
+			col = color,
+			uv = 0,
+			shape = shape_index,
+			paint = core.draw_state.paint,
+		},
 	)
-	c := add_vertex(Vertex{pos = box.hi, col = color, uv = 1, shape = shape_index})
+	b := add_vertex(
+		Vertex {
+			pos = {box.lo.x, box.hi.y},
+			col = color,
+			uv = {0, 1},
+			shape = shape_index,
+			paint = core.draw_state.paint,
+		},
+	)
+	c := add_vertex(
+		Vertex {
+			pos = box.hi,
+			col = color,
+			uv = 1,
+			shape = shape_index,
+			paint = core.draw_state.paint,
+		},
+	)
 	d := add_vertex(
-		Vertex{pos = {box.hi.x, box.lo.y}, col = color, uv = {1, 0}, shape = shape_index},
+		Vertex {
+			pos = {box.hi.x, box.lo.y},
+			col = color,
+			uv = {1, 0},
+			shape = shape_index,
+			paint = core.draw_state.paint,
+		},
 	)
 	add_indices(a, b, c, a, c, d)
 }
@@ -142,28 +176,52 @@ render_shape_uv :: proc(shape_index: u32, source: Box, color: Color) {
 	// Get texture size
 	size := [2]f32{f32(core.atlas.width), f32(core.atlas.height)}
 	// Add vertices
-	a := add_vertex(Vertex{pos = box.lo, col = color, uv = source.lo / size, shape = shape_index})
+	a := add_vertex(
+		Vertex {
+			pos = box.lo,
+			col = color,
+			uv = source.lo / size,
+			shape = shape_index,
+			paint = core.draw_state.paint,
+		},
+	)
 	b := add_vertex(
 		Vertex {
 			pos = [2]f32{box.lo.x, box.hi.y},
 			col = color,
 			uv = [2]f32{source.lo.x, source.hi.y} / size,
 			shape = shape_index,
+			paint = core.draw_state.paint,
 		},
 	)
-	c := add_vertex(Vertex{pos = box.hi, col = color, uv = source.hi / size, shape = shape_index})
+	c := add_vertex(
+		Vertex {
+			pos = box.hi,
+			col = color,
+			uv = source.hi / size,
+			shape = shape_index,
+			paint = core.draw_state.paint,
+		},
+	)
 	d := add_vertex(
 		Vertex {
 			pos = [2]f32{box.hi.x, box.lo.y},
 			col = color,
 			uv = [2]f32{source.hi.x, source.lo.y} / size,
 			shape = shape_index,
+			paint = core.draw_state.paint,
 		},
 	)
 	add_indices(a, b, c, a, c, d)
 }
 
-draw_joined_lines :: proc(points: [][2]f32, thickness: f32, color: Color, closed: bool = false, justify: Stroke_Justify = .Center) {
+draw_joined_lines :: proc(
+	points: [][2]f32,
+	thickness: f32,
+	color: Color,
+	closed: bool = false,
+	justify: Stroke_Justify = .Center,
+) {
 	if len(points) < 2 {
 		return
 	}
@@ -265,32 +323,30 @@ draw_glyph :: proc(source, target: Box, tint: Color) {
 		if target.lo.x >= target.hi.x || target.lo.y >= target.hi.y do return
 	}
 	size: [2]f32 = {f32(core.atlas.width), f32(core.atlas.height)}
-	set_paint(1)
 	shape_index := add_shape(Shape{kind = .Normal})
 	a := add_vertex(
-		Vertex{pos = target.lo, col = tint, uv = source.lo / size, shape = shape_index},
+		Vertex{pos = target.lo, col = tint, uv = source.lo / size, shape = shape_index, paint = 1},
 	)
 	b := add_vertex(
 		Vertex {
 			pos = [2]f32{target.lo.x, target.hi.y},
 			col = tint,
 			uv = [2]f32{source.lo.x, source.hi.y} / size,
-			shape = shape_index,
+			shape = shape_index, paint = 1,
 		},
 	)
 	c := add_vertex(
-		Vertex{pos = target.hi, col = tint, uv = source.hi / size, shape = shape_index},
+		Vertex{pos = target.hi, col = tint, uv = source.hi / size, shape = shape_index, paint = 1},
 	)
 	d := add_vertex(
 		Vertex {
 			pos = [2]f32{target.hi.x, target.lo.y},
 			col = tint,
 			uv = [2]f32{source.hi.x, source.lo.y} / size,
-			shape = shape_index,
+			shape = shape_index, paint = 1,
 		},
 	)
 	add_indices(a, b, c, a, c, d)
-	set_paint(0)
 }
 
 draw_triangle_fill :: proc(a, b, c: [2]f32, color: Color) {
@@ -348,8 +404,9 @@ draw_cubic_bezier :: proc(a, b, c, d: [2]f32, width: f32, color: Color) {
 	ab := linalg.lerp(a, b, 0.5)
 	cd := linalg.lerp(c, d, 0.5)
 	mp := linalg.lerp(ab, cd, 0.5)
-	draw_quad_bezier(a, ab, mp, width, color)
-	draw_quad_bezier(mp, cd, d, width, color)
+	shape0 := add_shape(Shape{kind = .Bezier, cv0 = a, cv1 = ab, cv2 = mp, width = width})
+	shape1 := add_shape(Shape{kind = .Bezier, cv0 = mp, cv1 = cd, cv2 = d, width = width, next = shape0})
+	render_shape(shape1, color)
 }
 
 add_polygon_shape :: proc(pts: ..[2]f32) -> u32 {

@@ -40,7 +40,7 @@ draw_texture :: proc(
 		set_sampler_descriptor(sampler_descriptor.?)
 	}
 
-	set_paint(add_paint({kind = .User_Image}))
+	set_paint(add_paint({kind = .User_Texture_Sample}))
 	defer set_paint(0)
 
 	shape := add_shape_box(box, {})
@@ -66,7 +66,7 @@ draw_texture_portion :: proc(
 	width := wgpu.TextureGetWidth(texture)
 	height := wgpu.TextureGetHeight(texture)
 
-	set_paint(add_paint({kind = .User_Image}))
+	set_paint(add_paint({kind = .User_Texture_Sample}))
 	defer set_paint(0)
 
 	size: [2]f32 = {f32(width), f32(height)}

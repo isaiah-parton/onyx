@@ -7,6 +7,7 @@ import img "core:image"
 import "core:image/png"
 import "core:math"
 import "core:math/bits"
+import "core:math/linalg"
 import "core:math/rand"
 import "core:mem"
 import "core:os"
@@ -14,10 +15,10 @@ import "core:reflect"
 import "core:slice"
 import "core:strconv"
 import "core:strings"
+import "core:sys/windows"
 import "core:time"
 import "vendor:glfw"
 import "vendor:wgpu"
-import "core:sys/windows"
 
 Option :: enum {
 	Process,
@@ -71,7 +72,10 @@ Table_Entry :: struct {
 component_showcase :: proc(state: ^State) -> bool {
 	using onyx
 
-	layer_info := Layer_Info{box = view_box(), kind = .Background}
+	layer_info := Layer_Info {
+		box  = view_box(),
+		kind = .Background,
+	}
 
 	begin_layer(&layer_info) or_return
 	defer end_layer()
@@ -81,7 +85,13 @@ component_showcase :: proc(state: ^State) -> bool {
 	foreground()
 	if layout({size = 65, side = .Top}) {
 		shrink_layout(15)
-		box_tabs({index = (^int)(&state.component), options = reflect.enum_field_names(Section), tab_width = 100})
+		box_tabs(
+			{
+				index = (^int)(&state.component),
+				options = reflect.enum_field_names(Section),
+				tab_width = 100,
+			},
+		)
 		set_side(.Right)
 		if toggle_switch({state = &state.light_mode, text = "\uf1bc" if state.light_mode else "\uef72", text_side = .Left}).toggled {
 			if state.light_mode {
@@ -95,7 +105,6 @@ component_showcase :: proc(state: ^State) -> bool {
 
 	#partial switch state.component {
 	case .Style:
-
 		set_width_percent(100 / 3)
 		set_side(.Left)
 		if layout({}) {
@@ -124,24 +133,75 @@ component_showcase :: proc(state: ^State) -> bool {
 			header({text = "Shape"})
 			add_space(20)
 			label({text = "rounding"})
-			slider(Slider_Info(f32){value = &core.style.rounding, lo = 0, hi = 10, format = "%.1f"})
+			slider(
+				Slider_Info(f32){value = &core.style.rounding, lo = 0, hi = 10, format = "%.1f"},
+			)
 			add_space(10)
 			label({text = "size x/y"})
-			slider(Slider_Info(f32){value = &core.style.visual_size.x, lo = 0, hi = 200, format = "%.1f"})
-			slider(Slider_Info(f32){value = &core.style.visual_size.y, lo = 0, hi = 50, format = "%.1f"})
+			slider(
+				Slider_Info(f32) {
+					value = &core.style.visual_size.x,
+					lo = 0,
+					hi = 200,
+					format = "%.1f",
+				},
+			)
+			slider(
+				Slider_Info(f32) {
+					value = &core.style.visual_size.y,
+					lo = 0,
+					hi = 50,
+					format = "%.1f",
+				},
+			)
 			add_space(10)
 			label({text = "label padding x/y"})
-			slider(Slider_Info(f32){value = &core.style.text_padding.x, lo = 0, hi = 10, format = "%.1f"})
-			slider(Slider_Info(f32){value = &core.style.text_padding.y, lo = 0, hi = 10, format = "%.1f"})
+			slider(
+				Slider_Info(f32) {
+					value = &core.style.text_padding.x,
+					lo = 0,
+					hi = 10,
+					format = "%.1f",
+				},
+			)
+			slider(
+				Slider_Info(f32) {
+					value = &core.style.text_padding.y,
+					lo = 0,
+					hi = 10,
+					format = "%.1f",
+				},
+			)
 			add_space(10)
 			label({text = "menu padding"})
-			slider(Slider_Info(f32){value = &core.style.menu_padding, lo = 0, hi = 10, format = "%.1f"})
+			slider(
+				Slider_Info(f32) {
+					value = &core.style.menu_padding,
+					lo = 0,
+					hi = 10,
+					format = "%.1f",
+				},
+			)
 			add_space(10)
 			label({text = "tooltip padding"})
-			slider(Slider_Info(f32){value = &core.style.tooltip_padding, lo = 0, hi = 10, format = "%.1f"})
+			slider(
+				Slider_Info(f32) {
+					value = &core.style.tooltip_padding,
+					lo = 0,
+					hi = 10,
+					format = "%.1f",
+				},
+			)
 			add_space(10)
 			label({text = "button text size"})
-			slider(Slider_Info(f32){value = &core.style.button_text_size, lo = 14, hi = 48, format = "%.1f"})
+			slider(
+				Slider_Info(f32) {
+					value = &core.style.button_text_size,
+					lo = 14,
+					hi = 48,
+					format = "%.1f",
+				},
+			)
 		}
 		if layout({}) {
 			shrink_layout_x(50)
@@ -240,15 +300,19 @@ component_showcase :: proc(state: ^State) -> bool {
 		}
 	// Small showcase of drawing capabilities
 	case .Primitives:
-		gradient_colors := [2]Color{
-			{0, 182, 255, 255},
-			{244, 0, 255, 255},
-		}
+		gradient_colors := [2]Color{{0, 182, 255, 255}, {244, 0, 255, 255}}
 		draw_box_stroke(layout_box(), 1, {255, 0, 0, 255})
 		{
 			box := cut_current_layout(.Top, [2]f32{0, 40})
 			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			set_paint(
+				add_paint_linear_gradient(
+					shape_box.lo,
+					shape_box.hi,
+					gradient_colors[0],
+					gradient_colors[1],
+				),
+			)
 			draw_rounded_box_fill(shape_box, 10, 255)
 			set_paint(0)
 		}
@@ -256,7 +320,14 @@ component_showcase :: proc(state: ^State) -> bool {
 		{
 			box := cut_current_layout(.Top, [2]f32{0, 40})
 			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			set_paint(
+				add_paint_linear_gradient(
+					shape_box.lo,
+					shape_box.hi,
+					gradient_colors[0],
+					gradient_colors[1],
+				),
+			)
 			draw_circle_fill(box_center(shape_box), 20, 255)
 			set_paint(0)
 		}
@@ -264,7 +335,14 @@ component_showcase :: proc(state: ^State) -> bool {
 		{
 			box := cut_current_layout(.Top, [2]f32{0, 40})
 			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			set_paint(
+				add_paint_linear_gradient(
+					shape_box.lo,
+					shape_box.hi,
+					gradient_colors[0],
+					gradient_colors[1],
+				),
+			)
 			draw_arc(box_center(shape_box), math.TAU * 0.25, math.TAU * 0.75, 18, 2, 255)
 			set_paint(0)
 		}
@@ -272,7 +350,14 @@ component_showcase :: proc(state: ^State) -> bool {
 		{
 			box := cut_current_layout(.Top, [2]f32{0, 40})
 			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			set_paint(
+				add_paint_linear_gradient(
+					shape_box.lo,
+					shape_box.hi,
+					gradient_colors[0],
+					gradient_colors[1],
+				),
+			)
 			draw_pie(box_center(shape_box), math.TAU * 0.1, math.TAU * 0.9, 20, 255)
 			set_paint(0)
 		}
@@ -280,7 +365,14 @@ component_showcase :: proc(state: ^State) -> bool {
 		{
 			box := cut_current_layout(.Top, [2]f32{0, 40})
 			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
+			set_paint(
+				add_paint_linear_gradient(
+					shape_box.lo,
+					shape_box.hi,
+					gradient_colors[0],
+					gradient_colors[1],
+				),
+			)
 			path_begin()
 			path_move_to(shape_box.lo)
 			path_line_to(shape_box.hi)
@@ -293,8 +385,53 @@ component_showcase :: proc(state: ^State) -> bool {
 		{
 			box := cut_current_layout(.Top, [2]f32{0, 40})
 			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(add_paint_linear_gradient(shape_box.lo, shape_box.hi, gradient_colors[0], gradient_colors[1]))
-			draw_cubic_bezier(shape_box.lo, {shape_box.hi.x, shape_box.lo.y}, {shape_box.lo.x, shape_box.hi.y}, shape_box.hi, 2, 255)
+			set_paint(
+				add_paint_linear_gradient(
+					shape_box.lo,
+					shape_box.hi,
+					gradient_colors[0],
+					gradient_colors[1],
+				),
+			)
+			draw_cubic_bezier(
+				shape_box.lo,
+				{shape_box.hi.x, shape_box.lo.y},
+				{shape_box.lo.x, shape_box.hi.y},
+				shape_box.hi,
+				2,
+				255,
+			)
+			set_paint(0)
+		}
+		add_space(10)
+		{
+			box := cut_current_layout(.Top, [2]f32{0, 40})
+			shape_box := cut_box_left(&box, box_height(box))
+			set_paint(
+				add_paint_linear_gradient(
+					shape_box.lo,
+					shape_box.hi,
+					gradient_colors[0],
+					gradient_colors[1],
+				),
+			)
+			shape0 := add_shape(
+				Shape {
+					kind = .Box,
+					cv0 = shape_box.lo,
+					cv1 = linalg.lerp(box_center(shape_box), shape_box.hi, 0.5),
+					mode = .Xor,
+				},
+			)
+			shape1 := add_shape(
+				Shape {
+					kind = .Box,
+					cv0 = linalg.lerp(shape_box.lo, box_center(shape_box), 0.5),
+					cv1 = shape_box.hi,
+					next = shape0,
+				},
+			)
+			render_shape(shape1, 255)
 			set_paint(0)
 		}
 	// Buttons of all shapes and sizes

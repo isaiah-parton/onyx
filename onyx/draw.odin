@@ -57,8 +57,9 @@ BUFFER_SIZE :: mem.Megabyte * 2
 
 Paint_Kind :: enum u32 {
 	Normal,
-	Glyph,
-	User_Image,
+	Solid_Color,
+	Atlas_Sample,
+	User_Texture_Sample,
 	Skeleton,
 	Linear_Gradient,
 	Radial_Gradient,
@@ -82,6 +83,13 @@ Shape_Kind :: enum u32 {
 	Polygon,
 }
 
+Shape_Mode :: enum u32 {
+	Union,
+	Subtraction,
+	Intersection,
+	Xor,
+}
+
 // `Paint` and `Shape` get sent to the GPU
 
 Paint :: struct #align (8) {
@@ -94,21 +102,32 @@ Paint :: struct #align (8) {
 	col1: [4]f32,
 }
 
+@(test)
+@(init)
+test_paint_struct :: proc() {
+	fmt.println("Paint struct offsets:", reflect.struct_field_offsets(Paint))
+}
+
 Shape :: struct #align (16) {
 	kind:    Shape_Kind,
-	pad0:    u32,
+	next:    u32,
 	cv0:     [2]f32,
 	cv1:     [2]f32,
 	cv2:     [2]f32,
 	corners: [4]f32,
 	radius:  f32,
 	width:   f32,
-	paint:   u32,
-	scissor: u32,
 	start:   u32,
 	count:   u32,
 	stroke:  b32,
 	xform:   u32,
+	mode:    Shape_Mode,
+}
+
+@(test)
+@(init)
+test_shape_struct :: proc() {
+	fmt.println("Shape struct offsets:", reflect.struct_field_offsets(Shape))
 }
 
 Matrix :: matrix[4, 4]f32
@@ -118,6 +137,7 @@ Vertex :: struct {
 	uv:    [2]f32,
 	col:   [4]u8,
 	shape: u32,
+	paint: u32,
 }
 
 Draw_Call :: struct {
@@ -155,7 +175,11 @@ push_scissor :: proc(box: Box, shape: u32 = 0) {
 	box := box
 	if scissor, ok := current_scissor().?; ok {
 		box = clamp_box(box, scissor.box)
+		if scissor.shape != 0 {
+			core.gfx.shapes.data[shape].next = scissor.shape
+		}
 	}
+	core.gfx.shapes.data[shape].mode = .Intersection
 	push_stack(&core.scissor_stack, Scissor{box = box, shape = shape})
 	set_scissor_shape(shape)
 }

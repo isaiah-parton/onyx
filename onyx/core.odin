@@ -501,7 +501,7 @@ new_frame :: proc() {
 	append(&core.gfx.paints.data, Paint{kind = .Normal})
 
 	// And glyph paint lives at index 1
-	append(&core.gfx.paints.data, Paint{kind = .Glyph})
+	append(&core.gfx.paints.data, Paint{kind = .Atlas_Sample})
 
 	// Default shape lives at index 0
 	append(&core.gfx.shapes.data, Shape{kind = .Normal})
