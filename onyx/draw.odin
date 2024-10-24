@@ -232,12 +232,15 @@ path_line_to :: proc(p: [2]f32) {
 	path_quad_to(linalg.lerp(core.draw_state.path_point, p, 0.5), p)
 }
 path_fill :: proc() {
-	vertex_count := u32(len(core.gfx.cvs.data)) - core.draw_state.path_start
 	render_shape(
-		add_shape(
-			Shape{kind = .Path, start = core.draw_state.path_start, count = vertex_count / 3},
-		),
+		add_shape_path_fill(),
 		255,
+	)
+}
+add_shape_path_fill :: proc() -> u32 {
+	vertex_count := u32(len(core.gfx.cvs.data)) - core.draw_state.path_start
+	return add_shape(
+		Shape{kind = .Path, start = core.draw_state.path_start, count = vertex_count / 3},
 	)
 }
 

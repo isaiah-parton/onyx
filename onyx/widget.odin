@@ -82,6 +82,9 @@ Widget :: struct {
 	click_button:       Mouse_Button,
 	// Desired size stored to be passed to the layout
 	desired_size:       [2]f32,
+	// Offset of visual position
+	offset: [2]f32,
+	click_offset: [2]f32,
 	// Widget chaining for forms
 	// these values are transient
 	prev:               ^Widget,
@@ -235,9 +238,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	}
 	widget := info.self
 	// Place widget
-	widget.box = info.box.? or_else next_widget_box(info)
-
-	widget.box = snapped_box(widget.box)
+	widget.box = snapped_box(move_box(info.box.? or_else next_widget_box(info), widget.offset))
 
 	if widget.frames >= core.frames {
 		draw_box_fill(
@@ -294,6 +295,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 		if pressed_buttons != {} {
 			if widget.click_count == 0 {
 				widget.click_button = core.mouse_button
+				widget.click_offset = core.mouse_pos - widget.box.lo
 			}
 			if widget.click_button == core.mouse_button &&
 			   time.since(widget.click_time) <= MAX_CLICK_DELAY {

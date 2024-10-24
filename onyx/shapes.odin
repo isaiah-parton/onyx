@@ -16,6 +16,39 @@ add_shape_circle :: proc(center: [2]f32, radius: f32) -> u32 {
 	return add_shape(Shape{kind = .Circle, cv0 = center, radius = radius})
 }
 
+add_shape_arc :: proc(center: [2]f32, from, to: f32, radius, width: f32) -> u32 {
+	from, to := from, to
+	if from > to do from, to = to, from
+	th0 := -(from + (to - from) * 0.5) + math.PI
+	th1 := (to - from) / 2
+	return add_shape(
+		Shape {
+			kind = .Arc,
+			cv0 = center,
+			cv1 = [2]f32{math.sin(th0), math.cos(th0)},
+			cv2 = [2]f32{math.sin(th1), math.cos(th1)},
+			radius = radius,
+			width = width,
+		},
+	)
+}
+
+add_shape_pie :: proc(center: [2]f32, from, to, radius: f32) -> u32 {
+	from, to := from, to
+	if from > to do from, to = to, from
+	th0 := -(from + (to - from) * 0.5) + math.PI
+	th1 := (to - from) / 2
+	return add_shape(
+		Shape {
+			kind = .Pie,
+			cv0 = center,
+			cv1 = [2]f32{math.sin(th0), math.cos(th0)},
+			cv2 = [2]f32{math.sin(th1), math.cos(th1)},
+			radius = radius,
+		},
+	)
+}
+
 add_shape :: proc(shape: Shape) -> u32 {
 	index := u32(len(core.gfx.shapes.data))
 	shape := shape
@@ -108,6 +141,7 @@ render_shape :: proc(shape_index: u32, color: Color) {
 	for next != 0 {
 		next_shape := core.gfx.shapes.data[next]
 		box = update_bounding(box, get_shape_bounding_box(next_shape))
+		box = expand_box(box, 20)
 		next = next_shape.next
 	}
 	// Apply scissor clipping
@@ -409,6 +443,15 @@ draw_cubic_bezier :: proc(a, b, c, d: [2]f32, width: f32, color: Color) {
 	render_shape(shape1, color)
 }
 
+add_shape_cubic_bezier :: proc(a, b, c, d: [2]f32, width: f32) -> u32 {
+	ab := linalg.lerp(a, b, 0.5)
+	cd := linalg.lerp(c, d, 0.5)
+	mp := linalg.lerp(ab, cd, 0.5)
+	shape0 := add_shape(Shape{kind = .Bezier, cv0 = a, cv1 = ab, cv2 = mp, width = width})
+	shape1 := add_shape(Shape{kind = .Bezier, cv0 = mp, cv1 = cd, cv2 = d, width = width, next = shape0})
+	return shape1
+}
+
 add_polygon_shape :: proc(pts: ..[2]f32) -> u32 {
 	shape := Shape {
 		kind  = .Polygon,
@@ -594,19 +637,18 @@ draw_spinner :: proc(center: [2]f32, radius: f32, color: Color) {
 }
 
 draw_arrow :: proc(pos: [2]f32, scale: f32, color: Color) {
-	// begin_path()
-	// point(pos + {-1, -0.5} * scale)
-	// point(pos + {0, 0.5} * scale)
-	// point(pos + {1, -0.5} * scale)
-	// stroke_path(2, color)
-	// end_path()
+	draw_joined_lines({
+		pos + {-1, -0.5} * scale,
+		pos + {0, 0.5} * scale,
+		pos + {1, -0.5} * scale,
+	}, 2, color)
 }
 
 draw_check :: proc(pos: [2]f32, scale: f32, color: Color) {
-	// begin_path()
-	// point(pos + {-1, -0.047} * scale)
-	// point(pos + {-0.333, 0.619} * scale)
-	// point(pos + {1, -0.713} * scale)
-	// stroke_path(2, color)
-	// end_path()
+	draw_joined_lines({
+		pos + {-1, -0.047} * scale,
+		pos + {-0.333, 0.619} * scale,
+		pos + {1, -0.713} * scale,
+
+	}, 2, color)
 }

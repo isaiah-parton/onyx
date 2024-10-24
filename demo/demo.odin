@@ -41,6 +41,7 @@ Section :: enum {
 State :: struct {
 	component:     Section,
 	light_mode:    bool,
+	shape_mode:    onyx.Shape_Mode,
 	checkboxes:    [Option]bool,
 	bio:           string,
 	full_name:     string,
@@ -301,139 +302,109 @@ component_showcase :: proc(state: ^State) -> bool {
 	// Small showcase of drawing capabilities
 	case .Primitives:
 		gradient_colors := [2]Color{{0, 182, 255, 255}, {244, 0, 255, 255}}
-		draw_box_stroke(layout_box(), 1, {255, 0, 0, 255})
-		{
-			box := cut_current_layout(.Top, [2]f32{0, 40})
-			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(
-				add_paint_linear_gradient(
-					shape_box.lo,
-					shape_box.hi,
-					gradient_colors[0],
-					gradient_colors[1],
-				),
-			)
-			draw_rounded_box_fill(shape_box, 10, 255)
-			set_paint(0)
+
+		if key_down(.H) {
+			draw_box_stroke(layout_box(), 1, {255, 0, 0, 255})
 		}
-		add_space(10)
-		{
-			box := cut_current_layout(.Top, [2]f32{0, 40})
-			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(
-				add_paint_linear_gradient(
-					shape_box.lo,
-					shape_box.hi,
-					gradient_colors[0],
-					gradient_colors[1],
-				),
-			)
-			draw_circle_fill(box_center(shape_box), 20, 255)
-			set_paint(0)
+
+		size := [2]f32{0, 50}
+
+		push_id(hash(#location()))
+		defer pop_id()
+
+		new_shape, shape: u32
+
+		enum_selector(&state.shape_mode)
+
+		set_side(.Left)
+		for i in 0 ..= 3 {
+			if i > 0 do add_space(20)
+			info := Widget_Info {
+				id           = hash(i + 1),
+				desired_size = 80,
+				sticky       = true,
+			}
+			if begin_widget(&info) {
+				defer end_widget()
+
+				button_behavior(info.self)
+
+				if .Pressed in info.self.state {
+					info.self.offset += core.mouse_pos - core.last_mouse_pos
+				}
+
+				if info.self.visible {
+
+					switch i {
+					case 0:
+						new_shape = add_shape_box(info.self.box, 10)
+					case 1:
+						new_shape = add_shape_circle(
+							box_center(info.self.box),
+							box_height(info.self.box) / 2,
+						)
+					case 2:
+						new_shape = add_shape_arc(
+							box_center(info.self.box),
+							math.TAU * 0.25,
+							math.TAU * 0.75,
+							box_height(info.self.box) / 2 - 2,
+							2,
+						)
+					case 3:
+						new_shape = add_shape_pie(
+							box_center(info.self.box),
+							math.TAU * 0.1,
+							math.TAU * 0.9,
+							box_height(info.self.box) / 2,
+						)
+					case 4:
+						path_begin()
+						path_move_to(info.self.box.lo)
+						path_line_to(info.self.box.hi)
+						path_quad_to(
+							{info.self.box.lo.x, info.self.box.hi.y},
+							box_center(info.self.box),
+						)
+						path_quad_to({info.self.box.hi.x, info.self.box.lo.y}, info.self.box.lo)
+						new_shape = add_shape_path_fill()
+					case 5:
+						new_shape = add_shape_cubic_bezier(
+							info.self.box.lo,
+							{info.self.box.hi.x, info.self.box.lo.y},
+							{info.self.box.lo.x, info.self.box.hi.y},
+							info.self.box.hi,
+							2,
+						)
+					}
+
+					core.gfx.shapes.data[new_shape].mode = state.shape_mode
+					// Join shapes
+					if shape != 0 && new_shape != shape {
+						next_shape := new_shape
+						shape_data := &core.gfx.shapes.data[next_shape]
+						for shape_data.next != 0 {
+							next_shape = shape_data.next
+							shape_data = &core.gfx.shapes.data[next_shape]
+						}
+						shape_data.next = shape
+					}
+					shape = new_shape
+				}
+			}
 		}
-		add_space(10)
-		{
-			box := cut_current_layout(.Top, [2]f32{0, 40})
-			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(
-				add_paint_linear_gradient(
-					shape_box.lo,
-					shape_box.hi,
-					gradient_colors[0],
-					gradient_colors[1],
-				),
-			)
-			draw_arc(box_center(shape_box), math.TAU * 0.25, math.TAU * 0.75, 18, 2, 255)
-			set_paint(0)
-		}
-		add_space(10)
-		{
-			box := cut_current_layout(.Top, [2]f32{0, 40})
-			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(
-				add_paint_linear_gradient(
-					shape_box.lo,
-					shape_box.hi,
-					gradient_colors[0],
-					gradient_colors[1],
-				),
-			)
-			draw_pie(box_center(shape_box), math.TAU * 0.1, math.TAU * 0.9, 20, 255)
-			set_paint(0)
-		}
-		add_space(10)
-		{
-			box := cut_current_layout(.Top, [2]f32{0, 40})
-			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(
-				add_paint_linear_gradient(
-					shape_box.lo,
-					shape_box.hi,
-					gradient_colors[0],
-					gradient_colors[1],
-				),
-			)
-			path_begin()
-			path_move_to(shape_box.lo)
-			path_line_to(shape_box.hi)
-			path_quad_to({shape_box.lo.x, shape_box.hi.y}, box_center(shape_box))
-			path_quad_to({shape_box.hi.x, shape_box.lo.y}, shape_box.lo)
-			path_fill()
-			set_paint(0)
-		}
-		add_space(10)
-		{
-			box := cut_current_layout(.Top, [2]f32{0, 40})
-			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(
-				add_paint_linear_gradient(
-					shape_box.lo,
-					shape_box.hi,
-					gradient_colors[0],
-					gradient_colors[1],
-				),
-			)
-			draw_cubic_bezier(
-				shape_box.lo,
-				{shape_box.hi.x, shape_box.lo.y},
-				{shape_box.lo.x, shape_box.hi.y},
-				shape_box.hi,
-				2,
-				255,
-			)
-			set_paint(0)
-		}
-		add_space(10)
-		{
-			box := cut_current_layout(.Top, [2]f32{0, 40})
-			shape_box := cut_box_left(&box, box_height(box))
-			set_paint(
-				add_paint_linear_gradient(
-					shape_box.lo,
-					shape_box.hi,
-					gradient_colors[0],
-					gradient_colors[1],
-				),
-			)
-			shape0 := add_shape(
-				Shape {
-					kind = .Box,
-					cv0 = shape_box.lo,
-					cv1 = linalg.lerp(box_center(shape_box), shape_box.hi, 0.5),
-					mode = .Xor,
+		set_paint(
+			add_paint(
+				Paint {
+					kind = .Skeleton,
+					col0 = normalize_color(gradient_colors[0]),
+					col1 = normalize_color(gradient_colors[1]),
 				},
-			)
-			shape1 := add_shape(
-				Shape {
-					kind = .Box,
-					cv0 = linalg.lerp(shape_box.lo, box_center(shape_box), 0.5),
-					cv1 = shape_box.hi,
-					next = shape0,
-				},
-			)
-			render_shape(shape1, 255)
-			set_paint(0)
-		}
+			),
+		)
+		render_shape(shape, 255)
+		set_paint(0)
+		core.draw_this_frame = true
 	// Buttons of all shapes and sizes
 	case .Button:
 		set_side(.Top)

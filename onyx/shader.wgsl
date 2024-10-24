@@ -101,7 +101,7 @@ fn sd_subtract(d1: f32, d2: f32) -> f32 {
 }
 
 fn sd_circle(p: vec2<f32>, r: f32) -> f32 {
-	return length(p) - r + 1;
+	return length(p) - r + 0.5;
 }
 
 fn sd_pie(p: vec2<f32>, sca: vec2<f32>, scb: vec2<f32>, r: f32) -> f32 {
@@ -427,7 +427,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 			switch (shape.mode) {
 				// Union
 				case 0u: {
-					d = min(d, sd_shape(shape, in.p));
+					let k = 20.0;
+					let dd = sd_shape(shape, in.p);
+					let h = clamp(0.5 + 0.5 * (dd - d) / k, 0.0, 1.0);
+					d = mix(dd, d, h) - k * h * (1.0 - h);
 				}
 				// Subtraction
 				case 1u: {
@@ -470,9 +473,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 			var uv = in.p;
 			var f = 0.5 * noise(uv * 0.0025 + uniforms.time * 0.2);
 			uv = mat2x2<f32>(1.6, 1.2, -1.2, 1.6) * uv;
-			f += 0.5 * noise(uv * 0.0025 - uniforms.time * 0.2);
-			// out = (paint.col0 + (paint.col1 - paint.col0) * f) * in.col;
-			out = vec4<f32>(1.0, 1.0, 1.0, clamp(f, 0.0, 1.0)) * in.col;
+			f += noise(uv * 0.005 - uniforms.time * 0.2);
+			out = mix(paint.col0, paint.col1, clamp(f, 0.0, 1.0)) * in.col;
 		}
 		// Linear Gradient
 		case 5u: {
