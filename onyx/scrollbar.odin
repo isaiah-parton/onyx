@@ -19,6 +19,7 @@ init_scrollbar :: proc(info: ^Scrollbar_Info, loc := #caller_location) -> bool {
 	info.id = hash(loc)
 	info.self = get_widget(info.id) or_return
 	info.sticky = true
+	info.sub_pixel = true
 	info.desired_size[1 - int(info.vertical)] = core.style.shape.scrollbar_thickness
 	return true
 }

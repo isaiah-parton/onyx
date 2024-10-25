@@ -1,4 +1,4 @@
-package onyx
+package vgo
 
 import "core:fmt"
 import "core:math"
@@ -44,11 +44,15 @@ Shape :: struct #align (16) {
 	mode:    Shape_Mode,
 }
 
+Box :: struct {
+	lo, hi: [2]f32,
+}
+
 // Constructors for GPU shapes
 // ---
 
-make_box :: proc(box: Box, corners: [4]f32) -> Shape {
-	return Shape{kind = .Box, corners = corners, cv0 = box.lo, cv1 = box.hi}
+make_box :: proc(top_left, bottom_right: [2]f32, corners: [4]f32) -> Shape {
+	return Shape{kind = .Box, corners = corners, cv0 = top_left, cv1 = bottom_right}
 }
 
 make_circle :: proc(center: [2]f32, radius: f32) -> Shape {
@@ -87,23 +91,23 @@ make_pie :: proc(center: [2]f32, from, to, radius: f32) -> Shape {
 
 // Link two shapes, so that one affects the other based on the provided `Shape_Mode`
 // the shape at `base` is affected by `deform`
-link_shapes :: proc(base, deform: u32, mode: Shape_Mode = .Union) -> u32 {
-	index := affected
-	shape_data := &core.gfx.shapes.data[index]
+link_shapes :: proc(base, deform: u32, mode: Shape_Mode = .Union) {
+	index := base
+	shape_data := &core.renderer.shapes.data[index]
 	for shape_data.next != 0 {
 		index = shape_data.next
-		shape_data = &core.gfx.shapes.data[index]
+		shape_data = &core.renderer.shapes.data[index]
 	}
 	// Sanity check
-	assert(index != affector)
+	assert(index != deform)
 	// Do the thing
-	shape_data.next = affector
+	shape_data.next = deform
 }
 
 // Applies the current transform matrix and scissor, then queues the shape to
 // be sent to the GPU.
 add_shape :: proc(shape: Shape) -> u32 {
-	index := u32(len(core.gfx.shapes.data))
+	index := u32(len(core.renderer.shapes.data))
 	shape := shape
 	// Apply the last scissor shape
 	if scissor, ok := current_scissor().?; ok && scissor.shape != 0 {
@@ -111,13 +115,13 @@ add_shape :: proc(shape: Shape) -> u32 {
 	}
 	// Try use the current matrix
 	if core.current_matrix != nil && core.current_matrix^ != core.last_matrix {
-		core.matrix_index = u32(len(core.gfx.xforms.data))
-		append(&core.gfx.xforms.data, core.current_matrix^)
+		core.matrix_index = u32(len(core.renderer.xforms.data))
+		append(&core.renderer.xforms.data, core.current_matrix^)
 		core.last_matrix = core.current_matrix^
 	}
 	shape.xform = core.matrix_index
 	// Append the shape
-	append(&core.gfx.shapes.data, shape)
+	append(&core.renderer.shapes.data, shape)
 	return index
 }
 
@@ -166,7 +170,7 @@ get_shape_bounding_box :: proc(shape: Shape) -> Box {
 
 apply_scissor_box :: proc(target, source: ^Box, clip: Box) {
 	left := clip.lo.x - target.lo.x
-	source_factor := box_size(source^) / box_size(target^)
+	source_factor := (source.hi - source.lo) / box_size(target^)
 	if left > 0 {
 		target.lo.x += left
 		source.lo.x += left * source_factor.x
@@ -198,7 +202,7 @@ paint_index_from_option :: proc(option: Paint_Option) -> u32 {
 	case Color:
 		return 0
 	}
-	return core.draw_state.paint
+	return core.paint
 }
 
 // Render an already added shape

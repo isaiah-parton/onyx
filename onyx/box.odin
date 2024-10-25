@@ -103,7 +103,7 @@ clamp_box :: proc(a, b: Box) -> Box {
 }
 
 snapped_box :: proc(box: Box) -> Box {
-	return Box{linalg.floor(box.lo), linalg.floor(box.hi)}
+	return Box{linalg.floor(box.lo), linalg.round(box.hi)}
 }
 
 box_center :: proc(a: Box) -> [2]f32 {

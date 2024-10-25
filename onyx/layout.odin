@@ -92,6 +92,7 @@ begin_layout :: proc(info: Layout_Info) -> bool {
 			layout.next_cut_side = .Left if int(side) > 1 else .Top
 		}
 	}
+	layout.box = snapped_box(layout.box)
 	layout.bounds = layout.box
 	return push_layout(layout)
 }

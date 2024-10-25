@@ -12,6 +12,11 @@ button_behavior :: proc(widget: ^Widget) {
 		0.1,
 		.Hovered in widget.state,
 	)
+	widget.press_time = animate(
+		widget.press_time,
+		0.3,
+		.Pressed in widget.state,
+	)
 	if .Hovered in widget.state {
 		core.cursor_type = .Pointing_Hand
 	}
@@ -92,26 +97,27 @@ get_popup_layer_info :: proc(widget: ^Widget, size: [2]f32, side: Side = .Bottom
 			{parent.lo.x, parent.hi.y + margin},
 			{parent.lo.x + size.x, parent.hi.y + margin + size.y},
 		}
-		info.origin = info.box.lo
+		// info.origin = info.box.lo
 	case .Top:
 		info.box = Box {
 			{parent.lo.x, parent.lo.y - (margin + size.y)},
 			{parent.lo.x + size.x, parent.lo.y - margin},
 		}
-		info.origin = {info.box.lo.x, info.box.hi.y}
+		// info.origin = {info.box.lo.x, info.box.hi.y}
 	case .Left:
 		info.box = Box {
 			{parent.lo.x - (margin + size.x), box_center_y(parent) - size.y / 2},
 			{parent.lo.x - margin, box_center_y(parent) + size.y / 2},
 		}
-		info.origin = {info.box.hi.x, box_center_y(info.box)}
+		// info.origin = {info.box.hi.x, box_center_y(info.box)}
 	case .Right:
 		info.box = Box {
 			{parent.hi.x + margin, box_center_y(parent) - size.y / 2},
 			{parent.hi.x + margin + size.x, box_center_y(parent) + size.y / 2},
 		}
-		info.origin = {info.box.lo.x, box_center_y(info.box)}
+		// info.origin = {info.box.lo.x, box_center_y(info.box)}
 	}
+	info.origin = box_center(info.box)
 
 	return
 }

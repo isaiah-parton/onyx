@@ -1,4 +1,4 @@
-package onyx
+package vgo
 // Time to work out the intended usage of this renderer
 //
 // Index of a paint that was already added
@@ -41,7 +41,7 @@ MAX_ATLASES :: 8
 MIN_ATLAS_SIZE :: 1024
 MAX_ATLAS_SIZE :: 8192
 
-BUFFER_SIZE :: mem.Megabyte * 2
+BUFFER_SIZE :: mem.Megabyte
 
 Matrix :: matrix[4, 4]f32
 
@@ -68,8 +68,6 @@ Stroke_Justify :: enum {
 	Outer,
 }
 
-
-
 // The paint data sent to the GPU
 Paint :: struct #align (8) {
 	kind: Paint_Kind,
@@ -81,11 +79,15 @@ Paint :: struct #align (8) {
 	col1: [4]f32,
 }
 
+Color :: [4]u8
+
 Paint_Option :: union {
 	u32,
 	Paint,
 	Color,
 }
+
+Index :: u16
 
 // I keep UV and color in here purely for the HSVA color wheel, they shouldn't be necessary
 Vertex :: struct {
@@ -103,15 +105,6 @@ Draw_Call :: struct {
 	elem_offset:       int,
 	elem_count:        int,
 	index:             int,
-}
-
-// Current draw state
-Draw_State :: struct {
-	paint:      u32,
-	shape:      u32,
-	xform:      u32,
-	path_start: u32,
-	path_point: [2]f32,
 }
 
 Scissor :: struct {
@@ -149,10 +142,10 @@ push_scissor :: proc(box: Box, shape: u32 = 0) {
 	if scissor, ok := current_scissor().?; ok {
 		box = clamp_box(box, scissor.box)
 		if scissor.shape != 0 {
-			core.gfx.shapes.data[shape].next = scissor.shape
+			core.renderer.shapes.data[shape].next = scissor.shape
 		}
 	}
-	core.gfx.shapes.data[shape].mode = .Intersection
+	core.renderer.shapes.data[shape].mode = .Intersection
 	push_stack(&core.scissor_stack, Scissor{box = box, shape = shape})
 }
 
@@ -193,51 +186,51 @@ make_radial_gradient :: proc(center: [2]f32, radius: f32, inner, outer: Color) -
 
 // Add a paint to the the shader buffer and return its index
 add_paint :: proc(paint: Paint) -> u32 {
-	index := u32(len(core.gfx.paints.data))
-	append(&core.gfx.paints.data, paint)
+	index := u32(len(core.renderer.paints.data))
+	append(&core.renderer.paints.data, paint)
 	return index
 }
 
 // This paint will be used by all paints added after the call
 set_paint :: proc(paint: u32) {
-	core.draw_state.paint = paint
+	core.paint = paint
 }
 
 // Path operations
 path_begin :: proc() {
-	core.draw_state.path_start = u32(len(core.gfx.cvs.data))
+	core.path_start = u32(len(core.renderer.cvs.data))
 }
 
 path_move_to :: proc(p: [2]f32) {
-	core.draw_state.path_point = p
+	core.path_point = p
 }
 
 path_quad_to :: proc(cp, p: [2]f32) {
-	append(&core.gfx.cvs.data, core.draw_state.path_point, cp, p)
+	append(&core.renderer.cvs.data, core.path_point, cp, p)
 	path_move_to(p)
 }
 
 path_line_to :: proc(p: [2]f32) {
-	path_quad_to(linalg.lerp(core.draw_state.path_point, p, 0.5), p)
+	path_quad_to(linalg.lerp(core.path_point, p, 0.5), p)
 }
 
 fill_path :: proc(color: Color) {
-	render_shape(
+	draw_shape(
 		add_fill_path(),
 		color,
 	)
 }
 
 add_fill_path :: proc() -> u32 {
-	vertex_count := u32(len(core.gfx.cvs.data)) - core.draw_state.path_start
+	vertex_count := u32(len(core.renderer.cvs.data)) - core.path_start
 	return add_shape(
-		Shape{kind = .Path, start = core.draw_state.path_start, count = vertex_count / 3},
+		Shape{kind = .Path, start = core.path_start, count = vertex_count / 3},
 	)
 }
 
 add_xform :: proc(xform: Matrix) -> u32 {
-	index := u32(len(core.gfx.xforms.data))
-	append(&core.gfx.xforms.data, xform)
+	index := u32(len(core.renderer.xforms.data))
+	append(&core.renderer.xforms.data, xform)
 	return index
 }
 
@@ -247,25 +240,25 @@ set_shape :: proc(shape: u32) {
 
 // Append a vertex and return it's index
 add_vertex :: proc(v: Vertex) -> u32 {
-	index := u32(len(core.gfx.vertices))
-	append(&core.gfx.vertices, v)
+	index := u32(len(core.renderer.vertices))
+	append(&core.renderer.vertices, v)
 	return index
 }
 
 add_index :: proc(i: u32) {
 	assert(core.current_draw_call != nil)
-	append(&core.gfx.indices, i)
+	append(&core.renderer.indices, i)
 	core.current_draw_call.elem_count += 1
 }
 
 add_indices :: proc(i: ..u32) {
 	assert(core.current_draw_call != nil)
-	append(&core.gfx.indices, ..i)
+	append(&core.renderer.indices, ..i)
 	core.current_draw_call.elem_count += len(i)
 }
 
 next_vertex_index :: proc() -> u32 {
-	return u32(len(core.gfx.vertices))
+	return u32(len(core.renderer.vertices))
 }
 
 current_matrix :: proc() -> Maybe(Matrix) {
@@ -323,23 +316,18 @@ set_texture :: proc(texture: wgpu.Texture) {
 	if core.current_draw_call == nil do return
 	if core.current_draw_call.user_texture == core.current_texture do return
 	if core.current_draw_call.user_texture != nil {
-		append_draw_call(current_layer().?.index)
+		append_draw_call()
 	}
 	core.current_draw_call.user_texture = texture
 }
 
-// Returns the current user texture
-get_current_texture :: proc() -> wgpu.Texture {
-	return core.current_texture
-}
-
-// Add a new draw call at the given index with the currently bound user texture
-append_draw_call :: proc(index: int) {
+@(private)
+append_draw_call :: proc() {
 	append(
 		&core.draw_calls,
 		Draw_Call {
-			index = index,
-			elem_offset = len(core.gfx.indices),
+			index = core.draw_call_index,
+			elem_offset = len(core.renderer.indices),
 			user_texture = core.current_texture,
 		},
 	)

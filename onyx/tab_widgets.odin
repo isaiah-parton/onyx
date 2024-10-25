@@ -93,7 +93,7 @@ add_tabs :: proc(using info: ^Tabs_Info) -> bool {
 					if button({
 						id = hash("close"),
 						text = "\ueb99",
-						style = .Ghost,
+						style = .Outline,
 						box = shrink_box(get_box_cut_right(tab_info.self.box, box_height(tab_info.self.box)), 4),
 					}).clicked {
 						closed_index = o

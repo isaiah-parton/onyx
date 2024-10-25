@@ -228,8 +228,8 @@ end_container :: proc(using info: ^Container_Info) {
 	enable_scroll_x := math.floor(content_size.x) > box_width(self.box) && !hide_scrollbars
 	enable_scroll_y := math.floor(content_size.y) > box_height(self.box) && !hide_scrollbars
 	// Animate scrollbars
-	self.cont.scroll_time.x = animate(self.cont.scroll_time.x, 0.2, enable_scroll_x)
-	self.cont.scroll_time.y = animate(self.cont.scroll_time.y, 0.2, enable_scroll_y)
+	self.cont.scroll_time.x = animate(self.cont.scroll_time.x, 0.15, enable_scroll_x)
+	self.cont.scroll_time.y = animate(self.cont.scroll_time.y, 0.15, enable_scroll_y)
 	// Enable/disable them for real this time
 	display_scroll_x := self.cont.scroll_time.x > 0.0
 	display_scroll_y := self.cont.scroll_time.y > 0.0

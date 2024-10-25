@@ -6,10 +6,9 @@ import "core:math/linalg"
 import "core:time"
 
 Button_Style :: enum {
-	Primary,
-	Secondary,
-	Outlined,
-	Ghost,
+	Normal,
+	Outline,
+	Glass,
 }
 
 Button_Info :: struct {
@@ -35,7 +34,7 @@ init_button :: proc(using info: ^Button_Info, loc := #caller_location) -> bool {
 			align_h = .Middle,
 		},
 	) or_return
-	desired_size = text_job.size + {18, 6}
+	desired_size = text_job.size + core.style.text_padding * 2
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	return true
@@ -50,59 +49,50 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 	if self.visible {
 		text_color: Color
 
+		fill_color := lerp_colors(
+			(self.hover_time + self.press_time) * 0.1,
+			color.? or_else core.style.color.substance,
+			255,
+		)
+
 		switch style {
-		case .Outlined:
-			draw_rounded_box_fill(
+		case .Normal:
+			fill_box(
 				self.box,
 				core.style.rounding,
-				fade(color.? or_else core.style.color.substance, self.hover_time * 0.5),
+				fill_color,
+			)
+			text_color = core.style.color.content
+		case .Outline:
+			fill_box(
+				self.box,
+				core.style.rounding,
+				fade(fill_color, 0.5),
 			)
 			draw_rounded_box_stroke(
 				self.box,
 				core.style.rounding,
 				1,
-				color.? or_else core.style.color.substance,
+				fill_color,
 			)
-			text_color = core.style.color.content
-
-		case .Secondary:
-			draw_rounded_box_fill(
-				self.box,
-				core.style.rounding,
-				lerp_colors(
-					self.hover_time * 0.25,
-					color.? or_else core.style.color.substance,
-					core.style.color.foreground,
+				text_color = core.style.color.content
+		case .Glass:
+			greater := max(box_width(self.box), box_height(self.box))
+			set_paint(
+				add_radial_gradient(
+					{box_center_x(self.box), self.box.lo.y},
+					math.lerp(greater * 0.5, greater, (self.hover_time + self.press_time) * 0.5),
+					255,
+					{255, 255, 255, 100},
 				),
 			)
-			text_color = core.style.color.content
-
-		case .Primary:
-			if self.hover_time > 0 {
-				draw_rounded_box_shadow(
-					self.box,
-					core.style.rounding,
-					6,
-					fade({0, 0, 0, 40}, self.hover_time),
-				)
-			}
-			draw_rounded_box_fill(
+			fill_box(
 				self.box,
 				core.style.rounding,
-				lerp_colors(
-					self.hover_time * 0.25,
-					color.? or_else core.style.color.accent,
-					core.style.color.foreground,
-				),
+				fade(fill_color, 0.5),
 			)
-			text_color = core.style.color.accent_content
-
-		case .Ghost:
-			draw_rounded_box_fill(
-				self.box,
-				core.style.rounding,
-				fade(color.? or_else core.style.color.substance, self.hover_time * 0.5),
-			)
+			draw_rounded_box_stroke(self.box, core.style.rounding, 1, fill_color)
+			set_paint(0)
 			text_color = core.style.color.content
 		}
 
@@ -111,7 +101,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 		}
 
 		if self.disable_time > 0 {
-			draw_rounded_box_fill(
+			fill_box(
 				self.box,
 				core.style.rounding,
 				fade(core.style.color.background, self.disable_time * 0.5),
@@ -169,25 +159,25 @@ add_image_button :: proc(using info: ^Image_Button_Info) -> bool {
 				center := box_center(self.box)
 				set_paint(add_paint({kind = .Atlas_Sample}))
 				defer set_paint(0)
-				shape := add_shape_box(
+				shape := add_shape(make_box(
 					{center - image_size / 2, center + image_size / 2},
 					core.style.rounding,
-				)
+				))
 				h_overlap := max(0, image_size.x - view_size.x)
 				source.lo.x += h_overlap / 2
 				source.hi.x -= h_overlap / 2
 				v_overlap := max(0, image_size.y - view_size.y)
 				source.lo.y += v_overlap / 2
 				source.hi.y -= v_overlap / 2
-				render_shape_uv(shape, source, 255)
+				draw_shape_uv(shape, source, 255)
 			}
 		} else {
 			draw_skeleton(self.box, core.style.rounding)
 		}
-		draw_rounded_box_fill(
+		fill_box(
 			self.box,
-			core.style.rounding,
 			fade(core.style.color.substance, self.hover_time * 0.5),
+			radius = core.style.rounding,
 		)
 		// draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
 	}
@@ -235,13 +225,13 @@ add_floating_button :: proc(using info: ^Floating_Button_Info) -> bool {
 	if self.visible {
 		rounding := math.lerp(box_height(self.box) / 2, core.style.rounding, self.hover_time)
 		// draw_shadow(self.box, rounding)
-		draw_rounded_box_fill(
+		fill_box(
 			self.box,
-			rounding,
 			fade(
 				lerp_colors(self.hover_time, core.style.color.background, core.style.color.accent),
 				math.lerp(f32(0.75), f32(1.0), self.hover_time),
 			),
+			radius = rounding,
 		)
 		draw_text_glyphs(text_job, box_center(self.box), core.style.color.content)
 	}

@@ -77,7 +77,7 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 				push_id(o)
 				buttons[o] = {
 					text      = option,
-					style     = .Ghost,
+					style     = .Outline,
 					font_size = 20,
 				}
 				init_button(&buttons[0]) or_continue

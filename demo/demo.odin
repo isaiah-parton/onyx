@@ -35,7 +35,7 @@ Section :: enum {
 	Data_Input,
 	Boolean,
 	Graph,
-	Scroll_Zone,
+	Containers,
 }
 
 State :: struct {
@@ -81,7 +81,8 @@ component_showcase :: proc(state: ^State) -> bool {
 	begin_layer(&layer_info) or_return
 	defer end_layer()
 
-	draw_box_fill(current_layout().?.box, core.style.color.background)
+	fill_box(current_layout().?.box, core.style.color.background)
+
 	shrink_layout(100)
 	foreground()
 	if layout({size = 65, side = .Top}) {
@@ -233,11 +234,11 @@ component_showcase :: proc(state: ^State) -> bool {
 				entry := &state.entries[index]
 				begin_table_row(&table, {index = index})
 				set_width_auto()
-				number_input(Number_Input_Info(u64){value = &entry.id, undecorated = true})
-				string_input({value = &entry.hash, undecorated = true})
-				string_input({value = &entry.public_key, undecorated = true})
-				string_input({value = &entry.private_key, undecorated = true})
-				string_input({value = &entry.location, undecorated = true})
+				number_input(Number_Input_Info(u64){value = &entry.id, undecorated = true, monospace = true})
+				string_input({value = &entry.hash, undecorated = true, monospace = true})
+				string_input({value = &entry.public_key, undecorated = true, monospace = true})
+				string_input({value = &entry.private_key, undecorated = true, monospace = true})
+				string_input({value = &entry.location, undecorated = true, monospace = true})
 				end_table_row()
 			}
 		}
@@ -269,34 +270,42 @@ component_showcase :: proc(state: ^State) -> bool {
 			}
 			core.draw_next_frame = true
 		}
-	case .Scroll_Zone:
+	case .Containers:
 		set_side(.Left)
 		set_width(300)
 		set_height_fill()
-		if container(&{space = [2]f32{0, 2000}}) {
-			set_width_fill()
-			set_height_auto()
-			for i in 0 ..< 50 {
-				if i > 0 {
-					add_space(4)
+		{
+			info := Container_Info{}
+			if container(&info) {
+				defer draw_rounded_box_stroke(info.self.box, core.style.rounding, 1, core.style.color.substance)
+				set_width_fill()
+				set_height_auto()
+				for i in 0 ..< 50 {
+					if i > 0 {
+						add_space(4)
+					}
+					push_id(i)
+					button({text = fmt.tprintf("Button #%i", i + 1), style = .Outline})
+					pop_id()
 				}
-				push_id(i)
-				button({text = fmt.tprintf("Button #%i", i + 1), style = .Ghost})
-				pop_id()
 			}
 		}
 		add_space(50)
 		set_width(500)
 		set_height(300)
-		if container(&{space = [2]f32{1000, 0}}) {
-			set_side(.Left)
-			set_height_fill()
-			set_width(200)
-			set_padding(10)
-			for i in 0 ..< 5 {
-				push_id(i)
-				button({text = fmt.tprint(i + 1), style = .Outlined})
-				pop_id()
+		{
+			info := Container_Info{space = [2]f32{1000, 0}}
+			if container(&info) {
+				defer draw_rounded_box_stroke(info.self.box, core.style.rounding, 1, core.style.color.substance)
+				set_side(.Left)
+				set_height_fill()
+				set_width(200)
+				set_padding(10)
+				for i in 0 ..< 5 {
+					push_id(i)
+					button({text = fmt.tprint(i + 1), style = .Outline})
+					pop_id()
+				}
 			}
 		}
 	// Small showcase of drawing capabilities
@@ -341,7 +350,7 @@ component_showcase :: proc(state: ^State) -> bool {
 					case 1:
 						new_shape = add_shape_circle(
 							box_center(info.self.box),
-							box_height(info.self.box) / 2,
+							box_height(info.self.box) / 4,
 						)
 					case 2:
 						new_shape = add_shape_arc(
@@ -394,13 +403,7 @@ component_showcase :: proc(state: ^State) -> bool {
 			}
 		}
 		set_paint(
-			add_paint(
-				Paint {
-					kind = .Skeleton,
-					col0 = normalize_color(gradient_colors[0]),
-					col1 = normalize_color(gradient_colors[1]),
-				},
-			),
+			add_radial_gradient(core.mouse_pos, 700, gradient_colors[0], gradient_colors[1])
 		)
 		render_shape(shape, 255)
 		set_paint(0)
@@ -586,6 +589,12 @@ main :: proc() {
 		using onyx
 		new_frame()
 		component_showcase(&state)
+
+		// font := &core.fonts[0].?
+		// font_size, _ := get_font_size(font, 100)
+		// glyph, _ := get_glyph(font, font_size, 'R')
+		// draw_glyph_shape(glyph, core.view / 2, font_size.scale, 255)
+
 		render()
 	}
 

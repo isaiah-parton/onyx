@@ -99,6 +99,7 @@ Widget :: struct {
 	focus_time:         f32,
 	hover_time:         f32,
 	open_time:          f32,
+	press_time:					f32,
 	disable_time:       f32,
 	// Unique state used by different widget types
 	using unique_state: struct #raw_union {
@@ -124,6 +125,8 @@ Widget_Info :: struct {
 	disabled:       bool,
 	// If the mouse sticks to the widget
 	sticky:         bool,
+	// If true, the widgets box will not be snapped to pixel
+	sub_pixel: bool,
 	// Which widget states can be passed to this widget
 	in_state_mask:  Maybe(Widget_State),
 	// Which widget states will be passed to the parent widget
@@ -238,7 +241,10 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	}
 	widget := info.self
 	// Place widget
-	widget.box = snapped_box(move_box(info.box.? or_else next_widget_box(info), widget.offset))
+	widget.box = move_box(info.box.? or_else next_widget_box(info), widget.offset)
+	if !info.sub_pixel {
+		widget.box = snapped_box(widget.box)
+	}
 
 	if widget.frames >= core.frames {
 		draw_box_fill(
@@ -421,10 +427,10 @@ foreground :: proc(loc := #caller_location) {
 	if begin_widget(&info) {
 		defer end_widget()
 		set_paint(
-			add_paint_linear_gradient(
+			add_linear_gradient(
 				info.self.box.lo,
 				info.self.box.hi,
-				alpha_blend_colors(core.style.color.foreground, 255, 0.01),
+				alpha_blend_colors(core.style.color.foreground, 255, 0.025),
 				core.style.color.foreground,
 			),
 		)

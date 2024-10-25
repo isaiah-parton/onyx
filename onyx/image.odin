@@ -40,15 +40,13 @@ draw_texture :: proc(
 		set_sampler_descriptor(sampler_descriptor.?)
 	}
 
-	set_paint(add_paint({kind = .User_Texture_Sample}))
-	defer set_paint(0)
-
+	paint := add_paint({kind = .User_Texture_Sample})
 	shape := add_shape_box(box, {})
 
-	a := add_vertex({pos = box.lo, col = tint, shape = shape})
-	b := add_vertex({pos = {box.lo.x, box.hi.y}, col = tint, uv = {0, 1}, shape = shape})
-	c := add_vertex({pos = box.hi, col = tint, uv = 1, shape = shape})
-	d := add_vertex({pos = {box.hi.x, box.lo.y}, col = tint, uv = {1, 0}, shape = shape})
+	a := add_vertex({pos = box.lo, col = tint, shape = shape, paint = paint})
+	b := add_vertex({pos = {box.lo.x, box.hi.y}, col = tint, uv = {0, 1}, shape = shape, paint = paint})
+	c := add_vertex({pos = box.hi, col = tint, uv = 1, shape = shape, paint = paint})
+	d := add_vertex({pos = {box.hi.x, box.lo.y}, col = tint, uv = {1, 0}, shape = shape, paint = paint})
 	add_indices(a, b, c, a, c, d)
 }
 
@@ -66,29 +64,26 @@ draw_texture_portion :: proc(
 	width := wgpu.TextureGetWidth(texture)
 	height := wgpu.TextureGetHeight(texture)
 
-	set_paint(add_paint({kind = .User_Texture_Sample}))
-	defer set_paint(0)
-
+	paint := add_paint({kind = .User_Texture_Sample})
 	size: [2]f32 = {f32(width), f32(height)}
-
 	shape := add_shape_box(target, {})
 
-	a := add_vertex({pos = target.lo, uv = source.lo / size, col = tint, shape = shape})
+	a := add_vertex({pos = target.lo, uv = source.lo / size, col = tint, shape = shape, paint = paint})
 	b := add_vertex(
 		{
 			pos = {target.lo.x, target.hi.y},
 			col = tint,
 			uv = [2]f32{source.lo.x, source.hi.y} / size,
-			shape = shape,
+			shape = shape, paint = paint,
 		},
 	)
-	c := add_vertex({pos = target.hi, col = tint, uv = source.hi / size, shape = shape})
+	c := add_vertex({pos = target.hi, col = tint, uv = source.hi / size, shape = shape, paint = paint})
 	d := add_vertex(
 		{
 			pos = {target.hi.x, target.lo.y},
 			col = tint,
 			uv = [2]f32{source.hi.x, source.lo.y} / size,
-			shape = shape,
+			shape = shape, paint = paint,
 		},
 	)
 

@@ -56,14 +56,14 @@ init_input :: proc(info: ^Input_Info, loc := #caller_location) -> bool {
 	info.self.flags += {.Is_Input, .Persistent}
 	// Make sticky for easy highlighting
 	info.sticky = true
-	// Default desired size
-	info.desired_size = core.style.visual_size
 	//
 	info.text_info = Text_Info {
 		font   = core.style.monospace_font if info.monospace else core.style.default_font,
 		size   = core.style.content_text_size,
 		hidden = info.hidden && len(info.text_info.text) > 0,
 	}
+	// Default desired size
+	info.desired_size = core.style.visual_size
 	// Stuff
 	if info.builder != nil {
 		info.text_info.text = strings.to_string(info.builder^)

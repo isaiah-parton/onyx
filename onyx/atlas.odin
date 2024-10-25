@@ -78,7 +78,7 @@ update_atlas :: proc(atlas: ^Atlas, gfx: ^Graphics) {
 }
 
 add_glyph_to_atlas :: proc(data: [^]u8, width, height: int, atlas: ^Atlas, gfx: ^Graphics) -> Box {
-	box := get_next_atlas_box(atlas, gfx, {f32(width), f32(height)})
+	box := get_next_atlas_box(atlas, gfx, {f32(width + 1), f32(height + 1)})
 
 	pixel_size: int = 4
 

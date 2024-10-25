@@ -140,7 +140,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		draw_rounded_box_stroke(
 			self.box,
 			core.style.rounding,
-			2,
+			1,
 			fade(core.style.color.accent, max(self.hover_time, self.open_time)),
 		)
 	}

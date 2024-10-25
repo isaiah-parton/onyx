@@ -19,6 +19,9 @@ import ttf "vendor:stb/truetype"
 FMT_BUFFER_COUNT :: 128
 FMT_BUFFER_SIZE :: 1024
 TEXT_BREAK :: "..."
+FONT_SIZE_PRECISION :: 0.5
+MAX_FONT_SIZE :: 144.0
+FONT_SIZE_COUNT :: int(MAX_FONT_SIZE / FONT_SIZE_PRECISION)
 
 Horizontal_Text_Align :: enum {
 	Left,
@@ -74,16 +77,19 @@ Text_Iterator :: struct {
 }
 
 Font_Size :: struct {
-	ascent, descent, line_gap, scale: f32,
-	glyphs:                           map[rune]Glyph,
-	break_size:                       f32,
+	ascent:     f32,
+	descent:    f32,
+	line_gap:   f32,
+	scale:      f32,
+	glyphs:     []Maybe(Glyph),
+	break_size: f32,
 }
 
 Font :: struct {
-	name: 			string,
-	data:       ttf.fontinfo,
-	sizes:      map[f32]Font_Size,
-	spacing:    f32,
+	name:      string,
+	data:      ttf.fontinfo,
+	sizes:     [FONT_SIZE_COUNT]Maybe(Font_Size),
+	spacing:   f32,
 	monospace: bool,
 }
 
@@ -91,6 +97,7 @@ Glyph :: struct {
 	source:  Box,
 	offset:  [2]f32,
 	advance: f32,
+	vertices: []ttf.vertex,
 }
 
 Text_Job_Glyph :: struct {
@@ -240,7 +247,7 @@ make_text_job :: proc(
 	// Apply vertical alignment
 	if iter.info.align_v == .Middle {
 		for &glyph in job.glyphs {
-			glyph.pos.y -= job.size.y / 2
+			glyph.pos.y -= math.floor(job.size.y / 2)
 		}
 	} else if iter.info.align_v == .Bottom {
 		for &glyph in job.glyphs {
@@ -277,10 +284,9 @@ draw_text_highlight :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 }
 
 draw_text_glyphs :: proc(job: Text_Job, pos: [2]f32, color: Color) {
-	// TODO: To floor, or not to floor
-	// pos := linalg.floor(pos)
+	pos := linalg.floor(pos)
 	for glyph in job.glyphs {
-		if glyph.codepoint == 0 || glyph.source == {} do continue
+		if glyph.codepoint == 0 do continue
 		glyph_pos := pos + glyph.pos + glyph.offset
 		draw_glyph(
 			glyph.source,
@@ -300,10 +306,11 @@ draw_text_cursor :: proc(job: Text_Job, pos: [2]f32, color: Color) {
 }
 
 destroy_font :: proc(font: ^Font) {
-	for _, &size in font.sizes {
-		destroy_font_size(&size)
+	for &size in font.sizes {
+		if size != nil {
+			destroy_font_size(&size.?)
+		}
 	}
-	delete(font.sizes)
 	delete(font.name)
 }
 
@@ -316,16 +323,21 @@ make_text_iterator :: proc(info: Text_Info) -> (iter: Text_Iterator, ok: bool) {
 		return
 	}
 	iter.info = info
-	iter.font = &core.fonts[info.font].?
+
+	iter.font, ok = &core.fonts[info.font].?
+	if !ok do return
 	iter.size, ok = get_font_size(iter.font, info.size)
+	if !ok do return
+
 	iter.line_limit = info.width
 	iter.line_size.y = iter.size.ascent - iter.size.descent + iter.size.line_gap
 	return
 }
 
 get_glyph_from_fallback_font :: proc(codepoint: rune, size: f32) -> (glyph: Glyph, ok: bool) {
-	font := core.fonts[core.style.icon_font].? or_return
-	return get_glyph(&font, get_font_size(&font, size) or_return, codepoint)
+	font, _ok := &core.fonts[core.style.icon_font].?
+	if !_ok do return
+	return get_glyph(font, get_font_size(font, size) or_return, codepoint)
 }
 
 iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
@@ -348,10 +360,7 @@ iterate_text_rune :: proc(it: ^Text_Iterator) -> bool {
 		ok: bool
 		it.glyph, ok = get_glyph(it.font, it.size, r)
 		if !ok && r > unicode.MAX_LATIN1 {
-			it.glyph, ok = get_glyph_from_fallback_font(
-				r,
-				it.info.size,
-			)
+			it.glyph, ok = get_glyph_from_fallback_font(r, it.info.size)
 		}
 	}
 	return true
@@ -422,10 +431,8 @@ iterate_text :: proc(iter: ^Text_Iterator) -> (ok: bool) {
 		iter.line_size.x = 0
 		iter.glyph_pos.x = 0
 		#partial switch iter.info.align_h {
-
 		case .Middle:
-			iter.glyph_pos.x -= measure_next_line(iter^) / 2
-
+			iter.glyph_pos.x -= math.floor(measure_next_line(iter^) / 2)
 		case .Right:
 			iter.glyph_pos.x -= measure_next_line(iter^)
 		}
@@ -474,8 +481,8 @@ load_font_from_file :: proc(path: string, monospace: bool = false) -> (handle: i
 }
 
 load_font_from_memory :: proc(data: []u8, monospace: bool = false) -> (handle: int, ok: bool) {
-	font := Font{
-		spacing = 0 if monospace else 1,
+	font := Font {
+		spacing   = 0 if monospace else 1,
 		monospace = monospace,
 	}
 
@@ -501,19 +508,23 @@ unload_font :: proc(handle: int) {
 }
 
 get_font_size :: proc(font: ^Font, size: f32) -> (data: ^Font_Size, ok: bool) {
-	size := math.round(size)
-	data, ok = &font.sizes[size]
+	size := math.floor(size / FONT_SIZE_PRECISION) * FONT_SIZE_PRECISION
+	index := clamp(int(size / FONT_SIZE_PRECISION), 0, FONT_SIZE_COUNT)
+	data, ok = &font.sizes[index].?
 	if !ok {
-		data = map_insert(&font.sizes, size, Font_Size{})
-		// Compute glyph scale
-		data.scale = ttf.ScaleForPixelHeight(&font.data, f32(size))
+		scale := ttf.ScaleForPixelHeight(&font.data, size)
 		// Compute vertical metrics
 		ascent, descent, line_gap: i32
 		ttf.GetFontVMetrics(&font.data, &ascent, &descent, &line_gap)
-		data.ascent = f32(ascent) * data.scale
-		data.descent = f32(descent) * data.scale
-		data.line_gap = f32(line_gap) * data.scale
-
+		// Define new font size
+		font.sizes[index] = Font_Size{
+			scale = scale,
+			ascent = f32(ascent) * scale,
+			descent = f32(descent) * scale,
+			line_gap = f32(line_gap) * scale,
+			glyphs = make([]Maybe(Glyph), font.data.numGlyphs),
+		}
+		data = &font.sizes[index].?
 		ok = true
 	}
 	return
@@ -522,14 +533,13 @@ get_font_size :: proc(font: ^Font, size: f32) -> (data: ^Font_Size, ok: bool) {
 // First creates the glyph if it doesn't exist, then returns its data
 get_glyph :: proc(font: ^Font, size: ^Font_Size, r: rune) -> (glyph: Glyph, ok: bool) {
 	// Try fetching from map
-	glyph, ok = size.glyphs[r]
+	index := ttf.FindGlyphIndex(&font.data, r)
+	if index == 0 {
+		return
+	}
+	glyph, ok = size.glyphs[index].?
 	// If the glyph doesn't exist, we create and render it
 	if !ok {
-		// Get codepoint index
-		index := ttf.FindGlyphIndex(&font.data, r)
-		if index == 0 {
-			return
-		}
 		// Get metrics
 		advance, left_side_bearing: i32
 		ttf.GetGlyphHMetrics(&font.data, index, &advance, &left_side_bearing)
@@ -545,6 +555,8 @@ get_glyph :: proc(font: ^Font, size: ^Font_Size, r: rune) -> (glyph: Glyph, ok: 
 			&glyph_offset_x,
 			&glyph_offset_y,
 		)
+		// vertices: [^]ttf.vertex
+		// vertex_count := ttf.GetGlyphShape(&font.data, index, &vertices)
 		// Set glyph data
 		glyph = Glyph {
 			source  = add_glyph_to_atlas(
@@ -554,6 +566,7 @@ get_glyph :: proc(font: ^Font, size: ^Font_Size, r: rune) -> (glyph: Glyph, ok: 
 				&core.atlas,
 				&core.gfx,
 			),
+			// vertices = vertices[:vertex_count],
 			offset  = {f32(glyph_offset_x), f32(glyph_offset_y) + size.ascent},
 			advance = f32(advance),
 		}
@@ -561,9 +574,8 @@ get_glyph :: proc(font: ^Font, size: ^Font_Size, r: rune) -> (glyph: Glyph, ok: 
 			glyph.advance -= f32(left_side_bearing)
 		}
 		glyph.advance *= size.scale
-
 		// Assign the new glyph
-		size.glyphs[r] = glyph
+		size.glyphs[index] = glyph
 		ok = true
 	}
 	return
@@ -575,6 +587,21 @@ draw_text :: proc(origin: [2]f32, info: Text_Info, color: Color) -> [2]f32 {
 		return job.size
 	}
 	return {}
+}
+
+draw_glyph_shape :: proc(glyph: Glyph, pos: [2]f32, scale: f32, color: Color) {
+	path_begin()
+	for v in glyph.vertices {
+		switch v.type {
+		case 1:
+			path_move_to(pos + {f32(v.x), -f32(v.y)} * scale)
+		case 2:
+			path_line_to(pos + {f32(v.x), -f32(v.y)} * scale)
+		case 3:
+			path_quad_to(pos + {f32(v.cx), -f32(v.cy)} * scale, pos + {f32(v.x), -f32(v.y)} * scale)
+		}
+	}
+	path_fill(color)
 }
 
 draw_aligned_rune :: proc(

@@ -89,11 +89,11 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 
 	if layout({side = .Top, size = size}) {
 		set_padding(5)
-		if button({text = "\uEA64", style = .Outlined}).clicked {
+		if button({text = "\uEA64", style = .Outline}).clicked {
 			month_offset -= 1
 		}
 		set_side(.Right)
-		if button({text = "\uEA6E", style = .Outlined}).clicked {
+		if button({text = "\uEA6E", style = .Outline}).clicked {
 			month_offset += 1
 		}
 		draw_text(

@@ -181,8 +181,8 @@ view_height :: proc() -> f32 {
 }
 
 load_default_fonts :: proc() -> bool {
-	DEFAULT_FONT :: "Geist-Medium.ttf"
-	MONOSPACE_FONT :: "Recursive_Monospace-Medium.ttf"
+	DEFAULT_FONT :: "Geist-Regular.ttf"
+	MONOSPACE_FONT :: "Recursive_Monospace-Regular.ttf"
 	HEADER_FONT :: "Lora-Medium.ttf"
 	ICON_FONT :: "remixicon.ttf"
 
@@ -503,6 +503,9 @@ new_frame :: proc() {
 	// And glyph paint lives at index 1
 	append(&core.gfx.paints.data, Paint{kind = .Atlas_Sample})
 
+	// Gradient paint lives at 2
+	add_radial_gradient(core.mouse_pos, 180, fade(255, 1.0), fade(core.style.color.substance, 0.25))
+
 	// Default shape lives at index 0
 	append(&core.gfx.shapes.data, Shape{kind = .Normal})
 
@@ -525,7 +528,6 @@ render :: proc() {
 
 	// Update the atlas if needed
 	if core.atlas.modified {
-		t := time.now()
 		update_atlas(&core.atlas, &core.gfx)
 		core.atlas.modified = false
 	}

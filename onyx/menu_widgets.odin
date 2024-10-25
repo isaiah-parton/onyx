@@ -156,7 +156,7 @@ init_menu_item :: proc(info: ^Menu_Item_Info) -> bool {
 		},
 	) or_return
 	info.desired_size = info.text_job.size + core.style.text_padding * 2
-	info.desired_size.x += info.desired_size.y
+	info.desired_size.x += 24
 	return true
 }
 
@@ -181,7 +181,7 @@ menu_item :: proc(info: Menu_Item_Info, loc := #caller_location) -> Menu_Item_In
 				draw_text_glyphs(
 					info.text_job,
 					{
-						info.self.box.lo.x + box_height(info.self.box) + core.style.text_padding.x,
+						info.self.box.lo.x + 24,
 						box_center_y(info.self.box),
 					},
 					core.style.color.content,
@@ -190,13 +190,13 @@ menu_item :: proc(info: Menu_Item_Info, loc := #caller_location) -> Menu_Item_In
 				case .None:
 				case .Check:
 					draw_check(
-						info.self.box.lo + box_height(info.self.box) / 2,
+						{info.self.box.lo.x + 12, box_center_y(info.self.box)},
 						5,
 						core.style.color.content,
 					)
 				case .Dot:
 					draw_circle_fill(
-						info.self.box.lo + box_height(info.self.box) / 2,
+						{info.self.box.lo.x + 12, box_center_y(info.self.box)},
 						5,
 						core.style.color.content,
 					)
