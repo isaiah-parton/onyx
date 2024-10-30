@@ -1,4 +1,6 @@
 package onyx
+
+import "../../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -63,13 +65,13 @@ triangle_barycentric :: proc(a, b, c, p: [2]f32) -> (u, v, w: f32) {
 	return
 }
 
-draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: Color) {
-	draw_box_fill(box, primary)
+draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: vgo.Color) {
+	vgo.fill_box(box, paint = primary)
 	for x in 0 ..< int(math.ceil(box_width(box) / size.x)) {
 		for y in 0 ..< int(math.ceil(box_height(box) / size.y)) {
 			if (x + y) % 2 == 0 {
 				pos := box.lo + [2]f32{f32(x), f32(y)} * size
-				draw_box_fill({pos, linalg.min(pos + size, box.hi)}, secondary)
+				vgo.fill_box({pos, linalg.min(pos + size, box.hi)}, paint = secondary)
 			}
 		}
 	}
@@ -91,24 +93,20 @@ Color_Format_Set :: bit_set[Color_Format]
 
 Color_Button_Info :: struct {
 	using _:       Widget_Info,
-	value:         ^Color,
+	value:         ^vgo.Color,
 	show_alpha:    bool,
 	input_formats: Color_Format_Set,
-	text_job:      Text_Job,
+	text_layout:    vgo.Text_Layout,
 	changed:       bool,
 }
 
 init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_location) -> bool {
 	if value == nil do return false
-	text_job = make_text_job(
-		{
-			text = fmt.tprintf("%6x", hex_from_color(value^)),
-			font = core.style.monospace_font,
-			size = 20,
-			align_h = .Middle,
-			align_v = .Middle,
-		},
-	) or_return
+	text_layout = vgo.make_text_layout(
+		fmt.tprintf("%6x", vgo.hex_from_color(value^)),
+		core.style.monospace_font,
+		20,
+	)
 	id = hash(loc)
 	self = get_widget(id) or_return
 	desired_size = core.style.visual_size
@@ -123,25 +121,23 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 	menu_behavior(self)
 
 	if self.visible {
-		draw_rounded_box_shadow(
+		vgo.box_shadow(
 			self.box,
 			core.style.rounding,
 			6,
-			fade({0, 0, 0, 40}, max(self.hover_time, self.open_time)),
+			vgo.fade({0, 0, 0, 40}, max(self.hover_time, self.open_time)),
 		)
-		draw_rounded_box_fill(self.box, core.style.rounding, value^)
-		set_scissor_shape(add_shape_box(self.box, core.style.rounding))
-		draw_text_glyphs(
-			text_job,
+		vgo.fill_box(self.box, core.style.rounding, paint = value^)
+		vgo.fill_text_layout(
+			text_layout,
 			box_center(self.box),
-			{0, 0, 0, 255} if get_color_brightness(value^) > 0.45 else 255,
+			paint = vgo.BLACK if vgo.get_color_brightness(value^) > 0.45 else vgo.WHITE,
 		)
-		set_scissor_shape(0)
-		draw_rounded_box_stroke(
+		vgo.stroke_box(
 			self.box,
-			core.style.rounding,
 			2,
-			fade(core.style.color.accent, max(self.hover_time, self.open_time)),
+			core.style.rounding,
+			paint = vgo.fade(core.style.color.accent, max(self.hover_time, self.open_time)),
 		)
 	}
 
@@ -149,7 +145,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 	PADDING :: 10
 	if .Open in self.state {
 		if .Open not_in self.last_state {
-			kind.hsva = hsva_from_color(value^)
+			kind.hsva = vgo.hsva_from_color(value^)
 		}
 
 		// Salt the hash stack to avoid collisions with other color pickers
@@ -183,12 +179,12 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 				text: string
 				switch format {
 				case .HEX:
-					text = fmt.tprintf("#%6x", hex_from_color(value^))
+					text = fmt.tprintf("#%6x", vgo.hex_from_color(value^))
 				case .RGB:
 					text = fmt.tprintf("%i, %i, %i", value.r, value.g, value.b)
 				case .CMYK:
 				case .HSL:
-					hsl := hsl_from_norm_rgb(normalize_color(value^).rgb)
+					hsl := vgo.hsl_from_norm_rgb(vgo.normalize_color(value^).rgb)
 					text = fmt.tprintf("%.0f, %.0f, %.0f", hsl.x, hsl.y * 100, hsl.z * 100)
 				}
 				// inputs[format].prefix = fmt.tprintf("%v ", format)
@@ -204,13 +200,13 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 
 		menu_layer := get_popup_layer_info(self, layer_size + input_size, side = .Right)
 		if layer(&menu_layer) {
-			draw_shadow(layout_box(), self.open_time)
+			draw_shadow(layout_box())
 			foreground()
 			defer {
-				draw_rounded_box_fill(
+				vgo.fill_box(
 					current_layer().?.box,
 					core.style.rounding,
-					fade(core.style.color.foreground, 1 - self.open_time),
+					vgo.fade(core.style.color.foreground, 1 - self.open_time),
 				)
 			}
 
@@ -235,22 +231,25 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 				if inputs[format].changed {
 					#partial switch format {
 					case .RGB:
-						if color, ok := parse_rgba(inputs[format].text_info.text); ok {
-							kind.hsva.xyz = hsva_from_color(color).xyz
+						if color, ok := vgo.parse_rgba(inputs[format].text); ok {
+						kind.hsva.xyz = vgo.hsva_from_color(color).xyz
 						}
 					case .HEX:
-						if hex, ok := strconv.parse_u64_of_base(inputs[format].text_info.text[1:], 16); ok {
-							kind.hsva.xyz = hsva_from_color(color_from_hex(u32(hex))).xyz
+						if hex, ok := strconv.parse_u64_of_base(
+							inputs[format].text[1:],
+							16,
+						); ok {
+							kind.hsva.xyz = vgo.hsva_from_color(vgo.color_from_hex(u32(hex))).xyz
 							changed = true
 						}
 					}
-					value^ = color_from_hsva(kind.hsva)
+					value^ = vgo.color_from_hsva(kind.hsva)
 				}
 			}
 
 			// Apply changes from wheel and slider
 			if picker_info.changed || slider_info.changed {
-				value^ = color_from_hsva(kind.hsva)
+				value^ = vgo.color_from_hsva(kind.hsva)
 				changed = true
 			}
 
@@ -286,7 +285,7 @@ Alpha_Slider_Info :: struct {
 	value:    ^f32,
 	vertical: bool,
 	changed:  bool,
-	color:    Color,
+	color:    vgo.Color,
 }
 
 init_alpha_slider :: proc(using info: ^Alpha_Slider_Info, loc := #caller_location) -> bool {
@@ -332,9 +331,8 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 		time := clamp(value^, 0, 1)
 		pos := box.lo[i] + (box.hi[i] - box.lo[i]) * time
 		if vertical {
-			draw_vertical_box_gradient(box, fade(color, 0), color)
-			draw_box_fill({{box.lo.x, pos - 1}, {box.hi.x, pos + 1}}, core.style.color.content)
-			// draw_triangle_fill(
+			vgo.fill_box({{box.lo.x, pos - 1}, {box.hi.x, pos + 1}}, paint = core.style.color.content)
+			// vgo.fill_polygon(
 			// 	{box.lo.x - 1.5 * R, pos - 0.866025 * R},
 			// 	{box.lo.x, pos},
 			// 	{box.lo.x - 1.5 * R, pos + 0.866025 * R},
@@ -347,18 +345,17 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 			// 	core.style.color.content,
 			// )
 		} else {
-			draw_horizontal_box_gradient(box, fade(color, 0), color)
-			draw_triangle_fill(
-				{pos - 0.866025 * R, box.lo.y - 1.5 * R},
-				{pos, box.lo.y},
-				{pos + 0.866025 * R, box.lo.y - 1.5 * R},
-				core.style.color.content,
+			vgo.fill_polygon(
+				[2]f32{pos - 0.866025 * R, box.lo.y - 1.5 * R},
+				[2]f32{pos, box.lo.y},
+				[2]f32{pos + 0.866025 * R, box.lo.y - 1.5 * R},
+				paint = core.style.color.content,
 			)
-			draw_triangle_fill(
-				{pos - 0.866025 * R, box.hi.y + 1.5 * R},
-				{pos, box.hi.y},
-				{pos + 0.866025 * R, box.hi.y + 1.5 * R},
-				core.style.color.content,
+			vgo.fill_polygon(
+				[2]f32{pos - 0.866025 * R, box.hi.y + 1.5 * R},
+				[2]f32{pos, box.hi.y},
+				[2]f32{pos + 0.866025 * R, box.hi.y + 1.5 * R},
+				paint = core.style.color.content,
 			)
 		}
 	}
@@ -459,41 +456,14 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 
 	if self.visible {
 		// H wheel
-		STEP :: math.TAU / 48.0
-		wheel_shape := add_shape(
-			Shape {
-				kind = .Circle,
-				cv0 = center,
-				stroke = true,
-				width = (outer - inner) - 4,
-				radius = (inner + outer) * 0.5,
-			},
-		)
-		for t: f32 = 0; t < math.TAU; t += STEP {
-			normal := [2]f32{math.cos(t), math.sin(t)}
-			next_normal := [2]f32{math.cos(t + STEP), math.sin(t + STEP)}
-
-			inner_radius := inner - 2
-			outer_radius := outer + 2
-
-			col0 := color_from_hsva({t * math.DEG_PER_RAD, 1, 1, 1})
-			col1 := color_from_hsva({(t + STEP) * math.DEG_PER_RAD, 1, 1, 1})
-
-			a := add_vertex(
-				{pos = center + normal * outer_radius, col = col0, shape = wheel_shape},
-			)
-			b := add_vertex(
-				{pos = center + normal * inner_radius, col = col0, shape = wheel_shape},
-			)
-			c := add_vertex(
-				{pos = center + next_normal * inner_radius, col = col1, shape = wheel_shape},
-			)
-			d := add_vertex(
-				{pos = center + next_normal * outer_radius, col = col1, shape = wheel_shape},
-			)
-
-			add_indices(a, b, c, a, c, d)
-		}
+		// vgo.add_shape(vgo.Shape{
+		// 	kind = .Circle,
+		// 	cv0 = center,
+		// 	outline = .Stroke,
+		// 	width = (outer - inner) - 4,
+		// 	radius = (inner - outer) * 0.5,
+		// 	paint = vgo.add_paint(vgo.make_wheel_gradient(center))
+		// })
 
 		angle := hsva.x * math.RAD_PER_DEG
 		// Hue point
@@ -506,31 +476,8 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			center + {math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * inner
 
 		// SV triangle
-		tri_shape := add_polygon_shape(point_a, point_b, point_c)
-		a := add_vertex(
-			{
-				pos = center + {math.cos(angle), math.sin(angle)} * (inner + 2),
-				col = color_from_hsva({hsva.x, 1, 1, 1}),
-				shape = tri_shape,
-			},
-		)
-		b := add_vertex(
-			{
-				pos = center +
-				{math.cos(angle - TRIANGLE_STEP), math.sin(angle - TRIANGLE_STEP)} * (inner + 2),
-				col = {0, 0, 0, 255},
-				shape = tri_shape,
-			},
-		)
-		c := add_vertex(
-			{
-				pos = center +
-				{math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * (inner + 2),
-				col = 255,
-				shape = tri_shape,
-			},
-		)
-		add_indices(a, b, c)
+		// TODO: Implement
+		// vgo.fill_polygon(tv0, tv1, tv2, paint = vgo.make_poly_gradient(color_from_hsva({hsva.x, 1, 1, 1}), vgo.BLACK, vgo.WHITE))
 
 		// SV circle
 		point := linalg.lerp(
@@ -539,8 +486,8 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			clamp(1 - hsva.z, 0, 1),
 		)
 		r: f32 = 9 if (self.state >= {.Pressed} && .Active not_in self.state) else 7
-		draw_circle_fill(point, r + 1, {0, 0, 0, 255} if hsva.z > 0.5 else 255)
-		draw_circle_fill(point, r, color_from_hsva({hsva.x, hsva.y, hsva.z, 1}))
+		vgo.fill_circle(point, r + 1, paint = vgo.BLACK if hsva.z > 0.5 else vgo.WHITE)
+		vgo.fill_circle(point, r, paint = vgo.color_from_hsva({hsva.x, hsva.y, hsva.z, 1}))
 	}
 
 	return true
@@ -557,7 +504,7 @@ hsva_picker :: proc(info: HSVA_Picker_Info, loc := #caller_location) -> HSVA_Pic
 
 Color_Picker_Info :: struct {
 	using _: Widget_Info,
-	color:   ^Color,
+	color:   ^vgo.Color,
 }
 
 init_color_picker :: proc(using info: ^Color_Picker_Info, loc := #caller_location) -> bool {
@@ -572,8 +519,8 @@ add_color_picker :: proc(using info: ^Color_Picker_Info) -> bool {
 	defer end_widget()
 
 	if self.visible {
-		draw_box_fill(self.box, color^)
-		draw_box_stroke(self.box, 1, core.style.color.substance)
+		vgo.fill_box(self.box, paint = color^)
+		vgo.stroke_box(self.box, 1, paint = core.style.color.substance)
 	}
 
 	return true

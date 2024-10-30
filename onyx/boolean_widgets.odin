@@ -1,5 +1,6 @@
 package onyx
 
+import "../../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -11,12 +12,12 @@ SIZE :: 20
 TEXT_PADDING :: 5
 
 Boolean_Widget_Info :: struct {
-	using _:   Widget_Info,
-	state:     ^bool,
-	text:      string,
-	text_side: Maybe(Side),
-	text_job:  Text_Job,
-	toggled:   bool,
+	using _:     Widget_Info,
+	state:       ^bool,
+	text:        string,
+	text_side:   Maybe(Side),
+	text_layout: vgo.Text_Layout,
+	toggled:     bool,
 }
 
 Boolean_Widget_Kind :: struct {
@@ -37,17 +38,17 @@ init_boolean_widget :: proc(info: ^Boolean_Widget_Info, loc := #caller_location)
 	info.self = get_widget(info.id) or_return
 	info.text_side = info.text_side.? or_else .Left
 	if len(info.text) > 0 {
-		if text_job, ok := make_text_job(
-			{font = core.style.default_font, size = 18, text = info.text},
-		); ok {
-			info.text_job = text_job
-			if info.text_side == .Bottom || info.text_side == .Top {
-				info.desired_size.x = max(SIZE, info.text_job.size.x)
-				info.desired_size.y = SIZE + info.text_job.size.y
-			} else {
-				info.desired_size.x = SIZE + info.text_job.size.x + TEXT_PADDING * 2
-				info.desired_size.y = SIZE
-			}
+		info.text_layout = vgo.make_text_layout(
+			info.text,
+			core.style.default_font,
+			core.style.button_text_size,
+		)
+		if info.text_side == .Bottom || info.text_side == .Top {
+			info.desired_size.x = max(SIZE, info.text_layout.size.x)
+			info.desired_size.y = SIZE + info.text_layout.size.y
+		} else {
+			info.desired_size.x = SIZE + info.text_layout.size.x + TEXT_PADDING * 2
+			info.desired_size.y = SIZE
 		}
 	} else {
 		info.desired_size = SIZE
@@ -81,44 +82,48 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 			icon_box = self.box
 		}
 		if self.hover_time > 0 {
-			draw_rounded_box_fill(
+			vgo.fill_box(
 				self.box,
 				core.style.rounding,
-				fade(core.style.color.substance, 0.5 * self.hover_time),
+				vgo.fade(core.style.color.substance, 0.5 * self.hover_time),
 			)
 		}
 		opacity: f32 = 0.5 if self.disabled else 1
-		draw_rounded_box_fill(
+		vgo.fill_box(
 			icon_box,
 			core.style.rounding,
-			fade(core.style.color.accent if state^ else core.style.color.substance, opacity),
+			vgo.fade(core.style.color.accent if state^ else core.style.color.substance, opacity),
 		)
 		center := box_center(icon_box)
 		// Paint icon
 		if state^ {
-			draw_check(center, SIZE / 4, core.style.color.background)
+			vgo.check(center, SIZE / 4, core.style.color.background)
 		}
 		// Paint text
 		text_pos: [2]f32
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				text_pos = {icon_box.hi.x + TEXT_PADDING, center.y - info.text_job.size.y / 2}
+				text_pos = {icon_box.hi.x + TEXT_PADDING, center.y - info.text_layout.size.y / 2}
 			case .Right:
-				text_pos = {icon_box.lo.x - TEXT_PADDING, center.y - info.text_job.size.y / 2}
+				text_pos = {icon_box.lo.x - TEXT_PADDING, center.y - info.text_layout.size.y / 2}
 			case .Top:
 				text_pos = self.box.lo
 			case .Bottom:
-				text_pos = {self.box.lo.x, self.box.hi.y - info.text_job.size.y}
+				text_pos = {self.box.lo.x, self.box.hi.y - info.text_layout.size.y}
 			}
-			draw_text_glyphs(info.text_job, text_pos, fade(core.style.color.content, opacity))
+			vgo.fill_text_layout(
+				info.text_layout,
+				text_pos,
+				vgo.fade(core.style.color.content, opacity),
+			)
 			// if self.hover_time > 0 {
-			// 	draw_box_fill(
+			// 	vgo.fill_box(
 			// 		{
-			// 			{text_pos.x, text_pos.y + info.text_job.ascent + 1},
+			// 			{text_pos.x, text_pos.y + info.text_layout.ascent + 1},
 			// 			{
-			// 				text_pos.x + info.text_job.size.x,
-			// 				text_pos.y + info.text_job.ascent + 2,
+			// 				text_pos.x + info.text_layout.size.x,
+			// 				text_pos.y + info.text_layout.ascent + 2,
 			// 			},
 			// 		},
 			// 		fade(core.style.color.content, self.hover_time),
@@ -149,10 +154,12 @@ init_toggle_switch :: proc(using info: ^Toggle_Switch_Info, loc := #caller_locat
 	text_side = text_side.? or_else .Right
 	desired_size = [2]f32{2, 1} * core.style.visual_size.y * 0.75
 	if len(text) > 0 {
-		text_job = make_text_job(
-			{font = core.style.default_font, size = 18, text = text},
-		) or_return
-		desired_size.x += text_job.size.x + TEXT_PADDING
+		text_layout = vgo.make_text_layout(
+			text,
+			core.style.default_font,
+			core.style.button_text_size,
+		)
+		desired_size.x += text_layout.size.x + TEXT_PADDING
 	}
 	fixed_size = true
 	id = hash(loc)
@@ -189,24 +196,27 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 			box_center_y(inner_box),
 		}
 
-		draw_rounded_box_fill(
+		vgo.fill_box(
 			switch_box,
-			outer_radius,
-			lerp_colors(how_on, core.style.color.substance, core.style.color.accent),
+			paint = vgo.mix(how_on, core.style.color.substance, core.style.color.accent),
+			radius = outer_radius,
 		)
-		draw_circle_fill(lever_center, inner_radius, core.style.color.content)
+		vgo.fill_circle(lever_center, inner_radius, core.style.color.content)
 
 		switch text_side {
 		case .Left:
-			draw_text_glyphs(
-				text_job,
-				{self.box.lo.x, box_center_y(self.box) - text_job.size.y / 2},
+			vgo.fill_text_layout(
+				text_layout,
+				{self.box.lo.x, box_center_y(self.box) - text_layout.size.y / 2},
 				core.style.color.content,
 			)
 		case .Right:
-			draw_text_glyphs(
-				text_job,
-				{self.box.hi.x - text_job.size.x, box_center_y(self.box) - text_job.size.y / 2},
+			vgo.fill_text_layout(
+				text_layout,
+				{
+					self.box.hi.x - text_layout.size.x,
+					box_center_y(self.box) - text_layout.size.y / 2,
+				},
 				core.style.color.content,
 			)
 		}
@@ -260,52 +270,55 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 		icon_center := box_center(icon_box)
 
 		if self.hover_time > 0 {
-			draw_box_fill(
+			vgo.fill_box(
 				{{self.box.lo.x + box_height(self.box) / 2, self.box.lo.y}, self.box.hi},
-				fade(core.style.color.substance, 0.5 * self.hover_time),
+				paint = vgo.fade(core.style.color.substance, 0.5 * self.hover_time),
 			)
 		}
 
 		state_time := ease.circular_in_out(kind.state_time)
-		draw_circle_fill(
+		vgo.fill_circle(
 			icon_center,
 			SIZE / 2,
-			lerp_colors(state_time, core.style.color.substance, core.style.color.accent),
+			vgo.mix(state_time, core.style.color.substance, core.style.color.accent),
 		)
 		if state_time > 0 {
-			draw_circle_fill(
+			vgo.fill_circle(
 				icon_center,
 				(SIZE / 2 - 5) * kind.state_time,
-				fade(core.style.color.background, state_time),
+				vgo.fade(core.style.color.background, state_time),
 			)
 		}
 		// Paint text
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				draw_text_glyphs(
-					info.text_job,
-					{icon_box.hi.x + TEXT_PADDING, icon_center.y - info.text_job.size.y / 2},
+				vgo.fill_text_layout(
+					info.text_layout,
+					{icon_box.hi.x + TEXT_PADDING, icon_center.y - info.text_layout.size.y / 2},
 					core.style.color.content,
 				)
 			case .Right:
-				draw_text_glyphs(
-					info.text_job,
-					{icon_box.lo.x - TEXT_PADDING, icon_center.y - info.text_job.size.y / 2},
+				vgo.fill_text_layout(
+					info.text_layout,
+					{icon_box.lo.x - TEXT_PADDING, icon_center.y - info.text_layout.size.y / 2},
 					core.style.color.content,
 				)
 			case .Top:
-				draw_text_glyphs(info.text_job, self.box.lo, core.style.color.content)
+				vgo.fill_text_layout(info.text_layout, self.box.lo, core.style.color.content)
 			case .Bottom:
-				draw_text_glyphs(
-					info.text_job,
-					{self.box.lo.x, self.box.hi.y - info.text_job.size.y},
+				vgo.fill_text_layout(
+					info.text_layout,
+					{self.box.lo.x, self.box.hi.y - info.text_layout.size.y},
 					core.style.color.content,
 				)
 			}
 		}
 		if self.disable_time > 0 {
-			draw_box_fill(self.box, fade(core.style.color.foreground, self.disable_time * 0.5))
+			vgo.fill_box(
+				self.box,
+				paint = vgo.fade(core.style.color.foreground, self.disable_time * 0.5),
+			)
 		}
 	}
 

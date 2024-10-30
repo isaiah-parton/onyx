@@ -1,5 +1,6 @@
 package onyx
 
+import "../../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -83,21 +84,21 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		}
 	}
 
-	background_color := fade(core.style.color.background, 0.9125)
+	background_color := vgo.fade(core.style.color.background, 0.9125)
 
-	draw_shadow(box, core.style.rounding)
+	draw_shadow(box)
 	begin_layer(&{box = box, kind = .Topmost, options = {.No_Scissor}}, loc)
-	draw_rounded_box_fill(box, core.style.rounding, background_color)
+	vgo.fill_box(box, core.style.rounding, background_color)
 
 	// Draw arrow thingy
-	start := u32(len(core.gfx.cvs.data))
+	// TODO: Utilize path procs here
+	start: u32
 	#partial switch info.side {
 	case .Top:
 		center := box_center_x(box)
 		left := box.lo.x + core.style.rounding
 		right := box.hi.x - core.style.rounding
-		append(
-			&core.gfx.cvs.data,
+		start = vgo.add_vertices(
 			[2]f32{center, box.hi.y + offset},
 			[2]f32{center, box.hi.y},
 			[2]f32{right, box.hi.y},
@@ -112,8 +113,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		center := box_center_x(box)
 		left := box.lo.x + core.style.rounding
 		right := box.hi.x - core.style.rounding
-		append(
-			&core.gfx.cvs.data,
+		start = vgo.add_vertices(
 			[2]f32{right, box.lo.y},
 			[2]f32{center, box.lo.y},
 			[2]f32{left, box.lo.y},
@@ -128,8 +128,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		center := box_center_y(box)
 		top := box.lo.y + core.style.rounding
 		bottom := box.hi.y - core.style.rounding
-		append(
-			&core.gfx.cvs.data,
+		start = vgo.add_vertices(
 			[2]f32{box.lo.x, bottom},
 			[2]f32{box.lo.x, center},
 			[2]f32{box.lo.x, top},
@@ -144,8 +143,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		center := box_center_y(box)
 		top := box.lo.y + core.style.rounding
 		bottom := box.hi.y - core.style.rounding
-		append(
-			&core.gfx.cvs.data,
+		start = vgo.add_vertices(
 			[2]f32{box.hi.x, top},
 			[2]f32{box.hi.x, center},
 			[2]f32{box.hi.x, bottom},
@@ -157,7 +155,9 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 			[2]f32{box.hi.x, top},
 		)
 	}
-	render_shape(add_shape({kind = .Path, start = start, count = 3}), background_color)
+	vgo.add_shape(
+		{kind = .Path, start = start, count = 3, paint = vgo.paint_index_from_option(vgo.WHITE)},
+	)
 
 	return true
 }

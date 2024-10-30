@@ -1,5 +1,6 @@
 package onyx
 
+import "../../vgo"
 import "tedit"
 
 Label_Info :: struct {
@@ -7,27 +8,21 @@ Label_Info :: struct {
 	text:        string,
 	header:      bool,
 	interactive: bool,
-	font:        Maybe(int),
 	font_size:   Maybe(f32),
-	color:       Maybe(Color),
-	text_job:    Text_Job,
+	font:        Maybe(vgo.Font),
+	color:       Maybe(vgo.Color),
+	text_layout: vgo.Text_Layout,
 	was_copied:  bool,
 }
 
 init_label :: proc(using info: ^Label_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
-	text_job = make_text_job(
-	{
-		text = text,
-		size = font_size.? or_else core.style.content_text_size,
-		font = font.? or_else core.style.default_font,
-		align_h = .Left,
-		align_v = .Top,
-	},
-	// &core.text_editor,
-	// core.mouse_pos - self.box.lo,
-	) or_return
-	desired_size = text_job.size
+	text_layout = vgo.make_text_layout(
+		text,
+		font.? or_else core.style.default_font,
+		font_size.? or_else core.style.content_text_size,
+	)
+	desired_size = text_layout.size
 	fixed_size = true
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
@@ -41,9 +36,9 @@ add_label :: proc(using info: ^Label_Info) -> bool {
 
 	if self.visible {
 		if interactive {
-			draw_text_highlight(text_job, self.box.lo, core.style.color.accent)
+			// draw_text_highlight(text_layout, self.box.lo, core.style.color.accent)
 		}
-		draw_text_glyphs(text_job, self.box.lo, color.? or_else core.style.color.content)
+		vgo.fill_text_layout(text_layout, self.box.lo, color.? or_else core.style.color.content)
 	}
 
 	return true

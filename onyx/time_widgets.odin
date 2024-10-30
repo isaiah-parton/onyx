@@ -6,6 +6,7 @@ import "core:math/ease"
 import "core:strings"
 import t "core:time"
 import dt "core:time/datetime"
+import "../../vgo"
 
 Date :: dt.Date
 CALENDAR_WEEK_SPACING :: 4
@@ -96,16 +97,14 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 		if button({text = "\uEA6E", style = .Outlined}).clicked {
 			month_offset += 1
 		}
-		draw_text(
+		vgo.fill_text_aligned(
+			fmt.tprintf("%s %i", t.Month(info.month), info.year),
+			core.style.default_font,
+			18,
 			box_center(layout_box()),
-			{
-				text = fmt.tprintf("%s %i", t.Month(info.month), info.year),
-				font = core.style.default_font,
-				size = 18,
-				align_h = .Middle,
-				align_v = .Middle,
-			},
-			core.style.color.content,
+			.Center,
+			.Center,
+			paint = core.style.color.content,
 		)
 		// if core.mouse_scroll.y != 0 {
 		// 	month_offset += int(core.mouse_scroll.y)
@@ -121,16 +120,14 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 	weekdays := [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
 	for weekday in weekdays {
 		sub_box := cut_box_left(&layout_box, size)
-		draw_text(
+		vgo.fill_text_aligned(
+			weekday,
+			core.style.default_font,
+			18,
 			box_center(sub_box),
-			{
-				text = weekday,
-				font = core.style.default_font,
-				size = 18,
-				align_h = .Middle,
-				align_v = .Middle,
-			},
-			fade(core.style.color.content, 0.5),
+			.Center,
+			.Center,
+			paint = vgo.fade(core.style.color.content, 0.5),
 		)
 	}
 
@@ -173,22 +170,22 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 					corners[1] = core.style.rounding
 					corners[3] = core.style.rounding
 				}
-				draw_rounded_box_corners_fill(
+				vgo.fill_box(
 					self.box,
 					corners,
-					fade(core.style.color.substance, 1 if is_month else 0.5),
+					vgo.fade(core.style.color.substance, 1 if is_month else 0.5),
 				)
 			} else {
 				// Hover box
 				if self.hover_time > 0 {
-					draw_rounded_box_fill(
+					vgo.fill_box(
 						self.box,
 						core.style.shape.rounding,
-						fade(core.style.color.substance, self.hover_time),
+						vgo.fade(core.style.color.substance, self.hover_time),
 					)
 				}
 				if date == todays_date() {
-					draw_rounded_box_stroke(
+					vgo.stroke_box(
 						self.box,
 						core.style.shape.rounding,
 						1,
@@ -198,25 +195,23 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 			}
 			// Focus box
 			if self.focus_time > 0 {
-				draw_rounded_box_fill(
+				vgo.fill_box(
 					self.box,
 					core.style.shape.rounding,
-					fade(core.style.color.content, self.focus_time),
+					vgo.fade(core.style.color.content, self.focus_time),
 				)
 			}
 			// Day number
-			draw_text(
+			vgo.fill_text_aligned(
+				fmt.tprint(day),
+				core.style.default_font,
+				18,
 				box_center(self.box),
-				{
-					text = fmt.tprint(day),
-					font = core.style.default_font,
-					size = 18,
-					align_v = .Middle,
-					align_h = .Middle,
-				},
-				lerp_colors(
+				.Center,
+				.Center,
+				paint = vgo.mix(
 					self.focus_time,
-					core.style.color.content if is_month else fade(core.style.color.content, 0.5),
+					core.style.color.content if is_month else vgo.fade(core.style.color.content, 0.5),
 					core.style.color.background,
 				),
 			)
@@ -297,12 +292,12 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 	self.open_time = animate(self.open_time, 0.2, .Open in self.state)
 
 	if self.visible {
-		draw_rounded_box_fill(
+		vgo.fill_box(
 			self.box,
 			core.style.rounding,
-			alpha_blend_colors(core.style.color.background, core.style.color.substance, self.hover_time * 0.5),
+			paint = vgo.blend(core.style.color.background, core.style.color.substance, self.hover_time * 0.5),
 		)
-		draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
+		vgo.stroke_box(self.box, core.style.rounding, 1, core.style.color.substance)
 
 		b := strings.builder_make(context.temp_allocator)
 
@@ -315,15 +310,14 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 			}
 		}
 
-		draw_text(
+		vgo.fill_text_aligned(
+			strings.to_string(b),
+			core.style.default_font,
+			core.style.content_text_size,
 			[2]f32{self.box.lo.x + 7, box_center_y(self.box)},
-			{
-				text = strings.to_string(b),
-				font = core.style.default_font,
-				size = core.style.content_text_size,
-				align_v = .Middle,
-			},
-			core.style.color.content,
+			.Left,
+			.Center,
+			paint = core.style.color.content,
 		)
 	}
 
@@ -338,7 +332,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 
 		menu_layer := get_popup_layer_info(self, calendar_info.desired_size + core.style.menu_padding * 2, side = .Left)
 		if layer(&menu_layer) {
-			draw_shadow(layout_box(), self.open_time)
+			draw_shadow(layout_box())
 			foreground()
 			shrink_layout(core.style.menu_padding)
 			set_width_auto()

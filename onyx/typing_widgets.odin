@@ -1,5 +1,6 @@
 package onyx
 
+import "../../vgo"
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
@@ -33,12 +34,14 @@ Input_Info :: struct {
 	read_only:   bool,
 	hidden:      bool,
 	undecorated: bool,
-	text_info:   Text_Info,
-	text_job:    Text_Job,
+	text_layout:  vgo.Text_Layout,
 	text_pos:    [2]f32,
 	changed:     bool,
 	submitted:   bool,
 	enter:       bool,
+	text:        string,
+	font:        vgo.Font,
+	font_size: f32,
 }
 
 Input_State :: struct {
@@ -58,15 +61,10 @@ init_input :: proc(info: ^Input_Info, loc := #caller_location) -> bool {
 	info.sticky = true
 	// Default desired size
 	info.desired_size = core.style.visual_size
-	//
-	info.text_info = Text_Info {
-		font   = core.style.monospace_font if info.monospace else core.style.default_font,
-		size   = core.style.content_text_size,
-		hidden = info.hidden && len(info.text_info.text) > 0,
-	}
+	info.font = core.style.monospace_font if info.monospace else core.style.default_font
 	// Stuff
 	if info.builder != nil {
-		info.text_info.text = strings.to_string(info.builder^)
+		info.text = strings.to_string(info.builder^)
 	}
 	return true
 }
@@ -78,11 +76,13 @@ input_behavior :: proc(info: ^Input_Info) -> bool {
 	editor := &info.self.input.editor
 	//
 	if info.self.visible || .Active in info.self.state {
-		info.text_job = make_text_job(
-			info.text_info,
-			editor,
-			core.mouse_pos - (info.text_pos - info.self.input.offset),
-		) or_return
+		info.text_layout = vgo.make_text_layout(
+			info.text,
+			info.font,
+			core.style.button_text_size,
+			selection = editor.selection,
+			mouse = core.mouse_pos - (info.text_pos - info.self.input.offset),
+		)
 	}
 	//
 	if editor.builder == nil {
@@ -200,77 +200,80 @@ input_behavior :: proc(info: ^Input_Info) -> bool {
 	// Mouse selection
 	last_selection := editor.selection
 	// Input is currently pressed and hovered rune is valid
-	if .Pressed in info.self.state && info.text_job.hovered_rune >= 0 {
+	if .Pressed in info.self.state && info.text_layout.mouse_index >= 0 {
 		// Was just pressed?
 		if .Pressed not_in info.self.last_state {
 			// Set click anchor
-			info.self.input.anchor = info.text_job.hovered_rune
+			info.self.input.anchor = info.text_layout.mouse_index
 			// Initial selection
 			if info.self.click_count == 3 {
 				// Triple-click selects all
 				tedit.editor_execute(editor, .Select_All)
 			} else {
 				// Default case
-				editor.selection = {info.text_job.hovered_rune, info.text_job.hovered_rune}
+				editor.selection = {info.text_layout.mouse_index, info.text_layout.mouse_index}
 			}
 		}
 		// Handle dragging
 		switch info.self.click_count {
 		// Double-click selects by `word_proc`
 		case 2:
-			if info.text_job.hovered_rune < info.self.input.anchor {
-			if info.text_info.text[info.text_job.hovered_rune] == ' ' {
-			editor.selection[0] = info.text_job.hovered_rune
+			if info.text_layout.mouse_index < info.self.input.anchor {
+			if info.text[info.text_layout.mouse_index] == ' ' {
+			editor.selection[0] = info.text_layout.mouse_index
 				} else {
 					editor.selection[0] = max(
 						0,
 						strings.last_index_proc(
-							info.text_info.text[:info.text_job.hovered_rune],
+							info.text[:info.text_layout.mouse_index],
 							word_proc,
 						) +
 						1,
 					)
 				}
 				editor.selection[1] = strings.index_proc(
-					info.text_info.text[info.self.input.anchor:],
+					info.text[info.self.input.anchor:],
 					word_proc,
 				)
 				if editor.selection[1] == -1 {
-					editor.selection[1] = len(info.text_info.text)
+					editor.selection[1] = len(info.text)
 				} else {
 					editor.selection[1] += info.self.input.anchor
 				}
 			} else {
 				editor.selection[1] = max(
 					0,
-					strings.last_index_proc(info.text_info.text[:info.self.input.anchor], word_proc) +
+					strings.last_index_proc(
+						info.text[:info.self.input.anchor],
+						word_proc,
+					) +
 					1,
 				)
-				if (info.text_job.hovered_rune > 0 &&
-					   info.text_info.text[info.text_job.hovered_rune - 1] == ' ') {
+				if (info.text_layout.mouse_index > 0 &&
+					   info.text[info.text_layout.mouse_index - 1] == ' ') {
 					editor.selection[0] = 0
 				} else {
 					editor.selection[0] = strings.index_proc(
-						info.text_info.text[info.text_job.hovered_rune:],
+						info.text[info.text_layout.mouse_index:],
 						word_proc,
 					)
 				}
 				if editor.selection[0] == -1 {
-					editor.selection[0] = len(info.text_info.text) - info.text_job.hovered_rune
+					editor.selection[0] = len(info.text) - info.text_layout.mouse_index
 				}
-				editor.selection[0] += info.text_job.hovered_rune
+				editor.selection[0] += info.text_layout.mouse_index
 			}
 		// Normal select
 		case 1:
-			editor.selection[0] = info.text_job.hovered_rune
+			editor.selection[0] = info.text_layout.mouse_index
 		}
 	}
 	// Resolve view offset so the cursor is always shown
-	if .Active in info.self.last_state && info.text_job.cursor_glyph >= 0 {
-		glyph := info.text_job.glyphs[info.text_job.cursor_glyph]
-		glyph_pos := (info.text_pos - info.self.input.offset) + glyph.pos
+	if .Active in info.self.last_state && info.text_layout.hovered_glyph >= 0 {
+		glyph := info.text_layout.glyphs[info.text_layout.hovered_glyph]
+		glyph_pos := (info.text_pos - info.self.input.offset) + glyph.offset
 		// The cursor's own bounding box
-		cursor_box := Box{glyph_pos + {-1, -2}, glyph_pos + {1, info.text_job.line_height + 2}}
+		cursor_box := Box{glyph_pos + {-1, -2}, glyph_pos + {1, info.text_layout.font.line_height + 2}}
 		// The box we want the cursor to stay in
 		inner_box := shrink_box(info.self.box, 4)
 		// Move view offset
@@ -318,7 +321,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	}
 
 	if self.visible && !undecorated {
-		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.background)
+		vgo.fill_box(self.box, core.style.rounding, core.style.color.background)
 	}
 
 	if builder == nil {
@@ -328,29 +331,23 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	text_pos = self.box.lo - self.input.offset
 
 	if .Active in self.state || submitted {
-		text_info.text = strings.to_string(builder^)
+		text = strings.to_string(builder^)
 	}
 
 	// Offset text origin based on font size
 	info.text_pos.x += core.style.text_padding.x
-	if font, ok := &core.fonts[text_info.font].?; ok {
-		if font_size, ok := get_font_size(font, text_info.size); ok {
-			if info.multiline {
-				text_pos.y = self.box.lo.y + (font_size.ascent - font_size.descent) / 2
-			} else {
-				text_pos.y =
-					(self.box.hi.y + self.box.lo.y) / 2 -
-					(font_size.ascent - font_size.descent) / 2
-			}
-		}
+	if info.multiline {
+		text_pos.y = self.box.lo.y + (font.ascend - font.descend) * info.font_size * 0.5
+	} else {
+		text_pos.y =
+			(self.box.hi.y + self.box.lo.y) / 2 -
+			(font.ascend - font.descend) / 2
 	}
 	// `text_offset` must be updated for the mouse interaction to line up
-	prefix_text_job: Maybe(Text_Job)
+	prefix_text_layout: vgo.Text_Layout
 	if len(prefix) > 0 {
-		prefix_text_job, _ = make_text_job({text = prefix, options = text_info.options})
-		if prefix_text_job, ok := prefix_text_job.?; ok {
-			text_pos.x += prefix_text_job.size.x
-		}
+		prefix_text_layout = vgo.make_text_layout(prefix, font, font_size)
+		text_pos.x += prefix_text_layout.size.x
 	}
 
 	input_behavior(info) or_return
@@ -361,32 +358,30 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	}
 
 	if self.visible {
-		push_scissor(self.box, add_shape_box(self.box, core.style.rounding))
+		vgo.push_scissor(vgo.make_box(self.box, core.style.rounding))
 		// Draw text placeholder
-		if len(text_info.text) == 0 {
-			text_info := text_info
-			text_info.text = info.placeholder
-			draw_text(text_pos, text_info, fade(core.style.color.content, 0.5))
+		if len(info.text) == 0 {
+			vgo.fill_text(placeholder, font, font_size, text_pos, paint = vgo.fade(core.style.color.content, 0.5))
 		}
 		// Draw prefix
-		if prefix_text_job, ok := prefix_text_job.?; ok {
-			draw_text_glyphs(
-				prefix_text_job,
-				text_pos + {-prefix_text_job.size.x, 0},
-				fade(core.style.color.content, 0.5),
+		if len(prefix) > 0 {
+			vgo.fill_text_layout(
+				prefix_text_layout,
+				text_pos + {-prefix_text_layout.size.x, 0},
+				vgo.fade(core.style.color.content, 0.5),
 			)
 		}
 		// First draw the highlighting behind the text
 		if .Active in self.last_state {
-			draw_text_highlight(text_job, text_pos, fade(core.style.color.accent, 0.5))
+			// draw_text_highlight(text_layout, text_pos, fade(core.style.color.accent, 0.5))
 		}
 		// Then draw the text
-		draw_text_glyphs(text_job, text_pos, core.style.color.content)
+		vgo.fill_text_layout(text_layout, text_pos, core.style.color.content)
 		// Draw the cursor in front of the text
 		if .Active in self.last_state {
-			draw_text_cursor(text_job, text_pos, core.style.color.accent)
+			// draw_text_cursor(text_layout, text_pos, core.style.color.accent)
 		}
-		pop_scissor()
+		vgo.pop_scissor()
 		// Draw decal
 		if self.input.icon_time > 0 {
 			a := box_height(self.box) / 2
@@ -396,31 +391,31 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				break
 			case .Check:
 				scale := [2]f32{1 + 4 * self.input.icon_time, 5}
-				// begin_path()
-				// point(center + {-1, -0.047} * scale)
-				// point(center + {-0.333, 0.619} * scale)
-				// point(center + {1, -0.713} * scale)
-				// stroke_path(2, {0, 255, 120, 255})
-				// end_path()
+			// begin_path()
+			// point(center + {-1, -0.047} * scale)
+			// point(center + {-0.333, 0.619} * scale)
+			// point(center + {1, -0.713} * scale)
+			// stroke_path(2, {0, 255, 120, 255})
+			// end_path()
 			case .Spinner:
-				draw_spinner(center, 5, core.style.color.content)
+				vgo.spinner(center, 5, core.style.color.content)
 			}
 		}
 		// Optional outline
 		if !undecorated {
-			draw_rounded_box_stroke(
+			vgo.stroke_box(
 				self.box,
 				core.style.rounding,
 				2,
-				fade(core.style.color.accent, self.focus_time),
+				vgo.fade(core.style.color.accent, self.focus_time),
 			)
 		}
 		// Draw disabled overlay
 		if self.disable_time > 0 {
-			draw_rounded_box_fill(
+			vgo.fill_box(
 				self.box,
 				core.style.rounding,
-				fade(core.style.color.foreground, self.disable_time * 0.5),
+				vgo.fade(core.style.color.foreground, self.disable_time * 0.5),
 			)
 		}
 	}
@@ -454,7 +449,7 @@ init_string_input :: proc(using info: ^String_Input_Info, loc := #caller_locatio
 		strings.builder_reset(builder)
 		strings.write_string(builder, value^)
 	}
-	text_info.text = value^
+	text = value^
 	return true
 }
 
@@ -495,7 +490,7 @@ init_number_input :: proc(info: ^Number_Input_Info($T), loc := #caller_location)
 		fmt.sbprintf(info.builder, info.format.? or_else "{:v}", info.value^)
 	}
 	if .Active not_in info.self.state {
-		info.text_info.text = fmt.tprintf(info.format.? or_else "{:v}", info.value^)
+		info.text = fmt.tprintf(info.format.? or_else "{:v}", info.value^)
 	}
 	return true
 }

@@ -1,5 +1,6 @@
 package onyx
 
+import "../../vgo"
 import "base:runtime"
 import "core:fmt"
 import "core:math"
@@ -15,6 +16,7 @@ import "tedit"
 import "vendor:fontstash"
 import "vendor:glfw"
 import "vendor:wgpu"
+import "vendor:wgpu/glfwglue"
 
 EMBED_DEFAULT_FONTS :: #config(ONYX_EMBED_FONTS, false)
 FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx/fonts")
@@ -72,6 +74,12 @@ Core :: struct {
 	debug:                 Debug_State,
 	view:                  [2]f32,
 	desired_fps:           int,
+	// Graphis
+	instance:              wgpu.Instance,
+	device:                wgpu.Device,
+	adapter:                wgpu.Adapter,
+	surface:               wgpu.Surface,
+	surface_config:        wgpu.SurfaceConfiguration,
 	// Disable frame rate limit
 	disable_frame_skip:    bool,
 	// Timings
@@ -131,37 +139,16 @@ Core :: struct {
 	focused:               bool,
 	// Style
 	style:                 Style,
-	// Text
-	fonts:                 [MAX_FONTS]Maybe(Font),
-	// Texture atlas
-	atlas:                 Atlas,
 	// Source boxes of user images on the texture atlas
 	user_images:           [100]Maybe(Box),
 	// Scratch text editor
 	text_editor:           tedit.Editor,
-	// Global arrays referenced by text jobs
-	// their contents are transient
-	glyphs:                [dynamic]Text_Job_Glyph,
-	lines:                 [dynamic]Text_Job_Line,
 	// Drawing
 	draw_this_frame:       bool,
 	draw_next_frame:       bool,
 	frames:                int,
 	drawn_frames:          int,
-	draw_state:            Draw_State,
-	// Transform matrices
-	matrix_stack:          Stack(Matrix, MAX_MATRICES),
-	current_matrix:        ^Matrix,
-	last_matrix:           Matrix,
-	matrix_index:          u32,
-	// Currently bound user texture
-	current_texture:       wgpu.Texture,
-	// Scissors
-	scissor_stack:         Stack(Scissor, 100),
-	draw_calls:            [dynamic]Draw_Call,
-	current_draw_call:     ^Draw_Call,
 	cursors:               [Mouse_Cursor]glfw.CursorHandle,
-	gfx:                   Graphics,
 }
 
 view_box :: proc() -> Box {
@@ -181,8 +168,8 @@ view_height :: proc() -> f32 {
 }
 
 load_default_fonts :: proc() -> bool {
-	DEFAULT_FONT :: "Geist-Medium.ttf"
-	MONOSPACE_FONT :: "Recursive_Monospace-Medium.ttf"
+	DEFAULT_FONT :: "Geist-Regular.ttf"
+	MONOSPACE_FONT :: "Recursive_Monospace-Regular.ttf"
 	HEADER_FONT :: "Lora-Medium.ttf"
 	ICON_FONT :: "remixicon.ttf"
 
@@ -190,35 +177,37 @@ load_default_fonts :: proc() -> bool {
 		#load("fonts/" + DEFAULT_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
 	MONOSPACE_FONT_DATA: Maybe([]u8) =
 		#load("fonts/" + MONOSPACE_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-	HEADER_FONT_DATA: Maybe([]u8) = #load("fonts/" + HEADER_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-	ICON_FONT_DATA: Maybe([]u8) = #load("fonts/" + ICON_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	HEADER_FONT_DATA: Maybe([]u8) =
+		#load("fonts/" + HEADER_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	ICON_FONT_DATA: Maybe([]u8) =
+		#load("fonts/" + ICON_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
 
-	core.style.default_font = load_font_from_memory(
-		DEFAULT_FONT_DATA.? or_else os.read_entire_file(
-			fmt.tprintf("%s/%s", FONT_PATH, DEFAULT_FONT),
-		) or_return,
-	) or_return
-	core.style.monospace_font = load_font_from_memory(
-		MONOSPACE_FONT_DATA.? or_else os.read_entire_file(
-			fmt.tprintf("%s/%s", FONT_PATH, MONOSPACE_FONT),
-		) or_return,
-		monospace = true,
-	) or_return
-	core.style.header_font = load_font_from_memory(
-		HEADER_FONT_DATA.? or_else os.read_entire_file(
-			fmt.tprintf("%s/%s", FONT_PATH, HEADER_FONT),
-		) or_return,
-	) or_return
-	core.style.icon_font = load_font_from_memory(
-		ICON_FONT_DATA.? or_else os.read_entire_file(
-			fmt.tprintf("%s/%s", FONT_PATH, ICON_FONT),
-		) or_return,
-	) or_return
+	// core.style.default_font = load_font_from_memory(
+	// 	DEFAULT_FONT_DATA.? or_else os.read_entire_file(
+	// 		fmt.tprintf("%s/%s", FONT_PATH, DEFAULT_FONT),
+	// 	) or_return,
+	// ) or_return
+	// core.style.monospace_font = load_font_from_memory(
+	// 	MONOSPACE_FONT_DATA.? or_else os.read_entire_file(
+	// 		fmt.tprintf("%s/%s", FONT_PATH, MONOSPACE_FONT),
+	// 	) or_return,
+	// 	monospace = true,
+	// ) or_return
+	// core.style.header_font = load_font_from_memory(
+	// 	HEADER_FONT_DATA.? or_else os.read_entire_file(
+	// 		fmt.tprintf("%s/%s", FONT_PATH, HEADER_FONT),
+	// 	) or_return,
+	// ) or_return
+	// core.style.icon_font = load_font_from_memory(
+	// 	ICON_FONT_DATA.? or_else os.read_entire_file(
+	// 		fmt.tprintf("%s/%s", FONT_PATH, ICON_FONT),
+	// 	) or_return,
+	// ) or_return
 
 	return true
 }
 
-init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
+start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	if window == nil do return false
 
 	// Default style
@@ -277,10 +266,14 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	})
 	glfw.SetWindowSizeCallback(core.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
 		context = runtime.default_context()
+
+		core.surface_config.width = u32(width)
+		core.surface_config.height = u32(height)
+		wgpu.SurfaceConfigure(core.surface, &core.surface_config)
+
 		core.draw_this_frame = true
 		core.draw_next_frame = true
 		core.view = {f32(width), f32(height)}
-		resize_graphics(&core.gfx, int(width), int(height))
 		core.draw_this_frame = true
 		core.draw_next_frame = true
 	})
@@ -326,12 +319,59 @@ init :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		},
 	)
 
-	// Initialize graphics pipeline
-	init_graphics(&core.gfx, core.window)
+	// Initialize WGPU
+	core.instance = wgpu.CreateInstance()
+	core.surface = glfwglue.GetSurface(core.instance, window)
 
-	// Init font atlas
-	atlas_size: int = min(cast(int)core.gfx.device_limits.maxTextureDimension2D, MAX_ATLAS_SIZE)
-	init_atlas(&core.atlas, &core.gfx, atlas_size, atlas_size)
+	on_device :: proc "c" (
+		status: wgpu.RequestDeviceStatus,
+		device: wgpu.Device,
+		message: cstring,
+		userdata: rawptr,
+	) {
+		context = runtime.default_context()
+		switch status {
+		case .Success: (^Core)(userdata).device = device
+		case .Error: fmt.panicf("Unable to aquire device: %s", message)
+		case .Unknown: panic("Unknown error")
+		}
+	}
+
+	on_adapter :: proc "c" (
+		status: wgpu.RequestAdapterStatus,
+		adapter: wgpu.Adapter,
+		message: cstring,
+		userdata: rawptr,
+	) {
+		context = runtime.default_context()
+		switch status {
+		case .Success:
+			(^Core)(userdata).adapter = adapter
+			info := wgpu.AdapterGetInfo(adapter)
+			fmt.printfln("Using %v on %v", info.backendType, info.description)
+
+			descriptor := vgo.device_descriptor()
+			wgpu.AdapterRequestDevice(
+				adapter,
+				&descriptor,
+				on_device,
+				userdata,
+			)
+		case .Error: fmt.panicf("Unable to acquire adapter: %s", message)
+		case .Unavailable: panic("Adapter unavailable")
+		case .Unknown: panic("Unknown error")
+		}
+	}
+
+	wgpu.InstanceRequestAdapter(core.instance, &{powerPreference = .LowPower}, on_adapter, &core)
+
+	core.surface_config = vgo.surface_configuration(core.device, core.adapter, core.surface)
+	core.surface_config.width = u32(width)
+	core.surface_config.height = u32(height)
+	wgpu.SurfaceConfigure(core.surface, &core.surface_config)
+
+	// Initialize vgo
+	vgo.start(core.device, core.surface, core.surface_config.format)
 
 	core.ready = true
 
@@ -366,30 +406,12 @@ new_frame :: proc() {
 		core.frames_so_far = 0
 	}
 
-	// Reset draw calls and draw list
-	clear(&core.draw_calls)
-	core.current_draw_call = nil
-
-	// Reset draw state
-	core.draw_state = {}
-	core.current_texture = {}
-
-	core.scissor_stack.height = 0
-	core.matrix_stack.height = 0
-	core.current_matrix = nil
-	core.matrix_index = 0
-	core.last_matrix = {}
-
 	// Clear inputs
 	core.last_mouse_bits = core.mouse_bits
 	core.last_mouse_pos = core.mouse_pos
 	core.last_keys = core.keys
 	core.mouse_scroll = {}
 	clear(&core.runes)
-
-	// Clear text job arrays
-	clear(&core.glyphs)
-	clear(&core.lines)
 
 	// Clear temp allocator
 	free_all(context.temp_allocator)
@@ -445,7 +467,6 @@ new_frame :: proc() {
 	// Purge layers
 	for id, &layer in core.layer_map {
 		if layer.dead {
-
 			// Move other layers down by one z index
 			for i in 0 ..< len(core.layers) {
 				other_layer := &core.layers[i]
@@ -472,7 +493,6 @@ new_frame :: proc() {
 		} else {
 			layer.dead = true
 		}
-
 	}
 
 	// Free unused widgets
@@ -495,23 +515,14 @@ new_frame :: proc() {
 	// Process widgets
 	process_widgets()
 
-	reset(&core.gfx)
-
-	// For now, null paint lives at index 0
-	append(&core.gfx.paints.data, Paint{kind = .Normal})
-
-	// And glyph paint lives at index 1
-	append(&core.gfx.paints.data, Paint{kind = .Atlas_Sample})
-
-	// Default shape lives at index 0
-	append(&core.gfx.shapes.data, Shape{kind = .Normal})
+	vgo.new_frame()
 
 	// User code profiler scope
 	profiler_begin_scope(.Construct)
 }
 
 // Render queued draw calls and reset draw state
-render :: proc() {
+present :: proc() {
 	profiler_end_scope(.Construct)
 	profiler_scope(.Render)
 
@@ -523,21 +534,14 @@ render :: proc() {
 		do_debug_layer()
 	}
 
-	// Update the atlas if needed
-	if core.atlas.modified {
-		t := time.now()
-		update_atlas(&core.atlas, &core.gfx)
-		core.atlas.modified = false
-	}
-
 	if core.draw_this_frame && core.visible {
-		draw(&core.gfx, core.draw_calls[:])
+		vgo.present()
 		core.drawn_frames += 1
 		core.draw_this_frame = false
 	}
 }
 
-destroy :: proc() {
+shutdown :: proc() {
 	if !core.ready {
 		return
 	}
@@ -550,20 +554,12 @@ destroy :: proc() {
 		destroy_layer(layer)
 	}
 
-	for &font, f in core.fonts {
-		if font, ok := font.?; ok {
-			destroy_font(&font)
-		}
-	}
-
 	delete(core.widget_map)
 	delete(core.panel_map)
 	delete(core.layer_map)
-	delete(core.glyphs)
-	delete(core.lines)
 	delete(core.runes)
-	destroy_atlas(&core.atlas)
-	destroy_graphics(&core.gfx)
+
+	vgo.shutdown()
 }
 
 __set_clipboard_string :: proc(_: rawptr, str: string) -> bool {
@@ -577,4 +573,8 @@ __get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
 	str = glfw.GetClipboardString(core.window)
 	ok = len(str) > 0
 	return
+}
+
+draw_shadow :: proc(box: vgo.Box) {
+	vgo.box_shadow(box, core.style.rounding, 6, core.style.color.shadow)
 }

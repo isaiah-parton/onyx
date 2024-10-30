@@ -5,15 +5,16 @@ import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 import "core:reflect"
+import "../../vgo"
 
 Breadcrumb_Info :: struct {
 	using _:   Widget_Info,
 	text:      string,
+	text_layout: vgo.Text_Layout,
 	index:     ^int,
 	options:   []string,
 	is_tail:   bool,
 	has_menu:  bool,
-	text_info: Text_Info,
 }
 
 init_breadcrumb :: proc(using info: ^Breadcrumb_Info, loc := #caller_location) -> bool {
@@ -21,12 +22,9 @@ init_breadcrumb :: proc(using info: ^Breadcrumb_Info, loc := #caller_location) -
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	has_menu = len(options) > 1 && index != nil
-	text_info = {
-		text = options[index^] if has_menu else text,
-		font = core.style.default_font,
-		size = core.style.button_text_size,
-	}
-	desired_size = measure_text(text_info)
+	text = options[index^] if has_menu else text
+	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.button_text_size)
+	desired_size = text_layout.size
 	if !is_tail {
 		desired_size.x += 20
 	}
@@ -49,14 +47,14 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 	menu_behavior(self)
 
 	if self.visible {
-		color := fade(core.style.color.content, 0.5 + 0.5 * self.hover_time)
-		draw_text(self.box.lo, info.text_info, color)
+		color := vgo.fade(core.style.color.content, 0.5 + 0.5 * self.hover_time)
+		vgo.fill_text(text, core.style.default_font, core.style.button_text_size, self.box.lo, paint = color)
 		if info.has_menu {
-			draw_arrow({math.floor(self.box.hi.x - 24), box_center_y(self.box)}, 5, color)
+			vgo.arrow({math.floor(self.box.hi.x - 24), box_center_y(self.box)}, 5, color)
 		}
 		if !info.is_tail {
 			origin: [2]f32 = {math.floor(self.box.hi.x - 10), box_center_y(self.box)}
-			draw_line(origin + {-2, 6}, origin + {2, -6}, 2, fade(core.style.color.content, 0.5))
+			vgo.line(origin + {-2, 6}, origin + {2, -6}, 2, vgo.fade(core.style.color.content, 0.5))
 		}
 	}
 

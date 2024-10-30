@@ -2,6 +2,7 @@ package onyx
 // Layers exist only to allow ordered rendering
 // Layers have no interaction of their own, but clicking or hovering a widget in a given layer, will update its
 // state.
+import "../../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -213,19 +214,18 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 
 	// Set vertex z position
 	if .No_Scissor not_in info.self.options {
-		push_scissor(info.self.box)
+		vgo.push_scissor(vgo.make_box(info.self.box))
 	}
 
-	info.self.draw_call_index = len(core.draw_calls)
-	append_draw_call(info.self.index)
+	vgo.set_draw_order(info.self.index)
 
 	// Transform matrix
 	scale: [2]f32 = info.scale.? or_else 1
-	push_matrix()
-	translate_matrix(info.origin.x, info.origin.y, 0)
-	scale_matrix(scale.x, scale.y, 1)
-	rotate_matrix(info.rotation, 0, 0, 1)
-	translate_matrix(-info.origin.x, -info.origin.y, 0)
+	vgo.push_matrix()
+	vgo.translate(info.origin)
+	vgo.scale(scale)
+	vgo.rotate(info.rotation)
+	vgo.translate(-info.origin)
 
 	// Push layout
 	push_layout(
@@ -236,20 +236,20 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 }
 
 end_layer :: proc() {
-	pop_matrix()
+	vgo.pop_matrix()
 	pop_layout()
 	if layer, ok := current_layer().?; ok {
 		if .No_Scissor not_in layer.options {
-			pop_scissor()
+			vgo.pop_scissor()
 		}
 		// Remove draw calls if invisible
 		if .Invisible in layer.options {
-			remove_range(&core.draw_calls, layer.draw_call_index, len(core.draw_calls))
+			// remove_range(&core.draw_calls, layer.draw_call_index, len(core.draw_calls))
 		}
 	}
 	pop_stack(&core.layer_stack)
 	if layer, ok := current_layer().?; ok {
-		append_draw_call(layer.index)
+		vgo.set_draw_order(layer.index)
 	}
 }
 

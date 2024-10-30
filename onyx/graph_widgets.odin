@@ -1,11 +1,11 @@
 package onyx
 
+import "../../vgo"
+import "base:intrinsics"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
-
-import "base:intrinsics"
 
 Bar_Graph :: struct {
 	stacked, value_labels, entry_labels, show_tooltip, horizontal: bool,
@@ -27,7 +27,7 @@ Graph_Entry :: struct {
 
 Graph_Field_Info :: struct {
 	name:  string,
-	color: Color,
+	color: vgo.Color,
 }
 
 Graph_Info :: struct {
@@ -73,9 +73,9 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				p := math.floor(
 					inner_box.hi.y + (inner_box.lo.y - inner_box.hi.y) * (f32(v) / f32(hi - lo)),
 				)
-				draw_box_fill(
+				vgo.fill_box(
 					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
-					fade(core.style.color.substance, 0.5),
+					paint = vgo.fade(core.style.color.substance, 0.5),
 				)
 			}
 
@@ -120,9 +120,9 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				p :=
 					inner_box.lo.x +
 					(f32(hn) / f32(len(entries) - 1)) * (inner_box.hi.x - inner_box.lo.x)
-				draw_box_fill(
+				vgo.fill_box(
 					{{p, inner_box.lo.y}, {p + 1, inner_box.hi.y}},
-					core.style.color.content,
+					paint = core.style.color.content,
 				)
 			}
 
@@ -139,11 +139,11 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 					dot_time := variant.dot_times[e]
 					dot_time = animate(dot_time, 0.15, hn == e && .Hovered in self.state)
 					if kind.show_dots {
-						draw_circle_fill(p, 4.5, field.color)
+						vgo.fill_circle(p, 4.5, field.color)
 					}
 					if dot_time > 0 {
-						draw_circle_fill(p, 8 * dot_time, field.color)
-						draw_circle_fill(p, 6 * dot_time, core.style.color.foreground)
+						vgo.fill_circle(p, 8 * dot_time, field.color)
+						vgo.fill_circle(p, 6 * dot_time, core.style.color.foreground)
 					}
 					variant.dot_times[e] = dot_time
 					lp = p
@@ -161,12 +161,12 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 		)
 
 		if .Hovered in self.state {
-			draw_box_fill(
+			vgo.fill_box(
 				{
 					{inner_box.lo.x + f32(tooltip_idx) * block_size, inner_box.lo.y},
 					{inner_box.lo.x + f32(tooltip_idx) * block_size + block_size, inner_box.hi.y},
 				},
-				fade(core.style.color.substance, 0.5),
+				paint = vgo.fade(core.style.color.substance, 0.5),
 			)
 		}
 
@@ -176,9 +176,9 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				p := math.floor(
 					inner_box.hi.y + (inner_box.lo.y - inner_box.hi.y) * (f32(v) / f32(hi - lo)),
 				)
-				draw_box_fill(
+				vgo.fill_box(
 					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
-					fade(core.style.color.substance, 0.5),
+					paint = vgo.fade(core.style.color.substance, 0.5),
 				)
 			}
 
@@ -191,16 +191,12 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				}
 
 				if kind.entry_labels && len(entry.label) > 0 {
-					draw_text(
+					vgo.fill_text(
+						entry.label,
+						core.style.default_font,
+						16,
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
-						{
-							text = entry.label,
-							font = core.style.default_font,
-							size = 16,
-							align_h = .Middle,
-							align_v = .Top,
-						},
-						core.style.color.content,
+						paint = core.style.color.content,
 					)
 				}
 
@@ -213,13 +209,13 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 					field_height :=
 						(f32(entry.values[f]) / f32(hi * f64(len(fields)))) *
 						(inner_box.hi.y - inner_box.lo.y)
-					draw_rounded_box_fill(
+					vgo.fill_box(
 						{
 							{block.lo.x, block.hi.y - (height + field_height)},
 							{block.hi.x, block.hi.y - height},
 						},
 						core.style.rounding,
-						field.color,
+						paint = field.color,
 					)
 					height += field_height
 				}
@@ -230,9 +226,9 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 				p := math.floor(
 					inner_box.hi.y + (inner_box.lo.y - inner_box.hi.y) * (f32(v) / f32(hi - lo)),
 				)
-				draw_box_fill(
+				vgo.fill_box(
 					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
-					fade(core.style.color.substance, 0.5),
+					paint = vgo.fade(core.style.color.substance, 0.5),
 				)
 			}
 
@@ -248,16 +244,14 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 
 				// Draw entry label if enabled
 				if kind.entry_labels && len(entry.label) > 0 {
-					draw_text(
+					vgo.fill_text_aligned(
+						entry.label,
+						core.style.default_font,
+						18,
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
-						{
-							text = entry.label,
-							font = core.style.default_font,
-							size = 18,
-							align_h = .Middle,
-							align_v = .Top,
-						},
-						core.style.color.content,
+						.Center,
+						.Top,
+						paint = core.style.color.content,
 					)
 				}
 
@@ -270,22 +264,20 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 					corners: Corners = {}
 					if f == 0 do corners += {.Top_Left, .Bottom_Left}
 					if f == len(fields) - 1 do corners += {.Top_Right, .Bottom_Right}
-					draw_rounded_box_corners_fill(
+					vgo.fill_box(
 						bar,
 						{core.style.rounding, core.style.rounding, 0, 0},
 						field.color,
 					)
 					if kind.value_labels {
-						draw_text(
+						vgo.fill_text_aligned(
+							fmt.tprint(entry.values[f]),
+							core.style.default_font,
+							18,
 							{(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},
-							{
-								text = fmt.tprint(entry.values[f]),
-								font = core.style.default_font,
-								size = 18,
-								align_h = .Middle,
-								align_v = .Bottom,
-							},
-							fade(core.style.color.content, 0.5 if entry.values[f] == 0 else 1.0),
+							.Center,
+							.Center,
+							paint = vgo.fade(core.style.color.content, 0.5 if entry.values[f] == 0 else 1.0),
 						)
 					}
 				}
@@ -299,50 +291,41 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 			tooltip_size += 26
 		}
 		// Tooltip
-		begin_tooltip(
-			{
-				bounds = self.box,
-				size = tooltip_size,
-			},
-		)
+		begin_tooltip({bounds = self.box, size = tooltip_size})
 		shrink_layout(3)
 		if label_tooltip {
 			box := cut_current_layout(.Top, [2]f32{0, 26})
-			draw_text(
+			vgo.fill_text_aligned(
+				entries[tooltip_idx].label,
+				core.style.default_font,
+				18,
 				box.lo + [2]f32{5, 13},
-				{
-					text = entries[tooltip_idx].label,
-					font = core.style.default_font,
-					size = 18,
-					align_v = .Middle,
-				},
-				core.style.color.content,
+				.Center,
+				.Top,
+				paint = core.style.color.content,
 			)
 		}
 		for &field, f in fields {
 			tip_box := shrink_box(cut_box(&current_layout().?.box, .Top, 26), 3)
 			blip_box := shrink_box(cut_box_left(&tip_box, box_height(tip_box)), 4)
-			draw_box_fill(blip_box, field.color)
-			draw_text(
+			vgo.fill_box(blip_box, paint = field.color)
+			vgo.fill_text_aligned(
+				field.name,
+				core.style.default_font,
+				18,
 				{tip_box.lo.x, (tip_box.lo.y + tip_box.hi.y) / 2},
-				{
-					text = field.name,
-					font = core.style.default_font,
-					size = 18,
-					align_v = .Middle,
-				},
-				color = fade(core.style.color.content, 0.5),
+				.Left,
+				.Center,
+				paint = vgo.fade(core.style.color.content, 0.5),
 			)
-			draw_text(
+			vgo.fill_text_aligned(
+				fmt.tprintf("%v", entries[tooltip_idx].values[f]),
+				core.style.default_font,
+				18,
 				{tip_box.hi.x, (tip_box.lo.y + tip_box.hi.y) / 2},
-				{
-					text = fmt.tprintf("%v", entries[tooltip_idx].values[f]),
-					font = core.style.default_font,
-					size = 18,
-					align_h = .Right,
-					align_v = .Middle,
-				},
-				color = core.style.color.content,
+				.Right,
+				.Center,
+				paint = core.style.color.content,
 			)
 		}
 		end_tooltip()

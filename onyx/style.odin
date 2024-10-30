@@ -1,18 +1,20 @@
 package onyx
 
+import "../../vgo"
+
 Color_Scheme :: struct {
-	background, foreground, substance, accent, accent_content, content, shadow: Color,
+	background, foreground, substance, accent, accent_content, content, shadow: vgo.Color,
 }
 
 Style :: struct {
 	// Used as a fallback in case a glyph is not found
-	icon_font:      int,
+	icon_font:      vgo.Font,
 	// For code editor
-	monospace_font: int,
+	monospace_font: vgo.Font,
 	// Might want a fancy serif font for headers
-	header_font:    Maybe(int),
+	header_font:    Maybe(vgo.Font),
 	// Default font for everything
-	default_font:   int,
+	default_font:   vgo.Font,
 	// Color scheme should be separate
 	color:          Color_Scheme,
 	// Dunno why this is its own struct

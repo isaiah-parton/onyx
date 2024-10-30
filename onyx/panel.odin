@@ -1,5 +1,6 @@
 package onyx
 
+import "../../vgo"
 import "core:math"
 import "core:math/linalg"
 
@@ -81,7 +82,10 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	panel.min_size = {}
 
 	// Begin the panel layer
-	layer_info := Layer_Info{id = id, box = expand_box(panel.box, 10)}
+	layer_info := Layer_Info {
+		id  = id,
+		box = expand_box(panel.box, 10),
+	}
 	begin_layer(&layer_info)
 	panel.layer = layer_info.self
 
@@ -95,8 +99,8 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		defer end_widget()
 		using background_widget
 
-		draw_rounded_box_shadow(self.box, core.style.rounding, 5, {0, 0, 0, 40})
-		draw_rounded_box_fill(self.box, core.style.rounding, core.style.color.foreground)
+		draw_shadow(self.box)
+		vgo.fill_box(self.box, core.style.rounding, core.style.color.foreground)
 
 		if point_in_box(core.mouse_pos, self.box) {
 			hover_widget(self)
@@ -116,16 +120,20 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		panel.min_size.y += TITLE_HEIGHT
 		title_box := cut_box_top(&inner_box, TITLE_HEIGHT)
 
-		draw_rounded_box_corners_fill(
+		vgo.fill_box(
 			title_box,
 			{core.style.rounding, core.style.rounding, 0, 0},
-			fade(core.style.color.substance, 0.5),
+			vgo.fade(core.style.color.substance, 0.5),
 		)
 
-		draw_text(
+		vgo.fill_text_aligned(
+			info.title,
+			core.style.default_font,
+			20,
 			{title_box.lo.x + 5, (title_box.hi.y + title_box.lo.y) / 2},
-			{text = info.title, font = core.style.default_font, size = 20, align_v = .Middle},
-			core.style.color.content,
+			.Left,
+			.Center,
+			paint = core.style.color.content,
 		)
 
 		dismiss_button := Widget_Info {
@@ -139,22 +147,22 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 			button_behavior(self)
 
-			draw_rounded_box_corners_fill(
+			vgo.fill_box(
 				self.box,
 				{1 = core.style.rounding},
-				fade({200, 50, 50, 255}, self.hover_time),
+				vgo.fade({200, 50, 50, 255}, self.hover_time),
 			)
 
 			// Resize icon
 			origin := box_center(self.box)
 			scale := box_height(self.box) * 0.2
-			icon_color := alpha_blend_colors(
+			icon_color := vgo.blend(
 				core.style.color.foreground,
 				core.style.color.content,
 				0.5 + 0.5 * self.hover_time,
 			)
-			draw_line(origin - scale, origin + scale, 2, icon_color)
-			draw_line(origin + {-scale, scale}, origin + {scale, -scale}, 2, icon_color)
+			vgo.line(origin - scale, origin + scale, 2, icon_color)
+			vgo.line(origin + {-scale, scale}, origin + {scale, -scale}, 2, icon_color)
 
 			if .Pressed in (self.state - self.last_state) {
 				panel.dismissed = true
@@ -196,33 +204,33 @@ end_panel :: proc() {
 
 			button_behavior(self)
 
-			draw_rounded_box_corners_fill(
+			vgo.fill_box(
 				self.box,
 				{3 = core.style.rounding},
-				fade(core.style.color.substance, 0.5 * self.hover_time),
+				vgo.fade(core.style.color.substance, 0.5 * self.hover_time),
 			)
 
 			// Resize icon
 			origin := box_center(self.box)
 			scale := box_height(self.box) * 0.2
-			icon_color := alpha_blend_colors(
+			icon_color := vgo.blend(
 				core.style.color.foreground,
 				core.style.color.content,
 				0.5 + 0.5 * self.hover_time,
 			)
-			draw_triangle_fill(
+			vgo.fill_polygon(
 				origin + {0, -1} * scale,
 				origin + {-1, -1} * scale,
 				origin + {-1, 0} * scale,
-				icon_color,
+				paint = icon_color,
 			)
-			draw_triangle_fill(
+			vgo.fill_polygon(
 				origin + {0, 1} * scale,
 				origin + {1, 1} * scale,
 				origin + {1, 0} * scale,
-				icon_color,
+				paint = icon_color,
 			)
-			draw_line(origin - 0.8 * scale, origin + 0.8 * scale, 2, icon_color)
+			vgo.line(origin - 0.8 * scale, origin + 0.8 * scale, 2, icon_color)
 
 			if .Pressed in (self.state - self.last_state) {
 				panel.resizing = true

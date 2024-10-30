@@ -73,7 +73,7 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 	}
 
 	if .Pressed in self.state {
-		if text_job, ok := make_text_job(
+		if text_job, ok := vgo.make_text_run(
 			{
 				text = fmt.tprintf(format.? or_else "%v", value^),
 				font = core.style.monospace_font,

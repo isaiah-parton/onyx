@@ -10,6 +10,7 @@ import "core:mem"
 import "core:strings"
 import "core:time"
 import "tedit"
+import "../../vgo"
 
 // Delay for compound clicking
 MAX_CLICK_DELAY :: time.Millisecond * 450
@@ -241,13 +242,11 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	widget.box = snapped_box(move_box(info.box.? or_else next_widget_box(info), widget.offset))
 
 	if widget.frames >= core.frames {
-		draw_box_fill(
+		vgo.fill_box(
 			widget.box,
-			{
-				255,
-				0,
-				0,
-				u8(
+			paint = vgo.Color{
+				0 = 255,
+				3 = u8(
 					128.0 +
 					math.sin(time.duration_seconds(time.since(core.start_time)) * 12.0) * 64.0,
 				),
@@ -269,7 +268,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	// Keep alive
 	widget.dead = false
 	// Set visible flag
-	widget.visible = core.visible && get_clip(current_scissor().?.box, widget.box) != .Full
+	widget.visible = core.visible && get_clip(vgo.current_scissor().?.box, widget.box) != .Full
 	// Reset state
 	widget.last_state = widget.state
 	widget.state -= {.Clicked, .Focused, .Changed}
@@ -364,7 +363,7 @@ end_widget :: proc() {
 		// Draw debug box
 		when ODIN_DEBUG {
 			if core.debug.enabled {
-				draw_box_stroke(widget.box, 1, {0, 255, 0, 255})
+				vgo.stroke_box(widget.box, 1, paint = vgo.GREEN)
 			}
 		}
 		// Transfer state to layer
@@ -397,8 +396,6 @@ hover_widget :: proc(widget: ^Widget) {
 	if widget.disabled do return
 	// Below highest hovered widget
 	if widget.layer.index < core.highest_layer_index do return
-	// Clipped?
-	if clip, ok := current_scissor().?; ok && !point_in_box(core.mouse_pos, current_scissor().?.box) do return
 	// Ok hover
 	core.next_hovered_widget = widget.id
 	core.next_hovered_layer = widget.layer.id
@@ -420,16 +417,12 @@ foreground :: proc(loc := #caller_location) {
 	}
 	if begin_widget(&info) {
 		defer end_widget()
-		set_paint(
-			add_paint_linear_gradient(
-				info.self.box.lo,
-				info.self.box.hi,
-				alpha_blend_colors(core.style.color.foreground, 255, 0.01),
-				core.style.color.foreground,
-			),
-		)
-		draw_rounded_box_fill(info.self.box, core.style.rounding, 255)
-		set_paint(0)
+		vgo.fill_box(info.self.box, core.style.rounding, vgo.make_linear_gradient(
+			info.self.box.lo,
+			info.self.box.hi,
+			vgo.blend(core.style.color.foreground, vgo.WHITE, 0.01),
+			core.style.color.foreground,
+		))
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)
 		}
@@ -446,7 +439,7 @@ background :: proc(loc := #caller_location) {
 	}
 	if begin_widget(&info) {
 		defer end_widget()
-		draw_rounded_box_fill(info.self.box, core.style.rounding, core.style.color.background)
+		vgo.fill_box(info.self.box, core.style.rounding, core.style.color.background)
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)
 		}
@@ -466,7 +459,7 @@ add_spinner :: proc(using info: ^Spinner_Info) -> bool {
 	begin_widget(info) or_return
 	defer end_widget()
 
-	draw_spinner(box_center(self.box), box_height(self.box) * 0.5, core.style.color.substance)
+	vgo.spinner(box_center(self.box), box_height(self.box) * 0.5, core.style.color.substance)
 
 	return true
 }
@@ -490,9 +483,8 @@ skeleton :: proc(loc := #caller_location) {
 }
 
 draw_skeleton :: proc(box: Box, rounding: f32) {
-	draw_rounded_box_fill(box, rounding, core.style.color.substance)
-	set_paint(add_paint({kind = .Skeleton}))
-	draw_rounded_box_fill(box, rounding, {255, 255, 255, 50})
-	set_paint(0)
+	vgo.fill_box(box, rounding, core.style.color.substance)
+	vgo.fill_box(box, rounding, vgo.Paint{kind = .Skeleton})
+
 	core.draw_this_frame = true
 }

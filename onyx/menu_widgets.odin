@@ -1,5 +1,6 @@
 package onyx
 
+import "../../vgo"
 import "base:intrinsics"
 import "core:fmt"
 import "core:math"
@@ -10,8 +11,8 @@ import "core:math/linalg"
 menu_bar :: proc() -> bool {
 	begin_layout({}) or_return
 	box := layout_box()
-	draw_rounded_box_fill(box, core.style.rounding, core.style.color.background)
-	draw_rounded_box_stroke(box, core.style.rounding, 1, core.style.color.substance)
+	vgo.fill_box(box, core.style.rounding, core.style.color.background)
+	vgo.stroke_box(box, core.style.rounding, 1, core.style.color.substance)
 	shrink_layout(core.style.menu_padding)
 	return true
 }
@@ -23,10 +24,10 @@ __menu_bar :: proc(ok: bool) {
 }
 
 Menu_Info :: struct {
-	using _:    Widget_Info,
-	text:       string,
-	menu_align: Alignment,
-	text_job:   Text_Job,
+	using _:     Widget_Info,
+	text:        string,
+	menu_align:  Alignment,
+	text_layout: vgo.Text_Layout,
 }
 
 Menu_State :: struct {
@@ -37,15 +38,11 @@ Menu_State :: struct {
 init_menu :: proc(using info: ^Menu_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
 	self = get_widget(id) or_return
-	text_info := Text_Info {
-		text    = text,
-		size    = core.style.button_text_size,
-		font    = core.style.default_font,
-		align_h = .Left,
-		align_v = .Middle,
+	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.button_text_size)
+	desired_size = {
+		text_layout.size.x + 20 + core.style.text_padding.x * 2,
+		core.style.visual_size.y,
 	}
-	text_job, _ = make_text_job(text_info)
-	desired_size = {text_job.size.x + 20 + core.style.text_padding.x * 2, core.style.visual_size.y}
 	return true
 }
 
@@ -53,23 +50,23 @@ begin_menu :: proc(info: ^Menu_Info) -> bool {
 	begin_widget(info) or_return
 
 	if info.self.visible {
-		draw_rounded_box_fill(
+		vgo.fill_box(
 			info.self.box,
 			core.style.rounding,
-			alpha_blend_colors(
+			vgo.blend(
 				core.style.color.background,
 				core.style.color.substance,
 				info.self.hover_time * 0.5,
 			),
 		)
-		draw_rounded_box_stroke(info.self.box, core.style.rounding, 1, core.style.color.substance)
+		vgo.stroke_box(info.self.box, core.style.rounding, 1, core.style.color.substance)
 		text_pos := [2]f32 {
 			info.self.box.lo.x + core.style.text_padding.x,
 			box_center_y(info.self.box),
 		}
-		draw_text_glyphs(info.text_job, text_pos, core.style.color.content)
-		draw_arrow(
-			{text_pos.x + info.text_job.size.x + 10, text_pos.y},
+		vgo.fill_text_layout(info.text_layout, text_pos, core.style.color.content)
+		vgo.arrow(
+			{text_pos.x + info.text_layout.size.x + 10, text_pos.y},
 			5,
 			core.style.color.content,
 		)
@@ -88,7 +85,7 @@ begin_menu :: proc(info: ^Menu_Info) -> bool {
 	}
 	if .Open in info.self.state {
 		push_id(info.self.id)
-		draw_shadow(layout_box(), info.self.open_time)
+		draw_shadow(layout_box())
 		background()
 		shrink_layout(core.style.menu_padding)
 		set_width_fill()
@@ -110,7 +107,7 @@ end_menu :: proc() -> bool {
 			self.state -= {.Open}
 		}
 
-		draw_rounded_box_stroke(layer.box, core.style.rounding, 1, core.style.color.substance)
+		vgo.stroke_box(layer.box, core.style.rounding, 1, core.style.color.substance)
 
 		end_layer()
 	}
@@ -137,25 +134,21 @@ Menu_Item_Decal :: enum {
 }
 
 Menu_Item_Info :: struct {
-	using _:  Widget_Info,
-	text:     string,
-	decal:    Menu_Item_Decal,
-	text_job: Text_Job,
-	clicked:  bool,
+	using _:     Widget_Info,
+	text:        string,
+	decal:       Menu_Item_Decal,
+	text_layout: vgo.Text_Layout,
+	clicked:     bool,
 }
 
 init_menu_item :: proc(info: ^Menu_Item_Info) -> bool {
 	info.self = get_widget(info.id) or_return
-	info.text_job = make_text_job(
-		{
-			text = info.text,
-			font = core.style.default_font,
-			size = core.style.button_text_size,
-			align_h = .Left,
-			align_v = .Middle,
-		},
-	) or_return
-	info.desired_size = info.text_job.size + core.style.text_padding * 2
+	info.text_layout = vgo.make_text_layout(
+		info.text,
+		core.style.default_font,
+		core.style.button_text_size,
+	)
+	info.desired_size = info.text_layout.size + core.style.text_padding * 2
 	info.desired_size.x += info.desired_size.y
 	return true
 }
@@ -172,30 +165,32 @@ menu_item :: proc(info: Menu_Item_Info, loc := #caller_location) -> Menu_Item_In
 
 			if info.self.visible {
 				if info.self.hover_time > 0.0 {
-					draw_rounded_box_fill(
+					vgo.fill_box(
 						info.self.box,
 						core.style.rounding,
-						fade(core.style.color.substance, info.self.hover_time * 0.5),
+						vgo.fade(core.style.color.substance, info.self.hover_time * 0.5),
 					)
 				}
-				draw_text_glyphs(
-					info.text_job,
+				vgo.fill_text_layout_aligned(
+					info.text_layout,
 					{
 						info.self.box.lo.x + box_height(info.self.box) + core.style.text_padding.x,
 						box_center_y(info.self.box),
 					},
+					.Center,
+					.Center,
 					core.style.color.content,
 				)
 				switch info.decal {
 				case .None:
 				case .Check:
-					draw_check(
+					vgo.check(
 						info.self.box.lo + box_height(info.self.box) / 2,
 						5,
 						core.style.color.content,
 					)
 				case .Dot:
-					draw_circle_fill(
+					vgo.fill_circle(
 						info.self.box.lo + box_height(info.self.box) / 2,
 						5,
 						core.style.color.content,

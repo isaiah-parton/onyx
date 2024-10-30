@@ -1,13 +1,11 @@
 package onyx
 
+import "../../vgo"
+import "base:intrinsics"
 import "core:math"
 import "core:math/linalg"
 
-import "base:intrinsics"
-
-Box :: struct {
-	lo, hi: [2]f32,
-}
+Box :: vgo.Box
 
 Alignment :: enum {
 	Near,
@@ -57,7 +55,7 @@ box_size :: proc(box: Box) -> [2]f32 {
 }
 
 size_ratio :: proc(size: [2]f32, ratio: [2]f32) -> [2]f32 {
-	return [2]f32{
+	return [2]f32 {
 		max(size.x, size.y * (ratio.x / ratio.y)),
 		max(size.y, size.x * (ratio.y / ratio.x)),
 	}

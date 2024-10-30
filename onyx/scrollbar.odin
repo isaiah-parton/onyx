@@ -1,6 +1,7 @@
 package onyx
 
 import "core:math/linalg"
+import "../../vgo"
 
 Scrollbar_Info :: struct {
 	using _:      Widget_Info,
@@ -53,15 +54,15 @@ add_scrollbar :: proc(using info: ^Scrollbar_Info) -> bool {
 
 	if self.visible {
 		rounding := (_box.hi[j] - _box.lo[j]) / 2
-		draw_rounded_box_fill(
+		vgo.fill_box(
 			_box,
 			rounding,
-			fade(core.style.color.substance, 0.7 * self.focus_time),
+			paint = vgo.fade(core.style.color.substance, 0.7 * self.focus_time),
 		)
-		draw_rounded_box_fill(
+		vgo.fill_box(
 			handle_box,
 			rounding,
-			fade(core.style.color.content, 0.7 * self.focus_time),
+			paint = vgo.fade(core.style.color.content, 0.7 * self.focus_time),
 		)
 	}
 

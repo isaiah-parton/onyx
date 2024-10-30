@@ -4,6 +4,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:strings"
+import "../../vgo"
 
 Type_Text :: struct {}
 Type_Number :: struct {
@@ -30,8 +31,8 @@ Table_Column_Info :: struct {
 	name:           string,
 	type:           Table_Column_Type,
 	width:          f32,
-	align:          Horizontal_Text_Align,
-	label_text_job: Text_Job,
+	align:          vgo.Text_Justify,
+	label_text_job: vgo.Text_Layout,
 }
 // Info needed to display a table row
 Table_Row_Info :: struct {
@@ -67,7 +68,7 @@ begin_table_row :: proc(table_info: ^Table_Info, info: Table_Row_Info) {
 	layout.queue_len += copy(layout.size_queue[:], table_info.widths[:table_info.widths_len])
 
 	if info.index % 2 == 1 {
-		draw_box_fill(layout.bounds, fade(core.style.color.substance, 0.5))
+		vgo.fill_box(layout.bounds, paint = vgo.fade(core.style.color.substance, 0.5))
 	}
 }
 
@@ -118,16 +119,11 @@ init_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 				}
 			}
 		}
-		column.label_text_job =
-		make_text_job(
-			{
-				text = text,
-				font = core.style.default_font,
-				size = core.style.button_text_size,
-				align_h = .Middle,
-				align_v = .Middle,
-			},
-		) or_continue
+		column.label_text_job = vgo.make_text_layout(
+			text,
+			core.style.default_font,
+			core.style.button_text_size,
+		)
 		column.width = max(column.width, column.label_text_job.size.x + 20)
 		widths[c] = column.width
 		desired_size.x += column.width
@@ -176,9 +172,9 @@ end_table :: proc(using info: ^Table_Info) {
 		core.style.table_row_height,
 	)
 	// Background and lower border
-	draw_box_fill(
+	vgo.fill_box(
 		header_box,
-		alpha_blend_colors(core.style.color.foreground, core.style.color.substance, 0.5),
+		paint = vgo.blend(core.style.color.foreground, core.style.color.substance, 0.5),
 	)
 	begin_layout({box = header_box})
 	// Set layout sizes
@@ -203,15 +199,15 @@ end_table :: proc(using info: ^Table_Info) {
 			},
 			3,
 		)
-		draw_rounded_box_fill(
+		vgo.fill_box(
 			text_box,
 			core.style.rounding,
-			fade(core.style.color.substance, self.hover_time),
+			paint = vgo.fade(core.style.color.substance, self.hover_time),
 		)
-		draw_text_glyphs(
+		vgo.fill_text_layout(
 			column.label_text_job,
 			box_center(self.box),
-			fade(core.style.color.content, 0.5),
+			vgo.fade(core.style.color.content, 0.5),
 		)
 
 		if self.state >= {.Clicked} {

@@ -4,6 +4,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
+import "../../vgo"
 
 Container_Info :: struct {
 	using _:            Widget_Info,
@@ -145,31 +146,13 @@ begin_container :: proc(using info: ^Container_Info) -> bool {
 	layout.next_cut_side = .Top
 
 	// Push draw scissor
-	push_scissor(self.box, add_shape_box(self.box, corners.? or_else core.style.rounding))
+	vgo.push_scissor(vgo.make_box(self.box, corners.? or_else core.style.rounding))
 
 	return true
 }
 
 end_container :: proc(using info: ^Container_Info) {
 	end_layout()
-	when ODIN_DEBUG {
-		if core.debug.enabled && is_active {
-			draw_text(
-				self.box.lo,
-				{
-					text = fmt.tprintf(
-						"space: %.2f\nscroll: %.2f",
-						self.cont.space,
-						self.cont.scroll,
-					),
-					font = core.style.monospace_font,
-					size = 16,
-					align_v = .Top,
-				},
-				{0, 255, 255, 255},
-			)
-		}
-	}
 	// Update needed space
 	self.cont.space_needed = linalg.max(layout.content_size + layout.spacing_size, self.cont.space_needed)
 	// Controls
@@ -261,7 +244,7 @@ end_container :: proc(using info: ^Container_Info) {
 		}
 	}
 	pop_id()
-	pop_scissor()
+	vgo.pop_scissor()
 	end_widget()
 }
 
