@@ -24,7 +24,7 @@ Style :: struct {
 Style_Shape :: struct {
 	visual_size:         [2]f32,
 	header_text_size:    f32,
-	button_text_size:    f32,
+	default_text_size:    f32,
 	tab_text_size:       f32,
 	content_text_size:   f32,
 	text_input_height:   f32,
@@ -48,7 +48,7 @@ default_style_shape :: proc() -> Style_Shape {
 		panel_padding = 10,
 		text_padding = {7, 5},
 		header_text_size = 36,
-		button_text_size = 18,
+		default_text_size = 16,
 		tab_text_size = 18,
 		content_text_size = 18,
 		rounding = 5,

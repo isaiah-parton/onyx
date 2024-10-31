@@ -59,6 +59,9 @@ main :: proc() {
 	)
 	defer vgo.destroy_font(&onyx.core.style.default_font)
 
+	checkbox_value: bool
+	input_value: string
+
 	for {
 		// Stuff
 		if glfw.WindowShouldClose(onyx.core.window) {
@@ -69,7 +72,18 @@ main :: proc() {
 			using onyx
 			new_frame()
 			if layer(&{box = view_box()}) {
-				button({text = "wsg ima button yo"})
+				vgo.fill_box(view_box(), paint = core.style.color.background)
+
+				shrink_layout(100)
+				foreground()
+				shrink_layout(100)
+				button({text = "wsg ima button yo", style = Button_Style.Outlined})
+				add_space(20)
+				checkbox({text = "checkbox!", state = &checkbox_value})
+				add_space(20)
+				string_input({value = &input_value, placeholder = "bro type somethin"})
+
+				vgo.fill_circle(200.5, 25, vgo.GOLD)
 			}
 			present()
 		}

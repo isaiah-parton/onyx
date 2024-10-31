@@ -41,7 +41,7 @@ init_boolean_widget :: proc(info: ^Boolean_Widget_Info, loc := #caller_location)
 		info.text_layout = vgo.make_text_layout(
 			info.text,
 			core.style.default_font,
-			core.style.button_text_size,
+			core.style.default_text_size,
 		)
 		if info.text_side == .Bottom || info.text_side == .Top {
 			info.desired_size.x = max(SIZE, info.text_layout.size.x)
@@ -157,7 +157,7 @@ init_toggle_switch :: proc(using info: ^Toggle_Switch_Info, loc := #caller_locat
 		text_layout = vgo.make_text_layout(
 			text,
 			core.style.default_font,
-			core.style.button_text_size,
+			core.style.default_text_size,
 		)
 		desired_size.x += text_layout.size.x + TEXT_PADDING
 	}

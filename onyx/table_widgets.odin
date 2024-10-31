@@ -122,7 +122,7 @@ init_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 		column.label_text_job = vgo.make_text_layout(
 			text,
 			core.style.default_font,
-			core.style.button_text_size,
+			core.style.default_text_size,
 		)
 		column.width = max(column.width, column.label_text_job.size.x + 20)
 		widths[c] = column.width

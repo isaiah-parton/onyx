@@ -30,7 +30,7 @@ init_button :: proc(using info: ^Button_Info, loc := #caller_location) -> bool {
 	text_layout = vgo.make_text_layout(
 		text,
 		core.style.default_font,
-		font_size.? or_else core.style.button_text_size,
+		font_size.? or_else core.style.default_text_size,
 	)
 	desired_size = text_layout.size + {18, 6}
 	if id == 0 do id = hash(loc)
@@ -56,8 +56,8 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			)
 			vgo.stroke_box(
 				self.box,
-				core.style.rounding,
 				1,
+				core.style.rounding,
 				color.? or_else core.style.color.substance,
 			)
 			text_color = core.style.color.content
@@ -219,7 +219,7 @@ init_floating_button :: proc(using info: ^Floating_Button_Info, loc := #caller_l
 	text_layout = vgo.make_text_layout(
 		text,
 		core.style.default_font,
-		font_size.? or_else core.style.button_text_size,
+		font_size.? or_else core.style.default_text_size,
 	)
 	desired_size = text_layout.size + 20
 	desired_size.x = max(desired_size.x, desired_size.y)

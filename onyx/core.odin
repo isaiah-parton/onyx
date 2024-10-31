@@ -271,8 +271,6 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		core.surface_config.height = u32(height)
 		wgpu.SurfaceConfigure(core.surface, &core.surface_config)
 
-		core.draw_this_frame = true
-		core.draw_next_frame = true
 		core.view = {f32(width), f32(height)}
 		core.draw_this_frame = true
 		core.draw_next_frame = true
@@ -371,7 +369,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	wgpu.SurfaceConfigure(core.surface, &core.surface_config)
 
 	// Initialize vgo
-	vgo.start(core.device, core.surface, core.surface_config.format)
+	vgo.start(core.device, core.surface)
 
 	core.ready = true
 

@@ -268,7 +268,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	// Keep alive
 	widget.dead = false
 	// Set visible flag
-	widget.visible = core.visible && get_clip(vgo.current_scissor().?.box, widget.box) != .Full
+	widget.visible = core.visible && get_clip(widget.layer.box, widget.box) != .Full
 	// Reset state
 	widget.last_state = widget.state
 	widget.state -= {.Clicked, .Focused, .Changed}

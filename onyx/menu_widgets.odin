@@ -38,7 +38,7 @@ Menu_State :: struct {
 init_menu :: proc(using info: ^Menu_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
 	self = get_widget(id) or_return
-	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.button_text_size)
+	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.default_text_size)
 	desired_size = {
 		text_layout.size.x + 20 + core.style.text_padding.x * 2,
 		core.style.visual_size.y,
@@ -146,7 +146,7 @@ init_menu_item :: proc(info: ^Menu_Item_Info) -> bool {
 	info.text_layout = vgo.make_text_layout(
 		info.text,
 		core.style.default_font,
-		core.style.button_text_size,
+		core.style.default_text_size,
 	)
 	info.desired_size = info.text_layout.size + core.style.text_padding * 2
 	info.desired_size.x += info.desired_size.y

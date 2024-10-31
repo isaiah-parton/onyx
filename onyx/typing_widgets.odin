@@ -79,7 +79,7 @@ input_behavior :: proc(info: ^Input_Info) -> bool {
 		info.text_layout = vgo.make_text_layout(
 			info.text,
 			info.font,
-			core.style.button_text_size,
+			core.style.default_text_size,
 			selection = editor.selection,
 			mouse = core.mouse_pos - (info.text_pos - info.self.input.offset),
 		)

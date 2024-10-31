@@ -23,7 +23,7 @@ init_breadcrumb :: proc(using info: ^Breadcrumb_Info, loc := #caller_location) -
 	self = get_widget(id) or_return
 	has_menu = len(options) > 1 && index != nil
 	text = options[index^] if has_menu else text
-	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.button_text_size)
+	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.default_text_size)
 	desired_size = text_layout.size
 	if !is_tail {
 		desired_size.x += 20
@@ -48,7 +48,7 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 
 	if self.visible {
 		color := vgo.fade(core.style.color.content, 0.5 + 0.5 * self.hover_time)
-		vgo.fill_text(text, core.style.default_font, core.style.button_text_size, self.box.lo, paint = color)
+		vgo.fill_text(text, core.style.default_font, core.style.default_text_size, self.box.lo, paint = color)
 		if info.has_menu {
 			vgo.arrow({math.floor(self.box.hi.x - 24), box_center_y(self.box)}, 5, color)
 		}
