@@ -34,14 +34,14 @@ Input_Info :: struct {
 	read_only:   bool,
 	hidden:      bool,
 	undecorated: bool,
-	text_layout:  vgo.Text_Layout,
+	text_layout: vgo.Text_Layout,
 	text_pos:    [2]f32,
 	changed:     bool,
 	submitted:   bool,
 	enter:       bool,
 	text:        string,
 	font:        vgo.Font,
-	font_size: f32,
+	font_size:   f32,
 }
 
 Input_State :: struct {
@@ -62,6 +62,7 @@ init_input :: proc(info: ^Input_Info, loc := #caller_location) -> bool {
 	// Default desired size
 	info.desired_size = core.style.visual_size
 	info.font = core.style.monospace_font if info.monospace else core.style.default_font
+	info.font_size = core.style.default_text_size
 	// Stuff
 	if info.builder != nil {
 		info.text = strings.to_string(info.builder^)
@@ -219,8 +220,8 @@ input_behavior :: proc(info: ^Input_Info) -> bool {
 		// Double-click selects by `word_proc`
 		case 2:
 			if info.text_layout.mouse_index < info.self.input.anchor {
-			if info.text[info.text_layout.mouse_index] == ' ' {
-			editor.selection[0] = info.text_layout.mouse_index
+				if info.text[info.text_layout.mouse_index] == ' ' {
+					editor.selection[0] = info.text_layout.mouse_index
 				} else {
 					editor.selection[0] = max(
 						0,
@@ -243,11 +244,7 @@ input_behavior :: proc(info: ^Input_Info) -> bool {
 			} else {
 				editor.selection[1] = max(
 					0,
-					strings.last_index_proc(
-						info.text[:info.self.input.anchor],
-						word_proc,
-					) +
-					1,
+					strings.last_index_proc(info.text[:info.self.input.anchor], word_proc) + 1,
 				)
 				if (info.text_layout.mouse_index > 0 &&
 					   info.text[info.text_layout.mouse_index - 1] == ' ') {
@@ -273,7 +270,10 @@ input_behavior :: proc(info: ^Input_Info) -> bool {
 		glyph := info.text_layout.glyphs[info.text_layout.hovered_glyph]
 		glyph_pos := (info.text_pos - info.self.input.offset) + glyph.offset
 		// The cursor's own bounding box
-		cursor_box := Box{glyph_pos + {-1, -2}, glyph_pos + {1, info.text_layout.font.line_height + 2}}
+		cursor_box := Box {
+			glyph_pos + {-1, -2},
+			glyph_pos + {1, info.text_layout.font.line_height + 2},
+		}
 		// The box we want the cursor to stay in
 		inner_box := shrink_box(info.self.box, 4)
 		// Move view offset
@@ -337,11 +337,10 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	// Offset text origin based on font size
 	info.text_pos.x += core.style.text_padding.x
 	if info.multiline {
-		text_pos.y = self.box.lo.y + (font.ascend - font.descend) * info.font_size * 0.5
+		text_pos.y += core.style.text_padding.y
 	} else {
-		text_pos.y =
-			(self.box.hi.y + self.box.lo.y) / 2 -
-			(font.ascend - font.descend) / 2
+		text_pos.y +=
+			(self.box.hi.y - self.box.lo.y) / 2 - (font.ascend - font.descend) * font_size * 0.5
 	}
 	// `text_offset` must be updated for the mouse interaction to line up
 	prefix_text_layout: vgo.Text_Layout
@@ -360,8 +359,16 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	if self.visible {
 		vgo.push_scissor(vgo.make_box(self.box, core.style.rounding))
 		// Draw text placeholder
-		if len(info.text) == 0 {
-			vgo.fill_text(placeholder, font, font_size, text_pos, paint = vgo.fade(core.style.color.content, 0.5))
+		if len(text) == 0 {
+			vgo.fill_text_aligned(
+				placeholder,
+				font,
+				font_size,
+				text_pos,
+				.Left,
+				.Top,
+				paint = vgo.fade(core.style.color.content, 0.5),
+			)
 		}
 		// Draw prefix
 		if len(prefix) > 0 {
@@ -371,16 +378,40 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				vgo.fade(core.style.color.content, 0.5),
 			)
 		}
+		line_height := (font.ascend - font.descend) + font_size
 		// First draw the highlighting behind the text
 		if .Active in self.last_state {
-			// draw_text_highlight(text_layout, text_pos, fade(core.style.color.accent, 0.5))
+			editor := &self.input.editor
+			if text_layout.glyph_selection[0] != text_layout.glyph_selection[1] {
+				for &line in text_layout.lines {
+					range := [2]int {
+						max(text_layout.glyph_selection[0], line.glyph_range[0]),
+						min(text_layout.glyph_selection[1], line.glyph_range[1]),
+					}
+					if range[0] != range[1] {
+						range = {min(range[0], range[1]), max(range[0], range[1])}
+						vgo.fill_box(
+							{
+								text_pos + {text_layout.glyphs[range[0]].offset.x, 0},
+								text_pos + {text_layout.glyphs[range[1]].offset.x, line_height},
+							},
+							paint = vgo.fade(core.style.color.accent, 0.5),
+						)
+					}
+				}
+			}
 		}
 		// Then draw the text
 		vgo.fill_text_layout(text_layout, text_pos, core.style.color.content)
-		// Draw the cursor in front of the text
+		// Draw cursor
 		if .Active in self.last_state {
-			// draw_text_cursor(text_layout, text_pos, core.style.color.accent)
+			cursor_pos := text_pos + text_layout.glyphs[text_layout.glyph_selection[0]].offset
+			vgo.fill_box(
+				{{cursor_pos.x - 1, cursor_pos.y}, {cursor_pos.x + 1, cursor_pos.y + line_height}},
+				paint = core.style.color.accent,
+			)
 		}
+		// Done clipping
 		vgo.pop_scissor()
 		// Draw decal
 		if self.input.icon_time > 0 {
@@ -405,9 +436,9 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 		if !undecorated {
 			vgo.stroke_box(
 				self.box,
+				1,
 				core.style.rounding,
-				2,
-				vgo.fade(core.style.color.accent, self.focus_time),
+				paint = vgo.fade(core.style.color.accent, self.focus_time),
 			)
 		}
 		// Draw disabled overlay
@@ -415,7 +446,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 			vgo.fill_box(
 				self.box,
 				core.style.rounding,
-				vgo.fade(core.style.color.foreground, self.disable_time * 0.5),
+				paint = vgo.fade(core.style.color.foreground, self.disable_time * 0.5),
 			)
 		}
 	}

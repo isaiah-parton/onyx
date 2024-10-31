@@ -131,7 +131,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		vgo.fill_text_layout(
 			text_layout,
 			box_center(self.box),
-			paint = vgo.BLACK if vgo.get_color_brightness(value^) > 0.45 else vgo.WHITE,
+			paint = vgo.BLACK if vgo.luminance_of(value^) > 0.45 else vgo.WHITE,
 		)
 		vgo.stroke_box(
 			self.box,

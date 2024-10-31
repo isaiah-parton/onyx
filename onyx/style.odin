@@ -48,7 +48,7 @@ default_style_shape :: proc() -> Style_Shape {
 		panel_padding = 10,
 		text_padding = {7, 5},
 		header_text_size = 36,
-		default_text_size = 16,
+		default_text_size = 14,
 		tab_text_size = 18,
 		content_text_size = 18,
 		rounding = 5,
