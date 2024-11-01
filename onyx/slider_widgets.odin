@@ -4,6 +4,7 @@ import "base:intrinsics"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
+import "../../vgo"
 
 Slider_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	using _: Widget_Info,
@@ -37,7 +38,7 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 	radius := box_height(_box) / 2
 
 	if self.visible {
-		draw_rounded_box_fill(_box, radius, core.style.color.substance)
+		vgo.fill_box(_box, radius, paint = core.style.color.substance)
 	}
 
 	if value == nil {
@@ -64,39 +65,36 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 	}
 
 	if self.visible {
-		draw_rounded_box_fill(
+		vgo.fill_box(
 			{_box.lo, {knob_center.x, _box.hi.y}},
 			radius,
-			fade(core.style.color.accent, 0.5),
+			vgo.fade(core.style.color.accent, 0.5),
 		)
-		draw_circle_fill(knob_center, knob_radius, core.style.color.accent)
+		vgo.fill_circle(knob_center, knob_radius, core.style.color.accent)
 	}
 
 	if .Pressed in self.state {
-		if text_job, ok := vgo.make_text_run(
+		text_layout := vgo.make_text_layout(
+			fmt.tprintf(format.? or_else "%v", value^),
+			core.style.monospace_font,
+			18,
+		)
+		tooltip_size := linalg.max(text_layout.size + 10, [2]f32{50, 0})
+		if self.slider.tooltip_size == {} {
+			self.slider.tooltip_size = tooltip_size
+		} else {
+			self.slider.tooltip_size += (tooltip_size - self.slider.tooltip_size) * 10 * core.delta_time
+		}
+		push_id(self.id)
+		defer pop_id()
+		if tooltip(
 			{
-				text = fmt.tprintf(format.? or_else "%v", value^),
-				font = core.style.monospace_font,
-				size = 18,
-				align_h = .Middle,
-				align_v = .Middle,
+				origin = Box{knob_center - knob_radius, knob_center + knob_radius},
+				size = self.slider.tooltip_size,
+				side = .Top,
 			},
-		); ok {
-			tooltip_size := linalg.max(text_job.size + 10, [2]f32{50, 0})
-			if self.slider.tooltip_size == {} {
-				self.slider.tooltip_size = tooltip_size
-			} else {
-				self.slider.tooltip_size += (tooltip_size - self.slider.tooltip_size) * 10 * core.delta_time
-			}
-			if tooltip(
-				{
-					origin = Box{knob_center - knob_radius, knob_center + knob_radius},
-					size = self.slider.tooltip_size,
-					side = .Top,
-				},
-			) {
-				draw_text_glyphs(text_job, box_center(layout_box()), core.style.color.content)
-			}
+		) {
+			vgo.fill_text_layout_aligned(text_layout, box_center(layout_box()), .Center, .Center, core.style.color.content)
 		}
 	}
 
@@ -126,11 +124,11 @@ add_box_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 
 	horizontal_slider_behavior(self)
 	if self.visible {
-		draw_box_fill(self.box, core.style.color.substance)
+		vgo.fill_box(self.box, paint = core.style.color.substance)
 		time := clamp(f32(value^ - lo) / f32(hi - lo), 0, 1)
-		draw_box_fill(
+		vgo.fill_box(
 			{self.box.lo, {self.box.lo.x + box_width(self.box) * time, self.box.hi.y}},
-			core.style.color.accent,
+			paint = core.style.color.accent,
 		)
 	}
 	if .Pressed in self.state {

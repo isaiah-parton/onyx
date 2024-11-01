@@ -85,7 +85,6 @@ set_layer_index :: proc(layer: ^Layer, index: int) {
 		other_layer := &core.layers[i]
 		if other_layer.id == 0 || other_layer.id == layer.id do continue
 
-		assert(other_layer.index != layer.index)
 		if index > layer.index {
 			if layer.index > 0 {
 				if other_layer.index <= index {
@@ -159,7 +158,7 @@ get_layer :: proc(info: ^Layer_Info) -> (layer: ^Layer, ok: bool) {
 				set_layer_index(layer, layer.parent.index + 1)
 			} else {
 				if info.sorting == .Above {
-					set_layer_index(layer, get_highest_layer_of_kind(info.kind.? or_return) + 1)
+					layer.index = get_highest_layer_of_kind(info.kind.? or_return) + 1
 				} else {
 					set_layer_index(layer, get_lowest_layer_of_kind(info.kind.? or_return))
 				}

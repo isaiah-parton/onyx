@@ -61,6 +61,7 @@ main :: proc() {
 
 	checkbox_value: bool
 	input_value: string
+	slider_value: f32
 
 	for {
 		// Stuff
@@ -71,9 +72,8 @@ main :: proc() {
 		{
 			using onyx
 			new_frame()
+			vgo.fill_box(view_box(), paint = core.style.color.background)
 			if layer(&{box = view_box()}) {
-				vgo.fill_box(view_box(), paint = core.style.color.background)
-
 				shrink_layout(100)
 				foreground()
 				shrink_layout(100)
@@ -82,8 +82,8 @@ main :: proc() {
 				checkbox({text = "checkbox!", state = &checkbox_value})
 				add_space(20)
 				string_input({value = &input_value, placeholder = "bro type somethin"})
-
-				vgo.fill_circle(200.5, 25, vgo.GOLD)
+				add_space(20)
+				slider(Slider_Info(f32){value = &slider_value, format = "rizz %.2f"})
 			}
 			present()
 		}
