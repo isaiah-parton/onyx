@@ -340,7 +340,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 		text_pos.y += core.style.text_padding.y
 	} else {
 		text_pos.y +=
-			(self.box.hi.y - self.box.lo.y) / 2 - (font.ascend - font.descend) * font_size * 0.5
+			(self.box.hi.y - self.box.lo.y) / 2
 	}
 	// `text_offset` must be updated for the mouse interaction to line up
 	prefix_text_layout: vgo.Text_Layout
@@ -366,7 +366,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				font_size,
 				text_pos,
 				.Left,
-				.Top,
+				.Top if multiline else .Center,
 				paint = vgo.fade(core.style.color.content, 0.5),
 			)
 		}
@@ -378,7 +378,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 				vgo.fade(core.style.color.content, 0.5),
 			)
 		}
-		line_height := (font.ascend - font.descend) + font_size
+		line_height := font.line_height * font_size
 		// First draw the highlighting behind the text
 		if .Active in self.last_state {
 			editor := &self.input.editor
@@ -392,8 +392,8 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 						range = {min(range[0], range[1]), max(range[0], range[1])}
 						vgo.fill_box(
 							{
-								text_pos + {text_layout.glyphs[range[0]].offset.x, 0},
-								text_pos + {text_layout.glyphs[range[1]].offset.x, line_height},
+								text_pos + text_layout.glyphs[range[0]].offset + {0, line_height * -0.5},
+								text_pos + text_layout.glyphs[range[1]].offset + {0, line_height * 0.5},
 							},
 							paint = vgo.fade(core.style.color.accent, 0.5),
 						)
@@ -402,12 +402,12 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 			}
 		}
 		// Then draw the text
-		vgo.fill_text_layout(text_layout, text_pos, core.style.color.content)
+		vgo.fill_text_layout_aligned(text_layout, text_pos, .Left, .Top if multiline else .Center, core.style.color.content)
 		// Draw cursor
 		if .Active in self.last_state {
 			cursor_pos := text_pos + text_layout.glyphs[text_layout.glyph_selection[0]].offset
 			vgo.fill_box(
-				{{cursor_pos.x - 1, cursor_pos.y}, {cursor_pos.x + 1, cursor_pos.y + line_height}},
+				{{cursor_pos.x - 1, cursor_pos.y - line_height / 2}, {cursor_pos.x + 1, cursor_pos.y + line_height / 2}},
 				paint = core.style.color.accent,
 			)
 		}

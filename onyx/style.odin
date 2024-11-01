@@ -24,7 +24,7 @@ Style :: struct {
 Style_Shape :: struct {
 	visual_size:         [2]f32,
 	header_text_size:    f32,
-	default_text_size:    f32,
+	default_text_size:   f32,
 	tab_text_size:       f32,
 	content_text_size:   f32,
 	text_input_height:   f32,
@@ -46,12 +46,12 @@ default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
 		tooltip_padding = 4,
 		panel_padding = 10,
-		text_padding = {7, 5},
-		header_text_size = 36,
+		text_padding = {10, 10},
+		header_text_size = 32,
 		default_text_size = 14,
 		tab_text_size = 18,
 		content_text_size = 18,
-		rounding = 5,
+		rounding = 7,
 		menu_padding = 2,
 		popup_margin = 7,
 		scrollbar_thickness = 8,
@@ -68,7 +68,7 @@ light_color_scheme :: proc() -> Color_Scheme {
 		accent = {59, 130, 246, 255},
 		accent_content = {25, 25, 25, 255},
 		content = {25, 25, 25, 255},
-		shadow = {0, 0, 0, 40},
+		shadow = {0, 0, 0, 255},
 	}
 }
 
@@ -80,7 +80,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		accent = {59, 130, 246, 255},
 		accent_content = {255, 255, 255, 255},
 		content = {255, 255, 255, 255},
-		shadow = {0, 0, 0, 40},
+		shadow = {0, 0, 0, 180},
 	}
 }
 

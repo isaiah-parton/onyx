@@ -85,7 +85,7 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 			vgo.fill_box(
 				self.box,
 				core.style.rounding,
-				vgo.fade(core.style.color.substance, 0.5 * self.hover_time),
+				vgo.fade(core.style.color.substance, 0.25 * self.hover_time),
 			)
 		}
 		opacity: f32 = 0.5 if self.disabled else 1
@@ -175,8 +175,8 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 
 	button_behavior(self)
 
-	variant.state_time = animate(variant.state_time, 0.2, info.state^)
-	how_on := ease.cubic_in_out(variant.state_time)
+	variant.state_time = animate(variant.state_time, 0.25, info.state^)
+	how_on := ease.quadratic_in_out(variant.state_time)
 
 	if self.visible {
 		outer_radius := box_height(self.box) / 2
@@ -198,10 +198,10 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 
 		vgo.fill_box(
 			switch_box,
-			paint = vgo.mix(how_on, core.style.color.substance, core.style.color.accent),
+			paint = vgo.mix(how_on, core.style.color.background, core.style.color.accent),
 			radius = outer_radius,
 		)
-		vgo.fill_circle(lever_center, inner_radius, core.style.color.content)
+		vgo.fill_circle(lever_center, inner_radius, vgo.mix(how_on, core.style.color.substance, core.style.color.background))
 
 		switch text_side {
 		case .Left:
@@ -271,8 +271,9 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 
 		if self.hover_time > 0 {
 			vgo.fill_box(
-				{{self.box.lo.x + box_height(self.box) / 2, self.box.lo.y}, self.box.hi},
-				paint = vgo.fade(core.style.color.substance, 0.5 * self.hover_time),
+				{{self.box.lo.x, self.box.lo.y}, self.box.hi},
+				box_height(self.box) / 2,
+				paint = vgo.fade(core.style.color.substance, 0.25 * self.hover_time),
 			)
 		}
 
@@ -324,6 +325,9 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 
 	if .Clicked in self.state {
 		toggled = true
+		if state != nil {
+			state^ = !state^
+		}
 	}
 
 	return true

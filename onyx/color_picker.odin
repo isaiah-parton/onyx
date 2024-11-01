@@ -96,7 +96,7 @@ Color_Button_Info :: struct {
 	value:         ^vgo.Color,
 	show_alpha:    bool,
 	input_formats: Color_Format_Set,
-	text_layout:    vgo.Text_Layout,
+	text_layout:   vgo.Text_Layout,
 	changed:       bool,
 }
 
@@ -105,7 +105,7 @@ init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_locatio
 	text_layout = vgo.make_text_layout(
 		fmt.tprintf("%6x", vgo.hex_from_color(value^)),
 		core.style.monospace_font,
-		20,
+		core.style.default_text_size,
 	)
 	id = hash(loc)
 	self = get_widget(id) or_return
@@ -125,20 +125,32 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			self.box,
 			core.style.rounding,
 			6,
-			vgo.fade({0, 0, 0, 40}, max(self.hover_time, self.open_time)),
+			vgo.fade(vgo.BLACK, max(self.hover_time, self.open_time) * 1.0),
 		)
+
+		vgo.push_scissor(vgo.make_box(self.box, core.style.rounding))
+		draw_checkerboard_pattern(
+			self.box,
+			box_height(self.box) / 2,
+			{210, 210, 210, 255},
+			{160, 160, 160, 255},
+		)
+		vgo.pop_scissor()
+
 		vgo.fill_box(self.box, core.style.rounding, paint = value^)
-		vgo.fill_text_layout(
+		vgo.fill_text_layout_aligned(
 			text_layout,
 			box_center(self.box),
+			.Center,
+			.Center,
 			paint = vgo.BLACK if vgo.luminance_of(value^) > 0.45 else vgo.WHITE,
 		)
-		vgo.stroke_box(
-			self.box,
-			2,
-			core.style.rounding,
-			paint = vgo.fade(core.style.color.accent, max(self.hover_time, self.open_time)),
-		)
+		// vgo.stroke_box(
+		// 	self.box,
+		// 	1,
+		// 	core.style.rounding,
+		// 	paint = vgo.fade(core.style.color.accent, max(self.hover_time, self.open_time)),
+		// )
 	}
 
 	kind := widget_kind(self, Color_Conversion_Widget_Kind)
@@ -174,6 +186,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 
 		for format, f in Color_Format {
 			if format in input_formats {
+				inputs[format].id = hash(f + 10)
 				inputs[format].monospace = true
 				inputs[format].builder = &kind.inputs[format]
 				text: string
@@ -191,9 +204,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 				if strings.builder_len(inputs[format].builder^) == 0 {
 					strings.write_string(inputs[format].builder, text)
 				}
-				push_id(f + 1)
 				init_input(&inputs[format])
-				pop_id()
 				input_size.x = max(input_size.x, inputs[format].desired_size.x)
 			}
 		}
@@ -232,13 +243,10 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 					#partial switch format {
 					case .RGB:
 						if color, ok := vgo.parse_rgba(inputs[format].text); ok {
-						kind.hsva.xyz = vgo.hsva_from_color(color).xyz
+							kind.hsva.xyz = vgo.hsva_from_color(color).xyz
 						}
 					case .HEX:
-						if hex, ok := strconv.parse_u64_of_base(
-							inputs[format].text[1:],
-							16,
-						); ok {
+						if hex, ok := strconv.parse_u64_of_base(inputs[format].text[1:], 16); ok {
 							kind.hsva.xyz = vgo.hsva_from_color(vgo.color_from_hex(u32(hex))).xyz
 							changed = true
 						}
@@ -331,7 +339,11 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 		time := clamp(value^, 0, 1)
 		pos := box.lo[i] + (box.hi[i] - box.lo[i]) * time
 		if vertical {
-			vgo.fill_box({{box.lo.x, pos - 1}, {box.hi.x, pos + 1}}, paint = core.style.color.content)
+			vgo.fill_box(box, paint = vgo.make_linear_gradient(box.lo, {box.lo.x, box.hi.y}, vgo.fade(vgo.BLACK, 0.0), vgo.BLACK))
+			vgo.fill_box(
+				{{box.lo.x, pos - 1}, {box.hi.x, pos + 1}},
+				paint = core.style.color.content,
+			)
 			// vgo.fill_polygon(
 			// 	{box.lo.x - 1.5 * R, pos - 0.866025 * R},
 			// 	{box.lo.x, pos},
@@ -456,14 +468,12 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 
 	if self.visible {
 		// H wheel
-		// vgo.add_shape(vgo.Shape{
-		// 	kind = .Circle,
-		// 	cv0 = center,
-		// 	outline = .Stroke,
-		// 	width = (outer - inner) - 4,
-		// 	radius = (inner - outer) * 0.5,
-		// 	paint = vgo.add_paint(vgo.make_wheel_gradient(center))
-		// })
+		vgo.stroke_circle(
+			center,
+			(inner + outer) * 0.5,
+			width = (outer - inner) - 4,
+			paint = vgo.make_wheel_gradient(center),
+		)
 
 		angle := hsva.x * math.RAD_PER_DEG
 		// Hue point
@@ -476,8 +486,15 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 			center + {math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * inner
 
 		// SV triangle
-		// TODO: Implement
-		// vgo.fill_polygon(tv0, tv1, tv2, paint = vgo.make_poly_gradient(color_from_hsva({hsva.x, 1, 1, 1}), vgo.BLACK, vgo.WHITE))
+		vgo.fill_polygon(
+			point_a,
+			point_b,
+			point_c,
+			paint = vgo.make_tri_gradient(
+				{point_a, point_b, point_c},
+				{vgo.color_from_hsva({hsva.x, 1, 1, 1}), vgo.BLACK, vgo.WHITE},
+			),
+		)
 
 		// SV circle
 		point := linalg.lerp(

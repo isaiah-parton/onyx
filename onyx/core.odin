@@ -33,7 +33,7 @@ Stack :: struct($T: typeid, $N: int) {
 }
 
 push_stack :: proc(stack: ^Stack($T, $N), item: T) -> bool {
-	if stack.height < 0 || stack.height >= N {
+	if stack.height >= N {
 		return false
 	}
 	stack.items[stack.height] = item
@@ -574,5 +574,7 @@ __get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
 }
 
 draw_shadow :: proc(box: vgo.Box) {
-	vgo.box_shadow(box, core.style.rounding, 6, core.style.color.shadow)
+	if vgo.disable_scissor() {
+		vgo.box_shadow(box, core.style.rounding, 6, core.style.color.shadow)
+	}
 }

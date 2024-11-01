@@ -314,3 +314,30 @@ add_layout_content_size :: proc(layout: ^Layout, size: [2]f32) {
 		layout.content_size.x += size.x
 	}
 }
+
+@(deferred_out=end_row)
+row_with_height :: proc(height: f32) -> bool {
+	result := begin_layout({side = .Top, size = height})
+	set_side(.Left)
+	return result
+}
+
+@(deferred_out=end_row)
+row_with_widgets :: proc(widgets: ..Widget_Info) -> bool {
+	height: f32
+	for &widget in widgets {
+		height = max(height, widget.desired_size.y)
+	}
+	return row_with_height(height)
+}
+
+end_row :: proc(ok: bool = true) {
+	if ok {
+		end_layout()
+	}
+}
+
+row :: proc {
+	row_with_height,
+	row_with_widgets,
+}

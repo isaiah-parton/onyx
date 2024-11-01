@@ -32,8 +32,7 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 
 	_box := self.box
 	h := box_height(_box)
-	_box.lo.y += h / 4
-	_box.hi.y -= h / 4
+	_box = shrink_box(_box, h / 4)
 
 	radius := box_height(_box) / 2
 
@@ -79,7 +78,7 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 			core.style.monospace_font,
 			18,
 		)
-		tooltip_size := linalg.max(text_layout.size + 10, [2]f32{50, 0})
+		tooltip_size := linalg.max(text_layout.size + core.style.tooltip_padding, [2]f32{50, 0})
 		if self.slider.tooltip_size == {} {
 			self.slider.tooltip_size = tooltip_size
 		} else {

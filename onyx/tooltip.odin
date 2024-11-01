@@ -84,80 +84,42 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		}
 	}
 
-	background_color := vgo.fade(core.style.color.background, 0.9125)
+	background_color := core.style.color.background
 
 	draw_shadow(box)
 	begin_layer(&{box = box, kind = .Topmost, options = {.No_Scissor}}, loc)
 	vgo.fill_box(box, core.style.rounding, background_color)
 
-	// Draw arrow thingy
-	// TODO: Utilize path procs here
-	start: u32
 	#partial switch info.side {
 	case .Top:
 		center := box_center_x(box)
 		left := box.lo.x + core.style.rounding
 		right := box.hi.x - core.style.rounding
-		start = vgo.add_vertices(
-			[2]f32{center, box.hi.y + offset},
-			[2]f32{center, box.hi.y},
-			[2]f32{right, box.hi.y},
-			[2]f32{right, box.hi.y},
-			[2]f32{center, box.hi.y},
-			[2]f32{left, box.hi.y},
-			[2]f32{left, box.hi.y},
-			[2]f32{center, box.hi.y},
-			[2]f32{center, box.hi.y + offset},
-		)
+		vgo.begin_path()
+		vgo.move_to({center, box.hi.y + offset})
+		vgo.quad_bezier_to({center, box.hi.y}, {right, box.hi.y})
+		vgo.line_to({left, box.hi.y})
+		vgo.quad_bezier_to({center, box.hi.y}, {center, box.hi.y + offset})
+		vgo.fill_path(background_color)
 	case .Bottom:
 		center := box_center_x(box)
 		left := box.lo.x + core.style.rounding
 		right := box.hi.x - core.style.rounding
-		start = vgo.add_vertices(
-			[2]f32{right, box.lo.y},
-			[2]f32{center, box.lo.y},
-			[2]f32{left, box.lo.y},
-			[2]f32{left, box.lo.y},
-			[2]f32{center, box.lo.y},
-			[2]f32{center, box.lo.y - offset},
-			[2]f32{center, box.lo.y - offset},
-			[2]f32{center, box.lo.y},
-			[2]f32{right, box.lo.y},
-		)
+		vgo.begin_path()
+		vgo.move_to({center, box.lo.y - offset})
+		vgo.quad_bezier_to({center, box.lo.y}, {right, box.lo.y})
+		vgo.line_to({left, box.lo.y})
+		vgo.quad_bezier_to({center, box.lo.y}, {center, box.lo.y - offset})
+		vgo.fill_path(background_color)
 	case .Right:
 		center := box_center_y(box)
 		top := box.lo.y + core.style.rounding
 		bottom := box.hi.y - core.style.rounding
-		start = vgo.add_vertices(
-			[2]f32{box.lo.x, bottom},
-			[2]f32{box.lo.x, center},
-			[2]f32{box.lo.x, top},
-			[2]f32{box.lo.x, top},
-			[2]f32{box.lo.x, center},
-			[2]f32{box.lo.x - offset, center},
-			[2]f32{box.lo.x - offset, center},
-			[2]f32{box.lo.x, center},
-			[2]f32{box.lo.x, bottom},
-		)
 	case .Left:
 		center := box_center_y(box)
 		top := box.lo.y + core.style.rounding
 		bottom := box.hi.y - core.style.rounding
-		start = vgo.add_vertices(
-			[2]f32{box.hi.x, top},
-			[2]f32{box.hi.x, center},
-			[2]f32{box.hi.x, bottom},
-			[2]f32{box.hi.x, bottom},
-			[2]f32{box.hi.x, center},
-			[2]f32{box.hi.x + offset, center},
-			[2]f32{box.hi.x + offset, center},
-			[2]f32{box.hi.x, center},
-			[2]f32{box.hi.x, top},
-		)
 	}
-	vgo.add_shape(
-		{kind = .Path, start = start, count = 3, paint = vgo.paint_index_from_option(vgo.WHITE)},
-	)
 
 	return true
 }

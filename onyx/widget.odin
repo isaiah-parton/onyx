@@ -80,6 +80,7 @@ Widget :: struct {
 	// Click information
 	click_count:        int,
 	click_time:         time.Time,
+	click_point: [2]f32,
 	click_button:       Mouse_Button,
 	// Desired size stored to be passed to the layout
 	desired_size:       [2]f32,
@@ -302,6 +303,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 			} else {
 				widget.click_count = 1
 			}
+			widget.click_point = core.mouse_pos
 			widget.click_button = core.mouse_button
 			widget.click_time = time.now()
 			widget.state += {.Pressed}
@@ -487,4 +489,9 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 	vgo.fill_box(box, rounding, vgo.Paint{kind = .Skeleton})
 
 	core.draw_this_frame = true
+}
+
+divider :: proc() {
+	cut := snapped_box(cut_current_layout(size = [2]f32{0, 1}))
+	vgo.fill_box(cut, paint = core.style.color.substance)
 }

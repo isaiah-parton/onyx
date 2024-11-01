@@ -25,6 +25,12 @@ Button_Info :: struct {
 	clicked:     bool,
 }
 
+make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
+	info := info
+	init_button(&info, loc)
+	return info
+}
+
 init_button :: proc(using info: ^Button_Info, loc := #caller_location) -> bool {
 	if info == nil do return false
 	text_layout = vgo.make_text_layout(
@@ -32,7 +38,7 @@ init_button :: proc(using info: ^Button_Info, loc := #caller_location) -> bool {
 		core.style.default_font,
 		font_size.? or_else core.style.default_text_size,
 	)
-	desired_size = text_layout.size + {18, 6}
+	desired_size = text_layout.size + core.style.text_padding * 2
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	return true
@@ -52,7 +58,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			vgo.fill_box(
 				self.box,
 				core.style.rounding,
-				vgo.fade(color.? or_else core.style.color.substance, self.hover_time * 0.5),
+				vgo.fade(color.? or_else core.style.color.substance, self.hover_time * 0.25),
 			)
 			vgo.stroke_box(
 				self.box,
@@ -60,6 +66,19 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 				core.style.rounding,
 				color.? or_else core.style.color.substance,
 			)
+
+			gradient_size := max(box_width(self.box), box_height(self.box))
+			gradient_time := clamp(f32(time.duration_seconds(time.since(self.click_time))) * 2.0, 0.0, 1.0)
+			if gradient_time <= 1.0 {
+				opacity := min(0.5, gradient_time) - max(0, gradient_time - 0.5)
+				vgo.stroke_box(
+					self.box,
+					1,
+					core.style.rounding,
+					paint = vgo.make_radial_gradient(box_center(self.box), gradient_size * gradient_time, vgo.fade(vgo.WHITE, opacity), vgo.fade(vgo.WHITE, 0.0)),
+				)
+				core.draw_this_frame = true
+			}
 			text_color = core.style.color.content
 
 		case .Secondary:
