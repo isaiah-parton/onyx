@@ -419,12 +419,14 @@ foreground :: proc(loc := #caller_location) {
 	}
 	if begin_widget(&info) {
 		defer end_widget()
-		vgo.fill_box(info.self.box, core.style.rounding, vgo.make_linear_gradient(
-			info.self.box.lo,
-			info.self.box.hi,
-			vgo.blend(core.style.color.foreground, vgo.WHITE, 0.01),
-			core.style.color.foreground,
-		))
+		// vgo.fill_box(info.self.box, core.style.rounding, vgo.make_linear_gradient(
+		// 	info.self.box.lo,
+		// 	info.self.box.hi,
+		// 	vgo.blend(core.style.color.foreground, vgo.WHITE, 0.01),
+		// 	core.style.color.foreground,
+		// ))
+		vgo.fill_box(info.self.box, core.style.rounding, paint = core.style.color.foreground)
+		vgo.stroke_box(info.self.box, 1, core.style.rounding, paint = core.style.color.substance)
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)
 		}

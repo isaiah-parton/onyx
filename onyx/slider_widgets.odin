@@ -78,7 +78,7 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 			core.style.monospace_font,
 			18,
 		)
-		tooltip_size := linalg.max(text_layout.size + core.style.tooltip_padding, [2]f32{50, 0})
+		tooltip_size := linalg.max(text_layout.size + core.style.tooltip_padding * 2, [2]f32{50, 0})
 		if self.slider.tooltip_size == {} {
 			self.slider.tooltip_size = tooltip_size
 		} else {

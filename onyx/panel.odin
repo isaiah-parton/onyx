@@ -219,15 +219,19 @@ end_panel :: proc() {
 				0.5 + 0.5 * self.hover_time,
 			)
 			vgo.fill_polygon(
-				origin + {0, -1} * scale,
-				origin + {-1, -1} * scale,
-				origin + {-1, 0} * scale,
+				{
+					origin + {0, -1} * scale,
+					origin + {-1, -1} * scale,
+					origin + {-1, 0} * scale,
+				},
 				paint = icon_color,
 			)
 			vgo.fill_polygon(
-				origin + {0, 1} * scale,
-				origin + {1, 1} * scale,
-				origin + {1, 0} * scale,
+				{
+					origin + {0, 1} * scale,
+					origin + {1, 1} * scale,
+					origin + {1, 0} * scale,
+				},
 				paint = icon_color,
 			)
 			vgo.line(origin - 0.8 * scale, origin + 0.8 * scale, 2, icon_color)

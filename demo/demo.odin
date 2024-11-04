@@ -47,6 +47,7 @@ main :: proc() {
 	glfw.Init()
 	defer glfw.Terminate()
 
+	// glfw.WindowHint(glfw.TRANSPARENT_FRAMEBUFFER, true)
 	window := glfw.CreateWindow(1600, 900, "demo", nil, nil)
 	defer glfw.DestroyWindow(window)
 
@@ -56,7 +57,6 @@ main :: proc() {
 	onyx.core.style.icon_font, _ = vgo.load_font_from_image_and_json(
 		"../onyx/fonts/remixicon.png",
 		"../onyx/fonts/remixicon.json",
-		type = .Emoji,
 	)
 	defer vgo.destroy_font(&onyx.core.style.icon_font)
 
@@ -109,9 +109,10 @@ main :: proc() {
 				add_space(10)
 
 				buttons := [?]Button_Info{
-					make_button({text = "Button", style = .Outlined}),
+					make_button({text = "Button", style = .Primary}),
 					make_button({text = "Button with icon \uf578", style = .Outlined}),
-					make_button({text = "\uf0d9", style = .Outlined, font_size = 20}),
+					make_button({text = "\uf0d9", style = .Secondary, font_size = 20}),
+					make_button({text = "Colored button", style = .Outlined, color = vgo.Color{220, 57, 57, 255}}),
 				}
 
 				if layout({side = .Top, size = buttons[0].desired_size.y}) {

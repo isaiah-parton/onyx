@@ -3,7 +3,7 @@ package onyx
 import "../../vgo"
 
 Color_Scheme :: struct {
-	background, foreground, substance, accent, accent_content, content, shadow: vgo.Color,
+	background, foreground, substance, hover, accent, accent_content, content, shadow: vgo.Color,
 }
 
 Style :: struct {
@@ -44,11 +44,11 @@ Style_Shape :: struct {
 
 default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
-		tooltip_padding = 4,
+		tooltip_padding = 6,
 		panel_padding = 10,
-		text_padding = {10, 10},
+		text_padding = {8, 6},
 		header_text_size = 32,
-		default_text_size = 14,
+		default_text_size = 16,
 		tab_text_size = 18,
 		content_text_size = 18,
 		rounding = 7,
@@ -56,7 +56,7 @@ default_style_shape :: proc() -> Style_Shape {
 		popup_margin = 7,
 		scrollbar_thickness = 8,
 		table_row_height = 40,
-		visual_size = {160, 28},
+		visual_size = {200, 28},
 	}
 }
 
@@ -74,13 +74,14 @@ light_color_scheme :: proc() -> Color_Scheme {
 
 dark_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
-		background = {12, 10, 17, 255},
-		foreground = {25, 24, 32, 255},
-		substance = {55, 55, 60, 255},
+		background = {25, 45, 50, 255},
+		foreground = {5, 15, 20, 255},
+		substance = {80, 80, 80, 255},
 		accent = {59, 130, 246, 255},
-		accent_content = {255, 255, 255, 255},
+		accent_content = {0, 0, 0, 255},
 		content = {255, 255, 255, 255},
-		shadow = {0, 0, 0, 180},
+		shadow = {0, 0, 0, 140},
+		hover = {120, 125, 140, 95}
 	}
 }
 

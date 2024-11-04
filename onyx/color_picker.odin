@@ -89,6 +89,7 @@ Color_Format :: enum {
 	CMYK,
 	HSL,
 }
+
 Color_Format_Set :: bit_set[Color_Format]
 
 Color_Button_Info :: struct {
@@ -121,23 +122,24 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 	menu_behavior(self)
 
 	if self.visible {
-		vgo.box_shadow(
-			self.box,
-			core.style.rounding,
-			6,
-			vgo.fade(vgo.BLACK, max(self.hover_time, self.open_time) * 1.0),
-		)
+		shadow_opacity := max(self.hover_time, self.open_time) * 1.0
+		if shadow_opacity > 0 {
+			vgo.box_shadow(
+				self.box,
+				core.style.rounding,
+				6,
+				vgo.fade(vgo.BLACK, shadow_opacity),
+			)
+		}
 
-		vgo.push_scissor(vgo.make_box(self.box, core.style.rounding))
 		draw_checkerboard_pattern(
 			self.box,
 			box_height(self.box) / 2,
 			{210, 210, 210, 255},
 			{160, 160, 160, 255},
 		)
-		vgo.pop_scissor()
+		vgo.fill_box(self.box, paint = value^)
 
-		vgo.fill_box(self.box, core.style.rounding, paint = value^)
 		vgo.fill_text_layout_aligned(
 			text_layout,
 			box_center(self.box),
@@ -145,12 +147,6 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 			.Center,
 			paint = vgo.BLACK if vgo.luminance_of(value^) > 0.45 else vgo.WHITE,
 		)
-		// vgo.stroke_box(
-		// 	self.box,
-		// 	1,
-		// 	core.style.rounding,
-		// 	paint = vgo.fade(core.style.color.accent, max(self.hover_time, self.open_time)),
-		// )
 	}
 
 	kind := widget_kind(self, Color_Conversion_Widget_Kind)
@@ -358,15 +354,19 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 			// )
 		} else {
 			vgo.fill_polygon(
-				[2]f32{pos - 0.866025 * R, box.lo.y - 1.5 * R},
-				[2]f32{pos, box.lo.y},
-				[2]f32{pos + 0.866025 * R, box.lo.y - 1.5 * R},
+				{
+					[2]f32{pos - 0.866025 * R, box.lo.y - 1.5 * R},
+					[2]f32{pos, box.lo.y},
+					[2]f32{pos + 0.866025 * R, box.lo.y - 1.5 * R},
+				},
 				paint = core.style.color.content,
 			)
 			vgo.fill_polygon(
-				[2]f32{pos - 0.866025 * R, box.hi.y + 1.5 * R},
-				[2]f32{pos, box.hi.y},
-				[2]f32{pos + 0.866025 * R, box.hi.y + 1.5 * R},
+				{
+					[2]f32{pos - 0.866025 * R, box.hi.y + 1.5 * R},
+					[2]f32{pos, box.hi.y},
+					[2]f32{pos + 0.866025 * R, box.hi.y + 1.5 * R},
+				},
 				paint = core.style.color.content,
 			)
 		}
@@ -487,9 +487,11 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 
 		// SV triangle
 		vgo.fill_polygon(
-			point_a,
-			point_b,
-			point_c,
+			{
+				point_a,
+				point_b,
+				point_c,
+			},
 			paint = vgo.make_tri_gradient(
 				{point_a, point_b, point_c},
 				{vgo.color_from_hsva({hsva.x, 1, 1, 1}), vgo.BLACK, vgo.WHITE},

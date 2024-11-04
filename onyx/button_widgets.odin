@@ -58,7 +58,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			vgo.fill_box(
 				self.box,
 				core.style.rounding,
-				vgo.fade(color.? or_else core.style.color.substance, self.hover_time * 0.25),
+				vgo.fade(color.? or_else core.style.color.substance, self.hover_time * 0.2),
 			)
 			vgo.stroke_box(
 				self.box,
@@ -68,14 +68,23 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			)
 
 			gradient_size := max(box_width(self.box), box_height(self.box))
-			gradient_time := clamp(f32(time.duration_seconds(time.since(self.click_time))) * 2.0, 0.0, 1.0)
+			gradient_time := clamp(
+				f32(time.duration_seconds(time.since(self.click_time))) * 2.0,
+				0.0,
+				1.0,
+			)
 			if gradient_time <= 1.0 {
 				opacity := min(0.5, gradient_time) - max(0, gradient_time - 0.5)
 				vgo.stroke_box(
 					self.box,
 					1,
 					core.style.rounding,
-					paint = vgo.make_radial_gradient(box_center(self.box), gradient_size * gradient_time, vgo.fade(vgo.WHITE, opacity), vgo.fade(vgo.WHITE, 0.0)),
+					paint = vgo.make_radial_gradient(
+						box_center(self.box),
+						gradient_size * gradient_time,
+						vgo.fade(vgo.WHITE, opacity),
+						vgo.fade(vgo.WHITE, 0.0),
+					),
 				)
 				core.draw_this_frame = true
 			}
@@ -94,24 +103,12 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			text_color = core.style.color.content
 
 		case .Primary:
-			if self.hover_time > 0 {
-				vgo.box_shadow(
-					self.box,
-					core.style.rounding,
-					6,
-					vgo.fade({0, 0, 0, 40}, self.hover_time),
-				)
-			}
 			vgo.fill_box(
 				self.box,
 				core.style.rounding,
-				vgo.mix(
-					self.hover_time * 0.25,
-					color.? or_else core.style.color.accent,
-					core.style.color.foreground,
-				),
+				vgo.mix(self.hover_time * 0.25, core.style.color.accent, core.style.color.foreground),
 			)
-			text_color = core.style.color.accent_content
+			text_color = core.style.color.content
 
 		case .Ghost:
 			vgo.fill_box(

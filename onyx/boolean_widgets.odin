@@ -104,17 +104,19 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				text_pos = {icon_box.hi.x + TEXT_PADDING, center.y - info.text_layout.size.y / 2}
+				text_pos = {icon_box.hi.x + TEXT_PADDING, center.y}
 			case .Right:
-				text_pos = {icon_box.lo.x - TEXT_PADDING, center.y - info.text_layout.size.y / 2}
+				text_pos = {icon_box.lo.x - TEXT_PADDING, center.y}
 			case .Top:
 				text_pos = self.box.lo
 			case .Bottom:
-				text_pos = {self.box.lo.x, self.box.hi.y - info.text_layout.size.y}
+				text_pos = {self.box.lo.x, self.box.hi.y}
 			}
-			vgo.fill_text_layout(
+			vgo.fill_text_layout_aligned(
 				info.text_layout,
 				text_pos,
+				.Left,
+				.Center,
 				vgo.fade(core.style.color.content, opacity),
 			)
 			// if self.hover_time > 0 {
