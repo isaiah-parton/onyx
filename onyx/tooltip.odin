@@ -84,11 +84,11 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		}
 	}
 
-	background_color := core.style.color.background
+	bg_color := core.style.color.bg[0]
 
 	draw_shadow(box)
 	begin_layer(&{box = box, kind = .Topmost, options = {.No_Scissor}}, loc)
-	vgo.fill_box(box, core.style.rounding, background_color)
+	vgo.fill_box(box, core.style.rounding, bg_color)
 
 	#partial switch info.side {
 	case .Top:
@@ -100,7 +100,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		vgo.quad_bezier_to({center, box.hi.y}, {right, box.hi.y})
 		vgo.line_to({left, box.hi.y})
 		vgo.quad_bezier_to({center, box.hi.y}, {center, box.hi.y + offset})
-		vgo.fill_path(background_color)
+		vgo.fill_path(bg_color)
 	case .Bottom:
 		center := box_center_x(box)
 		left := box.lo.x + core.style.rounding
@@ -110,7 +110,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		vgo.quad_bezier_to({center, box.lo.y}, {right, box.lo.y})
 		vgo.line_to({left, box.lo.y})
 		vgo.quad_bezier_to({center, box.lo.y}, {center, box.lo.y - offset})
-		vgo.fill_path(background_color)
+		vgo.fill_path(bg_color)
 	case .Right:
 		center := box_center_y(box)
 		top := box.lo.y + core.style.rounding

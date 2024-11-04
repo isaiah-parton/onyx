@@ -54,15 +54,15 @@ add_tabs :: proc(using info: ^Tabs_Info) -> bool {
 				tab_info.self.open_time = animate(tab_info.self.open_time, 0.15, index^ == o)
 				button_behavior(tab_info.self)
 				if tab_info.self.visible {
-					background_color := vgo.blend(
-						core.style.color.background,
-						core.style.color.foreground,
+					bg_color := vgo.blend(
+					core.style.color.field,
+						core.style.color.fg,
 						tab_info.self.open_time,
 					)
 					vgo.fill_box(
 						tab_info.self.box,
 						{core.style.rounding, core.style.rounding, 0, 0},
-						paint = background_color,
+						paint = bg_color,
 					)
 					vgo.push_scissor(vgo.make_box(tab_info.self.box))
 					defer vgo.pop_scissor()
@@ -147,7 +147,7 @@ add_box_tabs :: proc(using info: ^Tabs_Info) -> bool {
 			vgo.fill_box(
 				option_box,
 				option_rounding,
-				paint = vgo.fade(core.style.color.foreground, hover_time),
+				paint = vgo.fade(core.style.color.fg, hover_time),
 			)
 			vgo.stroke_box(
 				option_box,

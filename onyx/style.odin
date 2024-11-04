@@ -3,7 +3,9 @@ package onyx
 import "../../vgo"
 
 Color_Scheme :: struct {
-	background, foreground, substance, hover, accent, accent_content, content, shadow: vgo.Color,
+	substance, hover, accent, accent_content, content, shadow: vgo.Color,
+	field, fg: vgo.Color,
+	bg, checker_bg: [2]vgo.Color,
 }
 
 Style :: struct {
@@ -44,26 +46,26 @@ Style_Shape :: struct {
 
 default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
-		tooltip_padding = 6,
+		tooltip_padding = 3,
 		panel_padding = 10,
-		text_padding = {8, 6},
+		text_padding = {6, 4},
 		header_text_size = 32,
-		default_text_size = 16,
+		default_text_size = 14,
 		tab_text_size = 18,
-		content_text_size = 18,
-		rounding = 7,
+		content_text_size = 16,
+		rounding = 4,
 		menu_padding = 2,
 		popup_margin = 7,
 		scrollbar_thickness = 8,
 		table_row_height = 40,
-		visual_size = {200, 28},
+		visual_size = {200, 24},
 	}
 }
 
 light_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
-		background = {255, 255, 255, 255},
-		foreground = {255, 255, 255, 255},
+		// background = {255, 255, 255, 255},
+		// foreground = {255, 255, 255, 255},
 		substance = {162, 167, 167, 255},
 		accent = {59, 130, 246, 255},
 		accent_content = {25, 25, 25, 255},
@@ -74,13 +76,21 @@ light_color_scheme :: proc() -> Color_Scheme {
 
 dark_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
-		background = {25, 45, 50, 255},
-		foreground = {5, 15, 20, 255},
-		substance = {80, 80, 80, 255},
+		bg = {
+			{26, 29, 36, 255},
+			{37, 41, 52, 255},
+		},
+		checker_bg = {
+			{210, 210, 210, 255},
+			{160, 160, 160, 255},
+		},
+		fg = {50, 53, 68, 255},
+		field = {33, 35, 48, 255},
+		substance = {105, 109, 125, 255},
 		accent = {59, 130, 246, 255},
 		accent_content = {0, 0, 0, 255},
 		content = {255, 255, 255, 255},
-		shadow = {0, 0, 0, 140},
+		shadow = {0, 0, 0, 25},
 		hover = {120, 125, 140, 95}
 	}
 }

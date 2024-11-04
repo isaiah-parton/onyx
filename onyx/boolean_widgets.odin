@@ -6,11 +6,6 @@ import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 
-@(private = "file")
-SIZE :: 20
-@(private = "file")
-TEXT_PADDING :: 5
-
 Boolean_Widget_Info :: struct {
 	using _:     Widget_Info,
 	state:       ^bool,
@@ -18,6 +13,7 @@ Boolean_Widget_Info :: struct {
 	text_side:   Maybe(Side),
 	text_layout: vgo.Text_Layout,
 	toggled:     bool,
+	size: f32,
 }
 
 Boolean_Widget_Kind :: struct {
@@ -37,6 +33,7 @@ init_boolean_widget :: proc(info: ^Boolean_Widget_Info, loc := #caller_location)
 	info.id = hash(loc)
 	info.self = get_widget(info.id) or_return
 	info.text_side = info.text_side.? or_else .Left
+	info.size = core.style.visual_size.y * 0.8
 	if len(info.text) > 0 {
 		info.text_layout = vgo.make_text_layout(
 			info.text,
@@ -44,14 +41,14 @@ init_boolean_widget :: proc(info: ^Boolean_Widget_Info, loc := #caller_location)
 			core.style.default_text_size,
 		)
 		if info.text_side == .Bottom || info.text_side == .Top {
-			info.desired_size.x = max(SIZE, info.text_layout.size.x)
-			info.desired_size.y = SIZE + info.text_layout.size.y
+			info.desired_size.x = max(info.size, info.text_layout.size.x)
+			info.desired_size.y = info.size + info.text_layout.size.y
 		} else {
-			info.desired_size.x = SIZE + info.text_layout.size.x + TEXT_PADDING * 2
-			info.desired_size.y = SIZE
+			info.desired_size.x = info.size + info.text_layout.size.x + core.style.text_padding.x * 2
+			info.desired_size.y = info.size
 		}
 	} else {
-		info.desired_size = SIZE
+		info.desired_size = info.size
 	}
 	info.fixed_size = true
 	return true
@@ -68,13 +65,13 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				icon_box = {self.box.lo, SIZE}
+				icon_box = {self.box.lo, info.size}
 			case .Right:
-				icon_box = {{self.box.hi.x - SIZE, self.box.lo.y}, SIZE}
+				icon_box = {{self.box.hi.x - info.size, self.box.lo.y}, info.size}
 			case .Top:
-				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.hi.y - SIZE}, SIZE}
+				icon_box = {{box_center_x(self.box) - info.size / 2, self.box.hi.y - info.size}, info.size}
 			case .Bottom:
-				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.lo.y}, SIZE}
+				icon_box = {{box_center_x(self.box) - info.size / 2, self.box.lo.y}, info.size}
 			}
 			icon_box.lo = linalg.floor(icon_box.lo)
 			icon_box.hi += icon_box.lo
@@ -92,21 +89,21 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 		vgo.fill_box(
 			icon_box,
 			core.style.rounding,
-			vgo.fade(core.style.color.accent if state^ else core.style.color.substance, opacity),
+			vgo.fade(core.style.color.accent if state^ else core.style.color.field, opacity),
 		)
 		center := box_center(icon_box)
 		// Paint icon
 		if state^ {
-			vgo.check(center, SIZE / 4, core.style.color.background)
+			vgo.check(center, info.size / 4, core.style.color.field)
 		}
 		// Paint text
 		text_pos: [2]f32
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				text_pos = {icon_box.hi.x + TEXT_PADDING, center.y}
+				text_pos = {icon_box.hi.x + core.style.text_padding.x, center.y}
 			case .Right:
-				text_pos = {icon_box.lo.x - TEXT_PADDING, center.y}
+				text_pos = {icon_box.lo.x - core.style.text_padding.x, center.y}
 			case .Top:
 				text_pos = self.box.lo
 			case .Bottom:
@@ -119,18 +116,6 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 				.Center,
 				vgo.fade(core.style.color.content, opacity),
 			)
-			// if self.hover_time > 0 {
-			// 	vgo.fill_box(
-			// 		{
-			// 			{text_pos.x, text_pos.y + info.text_layout.ascent + 1},
-			// 			{
-			// 				text_pos.x + info.text_layout.size.x,
-			// 				text_pos.y + info.text_layout.ascent + 2,
-			// 			},
-			// 		},
-			// 		fade(core.style.color.content, self.hover_time),
-			// 	)
-			// }
 		}
 	}
 
@@ -154,14 +139,15 @@ Toggle_Switch_Info :: Boolean_Widget_Info
 
 init_toggle_switch :: proc(using info: ^Toggle_Switch_Info, loc := #caller_location) -> bool {
 	text_side = text_side.? or_else .Right
-	desired_size = [2]f32{2, 1} * core.style.visual_size.y * 0.75
+	info.size = core.style.visual_size.y * 0.75
+	desired_size = [2]f32{2, 1} * info.size
 	if len(text) > 0 {
 		text_layout = vgo.make_text_layout(
 			text,
 			core.style.default_font,
 			core.style.default_text_size,
 		)
-		desired_size.x += text_layout.size.x + TEXT_PADDING
+		desired_size.x += text_layout.size.x + core.style.text_padding.x
 	}
 	fixed_size = true
 	id = hash(loc)
@@ -185,9 +171,9 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 		switch_box: Box = self.box
 		switch text_side {
 		case .Left:
-			switch_box = get_box_cut_right(self.box, box_height(switch_box) * 2)
+			switch_box = get_box_cut_right(self.box, info.size * 2)
 		case .Right:
-			switch_box = get_box_cut_left(self.box, box_height(switch_box) * 2)
+			switch_box = get_box_cut_left(self.box, info.size * 2)
 		}
 		inner_box := shrink_box(switch_box, 2)
 		inner_radius := box_height(inner_box) / 2
@@ -198,12 +184,19 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 			box_center_y(inner_box),
 		}
 
+		if how_on < 1 {
+			vgo.fill_box(
+				switch_box,
+				paint = core.style.color.field,
+				radius = outer_radius,
+			)
+		}
 		vgo.fill_box(
-			switch_box,
-			paint = vgo.mix(how_on, core.style.color.background, core.style.color.accent),
+			{switch_box.lo, lever_center + outer_radius},
+			paint = vgo.fade(core.style.color.accent, how_on),
 			radius = outer_radius,
 		)
-		vgo.fill_circle(lever_center, inner_radius, vgo.mix(how_on, core.style.color.substance, core.style.color.background))
+		vgo.fill_circle(lever_center, inner_radius, core.style.color.fg)
 
 		switch text_side {
 		case .Left:
@@ -256,13 +249,13 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				icon_box = {self.box.lo, SIZE}
+				icon_box = {self.box.lo, info.size}
 			case .Right:
-				icon_box = {{self.box.hi.x - SIZE, self.box.lo.y}, SIZE}
+				icon_box = {{self.box.hi.x - info.size, self.box.lo.y}, info.size}
 			case .Top:
-				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.hi.y - SIZE}, SIZE}
+				icon_box = {{box_center_x(self.box) - info.size / 2, self.box.hi.y - info.size}, info.size}
 			case .Bottom:
-				icon_box = {{box_center_x(self.box) - SIZE / 2, self.box.lo.y}, SIZE}
+				icon_box = {{box_center_x(self.box) - info.size / 2, self.box.lo.y}, info.size}
 			}
 			icon_box.lo = linalg.floor(icon_box.lo)
 			icon_box.hi += icon_box.lo
@@ -279,17 +272,17 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 			)
 		}
 
-		state_time := ease.circular_in_out(kind.state_time)
+		state_time := ease.quadratic_in_out(kind.state_time)
 		vgo.fill_circle(
 			icon_center,
-			SIZE / 2,
-			vgo.mix(state_time, core.style.color.substance, core.style.color.accent),
+			info.size / 2,
+			vgo.mix(state_time, core.style.color.field, core.style.color.accent),
 		)
 		if state_time > 0 {
 			vgo.fill_circle(
 				icon_center,
-				(SIZE / 2 - 5) * kind.state_time,
-				vgo.fade(core.style.color.background, state_time),
+				(info.size / 2 - 5) * kind.state_time,
+				vgo.fade(core.style.color.field, state_time),
 			)
 		}
 		// Paint text
@@ -298,13 +291,13 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 			case .Left:
 				vgo.fill_text_layout(
 					info.text_layout,
-					{icon_box.hi.x + TEXT_PADDING, icon_center.y - info.text_layout.size.y / 2},
+					{icon_box.hi.x + core.style.text_padding.x, icon_center.y - info.text_layout.size.y / 2},
 					core.style.color.content,
 				)
 			case .Right:
 				vgo.fill_text_layout(
 					info.text_layout,
-					{icon_box.lo.x - TEXT_PADDING, icon_center.y - info.text_layout.size.y / 2},
+					{icon_box.lo.x - core.style.text_padding.x, icon_center.y - info.text_layout.size.y / 2},
 					core.style.color.content,
 				)
 			case .Top:
@@ -320,7 +313,7 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 		if self.disable_time > 0 {
 			vgo.fill_box(
 				self.box,
-				paint = vgo.fade(core.style.color.foreground, self.disable_time * 0.5),
+				paint = vgo.fade(core.style.color.fg, self.disable_time * 0.5),
 			)
 		}
 	}

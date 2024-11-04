@@ -211,12 +211,12 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 		info.self.state += {.Focused}
 	}
 
-	// Set vertex z position
-	if .No_Scissor not_in info.self.options {
-		vgo.push_scissor(vgo.make_box(info.self.box))
-	}
+	core.highest_layer_index = max(core.highest_layer_index, info.self.index)
 
+	// Set draw order
 	vgo.set_draw_order(info.self.index)
+
+	vgo.save_scissor()
 
 	// Transform matrix
 	scale: [2]f32 = info.scale.? or_else 1
@@ -236,11 +236,9 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 
 end_layer :: proc() {
 	vgo.pop_matrix()
+	vgo.restore_scissor()
 	pop_layout()
 	if layer, ok := current_layer().?; ok {
-		if .No_Scissor not_in layer.options {
-			vgo.pop_scissor()
-		}
 		// Remove draw calls if invisible
 		if .Invisible in layer.options {
 			// remove_range(&core.draw_calls, layer.draw_call_index, len(core.draw_calls))

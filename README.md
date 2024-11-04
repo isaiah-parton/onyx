@@ -1,6 +1,8 @@
 # Onyx
 Beautiful immediate-mode gui that runs as fast as your monitor.
 
+![image](preview.png)
+
 ## What?
 This library is designed by me, for me, based on what I like, but I expect that it will end up being very customizable visually.
 

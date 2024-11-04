@@ -50,7 +50,7 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 		color := vgo.fade(core.style.color.content, 0.5 + 0.5 * self.hover_time)
 		vgo.fill_text(text, core.style.default_font, core.style.default_text_size, self.box.lo, paint = color)
 		if info.has_menu {
-			vgo.arrow({math.floor(self.box.hi.x - 24), box_center_y(self.box)}, 5, color)
+			vgo.arrow({math.floor(self.box.hi.x - 24), box_center_y(self.box)}, 5, paint = color)
 		}
 		if !info.is_tail {
 			origin: [2]f32 = {math.floor(self.box.hi.x - 10), box_center_y(self.box)}
@@ -116,7 +116,7 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 					self.next_state += {.Focused}
 				}
 				foreground()
-				shrink_layout(5)
+				add_padding(5)
 				set_side(.Top)
 				set_width_fill()
 				for &button, b in buttons[:len(info.options)] {

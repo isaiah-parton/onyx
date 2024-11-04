@@ -12,6 +12,11 @@ button_behavior :: proc(widget: ^Widget) {
 		0.1,
 		.Hovered in widget.state,
 	)
+	widget.press_time = animate(
+		widget.press_time,
+		0.1,
+		.Pressed in widget.state,
+	)
 	if .Hovered in widget.state {
 		core.cursor_type = .Pointing_Hand
 	}

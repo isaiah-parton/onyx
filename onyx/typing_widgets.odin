@@ -321,7 +321,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	}
 
 	if self.visible && !undecorated {
-		vgo.fill_box(self.box, core.style.rounding, core.style.color.background)
+		vgo.fill_box(self.box, core.style.rounding, core.style.color.field)
 	}
 
 	if builder == nil {
@@ -436,7 +436,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 		if !undecorated {
 			vgo.stroke_box(
 				self.box,
-				1,
+				2 * self.focus_time,
 				core.style.rounding,
 				paint = vgo.fade(core.style.color.accent, self.focus_time),
 			)
@@ -446,7 +446,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 			vgo.fill_box(
 				self.box,
 				core.style.rounding,
-				paint = vgo.fade(core.style.color.foreground, self.disable_time * 0.5),
+				paint = vgo.fade(core.style.color.fg, self.disable_time * 0.5),
 			)
 		}
 	}

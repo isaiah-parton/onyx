@@ -100,6 +100,7 @@ Widget :: struct {
 	// Generic state used by most widgets
 	focus_time:         f32,
 	hover_time:         f32,
+	press_time: f32,
 	open_time:          f32,
 	disable_time:       f32,
 	// Unique state used by different widget types
@@ -397,11 +398,11 @@ hover_widget :: proc(widget: ^Widget) {
 	// Disabled?
 	if widget.disabled do return
 	// Below highest hovered widget
-	if widget.layer.index < core.highest_layer_index do return
+	if widget.layer.index < core.hovered_layer_index do return
 	// Ok hover
 	core.next_hovered_widget = widget.id
 	core.next_hovered_layer = widget.layer.id
-	core.highest_layer_index = widget.layer.index
+	core.hovered_layer_index = widget.layer.index
 }
 // Try make this widget focused
 focus_widget :: proc(widget: ^Widget) {
@@ -419,14 +420,7 @@ foreground :: proc(loc := #caller_location) {
 	}
 	if begin_widget(&info) {
 		defer end_widget()
-		// vgo.fill_box(info.self.box, core.style.rounding, vgo.make_linear_gradient(
-		// 	info.self.box.lo,
-		// 	info.self.box.hi,
-		// 	vgo.blend(core.style.color.foreground, vgo.WHITE, 0.01),
-		// 	core.style.color.foreground,
-		// ))
-		vgo.fill_box(info.self.box, core.style.rounding, paint = core.style.color.foreground)
-		vgo.stroke_box(info.self.box, 1, core.style.rounding, paint = core.style.color.substance)
+		vgo.fill_box(info.self.box, core.style.rounding, paint = core.style.color.fg)
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)
 		}
@@ -443,7 +437,7 @@ background :: proc(loc := #caller_location) {
 	}
 	if begin_widget(&info) {
 		defer end_widget()
-		vgo.fill_box(info.self.box, core.style.rounding, core.style.color.background)
+		vgo.fill_box(info.self.box, core.style.rounding, core.style.color.field)
 		if point_in_box(core.mouse_pos, info.self.box) {
 			hover_widget(info.self)
 		}
@@ -494,6 +488,8 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 }
 
 divider :: proc() {
-	cut := snapped_box(cut_current_layout(size = [2]f32{0, 1}))
+	cut := snapped_box(cut_current_layout(size = [2]f32{1, 1}))
+	layout := current_layout().?
+	layout.content_size[int(layout.next_cut_side) / 2] += 1
 	vgo.fill_box(cut, paint = core.style.color.substance)
 }

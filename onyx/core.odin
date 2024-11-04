@@ -77,7 +77,7 @@ Core :: struct {
 	// Graphis
 	instance:              wgpu.Instance,
 	device:                wgpu.Device,
-	adapter:                wgpu.Adapter,
+	adapter:               wgpu.Adapter,
 	surface:               wgpu.Surface,
 	surface_config:        wgpu.SurfaceConfiguration,
 	// Disable frame rate limit
@@ -119,7 +119,9 @@ Core :: struct {
 	layer_map:             map[Id]^Layer,
 	layer_stack:           Stack(^Layer, MAX_LAYERS),
 	focused_layer:         Id,
+	hovered_layer_index:   int,
 	highest_layer_index:   int,
+	last_highest_layer_index:   int,
 	last_hovered_layer:    Id,
 	hovered_layer:         Id,
 	next_hovered_layer:    Id,
@@ -329,9 +331,12 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	) {
 		context = runtime.default_context()
 		switch status {
-		case .Success: (^Core)(userdata).device = device
-		case .Error: fmt.panicf("Unable to aquire device: %s", message)
-		case .Unknown: panic("Unknown error")
+		case .Success:
+			(^Core)(userdata).device = device
+		case .Error:
+			fmt.panicf("Unable to aquire device: %s", message)
+		case .Unknown:
+			panic("Unknown error")
 		}
 	}
 
@@ -349,15 +354,13 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 			fmt.printfln("Using %v on %v", info.backendType, info.description)
 
 			descriptor := vgo.device_descriptor()
-			wgpu.AdapterRequestDevice(
-				adapter,
-				&descriptor,
-				on_device,
-				userdata,
-			)
-		case .Error: fmt.panicf("Unable to acquire adapter: %s", message)
-		case .Unavailable: panic("Adapter unavailable")
-		case .Unknown: panic("Unknown error")
+			wgpu.AdapterRequestDevice(adapter, &descriptor, on_device, userdata)
+		case .Error:
+			fmt.panicf("Unable to acquire adapter: %s", message)
+		case .Unavailable:
+			panic("Adapter unavailable")
+		case .Unknown:
+			panic("Unknown error")
 		}
 	}
 
@@ -448,12 +451,14 @@ new_frame :: proc() {
 	core.panel_stack.height = 0
 
 	// Update layer ids
-	core.highest_layer_index = 0
+	core.hovered_layer_index = 0
 	core.last_hovered_layer = core.hovered_layer
 	core.last_hovered_widget = core.hovered_widget
 	core.last_focused_widget = core.focused_widget
 	core.hovered_layer = core.next_hovered_layer
 	core.next_hovered_layer = 0
+	core.last_highest_layer_index = core.highest_layer_index
+	core.highest_layer_index = 0
 
 	core.active_container = core.next_active_container
 	core.next_active_container = 0
@@ -575,6 +580,6 @@ __get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
 
 draw_shadow :: proc(box: vgo.Box) {
 	if vgo.disable_scissor() {
-		vgo.box_shadow(box, core.style.rounding, 6, core.style.color.shadow)
+		vgo.box_shadow(move_box(box, 2), core.style.rounding, 4, core.style.color.shadow)
 	}
 }

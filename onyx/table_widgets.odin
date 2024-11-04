@@ -174,7 +174,7 @@ end_table :: proc(using info: ^Table_Info) {
 	// Background and lower border
 	vgo.fill_box(
 		header_box,
-		paint = vgo.blend(core.style.color.foreground, core.style.color.substance, 0.5),
+		paint = vgo.blend(core.style.color.fg, core.style.color.substance, 0.5),
 	)
 	begin_layout({box = header_box})
 	// Set layout sizes

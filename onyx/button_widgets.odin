@@ -14,15 +14,16 @@ Button_Style :: enum {
 }
 
 Button_Info :: struct {
-	using _:     Widget_Info,
-	text:        string,
-	is_loading:  bool,
-	style:       Button_Style,
-	font:        Maybe(int),
-	font_size:   Maybe(f32),
-	color:       Maybe(vgo.Color),
-	text_layout: vgo.Text_Layout,
-	clicked:     bool,
+	using _:       Widget_Info,
+	text:          string,
+	is_loading:    bool,
+	style:         Button_Style,
+	font:          Maybe(int),
+	font_size:     Maybe(f32),
+	color:         Maybe(vgo.Color),
+	sharp_corners: [4]bool,
+	text_layout:   vgo.Text_Layout,
+	clicked:       bool,
 }
 
 make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
@@ -52,68 +53,40 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 
 	if self.visible {
 		text_color: vgo.Color
+		radius: [4]f32 =
+			(1.0 - linalg.array_cast(linalg.array_cast(info.sharp_corners, i32), f32)) *
+			core.style.rounding
 
 		switch style {
 		case .Outlined:
 			vgo.fill_box(
 				self.box,
-				core.style.rounding,
+				radius,
 				vgo.fade(color.? or_else core.style.color.substance, self.hover_time * 0.2),
 			)
-			vgo.stroke_box(
-				self.box,
-				1,
-				core.style.rounding,
-				color.? or_else core.style.color.substance,
-			)
-
-			gradient_size := max(box_width(self.box), box_height(self.box))
-			gradient_time := clamp(
-				f32(time.duration_seconds(time.since(self.click_time))) * 2.0,
-				0.0,
-				1.0,
-			)
-			if gradient_time <= 1.0 {
-				opacity := min(0.5, gradient_time) - max(0, gradient_time - 0.5)
-				vgo.stroke_box(
-					self.box,
-					1,
-					core.style.rounding,
-					paint = vgo.make_radial_gradient(
-						box_center(self.box),
-						gradient_size * gradient_time,
-						vgo.fade(vgo.WHITE, opacity),
-						vgo.fade(vgo.WHITE, 0.0),
-					),
-				)
-				core.draw_this_frame = true
-			}
+			vgo.stroke_box(self.box, 1, radius, color.? or_else core.style.color.substance)
 			text_color = core.style.color.content
 
 		case .Secondary:
 			vgo.fill_box(
 				self.box,
-				core.style.rounding,
-				vgo.mix(
-					self.hover_time * 0.25,
-					color.? or_else core.style.color.substance,
-					core.style.color.foreground,
-				),
+				radius,
+				vgo.mix(self.hover_time * 0.2, color.? or_else core.style.color.substance, vgo.BLACK),
 			)
 			text_color = core.style.color.content
 
 		case .Primary:
 			vgo.fill_box(
 				self.box,
-				core.style.rounding,
-				vgo.mix(self.hover_time * 0.25, core.style.color.accent, core.style.color.foreground),
+				radius,
+				vgo.mix(self.hover_time * 0.2, core.style.color.accent, vgo.BLACK),
 			)
 			text_color = core.style.color.content
 
 		case .Ghost:
 			vgo.fill_box(
 				self.box,
-				core.style.rounding,
+				radius,
 				paint = vgo.fade(
 					color.? or_else core.style.color.substance,
 					self.hover_time * 0.5,
@@ -122,6 +95,20 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			text_color = core.style.color.content
 		}
 
+		if self.press_time > 0 {
+			scale := self.press_time if .Pressed in self.state else f32(1)
+			opacity := f32(1) if .Pressed in self.state else self.press_time
+			vgo.fill_box(
+				self.box,
+				radius,
+				vgo.make_radial_gradient(
+					self.click_point,
+					max(box_width(self.box), box_height(self.box)) * scale,
+					vgo.fade(vgo.WHITE, opacity * 0.333),
+					vgo.fade(vgo.WHITE, 0),
+				),
+			)
+		}
 		if !is_loading {
 			vgo.fill_text_layout_aligned(
 				text_layout,
@@ -133,11 +120,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 		}
 
 		if self.disable_time > 0 {
-			vgo.fill_box(
-				self.box,
-				core.style.rounding,
-				paint = vgo.fade(core.style.color.background, self.disable_time * 0.5),
-			)
+			vgo.fill_box(self.box, paint = vgo.fade(core.style.color.fg, self.disable_time * 0.5))
 		}
 
 		if is_loading {
@@ -257,7 +240,7 @@ add_floating_button :: proc(using info: ^Floating_Button_Info) -> bool {
 			self.box,
 			rounding,
 			vgo.fade(
-				vgo.mix(self.hover_time, core.style.color.background, core.style.color.accent),
+				vgo.mix(self.hover_time, core.style.color.field, core.style.color.accent),
 				math.lerp(f32(0.75), f32(1.0), self.hover_time),
 			),
 		)

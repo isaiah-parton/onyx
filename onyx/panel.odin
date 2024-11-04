@@ -1,6 +1,7 @@
 package onyx
 
 import "../../vgo"
+import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
@@ -18,6 +19,7 @@ Panel :: struct {
 	resizing:             bool,
 	dismissed:            bool,
 	resize_offset:        [2]f32,
+	fade:                 f32,
 	can_move, can_resize: bool,
 	dead:                 bool,
 }
@@ -49,7 +51,6 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		panel.can_move = true
 		panel.can_resize = true
 	}
-
 	// Push to stack
 	push_stack(&core.panel_stack, panel)
 
@@ -83,11 +84,14 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 	// Begin the panel layer
 	layer_info := Layer_Info {
-		id  = id,
-		box = expand_box(panel.box, 10),
+		id   = id,
+		kind = .Floating,
+		box  = panel.box,
 	}
-	begin_layer(&layer_info)
+	begin_layer(&layer_info) or_return
 	panel.layer = layer_info.self
+
+	vgo.push_scissor(vgo.make_box(panel.box, core.style.rounding))
 
 	// Background
 	background_widget := Widget_Info {
@@ -100,7 +104,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		using background_widget
 
 		draw_shadow(self.box)
-		vgo.fill_box(self.box, core.style.rounding, core.style.color.foreground)
+		vgo.fill_box(self.box, core.style.rounding, core.style.color.fg)
 
 		if point_in_box(core.mouse_pos, self.box) {
 			hover_widget(self)
@@ -116,7 +120,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	inner_box := panel.box
 
 	TITLE_HEIGHT :: 28
-	if info.title != "" {
+	if len(info.title) > 0 {
 		panel.min_size.y += TITLE_HEIGHT
 		title_box := cut_box_top(&inner_box, TITLE_HEIGHT)
 
@@ -157,7 +161,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 			origin := box_center(self.box)
 			scale := box_height(self.box) * 0.2
 			icon_color := vgo.blend(
-				core.style.color.foreground,
+				core.style.color.fg,
 				core.style.color.content,
 				0.5 + 0.5 * self.hover_time,
 			)
@@ -214,24 +218,16 @@ end_panel :: proc() {
 			origin := box_center(self.box)
 			scale := box_height(self.box) * 0.2
 			icon_color := vgo.blend(
-				core.style.color.foreground,
+				core.style.color.fg,
 				core.style.color.content,
 				0.5 + 0.5 * self.hover_time,
 			)
 			vgo.fill_polygon(
-				{
-					origin + {0, -1} * scale,
-					origin + {-1, -1} * scale,
-					origin + {-1, 0} * scale,
-				},
+				{origin + {0, -1} * scale, origin + {-1, -1} * scale, origin + {-1, 0} * scale},
 				paint = icon_color,
 			)
 			vgo.fill_polygon(
-				{
-					origin + {0, 1} * scale,
-					origin + {1, 1} * scale,
-					origin + {1, 0} * scale,
-				},
+				{origin + {0, 1} * scale, origin + {1, 1} * scale, origin + {1, 0} * scale},
 				paint = icon_color,
 			)
 			vgo.line(origin - 0.8 * scale, origin + 0.8 * scale, 2, icon_color)
@@ -241,79 +237,20 @@ end_panel :: proc() {
 				panel.resize_offset = panel.box.hi - core.mouse_pos
 			}
 		}
-		// PADDING := core.style.rounding
-		// OUTER :: 10
-		// INNER :: 2
-		// hover_boxes: [Side]Box = {
-		// 	.Left   = Box {
-		// 		{panel.box.lo.x - OUTER, panel.box.lo.y + PADDING},
-		// 		{panel.box.lo.x + INNER, panel.box.hi.y - PADDING},
-		// 	},
-		// 	.Right  = Box {
-		// 		{panel.box.hi.x - INNER, panel.box.lo.y + PADDING},
-		// 		{panel.box.hi.x + OUTER, panel.box.hi.y - PADDING},
-		// 	},
-		// 	.Top    = Box {
-		// 		{panel.box.lo.x + PADDING, panel.box.lo.y - OUTER},
-		// 		{panel.box.hi.x - PADDING, panel.box.lo.y + INNER},
-		// 	},
-		// 	.Bottom = Box {
-		// 		{panel.box.lo.x + PADDING, panel.box.hi.y - INNER},
-		// 		{panel.box.hi.x - PADDING, panel.box.hi.y + OUTER},
-		// 	},
-		// }
-		// DRAW_THICKNESS :: 1
-		// draw_boxes: [Side]Box = {
-		// 	.Left   = Box {
-		// 		{panel.box.lo.x, panel.box.lo.y + PADDING},
-		// 		{panel.box.lo.x + DRAW_THICKNESS, panel.box.hi.y - PADDING},
-		// 	},
-		// 	.Right  = Box {
-		// 		{panel.box.hi.x - DRAW_THICKNESS, panel.box.lo.y + PADDING},
-		// 		{panel.box.hi.x, panel.box.hi.y - PADDING},
-		// 	},
-		// 	.Top    = Box {
-		// 		{panel.box.lo.x + PADDING, panel.box.lo.y},
-		// 		{panel.box.hi.x - PADDING, panel.box.lo.y + DRAW_THICKNESS},
-		// 	},
-		// 	.Bottom = Box {
-		// 		{panel.box.lo.x + PADDING, panel.box.hi.y - DRAW_THICKNESS},
-		// 		{panel.box.hi.x - PADDING, panel.box.hi.y},
-		// 	},
-		// }
-		// push_id(panel.layer.id)
-		// for side, s in Side {
-		// 	widget, ok := begin_widget({id = hash(s)})
-		// 	if !ok do continue
-
-		// 	widget.draggable = true
-		// 	widget.box = hover_boxes[side]
-
-		// 	if point_in_box(core.mouse_pos, widget.box) {
-		// 		hover_widget(widget)
-		// 	}
-
-		// 	widget.hover_time = animate(widget.hover_time, 0.2, .Hovered in widget.state)
-		// 	draw_box_fill(draw_boxes[side], fade(core.style.color.content, widget.hover_time))
-
-		// 	if .Pressed in widget.state {
-		// 		panel.resize = side
-		// 	}
-
-		// 	if .Hovered in widget.state {
-		// 		core.cursor_type = .Resize_NS if int(side) > 1 else .Resize_EW
-		// 	}
-
-		// 	end_widget()
-		// }
-		// pop_id()
 	}
+
+	if panel.fade > 0 {
+		vgo.fill_box(panel.layer.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.15))
+	}
+	// panel.fade = animate(panel.fade, 0.15, panel.layer.index < core.last_highest_layer_index)
+
 	// Panel outline
 	// draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)
 	layout := current_layout().?
 	panel.min_size += layout.content_size + layout.spacing_size
 	pop_layout()
 	pop_id()
+	vgo.pop_scissor()
 	end_layer()
 	pop_stack(&core.panel_stack)
 }

@@ -104,7 +104,7 @@ Color_Button_Info :: struct {
 init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_location) -> bool {
 	if value == nil do return false
 	text_layout = vgo.make_text_layout(
-		fmt.tprintf("%6x", vgo.hex_from_color(value^)),
+		fmt.tprintf("#%6x", vgo.hex_from_color(value^)),
 		core.style.monospace_font,
 		core.style.default_text_size,
 	)
@@ -122,36 +122,38 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 	menu_behavior(self)
 
 	if self.visible {
-		shadow_opacity := max(self.hover_time, self.open_time) * 1.0
+		shadow_opacity := max(self.hover_time, self.open_time)
 		if shadow_opacity > 0 {
 			vgo.box_shadow(
 				self.box,
 				core.style.rounding,
 				6,
-				vgo.fade(vgo.BLACK, shadow_opacity),
+				vgo.fade(core.style.color.shadow, shadow_opacity),
 			)
 		}
 
+		checker_box := shrink_box(self.box, 1)
+		vgo.push_scissor(vgo.make_box(checker_box, box_height(checker_box) / 2))
 		draw_checkerboard_pattern(
 			self.box,
 			box_height(self.box) / 2,
-			{210, 210, 210, 255},
-			{160, 160, 160, 255},
+			vgo.blend(core.style.color.checker_bg[0], value^, vgo.WHITE),
+			vgo.blend(core.style.color.checker_bg[1], value^, vgo.WHITE),
 		)
-		vgo.fill_box(self.box, paint = value^)
+		vgo.pop_scissor()
 
 		vgo.fill_text_layout_aligned(
 			text_layout,
 			box_center(self.box),
 			.Center,
 			.Center,
-			paint = vgo.BLACK if vgo.luminance_of(value^) > 0.45 else vgo.WHITE,
+			paint = vgo.BLACK if max(vgo.luminance_of(value^), 1 - f32(value.a) / 255) > 0.45 else vgo.WHITE,
 		)
 	}
 
 	kind := widget_kind(self, Color_Conversion_Widget_Kind)
 	PADDING :: 10
-	if .Open in self.state {
+	if .Open in self.last_state {
 		if .Open not_in self.last_state {
 			kind.hsva = vgo.hsva_from_color(value^)
 		}
@@ -172,10 +174,12 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		slider_info := Alpha_Slider_Info {
 			value    = &kind.hsva.a,
 			vertical = true,
+			color = value^,
 		}
 
 		if show_alpha {
 			init_alpha_slider(&slider_info)
+			layer_size.x += slider_info.desired_size.x + 10
 		}
 
 		inputs: [Color_Format]Input_Info
@@ -213,11 +217,11 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 				vgo.fill_box(
 					current_layer().?.box,
 					core.style.rounding,
-					vgo.fade(core.style.color.foreground, 1 - self.open_time),
+					vgo.fade(core.style.color.fg, 1 - self.open_time),
 				)
 			}
 
-			shrink_layout(PADDING)
+			add_padding(PADDING)
 
 			set_height_auto()
 			set_width_auto()
@@ -323,50 +327,19 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 	if self.visible {
 		R :: 4
 		box := self.box
-		// box.lo[j] += R * 1.5
-		// box.hi[j] -= R * 1.5
 		draw_checkerboard_pattern(
 			box,
 			(box.hi[j] - box.lo[j]) / 2,
-			{210, 210, 210, 255},
-			{160, 160, 160, 255},
+			core.style.color.checker_bg[0],
+			core.style.color.checker_bg[1],
 		)
 		color.a = 255
 		time := clamp(value^, 0, 1)
 		pos := box.lo[i] + (box.hi[i] - box.lo[i]) * time
 		if vertical {
-			vgo.fill_box(box, paint = vgo.make_linear_gradient(box.lo, {box.lo.x, box.hi.y}, vgo.fade(vgo.BLACK, 0.0), vgo.BLACK))
+			vgo.fill_box(box, paint = vgo.make_linear_gradient(box.lo, {box.lo.x, box.hi.y}, vgo.fade(color, 0.0), color))
 			vgo.fill_box(
 				{{box.lo.x, pos - 1}, {box.hi.x, pos + 1}},
-				paint = core.style.color.content,
-			)
-			// vgo.fill_polygon(
-			// 	{box.lo.x - 1.5 * R, pos - 0.866025 * R},
-			// 	{box.lo.x, pos},
-			// 	{box.lo.x - 1.5 * R, pos + 0.866025 * R},
-			// 	core.style.color.content,
-			// )
-			// draw_triangle_fill(
-			// 	{box.hi.x + 1.5 * R, pos - 0.866025 * R},
-			// 	{box.hi.x, pos},
-			// 	{box.hi.x + 1.5 * R, pos + 0.866025 * R},
-			// 	core.style.color.content,
-			// )
-		} else {
-			vgo.fill_polygon(
-				{
-					[2]f32{pos - 0.866025 * R, box.lo.y - 1.5 * R},
-					[2]f32{pos, box.lo.y},
-					[2]f32{pos + 0.866025 * R, box.lo.y - 1.5 * R},
-				},
-				paint = core.style.color.content,
-			)
-			vgo.fill_polygon(
-				{
-					[2]f32{pos - 0.866025 * R, box.hi.y + 1.5 * R},
-					[2]f32{pos, box.hi.y},
-					[2]f32{pos + 0.866025 * R, box.hi.y + 1.5 * R},
-				},
 				paint = core.style.color.content,
 			)
 		}
@@ -470,8 +443,8 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 		// H wheel
 		vgo.stroke_circle(
 			center,
-			(inner + outer) * 0.5,
-			width = (outer - inner) - 4,
+			outer,
+			width = (outer - inner),
 			paint = vgo.make_wheel_gradient(center),
 		)
 

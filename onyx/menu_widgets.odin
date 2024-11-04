@@ -11,9 +11,9 @@ import "core:math/linalg"
 menu_bar :: proc() -> bool {
 	begin_layout({}) or_return
 	box := layout_box()
-	vgo.fill_box(box, core.style.rounding, core.style.color.background)
+	vgo.fill_box(box, core.style.rounding, core.style.color.field)
 	vgo.stroke_box(box, core.style.rounding, 1, core.style.color.substance)
-	shrink_layout(core.style.menu_padding)
+	add_padding(core.style.menu_padding)
 	return true
 }
 @(private)
@@ -54,7 +54,7 @@ begin_menu :: proc(info: ^Menu_Info) -> bool {
 			info.self.box,
 			core.style.rounding,
 			vgo.blend(
-				core.style.color.background,
+				core.style.color.field,
 				core.style.color.substance,
 				info.self.hover_time * 0.5,
 			),
@@ -68,7 +68,7 @@ begin_menu :: proc(info: ^Menu_Info) -> bool {
 		vgo.arrow(
 			{text_pos.x + info.text_layout.size.x + 10, text_pos.y},
 			5,
-			core.style.color.content,
+			paint = core.style.color.content,
 		)
 	}
 
@@ -87,7 +87,7 @@ begin_menu :: proc(info: ^Menu_Info) -> bool {
 		push_id(info.self.id)
 		draw_shadow(layout_box())
 		background()
-		shrink_layout(core.style.menu_padding)
+		add_padding(core.style.menu_padding)
 		set_width_fill()
 		set_height_auto()
 	}
@@ -208,7 +208,7 @@ menu_item :: proc(info: Menu_Item_Info, loc := #caller_location) -> Menu_Item_In
 enum_selector :: proc(value: ^$T, loc := #caller_location) where intrinsics.type_is_enum(T) {
 	if value == nil do return
 	if menu({text = fmt.tprintf("%v \ue14e", value^)}) {
-		shrink_layout(core.style.menu_padding)
+		add_padding(core.style.menu_padding)
 		set_side(.Top)
 		set_width_fill()
 		for member, m in T {

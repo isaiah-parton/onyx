@@ -143,7 +143,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 					}
 					if dot_time > 0 {
 						vgo.fill_circle(p, 8 * dot_time, field.color)
-						vgo.fill_circle(p, 6 * dot_time, core.style.color.foreground)
+						vgo.fill_circle(p, 6 * dot_time, core.style.color.fg)
 					}
 					variant.dot_times[e] = dot_time
 					lp = p
@@ -292,7 +292,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 		}
 		// Tooltip
 		begin_tooltip({bounds = self.box, size = tooltip_size})
-		shrink_layout(3)
+		add_padding(3)
 		if label_tooltip {
 			box := cut_current_layout(.Top, [2]f32{0, 26})
 			vgo.fill_text_aligned(

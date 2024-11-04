@@ -1,10 +1,10 @@
 package onyx
 
+import "../../vgo"
 import "base:intrinsics"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
-import "../../vgo"
 
 Slider_Info :: struct($T: typeid) where intrinsics.type_is_numeric(T) {
 	using _: Widget_Info,
@@ -37,7 +37,7 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 	radius := box_height(_box) / 2
 
 	if self.visible {
-		vgo.fill_box(_box, radius, paint = core.style.color.substance)
+		vgo.fill_box(_box, radius, paint = core.style.color.field)
 	}
 
 	if value == nil {
@@ -67,7 +67,7 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 		vgo.fill_box(
 			{_box.lo, {knob_center.x, _box.hi.y}},
 			radius,
-			vgo.fade(core.style.color.accent, 0.5),
+			vgo.mix(0.333, core.style.color.accent, vgo.BLACK),
 		)
 		vgo.fill_circle(knob_center, knob_radius, core.style.color.accent)
 	}
@@ -76,13 +76,17 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 		text_layout := vgo.make_text_layout(
 			fmt.tprintf(format.? or_else "%v", value^),
 			core.style.monospace_font,
-			18,
+			core.style.default_text_size,
 		)
-		tooltip_size := linalg.max(text_layout.size + core.style.tooltip_padding * 2, [2]f32{50, 0})
+		tooltip_size := linalg.max(
+			text_layout.size + core.style.tooltip_padding * 2,
+			[2]f32{50, 0},
+		)
 		if self.slider.tooltip_size == {} {
 			self.slider.tooltip_size = tooltip_size
 		} else {
-			self.slider.tooltip_size += (tooltip_size - self.slider.tooltip_size) * 10 * core.delta_time
+			self.slider.tooltip_size +=
+				(tooltip_size - self.slider.tooltip_size) * 10 * core.delta_time
 		}
 		push_id(self.id)
 		defer pop_id()
@@ -93,7 +97,13 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 				side = .Top,
 			},
 		) {
-			vgo.fill_text_layout_aligned(text_layout, box_center(layout_box()), .Center, .Center, core.style.color.content)
+			vgo.fill_text_layout_aligned(
+				text_layout,
+				box_center(layout_box()),
+				.Center,
+				.Center,
+				core.style.color.content,
+			)
 		}
 	}
 
@@ -123,11 +133,18 @@ add_box_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 
 	horizontal_slider_behavior(self)
 	if self.visible {
-		vgo.fill_box(self.box, paint = core.style.color.substance)
+		rounding := box_height(self.box) / 2
+		vgo.fill_box(self.box, rounding, paint = core.style.color.field)
 		time := clamp(f32(value^ - lo) / f32(hi - lo), 0, 1)
 		vgo.fill_box(
 			{self.box.lo, {self.box.lo.x + box_width(self.box) * time, self.box.hi.y}},
-			paint = core.style.color.accent,
+			rounding,
+			paint = vgo.make_linear_gradient(
+				self.box.lo,
+				{self.box.hi.x, self.box.lo.y},
+				vgo.mix(0.333, core.style.color.accent, vgo.BLACK),
+				core.style.color.accent,
+			),
 		)
 	}
 	if .Pressed in self.state {

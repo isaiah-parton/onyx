@@ -16,8 +16,8 @@ Alignment :: enum {
 Corner :: enum {
 	Top_Left,
 	Top_Right,
-	Bottom_Right,
 	Bottom_Left,
+	Bottom_Right,
 }
 
 Side :: enum {
