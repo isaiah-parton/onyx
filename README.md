@@ -7,7 +7,7 @@ Beautiful immediate-mode gui that runs as fast as your monitor.
 This library is designed by me, for me, based on what I like, but I expect that it will end up being very customizable visually.
 
 ## How?
-Windowing is *currently* handled by GLFW, the code for this is very minimal and is subject to change as I develop on different platforms in the future.
+Windowing is handled by GLFW, the code for this is very minimal and is subject to change as I develop on different platforms in the future.
 
 Rendering is and will always be done with WGPU; because of this, all WGPU resources are exposed and allowed to be used by the rest of the app.
 
@@ -36,10 +36,12 @@ Layouts use the dead simple rect-cut method, give it a side to cut from and just
 ## Can I use it?
 It's not nearly production ready yet, has no docs and calling it stable is still a stretch, but do as you will, I can't stop you.
 
+**Note**: you must also have the [vgo](https://github.com/isaiah-parton/vgo) package in the same folder as onyx
+
 ## Ok, and?
 
 Stuff i'm working on:
-- [ ] Popups
-- [ ] Helpers for retaining container scroll/zoom and other things
-- [ ] Forms for tab focusing
-- [ ] Better control over layer sorting
+- Popups
+- Helpers for retaining container scroll/zoom and other things
+- Forms for tab focusing
+- Better control over layer sorting
