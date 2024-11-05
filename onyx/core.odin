@@ -115,7 +115,7 @@ Core :: struct {
 	panel_map:                map[Id]^Panel,
 	panel_stack:              Stack(^Panel, MAX_PANELS),
 	// Layers are
-	layer_list:               [dynamic]^Layer,
+	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
 	layer_stack:              Stack(^Layer, MAX_LAYERS),
 	hovered_layer_index:      int,
@@ -471,18 +471,21 @@ new_frame :: proc() {
 	for id, &layer in core.layer_map {
 		if layer.dead {
 			// Move other layers down by one z index
-			for other in core.layer_list {
-				if other.id == 0 do continue
-				if other.index > layer.index {
-					other.index -= 1
+			if layer.parent != nil {
+				for child, c in layer.parent.children {
+					if child.id == layer.id {
+						ordered_remove(&layer.parent.children, c)
+						continue
+					}
+					if child.index >= layer.index {
+						child.index -= 1
+					}
 				}
 			}
 
 			// Remove from map
 			delete_key(&core.layer_map, id)
-
-			// Free slot in array
-			layer.id = 0
+			free(layer)
 
 			core.draw_next_frame = true
 		} else {
@@ -545,10 +548,12 @@ shutdown :: proc() {
 		destroy_widget(widget)
 	}
 
-	for _, &layer in core.layer_map {
+	for layer in core.layers {
 		destroy_layer(layer)
+		free(layer)
 	}
 
+	delete(core.layers)
 	delete(core.widget_map)
 	delete(core.panel_map)
 	delete(core.layer_map)

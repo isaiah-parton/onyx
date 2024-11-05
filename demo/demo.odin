@@ -84,7 +84,7 @@ main :: proc() {
 	toggle_value: bool
 	radio_value: bool
 	input_value: string
-	slider_value: f32
+	slider_values: [2]f32
 	date: Maybe(onyx.Date)
 	color: vgo.Color = vgo.GOLD
 
@@ -131,9 +131,9 @@ main :: proc() {
 				add_space(SPACING)
 				string_input({value = &input_value, placeholder = "String input"})
 				add_space(SPACING)
-				slider(Slider_Info(f32){value = &slider_value, lo = 0, hi = 10, format = "%.1f"})
+				slider(Slider_Info(f32){value = &slider_values[0], lo = 0, hi = 10, format = "%.1f"})
 				add_space(SPACING)
-				box_slider(Slider_Info(f32){value = &slider_value, lo = 0, hi = 10, format = "%.1f"})
+				box_slider(Slider_Info(f32){value = &slider_values[1], lo = 0, hi = 10, format = "%.1f"})
 				add_space(SPACING)
 				label({text = "Icons can be placed \ued3c anywhere within text! \uec8e"})
 				add_space(SPACING)
@@ -141,9 +141,8 @@ main :: proc() {
 				add_space(SPACING)
 				date_picker({first = &date})
 			}
-			if panel({size = [2]f32{200, 100}}) {
-				add_padding(20)
-				button({text = "hi this is a panel"})
+			if panel({}) {
+
 			}
 			present()
 		}

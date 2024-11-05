@@ -43,6 +43,7 @@ Layer_Options :: bit_set[Layer_Option]
 Layer :: struct {
 	id:              Id,
 	parent:          ^Layer,
+	children:        [dynamic]^Layer,
 	state:           Widget_State,
 	last_state:      Widget_State,
 	options:         Layer_Options,
@@ -52,11 +53,8 @@ Layer :: struct {
 	// Render order
 	kind:            Layer_Kind,
 	index:           int,
-	child_count:     int,
 	// Frame
 	frames:          int,
-	// Index of first draw call
-	draw_call_index: int,
 }
 
 Layer_Info :: struct {
@@ -78,6 +76,22 @@ current_layer :: proc(loc := #caller_location) -> Maybe(^Layer) {
 	return nil
 }
 
+create_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
+	layer = new(Layer)
+	layer.id = id
+	if id in core.layer_map do return
+	core.layer_map[id] = layer
+	ok = true
+	return
+}
+
+destroy_layer :: proc(layer: ^Layer) {
+	for child in layer.children {
+		destroy_layer(child)
+		free(child)
+	}
+	delete(layer.children)
+}
 
 get_layer :: proc(info: ^Layer_Info) -> (layer: ^Layer, ok: bool) {
 	assert(info != nil)
@@ -85,8 +99,13 @@ get_layer :: proc(info: ^Layer_Info) -> (layer: ^Layer, ok: bool) {
 	if !ok {
 		layer = create_layer(info.id) or_return
 		if parent, ok := current_layer().?; ok {
-			set_layer_parent(layer, parent)
-			set_layer_index(layer, parent.index + 1)
+			layer.parent = parent
+			append(&parent.children, layer)
+			layer.index = layer.parent.index + 1
+			// set_layer_index(layer, parent.index + len(parent.children) + 1)
+		} else {
+			layer.index = len(core.layers)
+			append(&core.layers, layer)
 		}
 		ok = true
 	}
@@ -119,8 +138,7 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 	if core.hovered_layer == info.self.id {
 		info.self.state += {.Hovered}
 		// Re-order layers if clicked
-		if mouse_pressed(.Left) &&
-		   info.self.kind == .Floating {
+		if mouse_pressed(.Left) && info.self.kind == .Floating {
 			bring_layer_to_front(info.self)
 		}
 	}
@@ -181,21 +199,12 @@ __layer :: proc(ok: bool) {
 	}
 }
 
-get_highest_layer_child :: proc(parent: ^Layer, kind: Layer_Kind) -> int {
+get_highest_layer_child :: proc(layer: ^Layer, kind: Layer_Kind) -> int {
+	if layer == nil do return 0
 	highest := int(0)
-	if parent == nil {
-		// TODO: Optimize this
-		for &layer in core.layers {
-			if layer.id == 0 do continue
-			if layer.kind == kind {
-				highest = max(highest, layer.index)
-			}
-		}
-	} else {
-		for child in parent.children {
-			if child.kind == kind {
-				highest = max(highest, child.index)
-			}
+	for child in layer.children {
+		if int(child.kind) <= int(kind) {
+			highest = max(highest, child.index)
 		}
 	}
 	return highest
@@ -203,47 +212,16 @@ get_highest_layer_child :: proc(parent: ^Layer, kind: Layer_Kind) -> int {
 
 bring_layer_to_front :: proc(layer: ^Layer) {
 	assert(layer != nil)
-	// First pass determines the new z-index
-	highest_of_kind := get_highest_layer_child(layer.parent, layer.kind)
-	if layer.index >= highest_of_kind {
-		return
-	}
+	list: []^Layer = core.layers[:] if layer.parent == nil else layer.parent.children[:]
+	new_index := len(list)
+	if layer.index >= new_index do return
 	// Second pass lowers other layers
-	for other in core.layer_list {
-		if other.index > layer.index + layer.child_count && other.index <= highest_of_kind {
-			other.index -= layer.child_count + 1
+	for child in list {
+		if child.index > layer.index && child.index <= new_index {
+			child.index -= 1
 		}
 	}
-	layer.index = highest_of_kind
-}
-
-bring_layer_to_front_of_children :: proc(layer: ^Layer) {
-	assert(layer != nil)
-
-	if layer.parent == nil do return
-
-	// First pass determines the new z-index
-	highest_of_kind: int
-	for i in 0..=layer.child_count {
-		if int(child.kind) <= int(layer.kind) {
-			highest_of_kind = max(highest_of_kind, child.index)
-		}
-	}
-
-	if layer.index >= highest_of_kind {
-		return
-	}
-
-	// Second pass lowers other layers
-	for i in 0 ..< len(core.layers) {
-		other_layer := &core.layers[i]
-		if other_layer.id == 0 do continue
-		if other_layer.index > layer.index && other_layer.index <= highest_of_kind {
-			other_layer.index -= 1
-		}
-	}
-
-	layer.index = highest_of_kind
+	layer.index = new_index
 }
 
 get_layer_by_id :: proc(id: Id) -> (result: ^Layer, ok: bool) {

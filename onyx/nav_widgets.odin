@@ -107,7 +107,6 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 				box     = box,
 				origin  = {box_center_x(box), box.lo.y},
 				scale   = ([2]f32)(layer_scale),
-				parent  = current_layer().?,
 				opacity = open_time,
 			}
 			if begin_layer(&layer_info) {

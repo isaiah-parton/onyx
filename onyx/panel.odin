@@ -14,6 +14,7 @@ Panel :: struct {
 	layer:                ^Layer,
 	box:                  Box,
 	move_offset:          [2]f32,
+	last_min_size:             [2]f32,
 	min_size:             [2]f32,
 	moving:               bool,
 	resizing:             bool,
@@ -68,18 +69,22 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	}
 
 	// Resizing
+	min_size := linalg.max(MIN_SIZE, panel.min_size)
 	if panel.resizing {
 		if mouse_released(.Left) {
 			panel.resizing = false
 		}
-		min_size := linalg.max(MIN_SIZE, panel.min_size)
 		panel.box.hi = core.mouse_pos + panel.resize_offset
 	}
-	panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + panel.min_size)
+	panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + min_size)
 
 	panel.box = {linalg.floor(panel.box.lo), linalg.floor(panel.box.hi)}
 
 	// Reset min_size to be calculated again
+	if panel.last_min_size != panel.min_size {
+		core.draw_this_frame = true
+	}
+	panel.last_min_size = panel.min_size
 	panel.min_size = {}
 
 	// Begin the panel layer
@@ -199,7 +204,7 @@ end_panel :: proc() {
 	if panel.can_resize {
 		resize_button := Widget_Info {
 			id  = hash("resize"),
-			box = Box{panel.box.hi - core.style.visual_size.y, panel.box.hi},
+			box = Box{panel.box.hi - core.style.visual_size.y * 0.75, panel.box.hi},
 		}
 		if begin_widget(&resize_button) {
 			defer end_widget()
@@ -207,30 +212,24 @@ end_panel :: proc() {
 			self := resize_button.self
 
 			button_behavior(self)
-
-			vgo.fill_box(
-				self.box,
-				{3 = core.style.rounding},
-				vgo.fade(core.style.color.substance, 0.5 * self.hover_time),
-			)
+			if .Hovered in self.state {
+				core.cursor_type = .Resize_NWSE
+			}
 
 			// Resize icon
-			origin := box_center(self.box)
-			scale := box_height(self.box) * 0.2
 			icon_color := vgo.blend(
-				core.style.color.fg,
+				core.style.color.substance,
 				core.style.color.content,
-				0.5 + 0.5 * self.hover_time,
+				0.5 * self.hover_time,
 			)
 			vgo.fill_polygon(
-				{origin + {0, -1} * scale, origin + {-1, -1} * scale, origin + {-1, 0} * scale},
+				{
+					{self.box.hi.x, self.box.lo.y},
+					self.box.hi,
+					{self.box.lo.x, self.box.hi.y}
+				},
 				paint = icon_color,
 			)
-			vgo.fill_polygon(
-				{origin + {0, 1} * scale, origin + {1, 1} * scale, origin + {1, 0} * scale},
-				paint = icon_color,
-			)
-			vgo.line(origin - 0.8 * scale, origin + 0.8 * scale, 2, icon_color)
 
 			if .Pressed in (self.state - self.last_state) {
 				panel.resizing = true

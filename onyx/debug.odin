@@ -1,8 +1,8 @@
 package onyx
 
+import "../../vgo"
 import "core:fmt"
 import "core:time"
-import "../../vgo"
 
 Profiler_Scope :: enum {
 	New_Frame,
@@ -35,38 +35,42 @@ profiler_end_scope :: proc(scope: Profiler_Scope) {
 
 @(private)
 do_debug_layer :: proc() {
+	DEBUG_TEXT_SIZE :: 16
 	vgo.set_paint(vgo.WHITE)
+
 	{
 		offset := f32(0)
 		for _, &layer in core.layer_map {
-			offset += vgo.fill_text(fmt.tprintf("%i - %v %i", layer.id, layer.kind, layer.index), core.style.monospace_font, 16, {0, offset}).y
+			offset +=
+				vgo.fill_text(fmt.tprintf("%i - %v %i", layer.id, layer.kind, layer.index), core.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
 		}
 	}
 
 	total: time.Duration
+	vgo.fill_text_aligned(
+		fmt.tprintf("FPS: %.0f", vgo.get_fps()),
+		core.style.monospace_font,
+		DEBUG_TEXT_SIZE,
+		{0, core.view.y - f32(len(Profiler_Scope) + 1) * DEBUG_TEXT_SIZE},
+		.Left,
+		.Bottom,
+	)
 	for scope, s in Profiler_Scope {
 		total += __prof.d[scope]
 		vgo.fill_text_aligned(
-			fmt.tprintf(
-				"%v: %.3fms",
-				scope,
-				time.duration_milliseconds(__prof.d[scope]),
-			),
+			fmt.tprintf("%v: %.3fms", scope, time.duration_milliseconds(__prof.d[scope])),
 			core.style.monospace_font,
-			16,
-			{0, core.view.y - f32(16 * (s + 1))},
+			DEBUG_TEXT_SIZE,
+			{0, core.view.y - f32(DEBUG_TEXT_SIZE * (s + 1))},
 			.Left,
 			.Bottom,
 			paint = vgo.WHITE,
 		)
 	}
 	vgo.fill_text_aligned(
-		fmt.tprintf(
-			"Total: %.3fms",
-			time.duration_milliseconds(total),
-		),
+		fmt.tprintf("Total: %.3fms", time.duration_milliseconds(total)),
 		core.style.monospace_font,
-		16,
+		DEBUG_TEXT_SIZE,
 		{0, core.view.y},
 		.Left,
 		.Bottom,

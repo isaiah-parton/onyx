@@ -153,7 +153,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 
 	kind := widget_kind(self, Color_Conversion_Widget_Kind)
 	PADDING :: 10
-	if .Open in self.last_state {
+	if .Open in self.state {
 		if .Open not_in self.last_state {
 			kind.hsva = vgo.hsva_from_color(value^)
 		}
