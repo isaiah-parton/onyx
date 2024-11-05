@@ -111,10 +111,6 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 			.Center,
 			paint = core.style.color.content,
 		)
-		// if core.mouse_scroll.y != 0 {
-		// 	month_offset += int(core.mouse_scroll.y)
-		// 	core.draw_next_frame = true
-		// }
 	}
 
 	add_space(CALENDAR_WEEK_SPACING)
@@ -182,19 +178,18 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 				)
 			} else {
 				// Hover box
-				if self.hover_time > 0 {
+				if .Hovered in self.state {
 					vgo.fill_box(
 						self.box,
 						core.style.shape.rounding,
-						vgo.fade(core.style.color.substance, self.hover_time),
+						paint = core.style.color.substance,
 					)
-				}
-				if date == todays_date() {
+				} else if date == todays_date() {
 					vgo.stroke_box(
 						self.box,
-						1,
+						2,
 						core.style.shape.rounding,
-						core.style.color.substance,
+						paint = core.style.color.substance,
 					)
 				}
 			}

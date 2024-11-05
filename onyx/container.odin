@@ -25,7 +25,7 @@ Container_Info :: struct {
 	corners:            Maybe([4]f32),
 	// Navigation mode
 	enable_zoom:        bool,
-	// Transient layout
+	// Transient layout reference
 	layout:             ^Layout,
 	// Self-managed values
 	is_active:          bool,
@@ -136,25 +136,26 @@ begin_container :: proc(using info: ^Container_Info) -> bool {
 		}
 	}
 
+	// Push draw scissor
+	vgo.push_scissor(vgo.make_box(self.box, corners.? or_else core.style.rounding))
+
 	// Determine layout box
 	layout_origin := self.box.lo - linalg.max(linalg.floor(self.cont.scroll), 0)
 	layout_box := Box{layout_origin, layout_origin + linalg.max(layout_size, box_size(self.box))}
 
 	begin_layout({box = layout_box, isolated = true}) or_return
-
 	layout = current_layout().?
-	layout.next_cut_side = .Top
-
-	// Push draw scissor
-	vgo.push_scissor(vgo.make_box(self.box, corners.? or_else core.style.rounding))
+	set_side(.Top)
 
 	return true
 }
 
 end_container :: proc(using info: ^Container_Info) {
-	end_layout()
+	assert(info != nil)
+	assert(info.self != nil)
 	// Update needed space
 	self.cont.space_needed = linalg.max(layout.content_size + layout.spacing_size, self.cont.space_needed)
+	end_layout()
 	// Controls
 	if is_active {
 		if enable_zoom &&
@@ -206,7 +207,6 @@ end_container :: proc(using info: ^Container_Info) {
 		core.draw_next_frame = true
 		was_scrolled = true
 	}
-
 	// Enable/disable scrollbars
 	enable_scroll_x := math.floor(content_size.x) > box_width(self.box) && !hide_scrollbars
 	enable_scroll_y := math.floor(content_size.y) > box_height(self.box) && !hide_scrollbars

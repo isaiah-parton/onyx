@@ -60,6 +60,8 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 	defer end_widget()
 
 	button_behavior(self)
+	// boolean_widget_behavior(self, info^)
+	self.boolean.state_time = animate(self.boolean.state_time, 0.2, state^)
 
 	if self.visible {
 		icon_box: Box
@@ -82,32 +84,48 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 		} else {
 			icon_box = self.box
 		}
-		if self.hover_time > 0 {
+		if .Hovered in self.state {
 			vgo.fill_box(
 				self.box,
 				core.style.rounding,
-				vgo.fade(core.style.color.substance, 0.25 * self.hover_time),
+				vgo.fade(core.style.color.substance, 0.2),
 			)
 		}
 		opacity: f32 = 0.5 if self.disabled else 1
+
+		state_time := ease.quadratic_in_out(self.boolean.state_time)
+		if state_time < 1 {
+			vgo.fill_box(
+				icon_box,
+				core.style.rounding,
+				core.style.color.field,
+			)
+		}
+		if state_time > 0 && state_time < 1 {
+			vgo.push_scissor(vgo.make_box(self.box, core.style.rounding))
+		}
 		vgo.fill_box(
 			icon_box,
 			core.style.rounding,
-			vgo.fade(core.style.color.accent if state^ else core.style.color.field, opacity),
+			vgo.fade(core.style.color.accent, state_time),
 		)
-		center := box_center(icon_box)
 		// Paint icon
-		if state^ {
+		if state_time > 0 {
+			icon_box := move_box(icon_box, {0, box_height(icon_box) * ((1 - state_time) if state^ else -(1 - state_time))})
+			center := box_center(icon_box)
 			vgo.check(center, info.size / 4, core.style.color.field)
+		}
+		if state_time > 0 && state_time < 1 {
+			vgo.pop_scissor()
 		}
 		// Paint text
 		text_pos: [2]f32
 		if len(info.text) > 0 {
 			switch info.text_side {
 			case .Left:
-				text_pos = {icon_box.hi.x + core.style.text_padding.x, center.y}
+				text_pos = {icon_box.hi.x + core.style.text_padding.x, box_center_y(self.box)}
 			case .Right:
-				text_pos = {icon_box.lo.x - core.style.text_padding.x, center.y}
+				text_pos = {icon_box.lo.x - core.style.text_padding.x, box_center_y(self.box)}
 			case .Top:
 				text_pos = self.box.lo
 			case .Bottom:
@@ -151,7 +169,7 @@ init_toggle_switch :: proc(using info: ^Toggle_Switch_Info, loc := #caller_locat
 			core.style.default_font,
 			core.style.default_text_size,
 		)
-		desired_size.x += text_layout.size.x + core.style.text_padding.x
+		desired_size.x += text_layout.size.x + core.style.text_padding.x * 2
 	}
 	fixed_size = true
 	id = hash(loc)
@@ -188,13 +206,21 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 			box_center_y(inner_box),
 		}
 
+		if .Hovered in self.state {
+			vgo.fill_box(
+				self.box,
+				outer_radius,
+				vgo.fade(core.style.color.substance, 0.2),
+			)
+		}
+
 		if how_on < 1 {
 			vgo.fill_box(switch_box, paint = core.style.color.field, radius = outer_radius)
 		}
 		vgo.fill_box(
 			{switch_box.lo, lever_center + outer_radius},
-			paint = vgo.fade(core.style.color.accent, how_on),
 			radius = outer_radius,
+			paint = vgo.fade(core.style.color.accent, how_on),
 		)
 		vgo.fill_circle(lever_center, inner_radius, vgo.mix(how_on, core.style.color.fg, core.style.color.field))
 
@@ -209,7 +235,7 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 			vgo.fill_text_layout(
 				text_layout,
 				{
-					self.box.hi.x - text_layout.size.x,
+					switch_box.hi.x + core.style.text_padding.x,
 					box_center_y(self.box) - text_layout.size.y / 2,
 				},
 				core.style.color.content,
@@ -267,11 +293,11 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 		}
 		icon_center := box_center(icon_box)
 
-		if self.hover_time > 0 {
+		if .Hovered in self.state {
 			vgo.fill_box(
 				{{self.box.lo.x, self.box.lo.y}, self.box.hi},
 				box_height(self.box) / 2,
-				paint = vgo.fade(core.style.color.substance, 0.25 * self.hover_time),
+				paint = vgo.fade(core.style.color.substance, 0.2),
 			)
 		}
 

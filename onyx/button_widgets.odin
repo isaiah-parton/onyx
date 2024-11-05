@@ -1,6 +1,7 @@
 package onyx
 
 import "../../vgo"
+import "core:container/small_array"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
@@ -24,6 +25,10 @@ Button_Info :: struct {
 	sharp_corners: [4]bool,
 	text_layout:   vgo.Text_Layout,
 	clicked:       bool,
+}
+
+Button_State :: struct {
+	clicks: small_array.Small_Array(10, [3]f32),
 }
 
 make_button :: proc(info: Button_Info, loc := #caller_location) -> Button_Info {
@@ -56,22 +61,24 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 		radius: [4]f32 =
 			(1.0 - linalg.array_cast(linalg.array_cast(info.sharp_corners, i32), f32)) *
 			core.style.rounding
+		shape := vgo.make_box(self.box, radius)
 
 		switch style {
 		case .Outlined:
 			vgo.fill_box(
 				self.box,
 				radius,
-				vgo.fade(color.? or_else core.style.color.substance, self.hover_time * 0.2),
+				vgo.fade(color.? or_else core.style.color.substance, 0.5 if .Hovered in self.state else 0.25),
 			)
-			vgo.stroke_box(self.box, 1, radius, color.? or_else core.style.color.substance)
+			vgo.stroke_box(self.box, 2, radius, color.? or_else core.style.color.substance)
 			text_color = core.style.color.content
 
 		case .Secondary:
+			bg_color := color.? or_else core.style.color.substance
 			vgo.fill_box(
 				self.box,
 				radius,
-				vgo.mix(self.hover_time * 0.2, color.? or_else core.style.color.substance, vgo.BLACK),
+				vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in self.state else bg_color,
 			)
 			text_color = core.style.color.content
 
@@ -79,35 +86,31 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 			vgo.fill_box(
 				self.box,
 				radius,
-				vgo.mix(self.hover_time * 0.2, core.style.color.accent, vgo.BLACK),
+				vgo.mix(0.15, core.style.color.accent, vgo.WHITE) if .Hovered in self.state else core.style.color.accent,
 			)
 			text_color = core.style.color.content
 
 		case .Ghost:
-			vgo.fill_box(
-				self.box,
-				radius,
-				paint = vgo.fade(
-					color.? or_else core.style.color.substance,
-					self.hover_time * 0.5,
-				),
-			)
+			if .Hovered in self.state {
+				vgo.fill_box(
+					self.box,
+					radius,
+					paint = vgo.fade(color.? or_else core.style.color.substance, 0.2),
+				)
+			}
 			text_color = core.style.color.content
 		}
 
 		if self.press_time > 0 {
 			scale := self.press_time if .Pressed in self.state else f32(1)
 			opacity := f32(1) if .Pressed in self.state else self.press_time
-			vgo.fill_box(
-				self.box,
-				radius,
-				vgo.make_radial_gradient(
-					self.click_point,
-					max(box_width(self.box), box_height(self.box)) * scale,
-					vgo.fade(vgo.WHITE, opacity * 0.333),
-					vgo.fade(vgo.WHITE, 0),
-				),
+			vgo.push_scissor(shape)
+			vgo.fill_circle(
+				self.click_point,
+				linalg.length(self.box.hi - self.box.lo) * scale,
+				paint = vgo.fade(vgo.WHITE, opacity * 0.2),
 			)
+			vgo.pop_scissor()
 		}
 		if !is_loading {
 			vgo.fill_text_layout_aligned(

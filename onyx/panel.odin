@@ -179,20 +179,6 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		}
 	}
 
-	// Title bar
-	if info.title != "" {
-		title_box := get_box_cut_top(panel.box, TITLE_HEIGHT)
-		// Dragging
-		if panel.can_move &&
-		   panel.resizing == false &&
-		   .Hovered in panel.layer.state &&
-		   point_in_box(core.mouse_pos, title_box) {
-			if mouse_pressed(.Left) {
-
-			}
-		}
-	}
-
 	push_layout(Layout{box = inner_box, next_cut_side = .Top})
 
 	return true
@@ -205,7 +191,7 @@ end_panel :: proc() {
 	if panel.can_resize {
 		resize_button := Widget_Info {
 			id  = hash("resize"),
-			box = Box{panel.box.hi - core.style.visual_size.y * 0.75, panel.box.hi},
+			box = Box{panel.box.hi - core.style.visual_size.y * 0.5, panel.box.hi},
 			sticky = true
 		}
 		if begin_widget(&resize_button) {

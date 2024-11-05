@@ -266,8 +266,8 @@ input_behavior :: proc(info: ^Input_Info) -> bool {
 		}
 	}
 	// Resolve view offset so the cursor is always shown
-	if .Active in info.self.last_state && info.text_layout.hovered_glyph >= 0 {
-		glyph := info.text_layout.glyphs[info.text_layout.hovered_glyph]
+	if .Active in info.self.last_state {
+		glyph := info.text_layout.glyphs[info.text_layout.glyph_selection[0]]
 		glyph_pos := (info.text_pos - info.self.input.offset) + glyph.offset
 		// The cursor's own bounding box
 		cursor_box := Box {
@@ -328,7 +328,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 		return false
 	}
 
-	text_pos = self.box.lo - self.input.offset
+	text_pos = self.box.lo
 
 	// Offset text origin based on font size
 	info.text_pos.x += core.style.text_padding.x
@@ -350,6 +350,8 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 	}
 
 	input_behavior(info) or_return
+
+	text_pos -= self.input.offset
 
 	if changed {
 		text = strings.to_string(builder^)

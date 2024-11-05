@@ -400,6 +400,8 @@ hover_widget :: proc(widget: ^Widget) {
 	if widget.disabled do return
 	// Below highest hovered widget
 	if widget.layer.index < core.hovered_layer_index do return
+	// Clipping
+	if !point_in_box(core.mouse_pos, widget.layer.box) do return
 	// Ok hover
 	core.next_hovered_widget = widget.id
 	core.next_hovered_layer = widget.layer.id

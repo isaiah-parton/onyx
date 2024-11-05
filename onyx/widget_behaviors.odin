@@ -7,16 +7,14 @@ import "core:math/linalg"
 // Some generic behaviors for widgets
 
 button_behavior :: proc(widget: ^Widget) {
-	widget.hover_time = animate(
-		widget.hover_time,
-		0.1,
-		.Hovered in widget.state,
-	)
 	widget.press_time = animate(
 		widget.press_time,
-		0.1,
+		0.2,
 		.Pressed in widget.state,
 	)
+	if .Pressed in (widget.last_state - widget.state) {
+		widget.press_time = 1
+	}
 	if .Hovered in widget.state {
 		core.cursor_type = .Pointing_Hand
 	}
@@ -58,7 +56,7 @@ menu_behavior :: proc(widget: ^Widget) {
 }
 
 get_popup_scale :: proc(size: [2]f32, time: f32) -> f32 {
-	return math.lerp(math.lerp(f32(0.9), f32(1.0), linalg.length(size) / linalg.length(core.view)), f32(1.0), time)
+	return math.lerp(math.lerp(f32(0.8), f32(1.0), linalg.length(size) / linalg.length(core.view)), f32(1.0), time)
 }
 
 get_popup_layer_info :: proc(widget: ^Widget, size: [2]f32, side: Side = .Bottom) -> (info: Layer_Info) {
@@ -97,7 +95,7 @@ get_popup_layer_info :: proc(widget: ^Widget, size: [2]f32, side: Side = .Bottom
 			{parent.lo.x, parent.hi.y + margin},
 			{parent.lo.x + size.x, parent.hi.y + margin + size.y},
 		}
-		info.origin = info.box.lo
+		info.origin = {box_center_x(info.box), info.box.lo.y}
 	case .Top:
 		info.box = Box {
 			{parent.lo.x, parent.lo.y - (margin + size.y)},

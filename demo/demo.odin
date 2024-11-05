@@ -87,6 +87,7 @@ main :: proc() {
 	slider_values: [2]f32
 	date: Maybe(onyx.Date)
 	color: vgo.Color = vgo.GOLD
+	enum_value: runtime.Odin_OS_Type
 
 	for {
 		// Stuff
@@ -110,8 +111,8 @@ main :: proc() {
 				buttons := [?]Button_Info{
 					make_button({text = "Button", style = .Primary}),
 					make_button({text = "Button with icon \uf578", style = .Secondary}),
-					make_button({text = "\uf0d9", style = .Secondary, font_size = 20}),
-					make_button({text = "Colored button", style = .Secondary, color = vgo.Color{220, 57, 57, 255}}),
+					make_button({text = "\uf0d9", style = .Ghost, font_size = 20}),
+					make_button({text = "Colored button", style = .Outlined, color = vgo.Color{220, 57, 57, 255}}),
 				}
 
 				if layout({side = .Top, size = buttons[2].desired_size.y}) {
@@ -140,6 +141,8 @@ main :: proc() {
 				color_button({value = &color, show_alpha = true})
 				add_space(SPACING)
 				date_picker({first = &date})
+				add_space(SPACING)
+				enum_selector(&enum_value)
 			}
 			if panel({}) {
 
