@@ -87,7 +87,7 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 	bg_color := core.style.color.bg[0]
 
 	draw_shadow(box)
-	begin_layer(&{box = box, kind = .Topmost, options = {.No_Scissor}}, loc)
+	begin_layer(&{box = box, kind = .Topmost}, loc)
 	vgo.fill_box(box, core.style.rounding, bg_color)
 
 	#partial switch info.side {

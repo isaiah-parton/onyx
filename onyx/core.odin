@@ -69,88 +69,88 @@ Debug_State :: struct {
 
 // The global core data
 Core :: struct {
-	ready:                 bool,
-	window:                glfw.WindowHandle,
-	debug:                 Debug_State,
-	view:                  [2]f32,
-	desired_fps:           int,
+	ready:                    bool,
+	window:                   glfw.WindowHandle,
+	debug:                    Debug_State,
+	view:                     [2]f32,
+	desired_fps:              int,
 	// Graphis
-	instance:              wgpu.Instance,
-	device:                wgpu.Device,
-	adapter:               wgpu.Adapter,
-	surface:               wgpu.Surface,
-	surface_config:        wgpu.SurfaceConfiguration,
+	instance:                 wgpu.Instance,
+	device:                   wgpu.Device,
+	adapter:                  wgpu.Adapter,
+	surface:                  wgpu.Surface,
+	surface_config:           wgpu.SurfaceConfiguration,
 	// Disable frame rate limit
-	disable_frame_skip:    bool,
+	disable_frame_skip:       bool,
 	// Timings
-	delta_time:            f32,
-	last_frame_time:       time.Time,
-	start_time:            time.Time,
-	last_second:           time.Time,
-	frames_so_far:         int,
-	frames_this_second:    int,
+	delta_time:               f32,
+	last_frame_time:          time.Time,
+	start_time:               time.Time,
+	last_second:              time.Time,
+	frames_so_far:            int,
+	frames_this_second:       int,
 	// Hashing
-	id_stack:              Stack(Id, MAX_IDS),
+	id_stack:                 Stack(Id, MAX_IDS),
 	// Widgets
-	widgets:               [MAX_WIDGETS]Maybe(Widget),
-	widget_map:            map[Id]^Widget,
-	widget_stack:          Stack(^Widget, 10),
-	last_hovered_widget:   Id,
-	hovered_widget:        Id,
-	next_hovered_widget:   Id,
-	last_focused_widget:   Id,
-	focused_widget:        Id,
-	dragged_widget:        Id,
-	disable_widgets:       bool,
-	drag_offset:           [2]f32,
+	widgets:                  [MAX_WIDGETS]Maybe(Widget),
+	widget_map:               map[Id]^Widget,
+	widget_stack:             Stack(^Widget, 10),
+	last_hovered_widget:      Id,
+	hovered_widget:           Id,
+	next_hovered_widget:      Id,
+	last_focused_widget:      Id,
+	focused_widget:           Id,
+	dragged_widget:           Id,
+	disable_widgets:          bool,
+	drag_offset:              [2]f32,
 	// Form
-	form:                  Form,
-	form_active:           bool,
+	form:                     Form,
+	form_active:              bool,
 	// Layout
-	layout_stack:          Stack(Layout, MAX_LAYOUTS),
-	active_container:      Id,
-	next_active_container: Id,
+	layout_stack:             Stack(Layout, MAX_LAYOUTS),
+	active_container:         Id,
+	next_active_container:    Id,
 	// Panels
-	panels:                [MAX_PANELS]Maybe(Panel),
-	panel_map:             map[Id]^Panel,
-	panel_stack:           Stack(^Panel, MAX_PANELS),
-	// Layers
-	layers:                [MAX_LAYERS]Layer,
-	layer_map:             map[Id]^Layer,
-	layer_stack:           Stack(^Layer, MAX_LAYERS),
-	focused_layer:         Id,
-	hovered_layer_index:   int,
-	highest_layer_index:   int,
-	last_highest_layer_index:   int,
-	last_hovered_layer:    Id,
-	hovered_layer:         Id,
-	next_hovered_layer:    Id,
+	panels:                   [MAX_PANELS]Maybe(Panel),
+	panel_map:                map[Id]^Panel,
+	panel_stack:              Stack(^Panel, MAX_PANELS),
+	// Layers are
+	layer_list:               [dynamic]^Layer,
+	layer_map:                map[Id]^Layer,
+	layer_stack:              Stack(^Layer, MAX_LAYERS),
+	hovered_layer_index:      int,
+	highest_layer_index:      int,
+	last_highest_layer_index: int,
+	last_hovered_layer:       Id,
+	hovered_layer:            Id,
+	next_hovered_layer:       Id,
+	focused_layer:            Id,
 	// IO
-	cursor_type:           Mouse_Cursor,
-	mouse_button:          Mouse_Button,
-	last_mouse_pos:        [2]f32,
-	mouse_pos:             [2]f32,
-	click_mouse_pos:       [2]f32,
-	mouse_delta:           [2]f32,
-	mouse_scroll:          [2]f32,
-	mouse_bits:            Mouse_Bits,
-	last_mouse_bits:       Mouse_Bits,
-	keys, last_keys:       #sparse[Keyboard_Key]bool,
-	runes:                 [dynamic]rune,
-	visible:               bool,
-	focused:               bool,
+	cursor_type:              Mouse_Cursor,
+	mouse_button:             Mouse_Button,
+	last_mouse_pos:           [2]f32,
+	mouse_pos:                [2]f32,
+	click_mouse_pos:          [2]f32,
+	mouse_delta:              [2]f32,
+	mouse_scroll:             [2]f32,
+	mouse_bits:               Mouse_Bits,
+	last_mouse_bits:          Mouse_Bits,
+	keys, last_keys:          #sparse[Keyboard_Key]bool,
+	runes:                    [dynamic]rune,
+	visible:                  bool,
+	focused:                  bool,
 	// Style
-	style:                 Style,
+	style:                    Style,
 	// Source boxes of user images on the texture atlas
-	user_images:           [100]Maybe(Box),
+	user_images:              [100]Maybe(Box),
 	// Scratch text editor
-	text_editor:           tedit.Editor,
+	text_editor:              tedit.Editor,
 	// Drawing
-	draw_this_frame:       bool,
-	draw_next_frame:       bool,
-	frames:                int,
-	drawn_frames:          int,
-	cursors:               [Mouse_Cursor]glfw.CursorHandle,
+	draw_this_frame:          bool,
+	draw_next_frame:          bool,
+	frames:                   int,
+	drawn_frames:             int,
+	cursors:                  [Mouse_Cursor]glfw.CursorHandle,
 }
 
 view_box :: proc() -> Box {
@@ -471,20 +471,12 @@ new_frame :: proc() {
 	for id, &layer in core.layer_map {
 		if layer.dead {
 			// Move other layers down by one z index
-			for i in 0 ..< len(core.layers) {
-				other_layer := &core.layers[i]
-				if other_layer.id == 0 do continue
-				if other_layer.index > layer.index {
-					other_layer.index -= 1
+			for other in core.layer_list {
+				if other.id == 0 do continue
+				if other.index > layer.index {
+					other.index -= 1
 				}
 			}
-
-			// Remove from parent's children
-			for &child, c in layer.children {
-				child.parent = nil
-			}
-			remove_layer_parent(layer)
-			destroy_layer(layer)
 
 			// Remove from map
 			delete_key(&core.layer_map, id)

@@ -210,6 +210,8 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		}
 
 		menu_layer := get_popup_layer_info(self, layer_size + input_size, side = .Right)
+		menu_layer.kind = .Background
+		menu_layer.options += {.Attached}
 		if layer(&menu_layer) {
 			draw_shadow(layout_box())
 			foreground()

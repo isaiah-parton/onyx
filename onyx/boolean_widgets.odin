@@ -13,7 +13,7 @@ Boolean_Widget_Info :: struct {
 	text_side:   Maybe(Side),
 	text_layout: vgo.Text_Layout,
 	toggled:     bool,
-	size: f32,
+	size:        f32,
 }
 
 Boolean_Widget_Kind :: struct {
@@ -44,7 +44,8 @@ init_boolean_widget :: proc(info: ^Boolean_Widget_Info, loc := #caller_location)
 			info.desired_size.x = max(info.size, info.text_layout.size.x)
 			info.desired_size.y = info.size + info.text_layout.size.y
 		} else {
-			info.desired_size.x = info.size + info.text_layout.size.x + core.style.text_padding.x * 2
+			info.desired_size.x =
+				info.size + info.text_layout.size.x + core.style.text_padding.x * 2
 			info.desired_size.y = info.size
 		}
 	} else {
@@ -69,7 +70,10 @@ add_checkbox :: proc(using info: ^Boolean_Widget_Info) -> bool {
 			case .Right:
 				icon_box = {{self.box.hi.x - info.size, self.box.lo.y}, info.size}
 			case .Top:
-				icon_box = {{box_center_x(self.box) - info.size / 2, self.box.hi.y - info.size}, info.size}
+				icon_box = {
+					{box_center_x(self.box) - info.size / 2, self.box.hi.y - info.size},
+					info.size,
+				}
 			case .Bottom:
 				icon_box = {{box_center_x(self.box) - info.size / 2, self.box.lo.y}, info.size}
 			}
@@ -185,11 +189,7 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 		}
 
 		if how_on < 1 {
-			vgo.fill_box(
-				switch_box,
-				paint = core.style.color.field,
-				radius = outer_radius,
-			)
+			vgo.fill_box(switch_box, paint = core.style.color.field, radius = outer_radius)
 		}
 		vgo.fill_box(
 			{switch_box.lo, lever_center + outer_radius},
@@ -253,7 +253,10 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 			case .Right:
 				icon_box = {{self.box.hi.x - info.size, self.box.lo.y}, info.size}
 			case .Top:
-				icon_box = {{box_center_x(self.box) - info.size / 2, self.box.hi.y - info.size}, info.size}
+				icon_box = {
+					{box_center_x(self.box) - info.size / 2, self.box.hi.y - info.size},
+					info.size,
+				}
 			case .Bottom:
 				icon_box = {{box_center_x(self.box) - info.size / 2, self.box.lo.y}, info.size}
 			}
@@ -291,13 +294,19 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 			case .Left:
 				vgo.fill_text_layout(
 					info.text_layout,
-					{icon_box.hi.x + core.style.text_padding.x, icon_center.y - info.text_layout.size.y / 2},
+					{
+						icon_box.hi.x + core.style.text_padding.x,
+						icon_center.y - info.text_layout.size.y / 2,
+					},
 					core.style.color.content,
 				)
 			case .Right:
 				vgo.fill_text_layout(
 					info.text_layout,
-					{icon_box.lo.x - core.style.text_padding.x, icon_center.y - info.text_layout.size.y / 2},
+					{
+						icon_box.lo.x - core.style.text_padding.x,
+						icon_center.y - info.text_layout.size.y / 2,
+					},
 					core.style.color.content,
 				)
 			case .Top:
@@ -311,10 +320,7 @@ add_radio_button :: proc(using info: ^Radio_Button_Info) -> bool {
 			}
 		}
 		if self.disable_time > 0 {
-			vgo.fill_box(
-				self.box,
-				paint = vgo.fade(core.style.color.fg, self.disable_time * 0.5),
-			)
+			vgo.fill_box(self.box, paint = vgo.fade(core.style.color.fg, self.disable_time * 0.5))
 		}
 	}
 

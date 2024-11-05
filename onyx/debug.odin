@@ -35,6 +35,13 @@ profiler_end_scope :: proc(scope: Profiler_Scope) {
 
 @(private)
 do_debug_layer :: proc() {
+	vgo.set_paint(vgo.WHITE)
+	{
+		offset := f32(0)
+		for _, &layer in core.layer_map {
+			offset += vgo.fill_text(fmt.tprintf("%i - %v %i", layer.id, layer.kind, layer.index), core.style.monospace_font, 16, {0, offset}).y
+		}
+	}
 
 	total: time.Duration
 	for scope, s in Profiler_Scope {
