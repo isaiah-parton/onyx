@@ -330,10 +330,6 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 
 	text_pos = self.box.lo - self.input.offset
 
-	if .Active in self.state || submitted {
-		text = strings.to_string(builder^)
-	}
-
 	// Offset text origin based on font size
 	info.text_pos.x += core.style.text_padding.x
 	if info.multiline {
@@ -349,7 +345,15 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 		text_pos.x += prefix_text_layout.size.x
 	}
 
+	if .Active in self.state || submitted {
+		text = strings.to_string(builder^)
+	}
+
 	input_behavior(info) or_return
+
+	if changed {
+		text = strings.to_string(builder^)
+	}
 
 	// Hover
 	if point_in_box(core.mouse_pos, self.box) {

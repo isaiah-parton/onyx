@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:math"
 import "core:math/ease"
 import "core:strings"
+import "core:strconv"
 import t "core:time"
 import dt "core:time/datetime"
 import "../../vgo"
@@ -60,7 +61,7 @@ init_calendar :: proc(using info: ^Calendar_Info, loc := #caller_location) -> bo
 
 	// Get the start of the month
 	month_start =
-		t.datetime_to_time(i64(year), i8(month), 1, 0, 0, 0) or_else panic("invalid date")
+		t.datetime_to_time(i64(year), i8(month), 1, 0, 0, 0) or_return
 
 	// Set the first date on the calendar to be the previous sunday
 	weekday := t.weekday(month_start)
@@ -267,7 +268,7 @@ calendar :: proc(info: Calendar_Info, loc := #caller_location) -> Calendar_Info 
 }
 
 Date_Picker_Info :: struct {
-	using _:       Widget_Info,
+	using _:       Input_Info,
 	first, second: ^Maybe(Date),
 }
 
@@ -276,10 +277,32 @@ Date_Picker_Widget_Kind :: struct {
 }
 
 init_date_picker :: proc(info: ^Date_Picker_Info, loc := #caller_location) -> bool {
-	info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
-	info.desired_size = core.style.visual_size
+	init_input(info, loc) or_return
+	if info.builder == nil {
+		info.builder = &info.self.input.builder
+	}
+	if first, ok := info.first.?; ok {
+		info.text = fmt.tprintf("%2i/%2i/%4i", first.month, first.day, first.year)
+	}
+	if .Active in (info.self.state - info.self.last_state) {
+		strings.builder_reset(info.builder)
+		strings.write_string(info.builder, info.text)
+	}
+	info.monospace = true
 	return true
+}
+
+parse_date :: proc(s: string) -> (date: Date, ok: bool) {
+	values := strings.split(s, "/")
+	defer delete(values)
+	if len(values) != 3 do return
+	date.month = i8(strconv.parse_uint(values[0]) or_return)
+	date.year = i64(strconv.parse_uint(values[2]) or_return)
+	date.day = i8(strconv.parse_uint(values[1]) or_return)
+	err := dt.validate_date(date)
+	if err != nil do return
+	ok = true
+	return
 }
 
 add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
@@ -287,54 +310,19 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 		return false
 	}
 
-	begin_widget(info) or_return
-	defer end_widget()
-
-	button_behavior(self)
-
-	kind := widget_kind(self, Date_Picker_Widget_Kind)
-	self.open_time = animate(self.open_time, 0.2, .Open in self.state)
-
-	if self.visible {
-		vgo.fill_box(
-			self.box,
-			core.style.rounding,
-			paint = vgo.blend(core.style.color.field, core.style.color.substance, self.hover_time * 0.5),
-		)
-		// vgo.stroke_box(self.box, 1, core.style.rounding, core.style.color.substance)
-
-		b := strings.builder_make(context.temp_allocator)
-
-		if first, ok := info.first.?; ok {
-			fmt.sbprintf(&b, "{:2i}/{:2i}/{:4i}", first.month, first.day, first.year)
-		}
-		if info.second != nil {
-			if second, ok := info.second.?; ok {
-				fmt.sbprintf(&b, " - {:2i}/{:2i}/{:4i}", second.month, second.day, second.year)
-			}
-		}
-
-		vgo.fill_text_aligned(
-			strings.to_string(b),
-			core.style.default_font,
-			core.style.default_text_size,
-			[2]f32{self.box.lo.x + 7, box_center_y(self.box)},
-			.Left,
-			.Center,
-			paint = core.style.color.content,
-		)
-	}
+	add_input(info)
 
 	if .Open in self.last_state {
 		calendar_info := Calendar_Info {
 			id           = self.id,
-			month_offset = kind.month_offset,
+			month_offset = self.date.month_offset,
 			selection    = {info.first^, info.second^ if info.second != nil else nil},
 			allow_range  = info.second != nil,
 		}
 		init_calendar(&calendar_info, {})
 
 		menu_layer := get_popup_layer_info(self, calendar_info.desired_size + core.style.menu_padding * 2, side = .Left)
+		menu_layer.scale = nil
 		if layer(&menu_layer) {
 			draw_shadow(layout_box())
 			foreground()
@@ -342,7 +330,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 			set_width_auto()
 			set_height_auto()
 			add_calendar(&calendar_info)
-			kind.month_offset = calendar_info.month_offset
+			self.date.month_offset = calendar_info.month_offset
 			info.first^ = calendar_info.selection[0]
 			if info.second != nil {
 				if date, ok := calendar_info.selection[1].?; ok {
@@ -358,9 +346,19 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 	} else {
 		if .Pressed in (self.state - self.last_state) {
 			self.state += {.Open}
-			kind.month_offset = 0
+			self.date.month_offset = 0
 		}
 	}
+
+	if changed {
+		if date, ok := parse_date(text); ok {
+			first^ = date
+		} else {
+			first^ = nil
+		}
+		core.draw_next_frame = true
+	}
+
 	return true
 }
 

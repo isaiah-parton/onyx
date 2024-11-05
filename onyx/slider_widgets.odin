@@ -134,11 +134,11 @@ add_box_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 	horizontal_slider_behavior(self)
 	if self.visible {
 		rounding := box_height(self.box) / 2
-		vgo.fill_box(self.box, rounding, paint = core.style.color.field)
+		vgo.push_scissor(vgo.make_box(self.box, rounding))
+		vgo.fill_box(self.box, paint = core.style.color.field)
 		time := clamp(f32(value^ - lo) / f32(hi - lo), 0, 1)
 		vgo.fill_box(
 			{self.box.lo, {self.box.lo.x + box_width(self.box) * time, self.box.hi.y}},
-			rounding,
 			paint = vgo.make_linear_gradient(
 				self.box.lo,
 				{self.box.hi.x, self.box.lo.y},
@@ -146,6 +146,7 @@ add_box_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 				core.style.color.accent,
 			),
 		)
+		vgo.pop_scissor()
 	}
 	if .Pressed in self.state {
 		new_time := clamp((core.mouse_pos.x - self.box.lo.x) / box_width(self.box), 0, 1)

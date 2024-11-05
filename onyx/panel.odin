@@ -68,7 +68,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		core.draw_next_frame = true
 	}
 
-	// Resizing
+	// Handle panel transforms
 	min_size := linalg.max(MIN_SIZE, panel.min_size)
 	if panel.resizing {
 		if mouse_released(.Left) {
@@ -77,8 +77,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		panel.box.hi = core.mouse_pos + panel.resize_offset
 	}
 	panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + min_size)
-
-	panel.box = {linalg.floor(panel.box.lo), linalg.floor(panel.box.hi)}
+	panel.box = snapped_box(panel.box)
 
 	// Reset min_size to be calculated again
 	if panel.last_min_size != panel.min_size {
@@ -103,13 +102,14 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		id     = panel.layer.id,
 		box    = panel.box,
 		sticky = true,
+		in_state_mask = WIDGET_STATE_ALL,
 	}
 	if begin_widget(&background_widget) {
 		defer end_widget()
 		using background_widget
 
 		draw_shadow(self.box)
-		vgo.fill_box(self.box, core.style.rounding, core.style.color.fg)
+		vgo.fill_box(self.box, paint = core.style.color.fg)
 
 		if point_in_box(core.mouse_pos, self.box) {
 			hover_widget(self)
@@ -199,12 +199,14 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 }
 
 end_panel :: proc() {
+
 	panel := current_panel()
 	// Resizing
 	if panel.can_resize {
 		resize_button := Widget_Info {
 			id  = hash("resize"),
 			box = Box{panel.box.hi - core.style.visual_size.y * 0.75, panel.box.hi},
+			sticky = true
 		}
 		if begin_widget(&resize_button) {
 			defer end_widget()

@@ -53,6 +53,7 @@ Widget_State :: bit_set[Widget_Status;u8]
 
 WIDGET_STATE_ALL :: Widget_State{.Hovered, .Focused, .Pressed, .Changed, .Clicked, .Open, .Active}
 
+// The widget struct is pretty monolithic rn
 Widget :: struct {
 	// Unique hashed id
 	id:                 Id,
@@ -111,10 +112,10 @@ Widget :: struct {
 		tabs:    Tabs_Widget_Kind,
 		input:   Input_State,
 		boolean: Boolean_Widget_Kind,
-		date:    Date_Picker_Widget_Kind,
 		table:   Table_Widget_Kind,
 		slider:  Slider_State,
 	},
+	date:    Date_Picker_Widget_Kind,
 }
 
 // A generic descriptor for all widgets

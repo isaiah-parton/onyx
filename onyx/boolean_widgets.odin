@@ -196,7 +196,7 @@ add_toggle_switch :: proc(using info: ^Toggle_Switch_Info) -> bool {
 			paint = vgo.fade(core.style.color.accent, how_on),
 			radius = outer_radius,
 		)
-		vgo.fill_circle(lever_center, inner_radius, core.style.color.fg)
+		vgo.fill_circle(lever_center, inner_radius, vgo.mix(how_on, core.style.color.fg, core.style.color.field))
 
 		switch text_side {
 		case .Left:
