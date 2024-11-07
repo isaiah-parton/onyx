@@ -58,9 +58,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	push_id(id)
 
 	if panel.moving == true {
-		if mouse_released(.Left) {
-			panel.moving = false
-		}
+		panel.moving = false
 		size := panel.box.hi - panel.box.lo
 		panel.box.lo = core.mouse_pos - panel.move_offset
 		panel.box.hi = panel.box.lo + size
@@ -71,9 +69,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	// Handle panel transforms
 	min_size := linalg.max(MIN_SIZE, panel.min_size)
 	if panel.resizing {
-		if mouse_released(.Left) {
-			panel.resizing = false
-		}
+		panel.resizing = false
 		panel.box.hi = core.mouse_pos + panel.resize_offset
 	}
 	panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + min_size)
@@ -219,9 +215,11 @@ end_panel :: proc() {
 				paint = icon_color,
 			)
 
-			if .Pressed in (self.state - self.last_state) {
+			if .Pressed in self.state {
 				panel.resizing = true
-				panel.resize_offset = panel.box.hi - core.mouse_pos
+				if .Pressed not_in self.last_state {
+					panel.resize_offset = panel.box.hi - core.mouse_pos
+				}
 			}
 		}
 	}

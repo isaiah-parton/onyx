@@ -301,6 +301,7 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 			} else {
 				widget.click_count = 1
 			}
+			widget.click_button = core.mouse_button
 			widget.click_point = core.mouse_pos
 			widget.click_time = time.now()
 			widget.state += {.Pressed}
@@ -365,10 +366,7 @@ end_widget :: proc() {
 			}
 		}
 		// Transfer state to layer
-		{
-			assert(widget.layer != nil)
-			widget.layer.state += widget.state
-		}
+		widget.layer.state += widget.state
 		// Update layout
 		if layout, ok := current_layout().?; ok {
 			add_layout_content_size(
@@ -388,20 +386,16 @@ end_widget :: proc() {
 		}
 	}
 }
-// Try make this widget hovered
+
 hover_widget :: proc(widget: ^Widget) {
-	// Disabled?
 	if widget.disabled do return
-	// Below highest hovered widget
 	if widget.layer.index < core.hovered_layer_index do return
-	// Clipping
 	if !point_in_box(core.mouse_pos, widget.layer.box) do return
-	// Ok hover
 	core.next_hovered_widget = widget.id
 	core.next_hovered_layer = widget.layer.id
 	core.hovered_layer_index = widget.layer.index
 }
-// Try make this widget focused
+
 focus_widget :: proc(widget: ^Widget) {
 	core.focused_widget = widget.id
 }

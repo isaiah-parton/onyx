@@ -38,12 +38,28 @@ do_debug_layer :: proc() {
 	DEBUG_TEXT_SIZE :: 16
 	vgo.set_paint(vgo.WHITE)
 
+	print_layer_debug :: proc(layer: ^Layer, left, pos: f32) -> f32 {
+		pos := pos
+		for child in layer.children {
+			pos += print_layer_debug(child, left + 20, pos)
+		}
+		pos += vgo.fill_text_aligned(
+			fmt.tprintf("%i - %v %i", layer.id, layer.kind, layer.index),
+			core.style.monospace_font,
+			DEBUG_TEXT_SIZE,
+			{left, core.view.y - pos},
+			.Left,
+			.Bottom,
+			paint = vgo.GOLD if layer.index == core.highest_layer_index else nil,
+			).y
+		return pos
+	}
+
 	// Layers
 	{
-		offset := f32(0)
-		for _, &layer in core.layer_map {
-			offset +=
-				vgo.fill_text_aligned(fmt.tprintf("%i - %v %i", layer.id, layer.kind, layer.index), core.style.monospace_font, DEBUG_TEXT_SIZE, {0, core.view.y - offset}, .Left, .Bottom, paint = vgo.GOLD if layer.index == core.highest_layer_index else nil).y
+		pos := f32(0)
+		for layer in core.layers {
+			pos += print_layer_debug(layer, 0, pos)
 		}
 	}
 

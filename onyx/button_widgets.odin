@@ -80,7 +80,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 				radius,
 				vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in self.state else bg_color,
 			)
-			text_color = core.style.color.content
+			text_color = core.style.color.accent_content
 
 		case .Primary:
 			vgo.fill_box(
@@ -88,7 +88,7 @@ add_button :: proc(using info: ^Button_Info) -> bool {
 				radius,
 				vgo.mix(0.15, core.style.color.accent, vgo.WHITE) if .Hovered in self.state else core.style.color.accent,
 			)
-			text_color = core.style.color.content
+			text_color = core.style.color.accent_content
 
 		case .Ghost:
 			if .Hovered in self.state {
