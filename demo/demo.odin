@@ -89,7 +89,7 @@ main :: proc() {
 					make_button({text = "Colored button", style = .Outlined, color = vgo.Color{220, 57, 57, 255}}),
 				}
 
-				if layout({side = .Top, size = buttons[2].desired_size.y}) {
+				if layout({side = .Top, size = buttons[2].self.desired_size.y}) {
 					for &button in buttons {
 						add_button(&button)
 						add_space(10)

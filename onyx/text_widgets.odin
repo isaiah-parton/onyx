@@ -17,15 +17,15 @@ Label_Info :: struct {
 
 init_label :: proc(using info: ^Label_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
+	if id == 0 do id = hash(loc)
+	self = get_widget(id) or_return
 	text_layout = vgo.make_text_layout(
 		text,
 		font.? or_else core.style.default_font,
 		font_size.? or_else core.style.content_text_size,
 	)
-	desired_size = text_layout.size
+	self.desired_size = text_layout.size
 	fixed_size = true
-	if id == 0 do id = hash(loc)
-	self = get_widget(id) or_return
 	return true
 }
 

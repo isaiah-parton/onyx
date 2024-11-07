@@ -41,15 +41,15 @@ init_boolean_widget :: proc(info: ^Boolean_Widget_Info, loc := #caller_location)
 			core.style.default_text_size,
 		)
 		if info.text_side == .Bottom || info.text_side == .Top {
-			info.desired_size.x = max(info.size, info.text_layout.size.x)
-			info.desired_size.y = info.size + info.text_layout.size.y
+			info.self.desired_size.x = max(info.size, info.text_layout.size.x)
+			info.self.desired_size.y = info.size + info.text_layout.size.y
 		} else {
-			info.desired_size.x =
+			info.self.desired_size.x =
 				info.size + info.text_layout.size.x + core.style.text_padding.x * 2
-			info.desired_size.y = info.size
+			info.self.desired_size.y = info.size
 		}
 	} else {
-		info.desired_size = info.size
+		info.self.desired_size = info.size
 	}
 	info.fixed_size = true
 	return true
@@ -162,18 +162,18 @@ Toggle_Switch_Info :: Boolean_Widget_Info
 init_toggle_switch :: proc(using info: ^Toggle_Switch_Info, loc := #caller_location) -> bool {
 	text_side = text_side.? or_else .Right
 	info.size = core.style.visual_size.y * 0.75
-	desired_size = [2]f32{2, 1} * info.size
+	id = hash(loc)
+	self = get_widget(id) or_return
+	self.desired_size = [2]f32{2, 1} * info.size
 	if len(text) > 0 {
 		text_layout = vgo.make_text_layout(
 			text,
 			core.style.default_font,
 			core.style.default_text_size,
 		)
-		desired_size.x += text_layout.size.x + core.style.text_padding.x * 2
+		self.desired_size.x += text_layout.size.x + core.style.text_padding.x * 2
 	}
 	fixed_size = true
-	id = hash(loc)
-	self = get_widget(id) or_return
 	return true
 }
 

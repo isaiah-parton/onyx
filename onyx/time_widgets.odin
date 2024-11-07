@@ -37,9 +37,10 @@ dates_are_equal :: proc(a, b: Date) -> bool {
 
 init_calendar :: proc(using info: ^Calendar_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
-	desired_size.x = 280
-	size = desired_size.x / 7
-	desired_size.y = size * 2
+	self = get_widget(id) or_return
+	self.desired_size.x = 280
+	size = self.desired_size.x / 7
+	self.desired_size.y = size * 2
 
 	date := selection[0].? or_else todays_date()
 
@@ -76,7 +77,7 @@ init_calendar :: proc(using info: ^Calendar_Info, loc := #caller_location) -> bo
 	days = int((month_start._nsec - calendar_start._nsec) / i64(t.Hour * 24) + i64(days))
 	days = int(math.ceil(f32(days) / 7)) * 7
 	weeks := math.ceil(f32(days) / 7)
-	desired_size.y += weeks * size + (weeks + 1) * CALENDAR_WEEK_SPACING
+	self.desired_size.y += weeks * size + (weeks + 1) * CALENDAR_WEEK_SPACING
 
 	return true
 }
@@ -316,7 +317,7 @@ add_date_picker :: proc(using info: ^Date_Picker_Info) -> bool {
 		}
 		init_calendar(&calendar_info, {})
 
-		menu_layer := get_popup_layer_info(self, calendar_info.desired_size + core.style.menu_padding * 2, side = .Left)
+		menu_layer := get_popup_layer_info(self, calendar_info.self.desired_size + core.style.menu_padding * 2, side = .Left)
 		menu_layer.scale = nil
 		if layer(&menu_layer) {
 			draw_shadow(layout_box())

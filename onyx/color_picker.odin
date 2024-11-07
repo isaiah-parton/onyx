@@ -110,7 +110,7 @@ init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_locatio
 	)
 	id = hash(loc)
 	self = get_widget(id) or_return
-	desired_size = core.style.visual_size
+	self.desired_size = core.style.visual_size
 	in_state_mask = Widget_State{}
 	return true
 }
@@ -168,7 +168,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		}
 		init_hsva_picker(&picker_info)
 
-		layer_size := picker_info.desired_size + PADDING * 2
+		layer_size := picker_info.self.desired_size + PADDING * 2
 		input_size: [2]f32
 
 		slider_info := Alpha_Slider_Info {
@@ -179,7 +179,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 
 		if show_alpha {
 			init_alpha_slider(&slider_info)
-			layer_size.x += slider_info.desired_size.x + 10
+			layer_size.x += slider_info.self.desired_size.x + 10
 		}
 
 		inputs: [Color_Format]Input_Info
@@ -205,7 +205,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 					strings.write_string(inputs[format].builder, text)
 				}
 				init_input(&inputs[format])
-				input_size.x = max(input_size.x, inputs[format].desired_size.x)
+				input_size.x = max(input_size.x, inputs[format].self.desired_size.x)
 			}
 		}
 
@@ -300,13 +300,13 @@ Alpha_Slider_Info :: struct {
 
 init_alpha_slider :: proc(using info: ^Alpha_Slider_Info, loc := #caller_location) -> bool {
 	if value == nil do return false
-	desired_size = core.style.visual_size
-	if vertical {
-		desired_size.xy = desired_size.yx
-	}
-	sticky = true
 	id = hash(loc)
 	self = get_widget(id) or_return
+	self.desired_size = core.style.visual_size
+	if vertical {
+		self.desired_size.xy = self.desired_size.yx
+	}
+	sticky = true
 	return true
 }
 
@@ -377,11 +377,11 @@ HSVA_Picker_Info :: struct {
 init_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	if info == nil do return false
 	if info.hsva == nil do return false
-	desired_size = 200
-	fixed_size = true
-	sticky = true
 	id = hash(uintptr(hsva))
 	self = get_widget(id) or_return
+	self.desired_size = 200
+	fixed_size = true
+	sticky = true
 	return true
 }
 

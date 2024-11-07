@@ -24,12 +24,12 @@ init_breadcrumb :: proc(using info: ^Breadcrumb_Info, loc := #caller_location) -
 	has_menu = len(options) > 1 && index != nil
 	text = options[index^] if has_menu else text
 	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.default_text_size)
-	desired_size = text_layout.size
+	self.desired_size = text_layout.size
 	if !is_tail {
-		desired_size.x += 20
+		self.desired_size.x += 20
 	}
 	if has_menu {
-		desired_size.x += 15
+		self.desired_size.x += 15
 	}
 	fixed_size = true
 	return true
@@ -79,8 +79,8 @@ add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
 					font_size = 20,
 				}
 				init_button(&buttons[0]) or_continue
-				menu_size.x = max(menu_size.x, buttons[o].desired_size.x)
-				menu_size.y += buttons[o].desired_size.y
+				menu_size.x = max(menu_size.x, buttons[o].self.desired_size.x)
+				menu_size.y += buttons[o].self.desired_size.y
 				pop_id()
 			}
 

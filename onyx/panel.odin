@@ -227,7 +227,7 @@ end_panel :: proc() {
 	if panel.fade > 0 {
 		vgo.fill_box(panel.layer.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.15))
 	}
-	// panel.fade = animate(panel.fade, 0.15, panel.layer.index < core.last_highest_layer_index)
+	panel.fade = animate(panel.fade, 0.15, panel.layer.index < core.last_highest_layer_index)
 
 	// Panel outline
 	// draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)

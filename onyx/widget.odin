@@ -134,10 +134,6 @@ Widget_Info :: struct {
 	out_state_mask: Maybe(Widget_State),
 	// Forces widget to occupy no more than its desired space
 	fixed_size:     bool,
-	// Size required by the user
-	// required_size: [2]f32,
-	// Size desired by the widget
-	desired_size:   [2]f32,
 }
 // Animation
 animate :: proc(value, duration: f32, condition: bool) -> f32 {
@@ -283,10 +279,10 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	// If the user set an explicit size with either `set_width()` or `set_height()` the widget's desired size should reflect that
 	// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
 	if layout.next_size.x == 0 || layout.next_size.x != box_width(layout.box) {
-		widget.desired_size.x = max(info.desired_size.x, layout.next_size.x)
+		widget.desired_size.x = max(widget.desired_size.x, layout.next_size.x)
 	}
 	if layout.next_size.y == 0 || layout.next_size.y != box_height(layout.box) {
-		widget.desired_size.y = max(info.desired_size.y, layout.next_size.y)
+		widget.desired_size.y = max(widget.desired_size.y, layout.next_size.y)
 	}
 	// Mouse hover
 	if core.hovered_widget == widget.id {
@@ -440,7 +436,7 @@ Spinner_Info :: Widget_Info
 init_spinner :: proc(using info: ^Spinner_Info, loc := #caller_location) -> bool {
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
-	desired_size = core.style.visual_size.y
+	self.desired_size = core.style.visual_size.y
 	return true
 }
 

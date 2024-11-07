@@ -50,7 +50,7 @@ init_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	spacing = max(spacing, 10)
-	desired_size = {spacing * f32(len(entries)), f32(hi - lo) * 2}
+	self.desired_size = {spacing * f32(len(entries)), f32(hi - lo) * 2}
 	return true
 }
 

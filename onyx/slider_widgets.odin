@@ -21,7 +21,7 @@ init_slider :: proc(using info: ^Slider_Info($T), loc := #caller_location) -> bo
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	sticky = true
-	desired_size = {core.style.visual_size.x, core.style.visual_size.y * 0.75}
+	self.desired_size = {core.style.visual_size.x, core.style.visual_size.y * 0.75}
 	hi = max(hi, lo + 1)
 	return true
 }

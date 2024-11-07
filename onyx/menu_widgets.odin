@@ -45,7 +45,7 @@ init_menu :: proc(using info: ^Menu_Info, loc := #caller_location) -> bool {
 	// 	text_layout.size.x + 20 + core.style.text_padding.x * 2,
 	// 	core.style.visual_size.y,
 	// }
-	desired_size = core.style.visual_size
+	self.desired_size = core.style.visual_size
 	return true
 }
 
@@ -87,7 +87,7 @@ begin_menu :: proc(info: ^Menu_Info) -> bool {
 	if .Open in info.self.state {
 		menu_layer := get_popup_layer_info(
 			info.self,
-			linalg.max(info.self.menu.size, info.desired_size),
+			linalg.max(info.self.menu.size, info.self.desired_size),
 		)
 		scale := math.lerp(f32(0.9), f32(1), ease.quadratic_in_out(info.self.open_time))
 		if !begin_layer(
@@ -182,8 +182,8 @@ init_menu_item :: proc(info: ^Menu_Item_Info) -> bool {
 		core.style.default_font,
 		core.style.default_text_size,
 	)
-	info.desired_size = info.text_layout.size + core.style.text_padding * 2
-	info.desired_size.x += info.desired_size.y
+	info.self.desired_size = info.text_layout.size + core.style.text_padding * 2
+	info.self.desired_size.x += info.self.desired_size.y
 	return true
 }
 

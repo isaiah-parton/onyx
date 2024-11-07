@@ -126,10 +126,10 @@ init_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 		)
 		column.width = max(column.width, column.label_text_job.size.x + 20)
 		widths[c] = column.width
-		desired_size.x += column.width
+		self.desired_size.x += column.width
 	}
 	widths_len = len(columns)
-	desired_size.y = core.style.shape.table_row_height * f32(min(row_count, max_displayed_rows))
+	self.desired_size.y = core.style.shape.table_row_height * f32(min(row_count, max_displayed_rows))
 	return true
 }
 // Begin a table

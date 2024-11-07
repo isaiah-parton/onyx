@@ -44,9 +44,9 @@ init_button :: proc(using info: ^Button_Info, loc := #caller_location) -> bool {
 		core.style.default_font,
 		font_size.? or_else core.style.default_text_size,
 	)
-	desired_size = text_layout.size + core.style.text_padding * 2
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
+	self.desired_size = text_layout.size + core.style.text_padding * 2
 	return true
 }
 
@@ -223,8 +223,8 @@ init_floating_button :: proc(using info: ^Floating_Button_Info, loc := #caller_l
 		core.style.default_font,
 		font_size.? or_else core.style.default_text_size,
 	)
-	desired_size = text_layout.size + 20
-	desired_size.x = max(desired_size.x, desired_size.y)
+	self.desired_size = text_layout.size + 20
+	self.desired_size.x = max(self.desired_size.x, self.desired_size.y)
 	if id == 0 do id = hash(loc)
 	self = get_widget(id) or_return
 	return true

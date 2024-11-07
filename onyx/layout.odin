@@ -177,7 +177,7 @@ next_widget_box :: proc(info: ^Widget_Info) -> Box {
 	size: [2]f32
 	if info != nil {
 		size = linalg.min(
-			info.desired_size if info.fixed_size else non_fixed_size(layout, info.desired_size),
+			info.self.desired_size if info.fixed_size else non_fixed_size(layout, info.self.desired_size),
 			layout.box.hi - layout.box.lo,
 		)
 	} else {
@@ -326,7 +326,7 @@ row_with_height :: proc(height: f32) -> bool {
 row_with_widgets :: proc(widgets: ..Widget_Info) -> bool {
 	height: f32
 	for &widget in widgets {
-		height = max(height, widget.desired_size.y)
+		height = max(height, widget.self.desired_size.y)
 	}
 	return row_with_height(height)
 }

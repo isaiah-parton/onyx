@@ -60,7 +60,7 @@ init_input :: proc(info: ^Input_Info, loc := #caller_location) -> bool {
 	// Make sticky for easy highlighting
 	info.sticky = true
 	// Default desired size
-	info.desired_size = core.style.visual_size
+	info.self.desired_size = core.style.visual_size
 	info.font = core.style.monospace_font if info.monospace else core.style.default_font
 	info.font_size = core.style.default_text_size
 	// Stuff
