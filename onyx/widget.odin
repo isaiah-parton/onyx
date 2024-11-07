@@ -295,10 +295,6 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 		// Clicking
 		pressed_buttons := core.mouse_bits - core.last_mouse_bits
 		if pressed_buttons != {} {
-			if widget.click_count == 0 {
-				widget.click_button = core.mouse_button
-				widget.click_offset = core.mouse_pos - widget.box.lo
-			}
 			if widget.click_button == core.mouse_button &&
 			   time.since(widget.click_time) <= MAX_CLICK_DELAY {
 				widget.click_count = max((widget.click_count + 1) % 4, 1)
@@ -306,7 +302,6 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 				widget.click_count = 1
 			}
 			widget.click_point = core.mouse_pos
-			widget.click_button = core.mouse_button
 			widget.click_time = time.now()
 			widget.state += {.Pressed}
 			core.draw_this_frame = true
@@ -327,13 +322,10 @@ begin_widget :: proc(info: ^Widget_Info) -> bool {
 	if widget.state >= {.Pressed} {
 		// Check for released buttons
 		released_buttons := core.last_mouse_bits - core.mouse_bits
-		for button in released_buttons {
-			if button == widget.click_button {
-				widget.state += {.Clicked}
-				widget.state -= {.Pressed}
-				core.dragged_widget = 0
-				break
-			}
+		if core.mouse_button in released_buttons {
+			widget.state += {.Clicked}
+			widget.state -= {.Pressed}
+			core.dragged_widget = 0
 		}
 	} else {
 		// Reset click time if cursor is moved beyond a threshold
@@ -367,7 +359,9 @@ end_widget :: proc() {
 		// Draw debug box
 		when ODIN_DEBUG {
 			if core.debug.enabled {
-				vgo.stroke_box(widget.box, 1, paint = vgo.GREEN)
+				if vgo.disable_scissor() {
+					vgo.stroke_box(widget.box, 1, paint = vgo.GREEN)
+				}
 			}
 		}
 		// Transfer state to layer

@@ -170,62 +170,31 @@ view_height :: proc() -> f32 {
 }
 
 load_default_fonts :: proc() -> bool {
-	DEFAULT_FONT :: "Geist-Regular.ttf"
-	MONOSPACE_FONT :: "Recursive_Monospace-Regular.ttf"
-	HEADER_FONT :: "Lora-Medium.ttf"
-	ICON_FONT :: "remixicon.ttf"
+	DEFAULT_FONT :: "Roboto-Regular"
+	MONOSPACE_FONT :: "RobotoMono-Regular"
+	HEADER_FONT :: "RobotoSlab-Regular"
+	ICON_FONT :: "remixicon"
 
-	DEFAULT_FONT_DATA: Maybe([]u8) =
-		#load("fonts/" + DEFAULT_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-	MONOSPACE_FONT_DATA: Maybe([]u8) =
-		#load("fonts/" + MONOSPACE_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-	HEADER_FONT_DATA: Maybe([]u8) =
-		#load("fonts/" + HEADER_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
-	ICON_FONT_DATA: Maybe([]u8) =
-		#load("fonts/" + ICON_FONT, []u8) when EMBED_DEFAULT_FONTS else nil
+	DEFAULT_FONT_IMAGE :: #load(FONT_PATH + "/" + DEFAULT_FONT + ".png", []u8)
+	MONOSPACE_FONT_IMAGE :: #load(FONT_PATH + "/" + MONOSPACE_FONT + ".png", []u8)
+	HEADER_FONT_IMAGE :: #load(FONT_PATH + "/" + HEADER_FONT + ".png", []u8)
+	ICON_FONT_IMAGE :: #load(FONT_PATH + "/" + ICON_FONT + ".png", []u8)
 
-	// core.style.default_font = load_font_from_memory(
-	// 	DEFAULT_FONT_DATA.? or_else os.read_entire_file(
-	// 		fmt.tprintf("%s/%s", FONT_PATH, DEFAULT_FONT),
-	// 	) or_return,
-	// ) or_return
-	// core.style.monospace_font = load_font_from_memory(
-	// 	MONOSPACE_FONT_DATA.? or_else os.read_entire_file(
-	// 		fmt.tprintf("%s/%s", FONT_PATH, MONOSPACE_FONT),
-	// 	) or_return,
-	// 	monospace = true,
-	// ) or_return
-	// core.style.header_font = load_font_from_memory(
-	// 	HEADER_FONT_DATA.? or_else os.read_entire_file(
-	// 		fmt.tprintf("%s/%s", FONT_PATH, HEADER_FONT),
-	// 	) or_return,
-	// ) or_return
-	// core.style.icon_font = load_font_from_memory(
-	// 	ICON_FONT_DATA.? or_else os.read_entire_file(
-	// 		fmt.tprintf("%s/%s", FONT_PATH, ICON_FONT),
-	// 	) or_return,
-	// ) or_return
+	DEFAULT_FONT_JSON :: #load(FONT_PATH + "/" + DEFAULT_FONT + ".json", []u8)
+	MONOSPACE_FONT_JSON :: #load(FONT_PATH + "/" + MONOSPACE_FONT + ".json", []u8)
+	HEADER_FONT_JSON :: #load(FONT_PATH + "/" + HEADER_FONT + ".json", []u8)
+	ICON_FONT_JSON :: #load(FONT_PATH + "/" + ICON_FONT + ".json", []u8)
+	core.style.default_font = vgo.load_font_from_slices(DEFAULT_FONT_IMAGE, DEFAULT_FONT_JSON) or_return
+	core.style.monospace_font = vgo.load_font_from_slices(MONOSPACE_FONT_IMAGE, MONOSPACE_FONT_JSON) or_return
+	core.style.header_font = vgo.load_font_from_slices(HEADER_FONT_IMAGE, HEADER_FONT_JSON) or_return
+	core.style.icon_font = vgo.load_font_from_slices(ICON_FONT_IMAGE, ICON_FONT_JSON) or_return
+	vgo.set_fallback_font(core.style.icon_font)
 
 	return true
 }
 
 start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	if window == nil do return false
-
-	// Default style
-	if style == nil {
-		core.style.color = dark_color_scheme()
-		core.style.shape = default_style_shape()
-		fmt.printfln("No style provided by user, using default theme and fonts")
-
-		if !load_default_fonts() {
-			fmt.printfln("Fatal: failed to load default fonts from '%s'", FONT_PATH)
-			return false
-		}
-
-	} else {
-		core.style = style.?
-	}
 
 	core.window = window
 	width, height := glfw.GetWindowSize(core.window)
@@ -306,11 +275,11 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	glfw.SetMouseButtonCallback(
 		core.window,
 		proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
-			core.mouse_button = Mouse_Button(button)
 			core.draw_this_frame = true
 			core.draw_next_frame = true
 			switch action {
 			case glfw.PRESS:
+				core.mouse_button = Mouse_Button(button)
 				core.mouse_bits += {Mouse_Button(button)}
 				core.click_mouse_pos = core.mouse_pos
 			case glfw.RELEASE:
@@ -373,6 +342,21 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 
 	// Initialize vgo
 	vgo.start(core.device, core.surface)
+
+	// Default style
+	if style == nil {
+		core.style.color = dark_color_scheme()
+		core.style.shape = default_style_shape()
+		fmt.printfln("No style provided by user, using default theme and fonts")
+
+		if !load_default_fonts() {
+			fmt.printfln("Fatal: failed to load default fonts from '%s'", filepath.abs(FONT_PATH) or_else "")
+			return false
+		}
+
+	} else {
+		core.style = style.?
+	}
 
 	core.ready = true
 

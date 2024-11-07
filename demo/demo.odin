@@ -48,37 +48,11 @@ main :: proc() {
 	defer glfw.Terminate()
 
 	// glfw.WindowHint(glfw.TRANSPARENT_FRAMEBUFFER, true)
-	window := glfw.CreateWindow(1600, 900, "demo", nil, nil)
+	window := glfw.CreateWindow(1400, 800, "demo", nil, nil)
 	defer glfw.DestroyWindow(window)
 
 	onyx.start(window)
 	defer onyx.shutdown()
-
-	onyx.core.style.icon_font, _ = vgo.load_font_from_image_and_json(
-		"../onyx/fonts/remixicon.png",
-		"../onyx/fonts/remixicon.json",
-	)
-	defer vgo.destroy_font(&onyx.core.style.icon_font)
-
-	onyx.core.style.default_font, _ = vgo.load_font_from_image_and_json(
-		"../onyx/fonts/Roboto-Regular.png",
-		"../onyx/fonts/Roboto-Regular.json",
-	)
-	defer vgo.destroy_font(&onyx.core.style.default_font)
-
-	onyx.core.style.monospace_font, _ = vgo.load_font_from_image_and_json(
-		"../onyx/fonts/RobotoMono-Regular.png",
-		"../onyx/fonts/RobotoMono-Regular.json",
-	)
-	defer vgo.destroy_font(&onyx.core.style.monospace_font)
-
-	onyx.core.style.header_font, _ = vgo.load_font_from_image_and_json(
-		"../onyx/fonts/RobotoSlab-Regular.png",
-		"../onyx/fonts/RobotoSlab-Regular.json",
-	)
-	defer vgo.destroy_font(&onyx.core.style.header_font.?)
-
-	vgo.set_fallback_font(onyx.core.style.icon_font)
 
 	checkbox_value: bool
 	toggle_value: bool
