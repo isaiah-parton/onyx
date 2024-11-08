@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -13,9 +13,13 @@ Boolean_Type :: enum {
 }
 
 Boolean :: struct {
-	state:           bool,
+	using base:      ^Object,
+	value:           ^bool,
 	type:            Boolean_Type,
 	animation_timer: f32,
+	side:            Side,
+	text:            string,
+	text_layout:     vgo.Text_Layout,
 	size:            f32,
 }
 
@@ -26,84 +30,94 @@ boolean :: proc(
 	type: Boolean_Type = .Checkbox,
 	loc := #caller_location,
 ) {
-	widget := get_widget(hash(loc))
-	if widget.variant == nil {
-		widget.variant = Boolean{}
+	object := persistent_object(hash(loc))
+	if object.variant == nil {
+		object.variant = Boolean{
+			base = object
+		}
 	}
-	boolean := &widget.variant.(Boolean)
+	boolean := &object.variant.(Boolean)
+	boolean.value = state
 	boolean.size = global_state.style.visual_size.y * 0.8
 	boolean.type = type
-	boolean.state = state^ if state != nil else false
-	text_layout: vgo.Text_Layout
+	boolean.text = text
 	if len(text) > 0 {
-		text_layout = vgo.make_text_layout(
+		boolean.text_layout = vgo.make_text_layout(
 			text,
 			global_state.style.default_font,
 			global_state.style.default_text_size,
 		)
 		if int(text_side) > 1 {
-			widget.desired_size.x = max(boolean.size, text_layout.size.x)
-			widget.desired_size.y = boolean.size + text_layout.size.y
+			object.desired_size.x = max(boolean.size, boolean.text_layout.size.x)
+			object.desired_size.y = boolean.size + boolean.text_layout.size.y
 		} else {
-			widget.desired_size.x =
-				boolean.size + text_layout.size.x + global_state.style.text_padding.x * 2
-			widget.desired_size.y = boolean.size
+			object.desired_size.x =
+				boolean.size + boolean.text_layout.size.x + global_state.style.text_padding.x * 2
+			object.desired_size.y = boolean.size
 		}
 	}
-	if begin_widget(widget) {
-		defer end_widget()
+	object.box = next_object_box(next_object_size(object.desired_size, fixed = true))
+	display_or_add_object(object)
+}
 
-		widget.box = next_widget_box(next_widget_size(widget.desired_size, fixed = true))
+display_boolean :: proc(boolean: ^Boolean) {
+	if begin_object(boolean) {
+		defer end_object()
 
-		handle_widget_click(widget)
+		handle_object_click(boolean)
 
-		button_behavior(widget)
-		boolean.animation_timer = animate(boolean.animation_timer, 0.2, boolean.state)
+		if .Hovered in boolean.state {
+			set_cursor(.Pointing_Hand)
+		}
+		if point_in_box(global_state.mouse_pos, boolean.box) {
+			hover_object(boolean)
+		}
+		boolean.animation_timer = animate(boolean.animation_timer, 0.2, boolean.value^)
 
-		if widget.visible {
+		if boolean.visible {
 			icon_box: Box
 
-			if len(text) > 0 {
-				switch text_side {
+			if len(boolean.text) > 0 {
+				switch boolean.side {
 				case .Left:
-					icon_box = {widget.box.lo, boolean.size}
+					icon_box = {boolean.box.lo, boolean.size}
 				case .Right:
-					icon_box = {{widget.box.hi.x - boolean.size, widget.box.lo.y}, boolean.size}
+					icon_box = {{boolean.box.hi.x - boolean.size, boolean.box.lo.y}, boolean.size}
 				case .Top:
 					icon_box = {
 						{
-							box_center_x(widget.box) - boolean.size / 2,
-							widget.box.hi.y - boolean.size,
+							box_center_x(boolean.box) - boolean.size / 2,
+							boolean.box.hi.y - boolean.size,
 						},
 						boolean.size,
 					}
 				case .Bottom:
 					icon_box = {
-						{box_center_x(widget.box) - boolean.size / 2, widget.box.lo.y},
+						{box_center_x(boolean.box) - boolean.size / 2, boolean.box.lo.y},
 						boolean.size,
 					}
 				}
 				icon_box.hi += icon_box.lo
 			} else {
-				icon_box = widget.box
+				icon_box = boolean.box
 			}
 
-			if .Hovered in widget.state {
+			if .Hovered in boolean.state {
 				vgo.fill_box(
-					widget.box,
+					boolean.box,
 					global_state.style.rounding,
 					vgo.fade(global_state.style.color.substance, 0.2),
 				)
 			}
 
-			opacity: f32 = 0.5 if widget.disabled else 1
+			opacity: f32 = 0.5 if boolean.disabled else 1
 
 			state_time := ease.quadratic_in_out(boolean.animation_timer)
 			if state_time < 1 {
 				vgo.fill_box(icon_box, global_state.style.rounding, global_state.style.color.field)
 			}
 			if state_time > 0 && state_time < 1 {
-				vgo.push_scissor(vgo.make_box(widget.box, global_state.style.rounding))
+				vgo.push_scissor(vgo.make_box(boolean.box, global_state.style.rounding))
 			}
 			vgo.fill_box(
 				icon_box,
@@ -117,7 +131,7 @@ boolean :: proc(
 					{
 						0,
 						box_height(icon_box) *
-						((1 - state_time) if boolean.state else -(1 - state_time)),
+						((1 - state_time) if boolean.value^ else -(1 - state_time)),
 					},
 				)
 				center := box_center(icon_box)
@@ -128,25 +142,25 @@ boolean :: proc(
 			}
 			// Paint text
 			text_pos: [2]f32
-			if len(text) > 0 {
-				switch text_side {
+			if len(boolean.text) > 0 {
+				switch boolean.side {
 				case .Left:
 					text_pos = {
 						icon_box.hi.x + global_state.style.text_padding.x,
-						box_center_y(widget.box),
+						box_center_y(boolean.box),
 					}
 				case .Right:
 					text_pos = {
 						icon_box.lo.x - global_state.style.text_padding.x,
-						box_center_y(widget.box),
+						box_center_y(boolean.box),
 					}
 				case .Top:
-					text_pos = widget.box.lo
+					text_pos = boolean.box.lo
 				case .Bottom:
-					text_pos = {widget.box.lo.x, widget.box.hi.y}
+					text_pos = {boolean.box.lo.x, boolean.box.hi.y}
 				}
 				vgo.fill_text_layout_aligned(
-					text_layout,
+					boolean.text_layout,
 					text_pos,
 					.Left,
 					.Center,
@@ -155,8 +169,8 @@ boolean :: proc(
 			}
 		}
 
-		if .Clicked in widget.state && state != nil {
-			state^ = !state^
+		if .Clicked in boolean.state {
+			boolean.value^ = !boolean.value^
 		}
 	}
 }
@@ -175,8 +189,8 @@ boolean :: proc(
 // 	text_side = text_side.? or_else .Right
 // 	info.size = core.style.visual_size.y * 0.75
 // 	id = hash(loc)
-// 	self = get_widget(id)
-// 	widget.desired_size = [2]f32{2, 1} * info.size
+// 	self = get_object(id)
+// 	object.desired_size = [2]f32{2, 1} * info.size
 // 	if len(text) > 0 {
 // 		text_layout = vgo.make_text_layout(
 // 			text,
@@ -190,10 +204,10 @@ boolean :: proc(
 // }
 
 // add_toggle_switch :: proc(using info: ^Toggle_Switch) -> bool {
-// 	begin_widget(info) or_return
-// 	defer end_widget()
+// 	begin_object(info) or_return
+// 	defer end_object()
 
-// 	variant := widget_kind(self, Boolean_Kind)
+// 	variant := object_kind(self, Boolean_Kind)
 
 // 	button_behavior(self)
 
@@ -274,10 +288,10 @@ boolean :: proc(
 // Radio_Button :: Boolean
 
 // add_radio_button :: proc(using info: ^Radio_Button) -> bool {
-// 	begin_widget(info) or_return
-// 	defer end_widget()
+// 	begin_object(info) or_return
+// 	defer end_object()
 
-// 	kind := widget_kind(self, Boolean_Kind)
+// 	kind := object_kind(self, Boolean_Kind)
 // 	kind.state_time = animate(kind.state_time, 0.15, info.state^)
 
 // 	button_behavior(self)

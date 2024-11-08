@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -11,18 +11,19 @@ Panel_Info :: struct {
 }
 
 Panel :: struct {
-	layer:                ^Layer,
-	box:                  Box,
-	move_offset:          [2]f32,
-	last_min_size:        [2]f32,
-	min_size:             [2]f32,
-	moving:               bool,
-	resizing:             bool,
-	dismissed:            bool,
-	resize_offset:        [2]f32,
-	fade:                 f32,
-	can_move, can_resize: bool,
-	dead:                 bool,
+	layer:         ^Layer,
+	box:           Box,
+	move_offset:   [2]f32,
+	last_min_size: [2]f32,
+	min_size:      [2]f32,
+	moving:        bool,
+	resizing:      bool,
+	dismissed:     bool,
+	resize_offset: [2]f32,
+	fade:          f32,
+	can_move:      bool,
+	can_resize:    bool,
+	dead:          bool,
 }
 
 create_panel :: proc(id: Id) -> Maybe(^Panel) {
@@ -52,6 +53,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		panel.can_move = true
 		panel.can_resize = true
 	}
+
 	// Push to stack
 	push_stack(&global_state.panel_stack, panel)
 
@@ -95,25 +97,25 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 	// Background
 	{
-		widget := get_widget(panel.layer.id)
-		if begin_widget(widget) {
-			defer end_widget()
+		object := persistent_object(panel.layer.id)
+		if begin_object(object) {
+			defer end_object()
 
-			if widget.variant == nil {
-				widget.in_state_mask = WIDGET_STATE_ALL
+			if object.variant == nil {
+				object.in_state_mask = OBJECT_STATE_ALL
 			}
-			widget.box = panel.box
+			object.box = panel.box
 
-			handle_widget_click(widget, sticky = true)
+			handle_object_click(object, sticky = true)
 
-			draw_shadow(widget.box)
-			vgo.fill_box(widget.box, paint = global_state.style.color.fg)
+			draw_shadow(object.box)
+			vgo.fill_box(object.box, paint = global_state.style.color.fg)
 
-			if point_in_box(global_state.mouse_pos, widget.box) {
-				hover_widget(widget)
+			if point_in_box(global_state.mouse_pos, object.box) {
+				hover_object(object)
 			}
 
-			if .Pressed in widget.state {
+			if .Pressed in object.state {
 				panel.moving = true
 				panel.move_offset = global_state.mouse_pos - panel.box.lo
 			}
@@ -123,57 +125,6 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	// The content layout box
 	inner_box := panel.box
 
-	TITLE_HEIGHT :: 28
-	if len(info.title) > 0 {
-		panel.min_size.y += TITLE_HEIGHT
-		title_box := cut_box_top(&inner_box, TITLE_HEIGHT)
-
-		vgo.fill_box(
-			title_box,
-			{global_state.style.rounding, global_state.style.rounding, 0, 0},
-			vgo.fade(global_state.style.color.substance, 0.5),
-		)
-
-		vgo.fill_text_aligned(
-			info.title,
-			global_state.style.default_font,
-			20,
-			{title_box.lo.x + 5, (title_box.hi.y + title_box.lo.y) / 2},
-			.Left,
-			.Center,
-			paint = global_state.style.color.content,
-		)
-
-		{
-			widget := get_widget(hash("dismiss"))
-			if begin_widget(widget) {
-				defer end_widget()
-
-				widget.box = cut_box_right(&title_box, box_height(title_box))
-				button_behavior(widget)
-				vgo.fill_box(
-					widget.box,
-					{1 = global_state.style.rounding},
-					vgo.fade({200, 50, 50, 255}, widget.hover_time),
-				)
-				origin := box_center(widget.box)
-				scale := box_height(widget.box) * 0.2
-				icon_color := vgo.blend(
-					global_state.style.color.fg,
-					global_state.style.color.content,
-					0.5 + 0.5 * widget.hover_time,
-				)
-				vgo.line(origin - scale, origin + scale, 2, icon_color)
-				vgo.line(origin + {-scale, scale}, origin + {scale, -scale}, 2, icon_color)
-				if .Pressed in (widget.state - widget.last_state) {
-					panel.dismissed = true
-				}
-			}
-		}
-	}
-
-	push_layout(Layout{box = inner_box, next_cut_side = .Top})
-
 	return true
 }
 
@@ -182,31 +133,37 @@ end_panel :: proc() {
 	panel := current_panel()
 	// Resizing
 	if panel.can_resize {
-		widget := get_widget(hash("resize"))
-		if begin_widget(widget) {
-			defer end_widget()
-			widget.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
-			handle_widget_click(widget, sticky = true)
-			button_behavior(widget)
-			if .Hovered in widget.state {
+		object := persistent_object(hash("resize"))
+		if object.variant == nil {
+			object.variant = Button{
+				object = object
+			}
+		}
+		button := &object.variant.(Button)
+		if begin_object(button) {
+			defer end_object()
+			button.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
+			handle_object_click(button, sticky = true)
+			button_behavior(button)
+			if .Hovered in button.state {
 				global_state.cursor_type = .Resize_NWSE
 			}
 			icon_color := vgo.blend(
 				global_state.style.color.substance,
 				global_state.style.color.content,
-				0.5 * widget.hover_time,
+				0.5,
 			)
 			vgo.fill_polygon(
 				{
-					{widget.box.hi.x, widget.box.lo.y},
-					widget.box.hi,
-					{widget.box.lo.x, widget.box.hi.y},
+					{button.box.hi.x, button.box.lo.y},
+					button.box.hi,
+					{button.box.lo.x, button.box.hi.y},
 				},
 				paint = icon_color,
 			)
-			if .Pressed in widget.state {
+			if .Pressed in button.state {
 				panel.resizing = true
-				if .Pressed not_in widget.last_state {
+				if .Pressed not_in button.last_state {
 					panel.resize_offset = panel.box.hi - global_state.mouse_pos
 				}
 			}
@@ -216,13 +173,15 @@ end_panel :: proc() {
 	if panel.fade > 0 {
 		vgo.fill_box(panel.layer.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.15))
 	}
-	panel.fade = animate(panel.fade, 0.15, panel.layer.index < global_state.last_highest_layer_index)
+	panel.fade = animate(
+		panel.fade,
+		0.15,
+		panel.layer.index < global_state.last_highest_layer_index,
+	)
 
-	// Panel outline
-	// draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)
 	layout := current_layout().?
 	panel.min_size += layout.content_size + layout.spacing_size
-	pop_layout()
+
 	pop_id()
 	vgo.pop_scissor()
 	end_layer()

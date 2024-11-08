@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -32,8 +32,8 @@ begin_tooltip :: proc(
 	bounds: Maybe(Box) = nil,
 	loc := #caller_location,
 ) -> bool {
-	widget := get_widget(hash(loc))
-	begin_widget(widget) or_return
+	object := persistent_object(hash(loc))
+	begin_object(object) or_return
 
 	anchor_point: [2]f32
 
@@ -124,5 +124,5 @@ begin_tooltip :: proc(
 
 end_tooltip :: proc() {
 	end_layer()
-	end_widget()
+	end_object()
 }

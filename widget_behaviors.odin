@@ -4,73 +4,71 @@ import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 
-// Some generic behaviors for widgets
-
 set_cursor :: proc(type: Mouse_Cursor) {
 	global_state.cursor_type = type
 }
 
-button_behavior :: proc(widget: ^Widget) {
-	widget.press_time = animate(
-		widget.press_time,
+button_behavior :: proc(button: ^Button) {
+	button.press_time = animate(
+	button.press_time,
 		0.2,
-		.Pressed in widget.state,
+		.Pressed in button.state,
 	)
-	if .Pressed in (widget.last_state - widget.state) {
-		widget.press_time = 1
+	if .Pressed in (button.last_state - button.state) {
+		button.press_time = 1
 	}
-	if .Hovered in widget.state {
+	if .Hovered in button.state {
 		set_cursor(.Pointing_Hand)
 	}
-	if point_in_box(global_state.mouse_pos, widget.box) {
-		hover_widget(widget)
+	if point_in_box(global_state.mouse_pos, button.box) {
+		hover_object(button)
 	}
 }
 
-horizontal_slider_behavior :: proc(widget: ^Widget) {
-	// widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
-	if .Hovered in widget.state {
+horizontal_slider_behavior :: proc(object: ^Object) {
+	// object.hover_time = animate(object.hover_time, 0.1, .Hovered in object.state)
+	if .Hovered in object.state {
 		global_state.cursor_type = .Resize_EW
 	}
-	if point_in_box(global_state.mouse_pos, widget.box) {
-		hover_widget(widget)
+	if point_in_box(global_state.mouse_pos, object.box) {
+		hover_object(object)
 	}
 }
 
-menu_behavior :: proc(widget: ^Widget) {
-	if .Open in widget.state {
-		widget.open_time = animate(widget.open_time, 0.3, true)
-	} else {
-		widget.open_time = 0
-	}
-	if .Pressed in (widget.state - widget.last_state) {
-		widget.state += {.Open}
-	}
-	widget.hover_time = animate(
-		widget.hover_time,
-		0.1,
-		.Hovered in widget.state,
-	)
-	if .Hovered in widget.state {
-		global_state.cursor_type = .Pointing_Hand
-	}
-	if point_in_box(global_state.mouse_pos, widget.box) {
-		hover_widget(widget)
-	}
-}
+// menu_behavior :: proc(object: ^Object) {
+// 	if .Open in object.state {
+// 		object.open_time = animate(object.open_time, 0.3, true)
+// 	} else {
+// 		object.open_time = 0
+// 	}
+// 	if .Pressed in (object.state - object.last_state) {
+// 		object.state += {.Open}
+// 	}
+// 	object.hover_time = animate(
+// 		object.hover_time,
+// 		0.1,
+// 		.Hovered in object.state,
+// 	)
+// 	if .Hovered in object.state {
+// 		global_state.cursor_type = .Pointing_Hand
+// 	}
+// 	if point_in_box(global_state.mouse_pos, object.box) {
+// 		hover_object(object)
+// 	}
+// }
 
 get_popup_scale :: proc(size: [2]f32, time: f32) -> f32 {
 	return math.lerp(math.lerp(f32(0.8), f32(1.0), linalg.length(size) / linalg.length(global_state.view)), f32(1.0), time)
 }
 
-get_popup_layer_info :: proc(widget: ^Widget, size: [2]f32, side: Side = .Bottom) -> (info: Layer_Info) {
-	if widget == nil do return
+get_popup_layer_info :: proc(object: ^Object, size: [2]f32, side: Side = .Bottom) -> (info: Layer_Info) {
+	if object == nil do return
 	margin := global_state.style.popup_margin
 	view := view_box()
 	side := side
-	parent := widget.box
-	scale := get_popup_scale(size, ease.quadratic_out(widget.open_time))
-	info.id = widget.id
+	parent := object.box
+	scale := get_popup_scale(size, 1.0)//ease.quadratic_out(object.open_time))
+	info.id = object.id
 	info.kind = .Floating
 	info.scale = [2]f32{scale, scale}
 

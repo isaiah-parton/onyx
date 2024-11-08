@@ -7,13 +7,13 @@ import "core:strings"
 import "core:strconv"
 import t "core:time"
 import dt "core:time/datetime"
-import "../../vgo"
+import "../vgo"
 
 Date :: dt.Date
 CALENDAR_WEEK_SPACING :: 4
 
 Calendar_Info :: struct {
-	using _:         Widget_Info,
+	using _:         Object_Info,
 	selection:       [2]Maybe(Date),
 	month_offset:    int,
 	allow_range:     bool,
@@ -37,7 +37,7 @@ dates_are_equal :: proc(a, b: Date) -> bool {
 
 init_calendar :: proc(using info: ^Calendar_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	self.desired_size.x = 280
 	size = self.desired_size.x / 7
 	self.desired_size.y = size * 2
@@ -84,7 +84,7 @@ init_calendar :: proc(using info: ^Calendar_Info, loc := #caller_location) -> bo
 
 add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 	push_id(id)
-	begin_layout({box = next_widget_box(info)})
+	begin_layout({box = next_object_box(info)})
 
 	set_width(size)
 	set_height(size)
@@ -153,10 +153,10 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 
 		today_year, today_month, today_day := t.date(t.now())
 
-		using widget_info := Widget_Info {
+		using object_info := Object_Info {
 			id = hash(i + 1),
 		}
-		begin_widget(&widget_info) or_continue
+		begin_object(&object_info) or_continue
 
 		if self.visible {
 			is_month := i8(month) == i8(info.month)
@@ -247,7 +247,7 @@ add_calendar :: proc(using info: ^Calendar_Info) -> bool {
 			}
 			month_offset = 0
 		}
-		end_widget()
+		end_object()
 	}
 	end_layout()
 	end_layout()
@@ -268,7 +268,7 @@ Date_Picker_Info :: struct {
 	first, second: ^Maybe(Date),
 }
 
-Date_Picker_Widget_Kind :: struct {
+Date_Picker_Object_Kind :: struct {
 	month_offset: int,
 }
 

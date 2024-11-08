@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 
 Color_Scheme :: struct {
 	substance, hover, accent, accent_content, content, shadow: vgo.Color,

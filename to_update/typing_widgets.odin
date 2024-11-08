@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
@@ -21,9 +21,9 @@ Input_Decal :: enum {
 	Spinner,
 }
 
-// The generic input widget takes a pointer to a `string.Builder` and edits it directly
+// The generic input object takes a pointer to a `string.Builder` and edits it directly
 Input_Info :: struct {
-	using _:     Widget_Info,
+	using _:     Object_Info,
 	builder:     ^strings.Builder,
 	placeholder: string,
 	prefix:      string,
@@ -54,7 +54,7 @@ Input_State :: struct {
 
 init_input :: proc(info: ^Input_Info, loc := #caller_location) -> bool {
 	if info.id == 0 do info.id = hash(loc)
-	info.self = get_widget(info.id)
+	info.self = get_object(info.id)
 	// Flag as an input and to keep data
 	info.self.flags += {.Is_Input, .Persistent}
 	// Make sticky for easy highlighting
@@ -100,7 +100,7 @@ input_behavior :: proc(info: ^Input_Info) -> bool {
 		core.cursor_type = .I_Beam
 	}
 	if .Active in info.self.state {
-		if (core.focused_widget != core.last_focused_widget) && !key_down(.Left_Control) {
+		if (core.focused_object != core.last_focused_object) && !key_down(.Left_Control) {
 			info.self.state -= {.Active}
 		}
 	} else {
@@ -304,8 +304,8 @@ input_behavior :: proc(info: ^Input_Info) -> bool {
 add_input :: proc(using info: ^Input_Info) -> bool {
 	using tedit
 
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	if info.shake > 0 {
 		core.draw_next_frame = true
@@ -359,7 +359,7 @@ add_input :: proc(using info: ^Input_Info) -> bool {
 
 	// Hover
 	if point_in_box(core.mouse_pos, self.box) {
-		hover_widget(self)
+		hover_object(self)
 	}
 
 	if self.visible {

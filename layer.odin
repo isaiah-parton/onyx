@@ -1,6 +1,6 @@
 package onyx
-// Layers exist only for widget drawing and interaction to be arbitrarily ordered
-// Layers have no interaction of their own, but clicking or hovering a widget in a given layer, will update its
+// Layers exist only for object drawing and interaction to be arbitrarily ordered
+// Layers have no interaction of their own, but clicking or hovering a object in a given layer, will update its
 // state.
 //
 // Layer ordering is somewhat complex
@@ -8,7 +8,7 @@ package onyx
 //
 // All layers are stored contiguously in the order they are to be rendered
 // a layer's index is an important value and must always be valid
-import "../../vgo"
+import "../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -44,8 +44,8 @@ Layer :: struct {
 	id:              Id,
 	parent:          ^Layer,
 	children:        [dynamic]^Layer,
-	state:           Widget_State,
-	last_state:      Widget_State,
+	state:           Object_State,
+	last_state:      Object_State,
 	options:         Layer_Options,
 	box:             Box,
 	// Will be deleted at the end of this frame
@@ -67,6 +67,54 @@ Layer_Info :: struct {
 	scale:    Maybe([2]f32),
 	rotation: f32,
 	opacity:  Maybe(f32),
+}
+
+clean_up_layers :: proc() {
+	for id, layer in global_state.layer_map {
+		if layer.dead {
+			if layer.parent != nil {
+				for child, c in layer.parent.children {
+					if child.id == layer.id {
+						ordered_remove(&layer.parent.children, c)
+						continue
+					}
+					if child.index >= layer.index {
+						child.index -= 1
+					}
+				}
+			} else {
+				for child, c in global_state.layers {
+					if child.id == layer.id {
+						ordered_remove(&global_state.layers, c)
+						continue
+					}
+					if child.index >= layer.index {
+						child.index -= 1
+					}
+				}
+			}
+
+			delete_key(&global_state.layer_map, id)
+			free(layer)
+			global_state.draw_next_frame = true
+		} else {
+			layer.dead = true
+		}
+	}
+}
+
+update_layer_references :: proc() {
+	global_state.hovered_layer_index = 0
+	global_state.last_hovered_layer = global_state.hovered_layer
+
+	global_state.hovered_layer = global_state.next_hovered_layer
+	global_state.next_hovered_layer = 0
+	global_state.last_highest_layer_index = global_state.highest_layer_index
+	global_state.highest_layer_index = 0
+
+	if (global_state.mouse_bits - global_state.last_mouse_bits) > {} {
+		global_state.focused_layer = global_state.hovered_layer
+	}
 }
 
 current_layer :: proc(loc := #caller_location) -> Maybe(^Layer) {
@@ -163,9 +211,7 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 	vgo.translate(-info.origin)
 
 	// Push layout
-	push_layout(
-		Layout{box = info.self.box, original_box = info.self.box, next_cut_side = .Top},
-	) or_return
+	begin_layout_with_box(info.self.box, axis = .Y, isolated = true)
 
 	return true
 }
@@ -173,7 +219,7 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 end_layer :: proc() {
 	vgo.pop_matrix()
 	vgo.restore_scissor()
-	pop_layout()
+	end_layout()
 	if layer, ok := current_layer().?; ok {
 		// Remove draw calls if invisible
 		if .Invisible in layer.options {

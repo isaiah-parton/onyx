@@ -1,7 +1,7 @@
 package onyx
 
 import "core:math/linalg"
-import "../../vgo"
+import "../vgo"
 
 Scrollbar :: struct {
 	vertical:     bool,
@@ -13,9 +13,9 @@ Scrollbar :: struct {
 }
 
 scrollbar :: proc(pos: ^f32, travel, handle_size: f32, vertical: bool = false, loc := #caller_location) {
-	widget := get_widget(hash(loc))
-	if begin_widget(widget) {
-		defer end_widget()
+	object := persistent_object(hash(loc))
+	if begin_object(object) {
+		defer end_object()
 
 
 	}

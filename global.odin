@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "base:runtime"
 import "core:fmt"
 import "core:math"
@@ -60,8 +60,9 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 }
 
 Debug_State :: struct {
-	enabled, widgets, panels, layers: bool,
+	enabled, objects, panels, layers: bool,
 	delta_time:                       [dynamic]f32,
+	deferred_objects: int,
 }
 
 @(private)
@@ -91,23 +92,26 @@ Global_State :: struct {
 	frames_this_second:       int,
 	// Hashing
 	id_stack:                 Stack(Id, MAX_IDS),
-	// Widgets
-	widgets:                  [dynamic]^Widget,
-	widget_map:               map[Id]^Widget,
-	widget_stack:             Stack(^Widget, 10),
-	last_hovered_widget:      Id,
-	hovered_widget:           Id,
-	next_hovered_widget:      Id,
-	last_focused_widget:      Id,
-	focused_widget:           Id,
-	dragged_widget:           Id,
-	disable_widgets:          bool,
+	// Objects
+	transient_objects:         [dynamic]Object,
+	objects:                  [dynamic]^Object,
+	object_map:               map[Id]^Object,
+	object_stack:             Stack(^Object, 10),
+	last_hovered_object:      Id,
+	hovered_object:           Id,
+	next_hovered_object:      Id,
+	last_focused_object:      Id,
+	focused_object:           Id,
+	dragged_object:           Id,
+	disable_objects:          bool,
 	drag_offset:              [2]f32,
 	// Form
 	form:                     Form,
 	form_active:              bool,
 	// Layout
+	current_layout: ^Layout,
 	layout_stack:             Stack(Layout, MAX_LAYOUTS),
+	layout_arrays:            [MAX_LAYOUTS][dynamic]^Object,
 	active_container:         Id,
 	next_active_container:    Id,
 	// Panels
@@ -139,6 +143,8 @@ Global_State :: struct {
 	runes:                    [dynamic]rune,
 	visible:                  bool,
 	focused:                  bool,
+	// Events
+	events:                   [dynamic]Event,
 	// Style
 	style:                    Style,
 	// Source boxes of user images on the texture atlas
@@ -159,10 +165,6 @@ colors :: proc() -> ^Color_Scheme {
 
 view_box :: proc() -> Box {
 	return Box{{}, global_state.view}
-}
-
-get_mouse_pos :: proc() -> [2]f32 {
-	return global_state.mouse_pos
 }
 
 view_width :: proc() -> f32 {
@@ -188,10 +190,22 @@ load_default_fonts :: proc() -> bool {
 	MONOSPACE_FONT_JSON :: #load(FONT_PATH + "/" + MONOSPACE_FONT + ".json", []u8)
 	HEADER_FONT_JSON :: #load(FONT_PATH + "/" + HEADER_FONT + ".json", []u8)
 	ICON_FONT_JSON :: #load(FONT_PATH + "/" + ICON_FONT + ".json", []u8)
-	global_state.style.default_font = vgo.load_font_from_slices(DEFAULT_FONT_IMAGE, DEFAULT_FONT_JSON) or_return
-	global_state.style.monospace_font = vgo.load_font_from_slices(MONOSPACE_FONT_IMAGE, MONOSPACE_FONT_JSON) or_return
-	global_state.style.header_font = vgo.load_font_from_slices(HEADER_FONT_IMAGE, HEADER_FONT_JSON) or_return
-	global_state.style.icon_font = vgo.load_font_from_slices(ICON_FONT_IMAGE, ICON_FONT_JSON) or_return
+	global_state.style.default_font = vgo.load_font_from_slices(
+		DEFAULT_FONT_IMAGE,
+		DEFAULT_FONT_JSON,
+	) or_return
+	global_state.style.monospace_font = vgo.load_font_from_slices(
+		MONOSPACE_FONT_IMAGE,
+		MONOSPACE_FONT_JSON,
+	) or_return
+	global_state.style.header_font = vgo.load_font_from_slices(
+		HEADER_FONT_IMAGE,
+		HEADER_FONT_JSON,
+	) or_return
+	global_state.style.icon_font = vgo.load_font_from_slices(
+		ICON_FONT_IMAGE,
+		ICON_FONT_JSON,
+	) or_return
 	vgo.set_fallback_font(global_state.style.icon_font)
 
 	return true
@@ -203,7 +217,6 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	global_state.window = window
 	width, height := glfw.GetWindowSize(global_state.window)
 
-	// Set view parameters
 	global_state.visible = true
 	global_state.focused = true
 	global_state.view = {f32(width), f32(height)}
@@ -211,7 +224,6 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	global_state.draw_next_frame = true
 	global_state.start_time = time.now()
 
-	// Create cursors
 	global_state.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
 	global_state.cursors[.Crosshair] = glfw.CreateStandardCursor(glfw.CROSSHAIR_CURSOR)
 	global_state.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(glfw.POINTING_HAND_CURSOR)
@@ -221,7 +233,6 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	global_state.cursors[.Resize_NESW] = glfw.CreateStandardCursor(glfw.RESIZE_NESW_CURSOR)
 	global_state.cursors[.Resize_NWSE] = glfw.CreateStandardCursor(glfw.RESIZE_NWSE_CURSOR)
 
-	// Set event callbacks
 	glfw.SetWindowIconifyCallback(
 		global_state.window,
 		proc "c" (_: glfw.WindowHandle, _: i32) {global_state.visible = false},
@@ -239,39 +250,45 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		global_state.draw_this_frame = true
 		global_state.draw_next_frame = true
 	})
-	glfw.SetWindowSizeCallback(global_state.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
-		context = runtime.default_context()
+	glfw.SetWindowSizeCallback(
+		global_state.window,
+		proc "c" (_: glfw.WindowHandle, width, height: i32) {
+			context = runtime.default_context()
 
-		global_state.surface_config.width = u32(width)
-		global_state.surface_config.height = u32(height)
-		wgpu.SurfaceConfigure(global_state.surface, &global_state.surface_config)
+			global_state.surface_config.width = u32(width)
+			global_state.surface_config.height = u32(height)
+			wgpu.SurfaceConfigure(global_state.surface, &global_state.surface_config)
 
-		global_state.view = {f32(width), f32(height)}
-		global_state.draw_this_frame = true
-		global_state.draw_next_frame = true
-	})
+			global_state.view = {f32(width), f32(height)}
+			global_state.draw_this_frame = true
+			global_state.draw_next_frame = true
+		},
+	)
 	glfw.SetCharCallback(global_state.window, proc "c" (_: glfw.WindowHandle, char: rune) {
 		context = runtime.default_context()
 		append(&global_state.runes, char)
 		global_state.draw_this_frame = true
 		global_state.draw_next_frame = true
 	})
-	glfw.SetKeyCallback(global_state.window, proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
-		global_state.draw_this_frame = true
-		global_state.draw_next_frame = true
-		if key < 0 {
-			return
-		}
-		switch action {
-		case glfw.PRESS:
-			global_state.keys[Keyboard_Key(key)] = true
-		case glfw.RELEASE:
-			global_state.keys[Keyboard_Key(key)] = false
-		case glfw.REPEAT:
-			global_state.keys[Keyboard_Key(key)] = true
-			global_state.last_keys[Keyboard_Key(key)] = false
-		}
-	})
+	glfw.SetKeyCallback(
+		global_state.window,
+		proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
+			global_state.draw_this_frame = true
+			global_state.draw_next_frame = true
+			if key < 0 {
+				return
+			}
+			switch action {
+			case glfw.PRESS:
+				global_state.keys[Keyboard_Key(key)] = true
+			case glfw.RELEASE:
+				global_state.keys[Keyboard_Key(key)] = false
+			case glfw.REPEAT:
+				global_state.keys[Keyboard_Key(key)] = true
+				global_state.last_keys[Keyboard_Key(key)] = false
+			}
+		},
+	)
 	glfw.SetCursorPosCallback(global_state.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
 		global_state.mouse_pos = {f32(x), f32(y)}
 		global_state.draw_this_frame = true
@@ -292,7 +309,6 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		},
 	)
 
-	// Initialize WGPU
 	global_state.instance = wgpu.CreateInstance()
 	global_state.surface = glfwglue.GetSurface(global_state.instance, window)
 
@@ -337,27 +353,33 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		}
 	}
 
-	wgpu.InstanceRequestAdapter(global_state.instance, &{powerPreference = .LowPower}, on_adapter, &global_state)
-
-	global_state.surface_config = vgo.surface_configuration(global_state.device, global_state.adapter, global_state.surface)
+	wgpu.InstanceRequestAdapter(
+		global_state.instance,
+		&{powerPreference = .LowPower},
+		on_adapter,
+		&global_state,
+	)
+	global_state.surface_config = vgo.surface_configuration(
+		global_state.device,
+		global_state.adapter,
+		global_state.surface,
+	)
 	global_state.surface_config.width = u32(width)
 	global_state.surface_config.height = u32(height)
 	wgpu.SurfaceConfigure(global_state.surface, &global_state.surface_config)
 
-	// Initialize vgo
 	vgo.start(global_state.device, global_state.surface)
 
-	// Default style
 	if style == nil {
 		global_state.style.color = dark_color_scheme()
 		global_state.style.shape = default_style_shape()
-		fmt.printfln("No style provided by user, using default theme and fonts")
-
 		if !load_default_fonts() {
-			fmt.printfln("Fatal: failed to load default fonts from '%s'", filepath.abs(FONT_PATH) or_else "")
+			fmt.printfln(
+				"Fatal: failed to load default fonts from '%s'",
+				filepath.abs(FONT_PATH) or_else "",
+			)
 			return false
 		}
-
 	} else {
 		global_state.style = style.?
 	}
@@ -367,9 +389,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	return true
 }
 
-// Call before each new frame
 new_frame :: proc() {
-	// Timings
 	if !global_state.disable_frame_skip {
 		time.sleep(
 			max(
@@ -383,9 +403,12 @@ new_frame :: proc() {
 
 	profiler_scope(.New_Frame)
 
-	// Update timings
+	free_all(context.temp_allocator)
+
 	now := time.now()
-	global_state.delta_time = f32(time.duration_seconds(time.diff(global_state.last_frame_time, now)))
+	global_state.delta_time = f32(
+		time.duration_seconds(time.diff(global_state.last_frame_time, now)),
+	)
 	global_state.last_frame_time = now
 	global_state.frames += 1
 	global_state.frames_so_far += 1
@@ -395,26 +418,13 @@ new_frame :: proc() {
 		global_state.frames_so_far = 0
 	}
 
-	// Clear inputs
-	global_state.last_mouse_bits = global_state.mouse_bits
-	global_state.last_mouse_pos = global_state.mouse_pos
-	global_state.last_keys = global_state.keys
-	global_state.mouse_scroll = {}
-	clear(&global_state.runes)
-
-	// Clear temp allocator
-	free_all(context.temp_allocator)
-
-	// Decide if this frame will be drawn
 	if global_state.draw_next_frame {
 		global_state.draw_next_frame = false
 		global_state.draw_this_frame = true
 	}
 
-	// Handle window events
+	reset_input()
 	glfw.PollEvents()
-
-	// Set and reset cursor
 	if global_state.cursor_type == .None {
 		glfw.SetInputMode(global_state.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
 	} else {
@@ -423,8 +433,23 @@ new_frame :: proc() {
 	}
 	global_state.cursor_type = .Normal
 
+	global_state.layer_stack.height = 0
+	global_state.layout_stack.height = 0
+	global_state.object_stack.height = 0
+	global_state.panel_stack.height = 0
+
+	global_state.active_container = global_state.next_active_container
+	global_state.next_active_container = 0
+
+	clean_up_layers()
+	update_layer_references()
+	clean_up_objects()
+	update_object_references()
+
+	clear(&global_state.events)
+
 	if key_pressed(.Escape) {
-		global_state.focused_widget = 0
+		global_state.focused_object = 0
 	}
 
 	if key_pressed(.F3) {
@@ -432,79 +457,8 @@ new_frame :: proc() {
 		global_state.draw_this_frame = true
 	}
 
-	// Reset stuff
-	global_state.layer_stack.height = 0
-	global_state.layout_stack.height = 0
-	global_state.widget_stack.height = 0
-	global_state.panel_stack.height = 0
-
-	// Update layer ids
-	global_state.hovered_layer_index = 0
-	global_state.last_hovered_layer = global_state.hovered_layer
-	global_state.last_hovered_widget = global_state.hovered_widget
-	global_state.last_focused_widget = global_state.focused_widget
-	global_state.hovered_layer = global_state.next_hovered_layer
-	global_state.next_hovered_layer = 0
-	global_state.last_highest_layer_index = global_state.highest_layer_index
-	global_state.highest_layer_index = 0
-
-	global_state.active_container = global_state.next_active_container
-	global_state.next_active_container = 0
-
-	if (global_state.mouse_bits - global_state.last_mouse_bits) > {} {
-		global_state.focused_layer = global_state.hovered_layer
-	}
-
-	// Purge layers
-	for id, &layer in global_state.layer_map {
-		if layer.dead {
-			// Move other layers down by one z index
-			if layer.parent != nil {
-				for child, c in layer.parent.children {
-					if child.id == layer.id {
-						ordered_remove(&layer.parent.children, c)
-						continue
-					}
-					if child.index >= layer.index {
-						child.index -= 1
-					}
-				}
-			}
-
-			// Remove from map
-			delete_key(&global_state.layer_map, id)
-			free(layer)
-
-			global_state.draw_next_frame = true
-		} else {
-			layer.dead = true
-		}
-	}
-
-	// Free unused widgets
-	for widget, index in global_state.widgets {
-		if widget.dead {
-			if .Persistent not_in widget.flags {
-				// Cleanup
-				destroy_widget(widget)
-				// Removal
-				delete_key(&global_state.widget_map, widget.id)
-				ordered_remove(&global_state.widgets, index)
-				free(widget)
-				// Redraw
-				global_state.draw_this_frame = true
-			}
-		} else {
-			widget.dead = true
-		}
-	}
-
-	// Process widgets
-	process_widgets()
-
 	vgo.new_frame()
 
-	// User code profiler scope
 	profiler_begin_scope(.Construct)
 }
 
@@ -533,8 +487,8 @@ shutdown :: proc() {
 		return
 	}
 
-	for _, widget in global_state.widget_map {
-		destroy_widget(widget)
+	for _, object in global_state.object_map {
+		destroy_object(object)
 	}
 
 	for layer in global_state.layers {
@@ -543,7 +497,7 @@ shutdown :: proc() {
 	}
 
 	delete(global_state.layers)
-	delete(global_state.widget_map)
+	delete(global_state.object_map)
 	delete(global_state.panel_map)
 	delete(global_state.layer_map)
 	delete(global_state.runes)
@@ -566,6 +520,11 @@ __get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
 
 draw_shadow :: proc(box: vgo.Box) {
 	if vgo.disable_scissor() {
-		vgo.box_shadow(move_box(box, 2), global_state.style.rounding, 4, global_state.style.color.shadow)
+		vgo.box_shadow(
+			move_box(box, 2),
+			global_state.style.rounding,
+			4,
+			global_state.style.color.shadow,
+		)
 	}
 }

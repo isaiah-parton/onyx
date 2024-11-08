@@ -1,7 +1,7 @@
 package demo
 
 import vgo "../../vgo"
-import onyx "../onyx"
+import onyx ".."
 import "base:runtime"
 import "core:fmt"
 import img "core:image"
@@ -82,10 +82,27 @@ main :: proc() {
 			}
 			if panel({}) {
 				add_padding(50)
-				add_space(10)
-				button("Hello, world")
-				add_space(10)
-				boolean(&checkbox_value, "Checkbox")
+				if begin_row(100) {
+					defer end_row()
+					justify(.Center)
+
+					label("this is a label")
+					for i in 1..=5 {
+						push_id(i)
+							button(fmt.tprintf("Button %i", i))
+						pop_id()
+					}
+				}
+				if begin_row(100) {
+					defer end_row()
+					justify(.Center)
+
+					for i in 1..=5 {
+						push_id(i)
+							boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
+						pop_id()
+					}
+				}
 			}
 			present()
 		}

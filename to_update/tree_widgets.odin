@@ -1,7 +1,7 @@
 package onyx
 
 Tree_Node_Info :: struct {
-	using _: Widget_Info,
+	using _: Object_Info,
 	text: string,
 }
 

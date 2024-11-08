@@ -1,19 +1,19 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
 Tabs_Info :: struct {
-	using _:      Widget_Info,
+	using _:      Object_Info,
 	index:        ^int,
 	options:      []string,
 	tab_width:    Maybe(f32),
 	closed_index: Maybe(int),
 }
 
-Tabs_Widget_Kind :: struct {
+Tabs_Object_Kind :: struct {
 	timers: [10]f32,
 }
 
@@ -22,7 +22,7 @@ init_tabs :: proc(using info: ^Tabs_Info, loc := #caller_location) -> bool {
 	// Value sanity check
 	if index == nil || len(options) == 0 do return false
 	if id == 0 do id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	options = options[:min(len(options), 10)]
 	self.desired_size = {
 		f32(len(options)) * (tab_width.? or_else core.style.visual_size.x),
@@ -32,8 +32,8 @@ init_tabs :: proc(using info: ^Tabs_Info, loc := #caller_location) -> bool {
 }
 
 add_tabs :: proc(using info: ^Tabs_Info) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	push_id(self.id)
 	defer pop_id()
@@ -46,11 +46,11 @@ add_tabs :: proc(using info: ^Tabs_Info) -> bool {
 			push_id(o + 1)
 			defer pop_id()
 
-			tab_info := Widget_Info {
+			tab_info := Object_Info {
 				id            = hash("tab"),
-				in_state_mask = Widget_State{.Hovered},
+				in_state_mask = Object_State{.Hovered},
 			}
-			if begin_widget(&tab_info) {
+			if begin_object(&tab_info) {
 				tab_info.self.open_time = animate(tab_info.self.open_time, 0.15, index^ == o)
 				button_behavior(tab_info.self)
 				if tab_info.self.visible {
@@ -94,7 +94,7 @@ add_tabs :: proc(using info: ^Tabs_Info) -> bool {
 					index^ = o
 				}
 
-				end_widget()
+				end_object()
 			}
 		}
 	}
@@ -115,13 +115,13 @@ init_box_tabs :: proc(using info: ^Tabs_Info, loc := #caller_location) -> bool {
 }
 
 add_box_tabs :: proc(using info: ^Tabs_Info) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
-	kind := widget_kind(self, Tabs_Widget_Kind)
+	kind := object_kind(self, Tabs_Object_Kind)
 
 	if point_in_box(core.mouse_pos, self.box) {
-		hover_widget(self)
+		hover_object(self)
 	}
 
 	inner_box := self.box

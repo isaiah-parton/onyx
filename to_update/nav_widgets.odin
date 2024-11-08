@@ -5,10 +5,10 @@ import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 import "core:reflect"
-import "../../vgo"
+import "../vgo"
 
 Breadcrumb_Info :: struct {
-	using _:   Widget_Info,
+	using _:   Object_Info,
 	text:      string,
 	text_layout: vgo.Text_Layout,
 	index:     ^int,
@@ -20,7 +20,7 @@ Breadcrumb_Info :: struct {
 init_breadcrumb :: proc(using info: ^Breadcrumb_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
 	if id == 0 do id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	has_menu = len(options) > 1 && index != nil
 	text = options[index^] if has_menu else text
 	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.default_text_size)
@@ -36,14 +36,14 @@ init_breadcrumb :: proc(using info: ^Breadcrumb_Info, loc := #caller_location) -
 }
 
 add_breadcrumb :: proc(using info: ^Breadcrumb_Info) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	if info.index == nil {
 		return false
 	}
 
-	kind := widget_kind(self, Menu_State)
+	kind := object_kind(self, Menu_State)
 	menu_behavior(self)
 
 	if self.visible {

@@ -13,7 +13,7 @@ Rendering is and will always be done with WGPU; because of this, all WGPU resour
 
 A somewhat complex SDF shader is used for drawing shapes with limited support for custom scissors and paints.  This results in really pretty graphics while taking a massive load off of the CPU.  So far, I've seen framerates as high as 2000+ on integrated Intel UHD 630 graphics running the demo.
 
-Widgets are immediate, but their functionality can be split apart to allow for advanced layouts.
+Objects are immediate, but their functionality can be split apart to allow for advanced layouts.
 
 **Example**:
 ```odin
@@ -29,9 +29,9 @@ fmt.println(btn.desired_size)
 add_button(&btn)
 ```
 
-In this example, the `btn` value is obviously **transient** and should not be used outside of it's GUI scope.  The same goes for any widget info value
+In this example, the `btn` value is obviously **transient** and should not be used outside of it's GUI scope.  The same goes for any object info value
 
-Layouts use the dead simple rect-cut method, give it a side to cut from and just add widgets.  You optionally specify widget size or margin.
+Layouts use the dead simple rect-cut method, give it a side to cut from and just add objects.  You optionally specify object size or margin.
 
 ## Can I use it?
 It's not nearly production ready yet, has no docs and calling it stable is still a stretch, but do as you will, I can't stop you.

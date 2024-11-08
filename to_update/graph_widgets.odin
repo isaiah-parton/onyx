@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "base:intrinsics"
 import "core:fmt"
 import "core:math"
@@ -31,7 +31,7 @@ Graph_Field_Info :: struct {
 }
 
 Graph_Info :: struct {
-	using _:           Widget_Info,
+	using _:           Object_Info,
 	lo, hi, increment: f64,
 	kind:              Graph_Kind,
 	spacing:           f32,
@@ -41,22 +41,22 @@ Graph_Info :: struct {
 	label_tooltip:     bool,
 }
 
-Graph_Widget_Kind :: struct {
+Graph_Object_Kind :: struct {
 	dot_times: [100]f32,
 }
 
 init_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 	if len(entries) == 0 do return false
 	if id == 0 do id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	spacing = max(spacing, 10)
 	self.desired_size = {spacing * f32(len(entries)), f32(hi - lo) * 2}
 	return true
 }
 
 add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	inner_box := self.box
 
@@ -64,7 +64,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 
 	tooltip_idx: int
 	tooltip_pos: Maybe([2]f32)
-	variant := widget_kind(self, Graph_Widget_Kind)
+	variant := object_kind(self, Graph_Object_Kind)
 	switch kind in kind {
 
 	case Line_Graph:
@@ -332,7 +332,7 @@ add_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 	}
 
 	if point_in_box(core.mouse_pos, self.box) {
-		hover_widget(self)
+		hover_object(self)
 	}
 
 	return true

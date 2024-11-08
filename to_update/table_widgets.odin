@@ -4,7 +4,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:strings"
-import "../../vgo"
+import "../vgo"
 
 Type_Text :: struct {}
 Type_Number :: struct {
@@ -41,7 +41,7 @@ Table_Row_Info :: struct {
 }
 
 Table_Info :: struct {
-	using _:            Widget_Info,
+	using _:            Object_Info,
 	sort_order:         ^Sort_Order,
 	sorted_column:      ^int,
 	columns:            []Table_Column_Info,
@@ -54,7 +54,7 @@ Table_Info :: struct {
 	cont_info:          Container_Info,
 }
 
-Table_Widget_Kind :: struct {
+Table_Object_Kind :: struct {
 	selection: [2][2]u64,
 }
 
@@ -106,7 +106,7 @@ table_cell :: proc(column, row: int, value: any, type: Table_Column_Type) {
 init_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 	if info == nil do return false
 	if id == 0 do id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	for &column, c in columns {
 		text: string = column.name
 		if sorted_column != nil && sorted_column^ == c {
@@ -135,7 +135,7 @@ init_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 // Begin a table
 begin_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 	init_table(info, loc) or_return
-	begin_widget(info) or_return
+	begin_object(info) or_return
 
 	push_id(info.id)
 	defer pop_id()
@@ -184,11 +184,11 @@ end_table :: proc(using info: ^Table_Info) {
 	layout.isolated = true
 	layout.queue_len += copy(layout.size_queue[:], info.widths[:info.widths_len])
 	for &column, c in info.columns {
-		using widget_info := Widget_Info {
+		using object_info := Object_Info {
 			id = hash(c + 1),
 		}
-		begin_widget(&widget_info) or_continue
-		defer end_widget()
+		begin_object(&object_info) or_continue
+		defer end_object()
 
 		button_behavior(self)
 
@@ -223,7 +223,7 @@ end_table :: proc(using info: ^Table_Info) {
 	}
 	end_layout()
 	end_container(&cont_info)
-	end_widget()
+	end_object()
 	pop_id()
 }
 

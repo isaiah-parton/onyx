@@ -118,3 +118,15 @@ mouse_pressed :: proc(button: Mouse_Button) -> bool {
 mouse_released :: proc(button: Mouse_Button) -> bool {
 	return (global_state.last_mouse_bits - global_state.mouse_bits) >= {button}
 }
+
+mouse_point :: proc() -> [2]f32 {
+	return global_state.mouse_pos
+}
+
+reset_input :: proc() {
+	global_state.last_mouse_bits = global_state.mouse_bits
+	global_state.last_mouse_pos = global_state.mouse_pos
+	global_state.last_keys = global_state.keys
+	global_state.mouse_scroll = {}
+	clear(&global_state.runes)
+}

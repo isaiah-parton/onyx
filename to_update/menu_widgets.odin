@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
@@ -25,7 +25,7 @@ __menu_bar :: proc(ok: bool) {
 }
 
 Menu_Info :: struct {
-	using _:     Widget_Info,
+	using _:     Object_Info,
 	text:        string,
 	menu_align:  Alignment,
 	text_layout: vgo.Text_Layout,
@@ -39,7 +39,7 @@ Menu_State :: struct {
 
 init_menu :: proc(using info: ^Menu_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.default_text_size)
 	// desired_size = {
 	// 	text_layout.size.x + 20 + core.style.text_padding.x * 2,
@@ -50,7 +50,7 @@ init_menu :: proc(using info: ^Menu_Info, loc := #caller_location) -> bool {
 }
 
 begin_menu :: proc(info: ^Menu_Info) -> bool {
-	begin_widget(info) or_return
+	begin_object(info) or_return
 
 	if info.self.visible {
 		vgo.fill_box(info.self.box, core.style.rounding, paint = core.style.color.field)
@@ -145,7 +145,7 @@ end_menu :: proc(info: ^Menu_Info) -> bool {
 		// End the layer
 		end_layer()
 	}
-	end_widget()
+	end_object()
 	return true
 }
 
@@ -168,7 +168,7 @@ Menu_Item_Decal :: enum {
 }
 
 Menu_Item_Info :: struct {
-	using _:     Widget_Info,
+	using _:     Object_Info,
 	text:        string,
 	decal:       Menu_Item_Decal,
 	text_layout: vgo.Text_Layout,
@@ -176,7 +176,7 @@ Menu_Item_Info :: struct {
 }
 
 init_menu_item :: proc(info: ^Menu_Item_Info) -> bool {
-	info.self = get_widget(info.id)
+	info.self = get_object(info.id)
 	info.text_layout = vgo.make_text_layout(
 		info.text,
 		core.style.default_font,
@@ -192,8 +192,8 @@ menu_item :: proc(info: Menu_Item_Info, loc := #caller_location) -> Menu_Item_In
 	if info.id == 0 do info.id = hash(loc)
 
 	if init_menu_item(&info) {
-		if begin_widget(&info) {
-			defer end_widget()
+		if begin_object(&info) {
+			defer end_object()
 
 			button_behavior(info.self)
 

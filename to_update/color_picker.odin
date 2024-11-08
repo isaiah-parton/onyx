@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -77,7 +77,7 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: vg
 	}
 }
 
-Color_Conversion_Widget_Kind :: struct {
+Color_Conversion_Object_Kind :: struct {
 	// This value is used as a mediary while the value is being edited
 	hsva:   [4]f32,
 	inputs: [Color_Format]strings.Builder,
@@ -93,7 +93,7 @@ Color_Format :: enum {
 Color_Format_Set :: bit_set[Color_Format]
 
 Color_Button_Info :: struct {
-	using _:       Widget_Info,
+	using _:       Object_Info,
 	value:         ^vgo.Color,
 	show_alpha:    bool,
 	input_formats: Color_Format_Set,
@@ -109,15 +109,15 @@ init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_locatio
 		core.style.default_text_size,
 	)
 	id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	self.desired_size = core.style.visual_size
-	in_state_mask = Widget_State{}
+	in_state_mask = Object_State{}
 	return true
 }
 
 add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	menu_behavior(self)
 
@@ -151,7 +151,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 		)
 	}
 
-	kind := widget_kind(self, Color_Conversion_Widget_Kind)
+	kind := object_kind(self, Color_Conversion_Object_Kind)
 	PADDING :: 10
 	if .Open in self.state {
 		if .Open not_in self.last_state {
@@ -272,7 +272,7 @@ add_color_button :: proc(using info: ^Color_Button_Info) -> bool {
 				}
 			}
 
-			// If the layer is not focused or hovered and the widget loses focus: close the dialog
+			// If the layer is not focused or hovered and the object loses focus: close the dialog
 			if menu_layer.self.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
 				self.state -= {.Open}
 			}
@@ -291,7 +291,7 @@ color_button :: proc(info: Color_Button_Info, loc := #caller_location) -> Color_
 }
 
 Alpha_Slider_Info :: struct {
-	using _:  Widget_Info,
+	using _:  Object_Info,
 	value:    ^f32,
 	vertical: bool,
 	changed:  bool,
@@ -301,7 +301,7 @@ Alpha_Slider_Info :: struct {
 init_alpha_slider :: proc(using info: ^Alpha_Slider_Info, loc := #caller_location) -> bool {
 	if value == nil do return false
 	id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	self.desired_size = core.style.visual_size
 	if vertical {
 		self.desired_size.xy = self.desired_size.yx
@@ -311,8 +311,8 @@ init_alpha_slider :: proc(using info: ^Alpha_Slider_Info, loc := #caller_locatio
 }
 
 add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	i := int(info.vertical)
 	j := 1 - i
@@ -348,7 +348,7 @@ add_alpha_slider :: proc(using info: ^Alpha_Slider_Info) -> bool {
 	}
 
 	if point_in_box(core.mouse_pos, self.box) {
-		hover_widget(self)
+		hover_object(self)
 	}
 
 	return true
@@ -368,7 +368,7 @@ HSVA_Picker_Mode :: enum {
 }
 
 HSVA_Picker_Info :: struct {
-	using _: Widget_Info,
+	using _: Object_Info,
 	hsva:    ^[4]f32,
 	mode:    HSVA_Picker_Mode,
 	changed: bool,
@@ -378,7 +378,7 @@ init_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	if info == nil do return false
 	if info.hsva == nil do return false
 	id = hash(uintptr(hsva))
-	self = get_widget(id)
+	self = get_object(id)
 	self.desired_size = 200
 	fixed_size = true
 	sticky = true
@@ -386,8 +386,8 @@ init_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 }
 
 add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	size := min(box_width(self.box), box_height(self.box))
 	outer := size / 2
@@ -412,7 +412,7 @@ add_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	dist := linalg.length(diff)
 
 	if dist <= outer {
-		hover_widget(self)
+		hover_object(self)
 	}
 
 	if .Pressed in (self.state - self.last_state) {
@@ -497,20 +497,20 @@ hsva_picker :: proc(info: HSVA_Picker_Info, loc := #caller_location) -> HSVA_Pic
 }
 
 Color_Picker_Info :: struct {
-	using _: Widget_Info,
+	using _: Object_Info,
 	color:   ^vgo.Color,
 }
 
 init_color_picker :: proc(using info: ^Color_Picker_Info, loc := #caller_location) -> bool {
 	if info.color == nil do return false
 	if id == 0 do id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	return true
 }
 
 add_color_picker :: proc(using info: ^Color_Picker_Info) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	if self.visible {
 		vgo.fill_box(self.box, paint = color^)

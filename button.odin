@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "core:container/small_array"
 import "core:math"
 import "core:math/ease"
@@ -15,14 +15,15 @@ Button_Style :: enum {
 }
 
 Button :: struct {
-	using base:  ^Widget,
-	text:        string,
-	is_loading:  bool,
-	style:       Button_Style,
-	font_index:  Maybe(int),
-	font_size:   Maybe(f32),
-	color:       Maybe(vgo.Color),
-	text_layout: vgo.Text_Layout,
+	using object: ^Object,
+	text:         string,
+	is_loading:   bool,
+	press_time:   f32,
+	style:        Button_Style,
+	font_index:   Maybe(int),
+	font_size:    Maybe(f32),
+	color:        Maybe(vgo.Color),
+	text_layout:  vgo.Text_Layout,
 }
 
 make_button_text_layout :: proc(text: string, font_size: Maybe(f32) = nil) -> vgo.Text_Layout {
@@ -33,44 +34,46 @@ make_button_text_layout :: proc(text: string, font_size: Maybe(f32) = nil) -> vg
 	)
 }
 
-button :: proc(text: string, loc := #caller_location) {
-	widget := get_widget(hash(loc))
-	text_layout := make_button_text_layout(text)
-	widget.desired_size = text_layout.size + global_state.style.text_padding * 2
-	if widget.variant == nil {
-		widget.variant = Button{
-			base = widget,
+button :: proc(text: string, style: Button_Style = .Primary, loc := #caller_location) -> Id {
+	id := hash(loc)
+	object := persistent_object(id)
+	if object.variant == nil {
+		object.variant = Button {
+			object = object,
 		}
 	}
-	button := &widget.variant.(Button)
-	button.text_layout = text_layout
-	if begin_widget(widget) {
-		defer end_widget()
+	button := &object.variant.(Button)
+	button.text_layout = make_button_text_layout(text)
+	button.desired_size = button.text_layout.size + global_state.style.text_padding * 2
+	button.box = next_object_box(next_object_size(button.desired_size))
+	button.style = style
+	display_or_add_object(object)
+	return id
+}
 
-		widget.box = next_widget_box(widget.desired_size)
+display_button :: proc(button: ^Button) {
+	if begin_object(button) {
+		defer end_object()
 
-		handle_widget_click(widget)
+		handle_object_click(button)
+		button_behavior(button)
 
-		button_behavior(widget)
-		button := widget.variant.(Button)
-
-		if widget.visible {
+		if button.visible {
 			text_color: vgo.Color
 			radius: [4]f32 = global_state.style.rounding
-			shape := vgo.make_box(widget.box, radius)
 
 			switch button.style {
 			case .Outlined:
 				vgo.fill_box(
-					widget.box,
+					button.box,
 					radius,
 					vgo.fade(
 						button.color.? or_else global_state.style.color.substance,
-						0.5 if .Hovered in widget.state else 0.25,
+						0.5 if .Hovered in button.state else 0.25,
 					),
 				)
 				vgo.stroke_box(
-					widget.box,
+					button.box,
 					2,
 					radius,
 					button.color.? or_else global_state.style.color.substance,
@@ -79,59 +82,56 @@ button :: proc(text: string, loc := #caller_location) {
 			case .Secondary:
 				bg_color := button.color.? or_else global_state.style.color.substance
 				vgo.fill_box(
-					widget.box,
+					button.box,
 					radius,
-					vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in widget.state else bg_color,
+					vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in button.state else bg_color,
 				)
 				text_color = global_state.style.color.accent_content
 			case .Primary:
 				vgo.fill_box(
-					widget.box,
+					button.box,
 					radius,
-					vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in widget.state else global_state.style.color.accent,
+					vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in button.state else global_state.style.color.accent,
 				)
 				text_color = global_state.style.color.accent_content
 			case .Ghost:
-				if .Hovered in widget.state {
+				if .Hovered in button.state {
 					vgo.fill_box(
-						widget.box,
+						button.box,
 						radius,
-						paint = vgo.fade(button.color.? or_else global_state.style.color.substance, 0.2),
+						paint = vgo.fade(
+							button.color.? or_else global_state.style.color.substance,
+							0.2,
+						),
 					)
 				}
 				text_color = global_state.style.color.content
 			}
 
-			if widget.press_time > 0 {
-				scale := widget.press_time if .Pressed in widget.state else f32(1)
-				opacity := f32(1) if .Pressed in widget.state else widget.press_time
-				vgo.push_scissor(shape)
+			if button.press_time > 0 {
+				scale := button.press_time if .Pressed in button.state else f32(1)
+				opacity := f32(1) if .Pressed in button.state else button.press_time
+				vgo.push_scissor(vgo.make_box(button.box, radius))
 				vgo.fill_circle(
-					widget.click_point,
-					linalg.length(widget.box.hi - widget.box.lo) * scale,
+					button.click_point,
+					linalg.length(button.box.hi - button.box.lo) * scale,
 					paint = vgo.fade(vgo.WHITE, opacity * 0.2),
 				)
 				vgo.pop_scissor()
 			}
+
 			if !button.is_loading {
 				vgo.fill_text_layout_aligned(
 					button.text_layout,
-					box_center(widget.box),
+					box_center(button.box),
 					.Center,
 					.Center,
 					text_color,
 				)
 			}
 
-			if widget.disable_time > 0 {
-				vgo.fill_box(
-					widget.box,
-					paint = vgo.fade(global_state.style.color.fg, widget.disable_time * 0.5),
-				)
-			}
-
 			if button.is_loading {
-				vgo.spinner(box_center(widget.box), box_height(widget.box) * 0.3, text_color)
+				vgo.spinner(box_center(button.box), box_height(button.box) * 0.3, text_color)
 			}
 		}
 	}
@@ -139,7 +139,7 @@ button :: proc(text: string, loc := #caller_location) {
 
 /*
 Image_Button :: struct {
-	using _: Widget_Info,
+	using _: Object_Info,
 	image:   Maybe(int),
 	clicked: bool,
 	hovered: bool,
@@ -148,13 +148,13 @@ Image_Button :: struct {
 init_image_button :: proc(using info: ^Image_Button, loc := #caller_location) -> bool {
 	if info == nil do return false
 	if id == 0 do id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	return true
 }
 
 add_image_button :: proc(using info: ^Image_Button) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	button_behavior(self)
 
@@ -220,13 +220,13 @@ init_floating_button :: proc(using info: ^Floating_Button_Info, loc := #caller_l
 	self.desired_size = text_layout.size + 20
 	self.desired_size.x = max(self.desired_size.x, self.desired_size.y)
 	if id == 0 do id = hash(loc)
-	self = get_widget(id)
+	self = get_object(id)
 	return true
 }
 
 add_floating_button :: proc(using info: ^Floating_Button_Info) -> bool {
-	begin_widget(info) or_return
-	defer end_widget()
+	begin_object(info) or_return
+	defer end_object()
 
 	button_behavior(self)
 

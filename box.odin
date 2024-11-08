@@ -1,6 +1,6 @@
 package onyx
 
-import "../../vgo"
+import "../vgo"
 import "base:intrinsics"
 import "core:math"
 import "core:math/linalg"
@@ -218,21 +218,25 @@ move_box :: proc(a: Box, delta: [2]f32) -> Box {
 
 // cut a box and return the cut piece
 cut_box_left :: proc(box: ^Box, a: f32) -> (res: Box) {
+	a := min(a, box.hi.x - box.lo.x)
 	res = {box.lo, {box.lo.x + a, box.hi.y}}
 	box.lo.x += a
 	return
 }
 cut_box_top :: proc(box: ^Box, a: f32) -> (res: Box) {
+	a := min(a, box.hi.y - box.lo.y)
 	res = {box.lo, {box.hi.x, box.lo.y + a}}
 	box.lo.y += a
 	return
 }
 cut_box_right :: proc(box: ^Box, a: f32) -> (res: Box) {
+	a := min(a, box.hi.x - box.lo.x)
 	res = {{box.hi.x - a, box.lo.y}, box.hi}
 	box.hi.x -= a
 	return
 }
 cut_box_bottom :: proc(box: ^Box, a: f32) -> (res: Box) {
+	a := min(a, box.hi.y - box.lo.y)
 	res = {{box.lo.x, box.hi.y - a}, box.hi}
 	box.hi.y -= a
 	return

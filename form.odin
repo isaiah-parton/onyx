@@ -1,8 +1,8 @@
 package onyx
 
 Form :: struct {
-	first: ^Widget,
-	last: ^Widget,
+	first: ^Object,
+	last: ^Object,
 }
 
 begin_form :: proc() {
@@ -11,9 +11,9 @@ begin_form :: proc() {
 }
 
 end_form :: proc() {
-	if global_state.form.first != nil {
-		global_state.form.first.prev = global_state.form.last
-	}
+	// if global_state.form.first != nil {
+	// 	global_state.form.first.prev = global_state.form.last
+	// }
 	global_state.form_active = false
 
 }
