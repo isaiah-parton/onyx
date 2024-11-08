@@ -106,7 +106,7 @@ table_cell :: proc(column, row: int, value: any, type: Table_Column_Type) {
 init_table :: proc(using info: ^Table_Info, loc := #caller_location) -> bool {
 	if info == nil do return false
 	if id == 0 do id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	for &column, c in columns {
 		text: string = column.name
 		if sorted_column != nil && sorted_column^ == c {

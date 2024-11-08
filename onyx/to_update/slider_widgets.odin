@@ -19,7 +19,7 @@ Slider_State :: struct {
 
 init_slider :: proc(using info: ^Slider_Info($T), loc := #caller_location) -> bool {
 	if id == 0 do id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	sticky = true
 	self.desired_size = {core.style.visual_size.x, core.style.visual_size.y * 0.75}
 	hi = max(hi, lo + 1)
@@ -41,7 +41,6 @@ add_slider :: proc(using info: ^Slider_Info($T)) -> bool {
 	}
 
 	if value == nil {
-		// Draw nil text
 		return false
 	}
 

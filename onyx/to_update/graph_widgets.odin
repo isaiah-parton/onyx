@@ -48,7 +48,7 @@ Graph_Widget_Kind :: struct {
 init_graph :: proc(using info: ^Graph_Info, loc := #caller_location) -> bool {
 	if len(entries) == 0 do return false
 	if id == 0 do id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	spacing = max(spacing, 10)
 	self.desired_size = {spacing * f32(len(entries)), f32(hi - lo) * 2}
 	return true

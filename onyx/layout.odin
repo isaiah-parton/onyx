@@ -1,109 +1,93 @@
 package onyx
-// Layouts are stackable data structures for cutting boxes.
-// 	They need to be able to store their contents' desired sizes for the next frame
-//  but also be isolated in some cases so that this doesn't happen.
-//
-// 	`content_size` is the accumulative size of contained widgets and layouts.
-//
-//  `spacing_size' is the accumulative size of spacing and is separated because it
-// 	is treated differently.
-//
-// 	TODO: Add a separate field for total cut size that disregards desired size
+
 import "core:math"
 import "core:math/linalg"
+
 Layout_Mode :: enum {
 	Maximum,
 	Minimum,
 	Absolute,
 }
-// Info for creating a layout
+
 Layout_Info :: struct {
-	// If defined, the layout will occupy the given box
-	box:      Maybe(Box),
-	// Otherwise, it will be cut from the previous layout with these parameters
-	side:     Maybe(Side),
-	size:     Maybe(f32),
-	// Isolate this layout?
-	isolated: bool,
+	box:         Maybe(Box),
+	side:        Maybe(Side),
+	size:        Maybe(f32),
+	isolated:    bool,
+	first_child: int,
+	last_child:  int,
 }
-// The internal layout structure
+
+Layout_Justify :: enum {
+	Near,
+	Center,
+	Far,
+}
+
 Layout :: struct {
-	// The bounding box (also the layout's box in its original state)
-	bounds:        Box,
-	// The current box to cut from
+	original_box:  Box,
 	box:           Box,
-	// Parameters for cutting the layout
+	justify: Layout_Justify,
 	next_cut_side: Side,
 	next_align:    Alignment,
 	next_padding:  [2]f32,
 	next_size:     [2]f32,
-	size_queue:    [100]f32,
-	queue_len:     int,
-	queue_offset:  int,
-	// Side from which the layout was cut when created
 	side:          Maybe(Side),
-	// Store accumulative size for next frame
 	content_size:  [2]f32,
 	spacing_size:  [2]f32,
-	// When true, only exact sizes are accumulated
-	// instead of desired sizes
 	fixed:         bool,
-	// Isolated from previous layout?
 	isolated:      bool,
 	mode:          Layout_Mode,
 }
-// Queue the next size to be cut from this layout
-queue_layout_size :: proc(layout: ^Layout, size: f32) {
-	layout.size_queue[layout.queue_len] = size
-	layout.queue_len += 1
-}
-// Get the next cut size that was previously queued on this layout
-next_queued_layout_size :: proc(layout: ^Layout) -> Maybe(f32) {
-	if layout.queue_offset < layout.queue_len {
-		result := layout.size_queue[layout.queue_offset]
-		layout.queue_offset += 1
-		return result
-	}
-	return nil
-}
-// Push a new layout to the global stack
-push_layout :: proc(layout: Layout) -> bool {
-	return push_stack(&core.layout_stack, layout)
-}
-// Pop the last layout from the global stack
-pop_layout :: proc() {
-	pop_stack(&core.layout_stack)
-}
-// Begin a layout
-begin_layout :: proc(info: Layout_Info) -> bool {
-	layout := Layout {
-		isolated = info.isolated,
-		side     = info.side,
-	}
-	if layout.isolated {
-		layout.box = info.box.? or_return
+
+display_or_add_widget :: proc(widget: ^Widget) {
+	layout := current_layout().?
+	if layout.justify == .Center {
+
 	} else {
-		if last_layout, ok := current_layout().?; ok {
-			side := info.side.? or_else last_layout.next_cut_side
-			size := info.size.? or_else last_layout.next_size[int(side) / 2]
-			layout.box = info.box.? or_else cut_box(&last_layout.box, side, size)
-			layout.next_size = last_layout.next_size
-			layout.next_padding = last_layout.next_padding
-			layout.next_cut_side = .Left if int(side) > 1 else .Top
+
+	}
+}
+
+push_layout :: proc(layout: Layout) -> bool {
+	return push_stack(&global_state.layout_stack, layout)
+}
+
+pop_layout :: proc() {
+	pop_stack(&global_state.layout_stack)
+}
+
+begin_layout_with_options :: proc(side: Side, size: f32) -> bool {
+	layout := current_layout().? or_return
+	return begin_layout_with_box(cut_box(&layout.box, side, size), side)
+}
+
+begin_layout_with_box :: proc(box: Box, side: Side = .Left, isolated: bool = false) -> bool {
+	layout := Layout {
+		isolated = isolated,
+		box = box,
+		original_box = box,
+	}
+	if !layout.isolated {
+		if parent_layout, ok := current_layout().?; ok {
+
+			layout.next_cut_side = .Left if int(parent_layout.next_cut_side) > 1 else .Top
 		}
 	}
-	layout.bounds = layout.box
 	return push_layout(layout)
 }
-// End the current layout
+
+begin_layout :: proc {
+	begin_layout_with_box,
+	begin_layout_with_options,
+}
+
 end_layout :: proc() {
 	layout := current_layout().?
 	pop_layout()
-	// If this layout is isolated we quit early
 	if layout.isolated {
 		return
 	}
-	// Update previous layout's content size
 	if previous_layout, ok := current_layout().?; ok {
 		size := layout.content_size + layout.spacing_size
 		if side, ok := layout.side.?; ok {
@@ -119,29 +103,18 @@ end_layout :: proc() {
 		}
 	}
 }
-// Scoped layout proc
-@(deferred_out = __layout)
-layout :: proc(info: Layout_Info) -> (ok: bool) {
-	return begin_layout(info)
-}
-@(private)
-__layout :: proc(ok: bool) {
-	if ok {
-		end_layout()
-	}
-}
-// Get the current layout if there is one, otherwise returns `nil`
+
 current_layout :: proc() -> Maybe(^Layout) {
-	if core.layout_stack.height > 0 {
-		return &core.layout_stack.items[core.layout_stack.height - 1]
+	if global_state.layout_stack.height > 0 {
+		return &global_state.layout_stack.items[global_state.layout_stack.height - 1]
 	}
 	return nil
 }
-// Get the current layout box.  **Asserts that there is a layout.**
+
 layout_box :: proc() -> Box {
 	return current_layout().?.box
 }
-// Cut this layout with these parameters
+
 cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -> Box {
 	side := side.? or_else layout.next_cut_side
 	size := size.? or_else layout.next_size
@@ -152,17 +125,12 @@ cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32)
 	)
 	return box
 }
-// Calls `cut_layout` on the current layout.  **Assertive**
+
 cut_current_layout :: proc(side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -> Box {
 	return cut_layout(current_layout().?, side, size)
 }
-// Size of the next widget
-next_widget_size :: proc(info: ^Widget_Info) -> [2]f32 {
 
-return {}
-}
-// Get the next widget box
-next_widget_box :: proc(info: ^Widget_Info) -> Box {
+next_widget_size :: proc(desired_size: [2]f32, fixed: bool = false) -> [2]f32 {
 	non_fixed_size :: proc(layout: ^Layout, desired_size: [2]f32) -> [2]f32 {
 		if layout.mode == .Maximum {
 			return linalg.max(layout.next_size, desired_size)
@@ -171,24 +139,16 @@ next_widget_box :: proc(info: ^Widget_Info) -> Box {
 		}
 		return layout.next_size
 	}
-	// First assert that a layout exists
 	layout := current_layout().?
-	// Decide the size of the box
-	size: [2]f32
-	if info != nil {
-		size = linalg.min(
-			info.self.desired_size if info.fixed_size else non_fixed_size(layout, info.self.desired_size),
-			layout.box.hi - layout.box.lo,
-		)
-	} else {
-		size = linalg.min(layout.next_size, layout.box.hi - layout.box.lo)
-	}
-	// Cut the initial box
+	return linalg.min(
+		desired_size if fixed else non_fixed_size(layout, desired_size),
+		layout.box.hi - layout.box.lo,
+	)
+}
+
+next_widget_box :: proc(size: [2]f32) -> Box {
+	layout := current_layout().?
 	box := cut_layout(layout, nil, size)
-	if layout.queue_offset > 0 {
-		size = box_size(box)
-	}
-	// Account for alignment if the content is smaller than the cut box
 	if int(layout.next_cut_side) > 1 {
 		if size.x < box_width(box) {
 			switch layout.next_align {
@@ -213,15 +173,11 @@ next_widget_box :: proc(info: ^Widget_Info) -> Box {
 			}
 		}
 	}
-	// Apply padding
 	box.lo += layout.next_padding
 	box.hi -= layout.next_padding
-	// Result is rounded for pixel perfect rendering
-	return {box.lo, box.hi}
+	return snapped_box(box)
 }
 
-// Procedures for setting the cut parameters of the current layout
-// **These are all assertive**
 set_mode :: proc(mode: Layout_Mode) {
 	current_layout().?.mode = mode
 }
@@ -275,9 +231,6 @@ set_height_to_width :: proc() {
 	layout.next_size.y = layout.next_size.x
 }
 
-// Procedures that directly modify the current layout
-// **These are all assertive**
-
 add_padding :: proc(amount: [2]f32) {
 	layout := current_layout().?
 	layout.box.lo += amount
@@ -300,11 +253,10 @@ add_space :: proc(amount: f32) {
 	layout.spacing_size[int(layout.next_cut_side) / 2] += amount
 }
 
-// Is this layout vertical
 layout_is_vertical :: proc(layout: ^Layout) -> bool {
 	return int(layout.next_cut_side) > 1
 }
-// Add content size to this layout
+
 add_layout_content_size :: proc(layout: ^Layout, size: [2]f32) {
 	if layout_is_vertical(layout) {
 		layout.content_size.x = max(layout.content_size.x, size.x)
@@ -313,31 +265,4 @@ add_layout_content_size :: proc(layout: ^Layout, size: [2]f32) {
 		layout.content_size.y = max(layout.content_size.y, size.y)
 		layout.content_size.x += size.x
 	}
-}
-
-@(deferred_out=end_row)
-row_with_height :: proc(height: f32) -> bool {
-	result := begin_layout({side = .Top, size = height})
-	set_side(.Left)
-	return result
-}
-
-@(deferred_out=end_row)
-row_with_widgets :: proc(widgets: ..Widget_Info) -> bool {
-	height: f32
-	for &widget in widgets {
-		height = max(height, widget.self.desired_size.y)
-	}
-	return row_with_height(height)
-}
-
-end_row :: proc(ok: bool = true) {
-	if ok {
-		end_layout()
-	}
-}
-
-row :: proc {
-	row_with_height,
-	row_with_widgets,
 }

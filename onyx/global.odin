@@ -59,16 +59,16 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 	stack.height = 0
 }
 
-// @(private)
-core: Core
-
 Debug_State :: struct {
 	enabled, widgets, panels, layers: bool,
 	delta_time:                       [dynamic]f32,
 }
 
-// The global core data
-Core :: struct {
+@(private)
+global_state: Global_State
+
+@(private)
+Global_State :: struct {
 	ready:                    bool,
 	window:                   glfw.WindowHandle,
 	debug:                    Debug_State,
@@ -92,7 +92,7 @@ Core :: struct {
 	// Hashing
 	id_stack:                 Stack(Id, MAX_IDS),
 	// Widgets
-	widgets:                  [MAX_WIDGETS]Maybe(Widget),
+	widgets:                  [dynamic]^Widget,
 	widget_map:               map[Id]^Widget,
 	widget_stack:             Stack(^Widget, 10),
 	last_hovered_widget:      Id,
@@ -153,20 +153,24 @@ Core :: struct {
 	cursors:                  [Mouse_Cursor]glfw.CursorHandle,
 }
 
+colors :: proc() -> ^Color_Scheme {
+	return &global_state.style.color
+}
+
 view_box :: proc() -> Box {
-	return Box{{}, core.view}
+	return Box{{}, global_state.view}
 }
 
 get_mouse_pos :: proc() -> [2]f32 {
-	return core.mouse_pos
+	return global_state.mouse_pos
 }
 
 view_width :: proc() -> f32 {
-	return core.view.x
+	return global_state.view.x
 }
 
 view_height :: proc() -> f32 {
-	return core.view.y
+	return global_state.view.y
 }
 
 load_default_fonts :: proc() -> bool {
@@ -184,11 +188,11 @@ load_default_fonts :: proc() -> bool {
 	MONOSPACE_FONT_JSON :: #load(FONT_PATH + "/" + MONOSPACE_FONT + ".json", []u8)
 	HEADER_FONT_JSON :: #load(FONT_PATH + "/" + HEADER_FONT + ".json", []u8)
 	ICON_FONT_JSON :: #load(FONT_PATH + "/" + ICON_FONT + ".json", []u8)
-	core.style.default_font = vgo.load_font_from_slices(DEFAULT_FONT_IMAGE, DEFAULT_FONT_JSON) or_return
-	core.style.monospace_font = vgo.load_font_from_slices(MONOSPACE_FONT_IMAGE, MONOSPACE_FONT_JSON) or_return
-	core.style.header_font = vgo.load_font_from_slices(HEADER_FONT_IMAGE, HEADER_FONT_JSON) or_return
-	core.style.icon_font = vgo.load_font_from_slices(ICON_FONT_IMAGE, ICON_FONT_JSON) or_return
-	vgo.set_fallback_font(core.style.icon_font)
+	global_state.style.default_font = vgo.load_font_from_slices(DEFAULT_FONT_IMAGE, DEFAULT_FONT_JSON) or_return
+	global_state.style.monospace_font = vgo.load_font_from_slices(MONOSPACE_FONT_IMAGE, MONOSPACE_FONT_JSON) or_return
+	global_state.style.header_font = vgo.load_font_from_slices(HEADER_FONT_IMAGE, HEADER_FONT_JSON) or_return
+	global_state.style.icon_font = vgo.load_font_from_slices(ICON_FONT_IMAGE, ICON_FONT_JSON) or_return
+	vgo.set_fallback_font(global_state.style.icon_font)
 
 	return true
 }
@@ -196,101 +200,101 @@ load_default_fonts :: proc() -> bool {
 start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	if window == nil do return false
 
-	core.window = window
-	width, height := glfw.GetWindowSize(core.window)
+	global_state.window = window
+	width, height := glfw.GetWindowSize(global_state.window)
 
 	// Set view parameters
-	core.visible = true
-	core.focused = true
-	core.view = {f32(width), f32(height)}
-	core.last_frame_time = time.now()
-	core.draw_next_frame = true
-	core.start_time = time.now()
+	global_state.visible = true
+	global_state.focused = true
+	global_state.view = {f32(width), f32(height)}
+	global_state.last_frame_time = time.now()
+	global_state.draw_next_frame = true
+	global_state.start_time = time.now()
 
 	// Create cursors
-	core.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
-	core.cursors[.Crosshair] = glfw.CreateStandardCursor(glfw.CROSSHAIR_CURSOR)
-	core.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(glfw.POINTING_HAND_CURSOR)
-	core.cursors[.I_Beam] = glfw.CreateStandardCursor(glfw.IBEAM_CURSOR)
-	core.cursors[.Resize_EW] = glfw.CreateStandardCursor(glfw.RESIZE_EW_CURSOR)
-	core.cursors[.Resize_NS] = glfw.CreateStandardCursor(glfw.RESIZE_NS_CURSOR)
-	core.cursors[.Resize_NESW] = glfw.CreateStandardCursor(glfw.RESIZE_NESW_CURSOR)
-	core.cursors[.Resize_NWSE] = glfw.CreateStandardCursor(glfw.RESIZE_NWSE_CURSOR)
+	global_state.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
+	global_state.cursors[.Crosshair] = glfw.CreateStandardCursor(glfw.CROSSHAIR_CURSOR)
+	global_state.cursors[.Pointing_Hand] = glfw.CreateStandardCursor(glfw.POINTING_HAND_CURSOR)
+	global_state.cursors[.I_Beam] = glfw.CreateStandardCursor(glfw.IBEAM_CURSOR)
+	global_state.cursors[.Resize_EW] = glfw.CreateStandardCursor(glfw.RESIZE_EW_CURSOR)
+	global_state.cursors[.Resize_NS] = glfw.CreateStandardCursor(glfw.RESIZE_NS_CURSOR)
+	global_state.cursors[.Resize_NESW] = glfw.CreateStandardCursor(glfw.RESIZE_NESW_CURSOR)
+	global_state.cursors[.Resize_NWSE] = glfw.CreateStandardCursor(glfw.RESIZE_NWSE_CURSOR)
 
 	// Set event callbacks
 	glfw.SetWindowIconifyCallback(
-		core.window,
-		proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = false},
+		global_state.window,
+		proc "c" (_: glfw.WindowHandle, _: i32) {global_state.visible = false},
 	)
 	glfw.SetWindowFocusCallback(
-		core.window,
-		proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = true},
+		global_state.window,
+		proc "c" (_: glfw.WindowHandle, _: i32) {global_state.visible = true},
 	)
 	glfw.SetWindowMaximizeCallback(
-		core.window,
-		proc "c" (_: glfw.WindowHandle, _: i32) {core.visible = true},
+		global_state.window,
+		proc "c" (_: glfw.WindowHandle, _: i32) {global_state.visible = true},
 	)
-	glfw.SetScrollCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
-		core.mouse_scroll = {f32(x), f32(y)}
-		core.draw_this_frame = true
-		core.draw_next_frame = true
+	glfw.SetScrollCallback(global_state.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
+		global_state.mouse_scroll = {f32(x), f32(y)}
+		global_state.draw_this_frame = true
+		global_state.draw_next_frame = true
 	})
-	glfw.SetWindowSizeCallback(core.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
+	glfw.SetWindowSizeCallback(global_state.window, proc "c" (_: glfw.WindowHandle, width, height: i32) {
 		context = runtime.default_context()
 
-		core.surface_config.width = u32(width)
-		core.surface_config.height = u32(height)
-		wgpu.SurfaceConfigure(core.surface, &core.surface_config)
+		global_state.surface_config.width = u32(width)
+		global_state.surface_config.height = u32(height)
+		wgpu.SurfaceConfigure(global_state.surface, &global_state.surface_config)
 
-		core.view = {f32(width), f32(height)}
-		core.draw_this_frame = true
-		core.draw_next_frame = true
+		global_state.view = {f32(width), f32(height)}
+		global_state.draw_this_frame = true
+		global_state.draw_next_frame = true
 	})
-	glfw.SetCharCallback(core.window, proc "c" (_: glfw.WindowHandle, char: rune) {
+	glfw.SetCharCallback(global_state.window, proc "c" (_: glfw.WindowHandle, char: rune) {
 		context = runtime.default_context()
-		append(&core.runes, char)
-		core.draw_this_frame = true
-		core.draw_next_frame = true
+		append(&global_state.runes, char)
+		global_state.draw_this_frame = true
+		global_state.draw_next_frame = true
 	})
-	glfw.SetKeyCallback(core.window, proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
-		core.draw_this_frame = true
-		core.draw_next_frame = true
+	glfw.SetKeyCallback(global_state.window, proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
+		global_state.draw_this_frame = true
+		global_state.draw_next_frame = true
 		if key < 0 {
 			return
 		}
 		switch action {
 		case glfw.PRESS:
-			core.keys[Keyboard_Key(key)] = true
+			global_state.keys[Keyboard_Key(key)] = true
 		case glfw.RELEASE:
-			core.keys[Keyboard_Key(key)] = false
+			global_state.keys[Keyboard_Key(key)] = false
 		case glfw.REPEAT:
-			core.keys[Keyboard_Key(key)] = true
-			core.last_keys[Keyboard_Key(key)] = false
+			global_state.keys[Keyboard_Key(key)] = true
+			global_state.last_keys[Keyboard_Key(key)] = false
 		}
 	})
-	glfw.SetCursorPosCallback(core.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
-		core.mouse_pos = {f32(x), f32(y)}
-		core.draw_this_frame = true
+	glfw.SetCursorPosCallback(global_state.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
+		global_state.mouse_pos = {f32(x), f32(y)}
+		global_state.draw_this_frame = true
 	})
 	glfw.SetMouseButtonCallback(
-		core.window,
+		global_state.window,
 		proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
-			core.draw_this_frame = true
-			core.draw_next_frame = true
+			global_state.draw_this_frame = true
+			global_state.draw_next_frame = true
 			switch action {
 			case glfw.PRESS:
-				core.mouse_button = Mouse_Button(button)
-				core.mouse_bits += {Mouse_Button(button)}
-				core.click_mouse_pos = core.mouse_pos
+				global_state.mouse_button = Mouse_Button(button)
+				global_state.mouse_bits += {Mouse_Button(button)}
+				global_state.click_mouse_pos = global_state.mouse_pos
 			case glfw.RELEASE:
-				core.mouse_bits -= {Mouse_Button(button)}
+				global_state.mouse_bits -= {Mouse_Button(button)}
 			}
 		},
 	)
 
 	// Initialize WGPU
-	core.instance = wgpu.CreateInstance()
-	core.surface = glfwglue.GetSurface(core.instance, window)
+	global_state.instance = wgpu.CreateInstance()
+	global_state.surface = glfwglue.GetSurface(global_state.instance, window)
 
 	on_device :: proc "c" (
 		status: wgpu.RequestDeviceStatus,
@@ -301,7 +305,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		context = runtime.default_context()
 		switch status {
 		case .Success:
-			(^Core)(userdata).device = device
+			(^Global_State)(userdata).device = device
 		case .Error:
 			fmt.panicf("Unable to aquire device: %s", message)
 		case .Unknown:
@@ -318,7 +322,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		context = runtime.default_context()
 		switch status {
 		case .Success:
-			(^Core)(userdata).adapter = adapter
+			(^Global_State)(userdata).adapter = adapter
 			info := wgpu.AdapterGetInfo(adapter)
 			fmt.printfln("Using %v on %v", info.backendType, info.description)
 
@@ -333,20 +337,20 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		}
 	}
 
-	wgpu.InstanceRequestAdapter(core.instance, &{powerPreference = .LowPower}, on_adapter, &core)
+	wgpu.InstanceRequestAdapter(global_state.instance, &{powerPreference = .LowPower}, on_adapter, &global_state)
 
-	core.surface_config = vgo.surface_configuration(core.device, core.adapter, core.surface)
-	core.surface_config.width = u32(width)
-	core.surface_config.height = u32(height)
-	wgpu.SurfaceConfigure(core.surface, &core.surface_config)
+	global_state.surface_config = vgo.surface_configuration(global_state.device, global_state.adapter, global_state.surface)
+	global_state.surface_config.width = u32(width)
+	global_state.surface_config.height = u32(height)
+	wgpu.SurfaceConfigure(global_state.surface, &global_state.surface_config)
 
 	// Initialize vgo
-	vgo.start(core.device, core.surface)
+	vgo.start(global_state.device, global_state.surface)
 
 	// Default style
 	if style == nil {
-		core.style.color = dark_color_scheme()
-		core.style.shape = default_style_shape()
+		global_state.style.color = dark_color_scheme()
+		global_state.style.shape = default_style_shape()
 		fmt.printfln("No style provided by user, using default theme and fonts")
 
 		if !load_default_fonts() {
@@ -355,10 +359,10 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		}
 
 	} else {
-		core.style = style.?
+		global_state.style = style.?
 	}
 
-	core.ready = true
+	global_state.ready = true
 
 	return true
 }
@@ -366,13 +370,13 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 // Call before each new frame
 new_frame :: proc() {
 	// Timings
-	if !core.disable_frame_skip {
+	if !global_state.disable_frame_skip {
 		time.sleep(
 			max(
 				0,
 				time.Duration(time.Second) /
-					time.Duration(max(core.desired_fps, DEFAULT_DESIRED_FPS)) -
-				time.since(core.last_frame_time),
+					time.Duration(max(global_state.desired_fps, DEFAULT_DESIRED_FPS)) -
+				time.since(global_state.last_frame_time),
 			),
 		)
 	}
@@ -381,78 +385,78 @@ new_frame :: proc() {
 
 	// Update timings
 	now := time.now()
-	core.delta_time = f32(time.duration_seconds(time.diff(core.last_frame_time, now)))
-	core.last_frame_time = now
-	core.frames += 1
-	core.frames_so_far += 1
-	if time.since(core.last_second) >= time.Second {
-		core.last_second = time.now()
-		core.frames_this_second = core.frames_so_far
-		core.frames_so_far = 0
+	global_state.delta_time = f32(time.duration_seconds(time.diff(global_state.last_frame_time, now)))
+	global_state.last_frame_time = now
+	global_state.frames += 1
+	global_state.frames_so_far += 1
+	if time.since(global_state.last_second) >= time.Second {
+		global_state.last_second = time.now()
+		global_state.frames_this_second = global_state.frames_so_far
+		global_state.frames_so_far = 0
 	}
 
 	// Clear inputs
-	core.last_mouse_bits = core.mouse_bits
-	core.last_mouse_pos = core.mouse_pos
-	core.last_keys = core.keys
-	core.mouse_scroll = {}
-	clear(&core.runes)
+	global_state.last_mouse_bits = global_state.mouse_bits
+	global_state.last_mouse_pos = global_state.mouse_pos
+	global_state.last_keys = global_state.keys
+	global_state.mouse_scroll = {}
+	clear(&global_state.runes)
 
 	// Clear temp allocator
 	free_all(context.temp_allocator)
 
 	// Decide if this frame will be drawn
-	if core.draw_next_frame {
-		core.draw_next_frame = false
-		core.draw_this_frame = true
+	if global_state.draw_next_frame {
+		global_state.draw_next_frame = false
+		global_state.draw_this_frame = true
 	}
 
 	// Handle window events
 	glfw.PollEvents()
 
 	// Set and reset cursor
-	if core.cursor_type == .None {
-		glfw.SetInputMode(core.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+	if global_state.cursor_type == .None {
+		glfw.SetInputMode(global_state.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
 	} else {
-		glfw.SetInputMode(core.window, glfw.CURSOR, glfw.CURSOR_NORMAL)
-		glfw.SetCursor(core.window, core.cursors[core.cursor_type])
+		glfw.SetInputMode(global_state.window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+		glfw.SetCursor(global_state.window, global_state.cursors[global_state.cursor_type])
 	}
-	core.cursor_type = .Normal
+	global_state.cursor_type = .Normal
 
 	if key_pressed(.Escape) {
-		core.focused_widget = 0
+		global_state.focused_widget = 0
 	}
 
 	if key_pressed(.F3) {
-		core.debug.enabled = !core.debug.enabled
-		core.draw_this_frame = true
+		global_state.debug.enabled = !global_state.debug.enabled
+		global_state.draw_this_frame = true
 	}
 
 	// Reset stuff
-	core.layer_stack.height = 0
-	core.layout_stack.height = 0
-	core.widget_stack.height = 0
-	core.panel_stack.height = 0
+	global_state.layer_stack.height = 0
+	global_state.layout_stack.height = 0
+	global_state.widget_stack.height = 0
+	global_state.panel_stack.height = 0
 
 	// Update layer ids
-	core.hovered_layer_index = 0
-	core.last_hovered_layer = core.hovered_layer
-	core.last_hovered_widget = core.hovered_widget
-	core.last_focused_widget = core.focused_widget
-	core.hovered_layer = core.next_hovered_layer
-	core.next_hovered_layer = 0
-	core.last_highest_layer_index = core.highest_layer_index
-	core.highest_layer_index = 0
+	global_state.hovered_layer_index = 0
+	global_state.last_hovered_layer = global_state.hovered_layer
+	global_state.last_hovered_widget = global_state.hovered_widget
+	global_state.last_focused_widget = global_state.focused_widget
+	global_state.hovered_layer = global_state.next_hovered_layer
+	global_state.next_hovered_layer = 0
+	global_state.last_highest_layer_index = global_state.highest_layer_index
+	global_state.highest_layer_index = 0
 
-	core.active_container = core.next_active_container
-	core.next_active_container = 0
+	global_state.active_container = global_state.next_active_container
+	global_state.next_active_container = 0
 
-	if (core.mouse_bits - core.last_mouse_bits) > {} {
-		core.focused_layer = core.hovered_layer
+	if (global_state.mouse_bits - global_state.last_mouse_bits) > {} {
+		global_state.focused_layer = global_state.hovered_layer
 	}
 
 	// Purge layers
-	for id, &layer in core.layer_map {
+	for id, &layer in global_state.layer_map {
 		if layer.dead {
 			// Move other layers down by one z index
 			if layer.parent != nil {
@@ -468,26 +472,27 @@ new_frame :: proc() {
 			}
 
 			// Remove from map
-			delete_key(&core.layer_map, id)
+			delete_key(&global_state.layer_map, id)
 			free(layer)
 
-			core.draw_next_frame = true
+			global_state.draw_next_frame = true
 		} else {
 			layer.dead = true
 		}
 	}
 
 	// Free unused widgets
-	for id, widget in core.widget_map {
+	for widget, index in global_state.widgets {
 		if widget.dead {
 			if .Persistent not_in widget.flags {
 				// Cleanup
 				destroy_widget(widget)
 				// Removal
-				delete_key(&core.widget_map, id)
-				(^Maybe(Widget))(widget)^ = nil
+				delete_key(&global_state.widget_map, widget.id)
+				ordered_remove(&global_state.widgets, index)
+				free(widget)
 				// Redraw
-				core.draw_this_frame = true
+				global_state.draw_this_frame = true
 			}
 		} else {
 			widget.dead = true
@@ -509,39 +514,39 @@ present :: proc() {
 	profiler_scope(.Render)
 
 	// Render debug info rq
-	if core.debug.enabled {
+	if global_state.debug.enabled {
 		if key_pressed(.F6) {
-			core.disable_frame_skip = !core.disable_frame_skip
+			global_state.disable_frame_skip = !global_state.disable_frame_skip
 		}
 		do_debug_layer()
 	}
 
-	if core.draw_this_frame && core.visible {
+	if global_state.draw_this_frame && global_state.visible {
 		vgo.present()
-		core.drawn_frames += 1
-		core.draw_this_frame = false
+		global_state.drawn_frames += 1
+		global_state.draw_this_frame = false
 	}
 }
 
 shutdown :: proc() {
-	if !core.ready {
+	if !global_state.ready {
 		return
 	}
 
-	for _, widget in core.widget_map {
+	for _, widget in global_state.widget_map {
 		destroy_widget(widget)
 	}
 
-	for layer in core.layers {
+	for layer in global_state.layers {
 		destroy_layer(layer)
 		free(layer)
 	}
 
-	delete(core.layers)
-	delete(core.widget_map)
-	delete(core.panel_map)
-	delete(core.layer_map)
-	delete(core.runes)
+	delete(global_state.layers)
+	delete(global_state.widget_map)
+	delete(global_state.panel_map)
+	delete(global_state.layer_map)
+	delete(global_state.runes)
 
 	vgo.shutdown()
 }
@@ -549,18 +554,18 @@ shutdown :: proc() {
 __set_clipboard_string :: proc(_: rawptr, str: string) -> bool {
 	cstr := strings.clone_to_cstring(str)
 	defer delete(cstr)
-	glfw.SetClipboardString(core.window, cstr)
+	glfw.SetClipboardString(global_state.window, cstr)
 	return true
 }
 
 __get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
-	str = glfw.GetClipboardString(core.window)
+	str = glfw.GetClipboardString(global_state.window)
 	ok = len(str) > 0
 	return
 }
 
 draw_shadow :: proc(box: vgo.Box) {
 	if vgo.disable_scissor() {
-		vgo.box_shadow(move_box(box, 2), core.style.rounding, 4, core.style.color.shadow)
+		vgo.box_shadow(move_box(box, 2), global_state.style.rounding, 4, global_state.style.color.shadow)
 	}
 }

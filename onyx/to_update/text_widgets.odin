@@ -18,7 +18,7 @@ Label_Info :: struct {
 init_label :: proc(using info: ^Label_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
 	if id == 0 do id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	text_layout = vgo.make_text_layout(
 		text,
 		font.? or_else core.style.default_font,

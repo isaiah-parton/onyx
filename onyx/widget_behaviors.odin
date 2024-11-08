@@ -6,6 +6,10 @@ import "core:math/linalg"
 
 // Some generic behaviors for widgets
 
+set_cursor :: proc(type: Mouse_Cursor) {
+	global_state.cursor_type = type
+}
+
 button_behavior :: proc(widget: ^Widget) {
 	widget.press_time = animate(
 		widget.press_time,
@@ -16,9 +20,9 @@ button_behavior :: proc(widget: ^Widget) {
 		widget.press_time = 1
 	}
 	if .Hovered in widget.state {
-		core.cursor_type = .Pointing_Hand
+		set_cursor(.Pointing_Hand)
 	}
-	if point_in_box(core.mouse_pos, widget.box) {
+	if point_in_box(global_state.mouse_pos, widget.box) {
 		hover_widget(widget)
 	}
 }
@@ -26,9 +30,9 @@ button_behavior :: proc(widget: ^Widget) {
 horizontal_slider_behavior :: proc(widget: ^Widget) {
 	// widget.hover_time = animate(widget.hover_time, 0.1, .Hovered in widget.state)
 	if .Hovered in widget.state {
-		core.cursor_type = .Resize_EW
+		global_state.cursor_type = .Resize_EW
 	}
-	if point_in_box(core.mouse_pos, widget.box) {
+	if point_in_box(global_state.mouse_pos, widget.box) {
 		hover_widget(widget)
 	}
 }
@@ -48,20 +52,20 @@ menu_behavior :: proc(widget: ^Widget) {
 		.Hovered in widget.state,
 	)
 	if .Hovered in widget.state {
-		core.cursor_type = .Pointing_Hand
+		global_state.cursor_type = .Pointing_Hand
 	}
-	if point_in_box(core.mouse_pos, widget.box) {
+	if point_in_box(global_state.mouse_pos, widget.box) {
 		hover_widget(widget)
 	}
 }
 
 get_popup_scale :: proc(size: [2]f32, time: f32) -> f32 {
-	return math.lerp(math.lerp(f32(0.8), f32(1.0), linalg.length(size) / linalg.length(core.view)), f32(1.0), time)
+	return math.lerp(math.lerp(f32(0.8), f32(1.0), linalg.length(size) / linalg.length(global_state.view)), f32(1.0), time)
 }
 
 get_popup_layer_info :: proc(widget: ^Widget, size: [2]f32, side: Side = .Bottom) -> (info: Layer_Info) {
 	if widget == nil do return
-	margin := core.style.popup_margin
+	margin := global_state.style.popup_margin
 	view := view_box()
 	side := side
 	parent := widget.box

@@ -96,9 +96,9 @@ dark_color_scheme :: proc() -> Color_Scheme {
 }
 
 set_style_rounding :: proc(amount: f32) {
-	core.style.rounding = amount
+	global_state.style.rounding = amount
 }
 
 set_color_scheme :: proc(scheme: Color_Scheme) {
-	core.style.color = scheme
+	global_state.style.color = scheme
 }

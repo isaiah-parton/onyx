@@ -6,14 +6,14 @@ Form :: struct {
 }
 
 begin_form :: proc() {
-	core.form_active = true
-	core.form = {}
+	global_state.form_active = true
+	global_state.form = {}
 }
 
 end_form :: proc() {
-	if core.form.first != nil {
-		core.form.first.prev = core.form.last
+	if global_state.form.first != nil {
+		global_state.form.first.prev = global_state.form.last
 	}
-	core.form_active = false
+	global_state.form_active = false
 
 }

@@ -70,8 +70,8 @@ Layer_Info :: struct {
 }
 
 current_layer :: proc(loc := #caller_location) -> Maybe(^Layer) {
-	if core.layer_stack.height > 0 {
-		return core.layer_stack.items[core.layer_stack.height - 1]
+	if global_state.layer_stack.height > 0 {
+		return global_state.layer_stack.items[global_state.layer_stack.height - 1]
 	}
 	return nil
 }
@@ -79,8 +79,8 @@ current_layer :: proc(loc := #caller_location) -> Maybe(^Layer) {
 create_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
 	layer = new(Layer)
 	layer.id = id
-	if id in core.layer_map do return
-	core.layer_map[id] = layer
+	if id in global_state.layer_map do return
+	global_state.layer_map[id] = layer
 	ok = true
 	return
 }
@@ -104,8 +104,8 @@ get_layer :: proc(info: ^Layer_Info) -> (layer: ^Layer, ok: bool) {
 			layer.index = layer.parent.index + 1
 			// set_layer_index(layer, parent.index + len(parent.children) + 1)
 		} else {
-			layer.index = len(core.layers)
-			append(&core.layers, layer)
+			layer.index = len(global_state.layers)
+			append(&global_state.layers, layer)
 		}
 		ok = true
 	}
@@ -118,14 +118,14 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 
 	info.self = get_layer(info) or_return
 
-	if info.self.frames == core.frames {
+	if info.self.frames == global_state.frames {
 		when ODIN_DEBUG {
 			fmt.println("Layer ID collision: %i", info.id)
 		}
 		return false
 	}
 
-	info.self.frames = core.frames
+	info.self.frames = global_state.frames
 	info.self.dead = false
 	info.self.id = info.id
 	info.self.box = info.box
@@ -135,7 +135,7 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 	info.self.state = {}
 
 	// Set input state
-	if core.hovered_layer == info.self.id {
+	if global_state.hovered_layer == info.self.id {
 		info.self.state += {.Hovered}
 		// Re-order layers if clicked
 		if mouse_pressed(.Left) && info.self.kind == .Floating {
@@ -143,14 +143,14 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 		}
 	}
 
-	if core.focused_layer == info.self.id {
+	if global_state.focused_layer == info.self.id {
 		info.self.state += {.Focused}
 	}
 
-	core.highest_layer_index = max(core.highest_layer_index, info.self.index)
+	global_state.highest_layer_index = max(global_state.highest_layer_index, info.self.index)
 
 	// Push layer
-	push_stack(&core.layer_stack, info.self)
+	push_stack(&global_state.layer_stack, info.self)
 
 	// Set draw order
 	vgo.set_draw_order(info.self.index)
@@ -164,7 +164,7 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 
 	// Push layout
 	push_layout(
-		Layout{box = info.self.box, bounds = info.self.box, next_cut_side = .Top},
+		Layout{box = info.self.box, original_box = info.self.box, next_cut_side = .Top},
 	) or_return
 
 	return true
@@ -180,7 +180,7 @@ end_layer :: proc() {
 			// remove_range(&core.draw_calls, layer.draw_call_index, len(core.draw_calls))
 		}
 	}
-	pop_stack(&core.layer_stack)
+	pop_stack(&global_state.layer_stack)
 	if layer, ok := current_layer().?; ok {
 		vgo.set_draw_order(layer.index)
 	}
@@ -212,7 +212,7 @@ get_highest_layer_child :: proc(layer: ^Layer, kind: Layer_Kind) -> int {
 
 bring_layer_to_front :: proc(layer: ^Layer) {
 	assert(layer != nil)
-	list: []^Layer = core.layers[:] if layer.parent == nil else layer.parent.children[:]
+	list: []^Layer = global_state.layers[:] if layer.parent == nil else layer.parent.children[:]
 	new_index := len(list)
 	if layer.index >= new_index do return
 	// Second pass lowers other layers
@@ -225,5 +225,5 @@ bring_layer_to_front :: proc(layer: ^Layer) {
 }
 
 get_layer_by_id :: proc(id: Id) -> (result: ^Layer, ok: bool) {
-	return core.layer_map[id]
+	return global_state.layer_map[id]
 }

@@ -37,7 +37,7 @@ dates_are_equal :: proc(a, b: Date) -> bool {
 
 init_calendar :: proc(using info: ^Calendar_Info, loc := #caller_location) -> bool {
 	id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	self.desired_size.x = 280
 	size = self.desired_size.x / 7
 	self.desired_size.y = size * 2

@@ -14,7 +14,7 @@ Panel :: struct {
 	layer:                ^Layer,
 	box:                  Box,
 	move_offset:          [2]f32,
-	last_min_size:             [2]f32,
+	last_min_size:        [2]f32,
 	min_size:             [2]f32,
 	moving:               bool,
 	resizing:             bool,
@@ -26,11 +26,11 @@ Panel :: struct {
 }
 
 create_panel :: proc(id: Id) -> Maybe(^Panel) {
-	for i in 0 ..< len(core.panels) {
-		if core.panels[i] == nil {
-			core.panels[i] = Panel{}
-			core.panel_map[id] = &core.panels[i].?
-			return &core.panels[i].?
+	for i in 0 ..< len(global_state.panels) {
+		if global_state.panels[i] == nil {
+			global_state.panels[i] = Panel{}
+			global_state.panel_map[id] = &global_state.panels[i].?
+			return &global_state.panels[i].?
 		}
 	}
 	return nil
@@ -41,7 +41,7 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	MIN_SIZE :: [2]f32{100, 100}
 
 	id := hash(loc)
-	panel, ok := core.panel_map[id]
+	panel, ok := global_state.panel_map[id]
 	if !ok {
 		panel = create_panel(id).? or_return
 
@@ -53,31 +53,31 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 		panel.can_resize = true
 	}
 	// Push to stack
-	push_stack(&core.panel_stack, panel)
+	push_stack(&global_state.panel_stack, panel)
 
 	push_id(id)
 
 	if panel.moving == true {
 		panel.moving = false
 		size := panel.box.hi - panel.box.lo
-		panel.box.lo = core.mouse_pos - panel.move_offset
+		panel.box.lo = global_state.mouse_pos - panel.move_offset
 		panel.box.hi = panel.box.lo + size
 
-		core.draw_next_frame = true
+		global_state.draw_next_frame = true
 	}
 
 	// Handle panel transforms
 	min_size := linalg.max(MIN_SIZE, panel.min_size)
 	if panel.resizing {
 		panel.resizing = false
-		panel.box.hi = core.mouse_pos + panel.resize_offset
+		panel.box.hi = global_state.mouse_pos + panel.resize_offset
 	}
 	panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + min_size)
 	panel.box = snapped_box(panel.box)
 
 	// Reset min_size to be calculated again
 	if panel.last_min_size != panel.min_size {
-		core.draw_this_frame = true
+		global_state.draw_this_frame = true
 	}
 	panel.last_min_size = panel.min_size
 	panel.min_size = {}
@@ -91,29 +91,32 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	begin_layer(&layer_info) or_return
 	panel.layer = layer_info.self
 
-	vgo.push_scissor(vgo.make_box(panel.box, core.style.rounding))
+	vgo.push_scissor(vgo.make_box(panel.box, global_state.style.rounding))
 
 	// Background
-	background_widget := Widget_Info {
-		id     = panel.layer.id,
-		box    = panel.box,
-		sticky = true,
-		in_state_mask = WIDGET_STATE_ALL,
-	}
-	if begin_widget(&background_widget) {
-		defer end_widget()
-		using background_widget
+	{
+		widget := get_widget(panel.layer.id)
+		if begin_widget(widget) {
+			defer end_widget()
 
-		draw_shadow(self.box)
-		vgo.fill_box(self.box, paint = core.style.color.fg)
+			if widget.variant == nil {
+				widget.in_state_mask = WIDGET_STATE_ALL
+			}
+			widget.box = panel.box
 
-		if point_in_box(core.mouse_pos, self.box) {
-			hover_widget(self)
-		}
+			handle_widget_click(widget, sticky = true)
 
-		if .Pressed in self.state {
-			panel.moving = true
-			panel.move_offset = core.mouse_pos - panel.box.lo
+			draw_shadow(widget.box)
+			vgo.fill_box(widget.box, paint = global_state.style.color.fg)
+
+			if point_in_box(global_state.mouse_pos, widget.box) {
+				hover_widget(widget)
+			}
+
+			if .Pressed in widget.state {
+				panel.moving = true
+				panel.move_offset = global_state.mouse_pos - panel.box.lo
+			}
 		}
 	}
 
@@ -127,50 +130,44 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 
 		vgo.fill_box(
 			title_box,
-			{core.style.rounding, core.style.rounding, 0, 0},
-			vgo.fade(core.style.color.substance, 0.5),
+			{global_state.style.rounding, global_state.style.rounding, 0, 0},
+			vgo.fade(global_state.style.color.substance, 0.5),
 		)
 
 		vgo.fill_text_aligned(
 			info.title,
-			core.style.default_font,
+			global_state.style.default_font,
 			20,
 			{title_box.lo.x + 5, (title_box.hi.y + title_box.lo.y) / 2},
 			.Left,
 			.Center,
-			paint = core.style.color.content,
+			paint = global_state.style.color.content,
 		)
 
-		dismiss_button := Widget_Info {
-			id  = hash("dismiss"),
-			box = cut_box_right(&title_box, box_height(title_box)),
-		}
-		if begin_widget(&dismiss_button) {
-			defer end_widget()
+		{
+			widget := get_widget(hash("dismiss"))
+			if begin_widget(widget) {
+				defer end_widget()
 
-			self := dismiss_button.self
-
-			button_behavior(self)
-
-			vgo.fill_box(
-				self.box,
-				{1 = core.style.rounding},
-				vgo.fade({200, 50, 50, 255}, self.hover_time),
-			)
-
-			// Resize icon
-			origin := box_center(self.box)
-			scale := box_height(self.box) * 0.2
-			icon_color := vgo.blend(
-				core.style.color.fg,
-				core.style.color.content,
-				0.5 + 0.5 * self.hover_time,
-			)
-			vgo.line(origin - scale, origin + scale, 2, icon_color)
-			vgo.line(origin + {-scale, scale}, origin + {scale, -scale}, 2, icon_color)
-
-			if .Pressed in (self.state - self.last_state) {
-				panel.dismissed = true
+				widget.box = cut_box_right(&title_box, box_height(title_box))
+				button_behavior(widget)
+				vgo.fill_box(
+					widget.box,
+					{1 = global_state.style.rounding},
+					vgo.fade({200, 50, 50, 255}, widget.hover_time),
+				)
+				origin := box_center(widget.box)
+				scale := box_height(widget.box) * 0.2
+				icon_color := vgo.blend(
+					global_state.style.color.fg,
+					global_state.style.color.content,
+					0.5 + 0.5 * widget.hover_time,
+				)
+				vgo.line(origin - scale, origin + scale, 2, icon_color)
+				vgo.line(origin + {-scale, scale}, origin + {scale, -scale}, 2, icon_color)
+				if .Pressed in (widget.state - widget.last_state) {
+					panel.dismissed = true
+				}
 			}
 		}
 	}
@@ -185,40 +182,32 @@ end_panel :: proc() {
 	panel := current_panel()
 	// Resizing
 	if panel.can_resize {
-		resize_button := Widget_Info {
-			id  = hash("resize"),
-			box = Box{panel.box.hi - core.style.visual_size.y * 0.5, panel.box.hi},
-			sticky = true
-		}
-		if begin_widget(&resize_button) {
+		widget := get_widget(hash("resize"))
+		if begin_widget(widget) {
 			defer end_widget()
-
-			self := resize_button.self
-
-			button_behavior(self)
-			if .Hovered in self.state {
-				core.cursor_type = .Resize_NWSE
+			widget.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
+			handle_widget_click(widget, sticky = true)
+			button_behavior(widget)
+			if .Hovered in widget.state {
+				global_state.cursor_type = .Resize_NWSE
 			}
-
-			// Resize icon
 			icon_color := vgo.blend(
-				core.style.color.substance,
-				core.style.color.content,
-				0.5 * self.hover_time,
+				global_state.style.color.substance,
+				global_state.style.color.content,
+				0.5 * widget.hover_time,
 			)
 			vgo.fill_polygon(
 				{
-					{self.box.hi.x, self.box.lo.y},
-					self.box.hi,
-					{self.box.lo.x, self.box.hi.y}
+					{widget.box.hi.x, widget.box.lo.y},
+					widget.box.hi,
+					{widget.box.lo.x, widget.box.hi.y},
 				},
 				paint = icon_color,
 			)
-
-			if .Pressed in self.state {
+			if .Pressed in widget.state {
 				panel.resizing = true
-				if .Pressed not_in self.last_state {
-					panel.resize_offset = panel.box.hi - core.mouse_pos
+				if .Pressed not_in widget.last_state {
+					panel.resize_offset = panel.box.hi - global_state.mouse_pos
 				}
 			}
 		}
@@ -227,7 +216,7 @@ end_panel :: proc() {
 	if panel.fade > 0 {
 		vgo.fill_box(panel.layer.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.15))
 	}
-	panel.fade = animate(panel.fade, 0.15, panel.layer.index < core.last_highest_layer_index)
+	panel.fade = animate(panel.fade, 0.15, panel.layer.index < global_state.last_highest_layer_index)
 
 	// Panel outline
 	// draw_rounded_box_stroke(panel.box, core.style.rounding, 1, core.style.color.substance)
@@ -237,7 +226,7 @@ end_panel :: proc() {
 	pop_id()
 	vgo.pop_scissor()
 	end_layer()
-	pop_stack(&core.panel_stack)
+	pop_stack(&global_state.panel_stack)
 }
 
 @(deferred_out = __panel)
@@ -253,14 +242,14 @@ __panel :: proc(ok: bool) {
 }
 
 current_panel :: proc(loc := #caller_location) -> ^Panel {
-	assert(core.panel_stack.height > 0, "There is no current panel!", loc)
-	return core.panel_stack.items[core.panel_stack.height - 1]
+	assert(global_state.panel_stack.height > 0, "There is no current panel!", loc)
+	return global_state.panel_stack.items[global_state.panel_stack.height - 1]
 }
 
 get_next_panel_position :: proc() -> [2]f32 {
 	pos: [2]f32 = 100
-	for i in 0 ..< len(core.panels) {
-		if panel, ok := core.panels[i].?; ok {
+	for i in 0 ..< len(global_state.panels) {
+		if panel, ok := global_state.panels[i].?; ok {
 			if pos == panel.box.lo {
 				pos += 50
 			}

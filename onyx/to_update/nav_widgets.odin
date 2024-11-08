@@ -20,7 +20,7 @@ Breadcrumb_Info :: struct {
 init_breadcrumb :: proc(using info: ^Breadcrumb_Info, loc := #caller_location) -> bool {
 	assert(info != nil)
 	if id == 0 do id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	has_menu = len(options) > 1 && index != nil
 	text = options[index^] if has_menu else text
 	text_layout = vgo.make_text_layout(text, core.style.default_font, core.style.default_text_size)

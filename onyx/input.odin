@@ -96,25 +96,25 @@ Mouse_Cursor :: enum {
 }
 
 key_down :: proc(key: Keyboard_Key) -> bool {
-	return core.keys[key]
+	return global_state.keys[key]
 }
 
 key_pressed :: proc(key: Keyboard_Key) -> bool {
-	return core.keys[key] && !core.last_keys[key]
+	return global_state.keys[key] && !global_state.last_keys[key]
 }
 
 key_released :: proc(key: Keyboard_Key) -> bool {
-	return core.last_keys[key] && !core.keys[key]
+	return global_state.last_keys[key] && !global_state.keys[key]
 }
 
 mouse_down :: proc(button: Mouse_Button) -> bool {
-	return button in core.mouse_bits
+	return button in global_state.mouse_bits
 }
 
 mouse_pressed :: proc(button: Mouse_Button) -> bool {
-	return (core.mouse_bits - core.last_mouse_bits) >= {button}
+	return (global_state.mouse_bits - global_state.last_mouse_bits) >= {button}
 }
 
 mouse_released :: proc(button: Mouse_Button) -> bool {
-	return (core.last_mouse_bits - core.mouse_bits) >= {button}
+	return (global_state.last_mouse_bits - global_state.mouse_bits) >= {button}
 }

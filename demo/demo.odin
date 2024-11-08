@@ -47,7 +47,6 @@ main :: proc() {
 	glfw.Init()
 	defer glfw.Terminate()
 
-	// glfw.WindowHint(glfw.TRANSPARENT_FRAMEBUFFER, true)
 	window := glfw.CreateWindow(1400, 800, "demo", nil, nil)
 	defer glfw.DestroyWindow(window)
 
@@ -59,67 +58,34 @@ main :: proc() {
 	radio_value: bool
 	input_value: string
 	slider_values: [2]f32
-	date: Maybe(onyx.Date)
 	color: vgo.Color = vgo.GOLD
 	enum_value: runtime.Odin_OS_Type
 
 	for {
-		// Stuff
-		if glfw.WindowShouldClose(onyx.core.window) {
+		if glfw.WindowShouldClose(window) {
 			break
 		}
-		// UI demo code
 		{
 			using onyx
 			new_frame()
-			vgo.fill_box(view_box(), paint = vgo.make_linear_gradient(0, core.view, core.style.color.bg[0], core.style.color.bg[1]))
-			if panel({}) {
-				add_padding(30)
-				header({text = "Header \uf28d"})
-				add_space(10)
-				label({text = "Label"})
-				add_space(10)
-				divider()
-				add_space(10)
-
-				buttons := [?]Button_Info{
-					make_button({text = "Button", style = .Primary}),
-					make_button({text = "Button with icon \uf578", style = .Secondary}),
-					make_button({text = "\uf0d9", style = .Ghost, font_size = 20}),
-					make_button({text = "Colored button", style = .Outlined, color = vgo.Color{220, 57, 57, 255}}),
-				}
-
-				if layout({side = .Top, size = buttons[2].self.desired_size.y}) {
-					for &button in buttons {
-						add_button(&button)
-						add_space(10)
-					}
-				}
-
-				SPACING :: 10
-				add_space(SPACING)
-				checkbox({text = "Checkbox", state = &checkbox_value})
-				add_space(SPACING)
-				radio_button({text = "Radio button", state = &radio_value})
-				add_space(SPACING)
-				toggle_switch({state = &toggle_value, text = "Toggle switch"})
-				add_space(SPACING)
-				string_input({value = &input_value, placeholder = "String input"})
-				add_space(SPACING)
-				slider(Slider_Info(f32){value = &slider_values[0], lo = 0, hi = 10, format = "%.1f"})
-				add_space(SPACING)
-				box_slider(Slider_Info(f32){value = &slider_values[1], lo = 0, hi = 10, format = "%.1f"})
-				add_space(SPACING)
-				label({text = "Icons can be placed \ued3c anywhere within text! \uec8e"})
-				add_space(SPACING)
-				color_button({value = &color, show_alpha = true})
-				add_space(SPACING)
-				date_picker({first = &date})
-				add_space(SPACING)
-				enum_selector(&enum_value)
+			{
+				box := view_box()
+				vgo.fill_box(
+					box,
+					paint = vgo.make_linear_gradient(
+						box.lo,
+						box.hi,
+						colors().bg[0],
+						colors().bg[1],
+					),
+				)
 			}
 			if panel({}) {
-
+				add_padding(50)
+				add_space(10)
+				button("Hello, world")
+				add_space(10)
+				boolean(&checkbox_value, "Checkbox")
 			}
 			present()
 		}

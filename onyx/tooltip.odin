@@ -24,26 +24,24 @@ Tooltip_Info :: struct {
 	mode:   Tooltip_Mode,
 }
 
-begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
-	info := info
-	widget_info := Widget_Info {
-		id  = hash(loc),
-		box = Box{},
-	}
-	begin_widget(&widget_info) or_return
-	defer end_widget()
-
-	if info.bounds == {} {
-		info.bounds.hi = core.view
-	}
+begin_tooltip :: proc(
+	size: [2]f32,
+	side: Side,
+	offset: Maybe(f32),
+	origin: union {[2]f32, Box} = nil,
+	bounds: Maybe(Box) = nil,
+	loc := #caller_location,
+) -> bool {
+	widget := get_widget(hash(loc))
+	begin_widget(widget) or_return
 
 	anchor_point: [2]f32
 
-	switch v in info.origin {
+	switch v in origin {
 	case [2]f32:
 		anchor_point = v
 	case Box:
-		switch info.side {
+		switch side {
 		case .Top:
 			anchor_point = {(v.lo.x + v.hi.x) / 2, v.lo.y}
 		case .Bottom:
@@ -54,47 +52,47 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 			anchor_point = {v.hi.x, (v.lo.y + v.hi.y) / 2}
 		}
 	case:
-		anchor_point = core.mouse_pos
+		anchor_point = global_state.mouse_pos
 	}
 
 	box: Box
 
-	offset := info.offset.? or_else DEFAULT_TOOLTIP_OFFSET
+	offset := offset.? or_else DEFAULT_TOOLTIP_OFFSET
 
-	switch info.side {
+	switch side {
 	case .Top:
 		box = {
-			{anchor_point.x - info.size.x / 2, anchor_point.y - info.size.y - offset},
-			{anchor_point.x + info.size.x / 2, anchor_point.y - offset},
+			{anchor_point.x - size.x / 2, anchor_point.y - size.y - offset},
+			{anchor_point.x + size.x / 2, anchor_point.y - offset},
 		}
 	case .Bottom:
 		box = {
-			{anchor_point.x - info.size.x / 2, anchor_point.y + offset},
-			{anchor_point.x + info.size.x / 2, anchor_point.y + info.size.y * offset},
+			{anchor_point.x - size.x / 2, anchor_point.y + offset},
+			{anchor_point.x + size.x / 2, anchor_point.y + size.y * offset},
 		}
 	case .Left:
 		box = {
-			{anchor_point.x - info.size.x - offset, anchor_point.y - info.size.y / 2},
-			{anchor_point.x - offset, anchor_point.y + info.size.y / 2},
+			{anchor_point.x - size.x - offset, anchor_point.y - size.y / 2},
+			{anchor_point.x - offset, anchor_point.y + size.y / 2},
 		}
 	case .Right:
 		box = {
-			{anchor_point.x + offset, anchor_point.y - info.size.y / 2},
-			{anchor_point.x + info.size.x + offset, anchor_point.y + info.size.y / 2},
+			{anchor_point.x + offset, anchor_point.y - size.y / 2},
+			{anchor_point.x + size.x + offset, anchor_point.y + size.y / 2},
 		}
 	}
 
-	bg_color := core.style.color.bg[0]
+	bg_color := global_state.style.color.bg[0]
 
 	draw_shadow(box)
 	begin_layer(&{box = box, kind = .Topmost}, loc)
-	vgo.fill_box(box, core.style.rounding, bg_color)
+	vgo.fill_box(box, global_state.style.rounding, bg_color)
 
-	#partial switch info.side {
+	#partial switch side {
 	case .Top:
 		center := box_center_x(box)
-		left := box.lo.x + core.style.rounding
-		right := box.hi.x - core.style.rounding
+		left := box.lo.x + global_state.style.rounding
+		right := box.hi.x - global_state.style.rounding
 		vgo.begin_path()
 		vgo.move_to({center, box.hi.y + offset})
 		vgo.quad_bezier_to({center, box.hi.y}, {right, box.hi.y})
@@ -103,8 +101,8 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		vgo.fill_path(bg_color)
 	case .Bottom:
 		center := box_center_x(box)
-		left := box.lo.x + core.style.rounding
-		right := box.hi.x - core.style.rounding
+		left := box.lo.x + global_state.style.rounding
+		right := box.hi.x - global_state.style.rounding
 		vgo.begin_path()
 		vgo.move_to({center, box.lo.y - offset})
 		vgo.quad_bezier_to({center, box.lo.y}, {right, box.lo.y})
@@ -113,12 +111,12 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 		vgo.fill_path(bg_color)
 	case .Right:
 		center := box_center_y(box)
-		top := box.lo.y + core.style.rounding
-		bottom := box.hi.y - core.style.rounding
+		top := box.lo.y + global_state.style.rounding
+		bottom := box.hi.y - global_state.style.rounding
 	case .Left:
 		center := box_center_y(box)
-		top := box.lo.y + core.style.rounding
-		bottom := box.hi.y - core.style.rounding
+		top := box.lo.y + global_state.style.rounding
+		bottom := box.hi.y - global_state.style.rounding
 	}
 
 	return true
@@ -126,16 +124,5 @@ begin_tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
 
 end_tooltip :: proc() {
 	end_layer()
-}
-
-@(deferred_out = __tooltip)
-tooltip :: proc(info: Tooltip_Info, loc := #caller_location) -> bool {
-	return begin_tooltip(info, loc)
-}
-
-@(private)
-__tooltip :: proc(ok: bool) {
-	if ok {
-		end_tooltip()
-	}
+	end_widget()
 }

@@ -22,7 +22,7 @@ init_tabs :: proc(using info: ^Tabs_Info, loc := #caller_location) -> bool {
 	// Value sanity check
 	if index == nil || len(options) == 0 do return false
 	if id == 0 do id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	options = options[:min(len(options), 10)]
 	self.desired_size = {
 		f32(len(options)) * (tab_width.? or_else core.style.visual_size.x),

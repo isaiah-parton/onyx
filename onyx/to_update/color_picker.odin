@@ -109,7 +109,7 @@ init_color_button :: proc(using info: ^Color_Button_Info, loc := #caller_locatio
 		core.style.default_text_size,
 	)
 	id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	self.desired_size = core.style.visual_size
 	in_state_mask = Widget_State{}
 	return true
@@ -301,7 +301,7 @@ Alpha_Slider_Info :: struct {
 init_alpha_slider :: proc(using info: ^Alpha_Slider_Info, loc := #caller_location) -> bool {
 	if value == nil do return false
 	id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	self.desired_size = core.style.visual_size
 	if vertical {
 		self.desired_size.xy = self.desired_size.yx
@@ -378,7 +378,7 @@ init_hsva_picker :: proc(using info: ^HSVA_Picker_Info) -> bool {
 	if info == nil do return false
 	if info.hsva == nil do return false
 	id = hash(uintptr(hsva))
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	self.desired_size = 200
 	fixed_size = true
 	sticky = true
@@ -504,7 +504,7 @@ Color_Picker_Info :: struct {
 init_color_picker :: proc(using info: ^Color_Picker_Info, loc := #caller_location) -> bool {
 	if info.color == nil do return false
 	if id == 0 do id = hash(loc)
-	self = get_widget(id) or_return
+	self = get_widget(id)
 	return true
 }
 

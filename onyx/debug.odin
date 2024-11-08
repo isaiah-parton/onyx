@@ -45,12 +45,12 @@ do_debug_layer :: proc() {
 		}
 		pos += vgo.fill_text_aligned(
 			fmt.tprintf("%i - %v %i", layer.id, layer.kind, layer.index),
-			core.style.monospace_font,
+			global_state.style.monospace_font,
 			DEBUG_TEXT_SIZE,
-			{left, core.view.y - pos},
+			{left, global_state.view.y - pos},
 			.Left,
 			.Bottom,
-			paint = vgo.GOLD if layer.index == core.highest_layer_index else nil,
+			paint = vgo.GOLD if layer.index == global_state.highest_layer_index else nil,
 			).y
 		return pos
 	}
@@ -58,7 +58,7 @@ do_debug_layer :: proc() {
 	// Layers
 	{
 		pos := f32(0)
-		for layer in core.layers {
+		for layer in global_state.layers {
 			pos += print_layer_debug(layer, 0, pos)
 		}
 	}
@@ -68,13 +68,13 @@ do_debug_layer :: proc() {
 		total: time.Duration
 		offset := f32(0)
 		offset +=
-			vgo.fill_text(fmt.tprintf("FPS: %.0f", vgo.get_fps()), core.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
+			vgo.fill_text(fmt.tprintf("FPS: %.0f", vgo.get_fps()), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
 		for scope, s in Profiler_Scope {
 			total += __prof.d[scope]
 			offset +=
-				vgo.fill_text(fmt.tprintf("%v: %.3fms", scope, time.duration_milliseconds(__prof.d[scope])), core.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
+				vgo.fill_text(fmt.tprintf("%v: %.3fms", scope, time.duration_milliseconds(__prof.d[scope])), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
 		}
 		offset +=
-			vgo.fill_text(fmt.tprintf("Total: %.3fms", time.duration_milliseconds(total)), core.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
+			vgo.fill_text(fmt.tprintf("Total: %.3fms", time.duration_milliseconds(total)), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
 	}
 }

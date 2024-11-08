@@ -54,7 +54,7 @@ Input_State :: struct {
 
 init_input :: proc(info: ^Input_Info, loc := #caller_location) -> bool {
 	if info.id == 0 do info.id = hash(loc)
-	info.self = get_widget(info.id) or_return
+	info.self = get_widget(info.id)
 	// Flag as an input and to keep data
 	info.self.flags += {.Is_Input, .Persistent}
 	// Make sticky for easy highlighting
