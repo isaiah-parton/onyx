@@ -1,6 +1,8 @@
 package onyx
 
 import "../vgo"
+import "base:runtime"
+import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
@@ -54,7 +56,7 @@ Layout :: struct {
 	mode:           Layout_Mode,
 	object_size:    [2]f32,
 	object_padding: [2]f32,
-	array:          Maybe(^[dynamic]^Object),
+	array:          ^[dynamic]^Object,
 }
 
 axis_normal :: proc(axis: Axis) -> [2]f32 {
@@ -64,7 +66,7 @@ axis_normal :: proc(axis: Axis) -> [2]f32 {
 display_or_add_object :: proc(object: ^Object) {
 	if layout, ok := current_layout().?; ok {
 		if layout_needs_array(layout) {
-			append(layout.array.?, object)
+			append(layout.array, object)
 			when ODIN_DEBUG {
 				global_state.debug.deferred_objects += 1
 			}
@@ -78,37 +80,40 @@ move_object :: proc(object: ^Object, delta: [2]f32) {
 	object.box.lo += delta
 	object.box.hi += delta
 	if layout, ok := object.variant.(Layout); ok {
-		for child in layout.array.? {
+		for child in layout.array {
 			move_object(child, delta)
 		}
 	}
 }
 
 display_layout :: proc(layout: ^Layout) {
-	if array, ok := layout.array.?; ok {
-		for object in array {
-			size := layout.content_box.hi[int(layout.axis)] - layout.content_box.lo[int(layout.axis)]
-			if layout.justify == .Center {
-				move_object(object, size * axis_normal(layout.axis) * 0.5)
-			} else if layout.justify == .Far {
-				move_object(object, size * axis_normal(layout.axis))
-			}
-			display_object(object)
+	if layout.array == nil do return
+	for object in layout.array {
+		size := layout.content_box.hi[int(layout.axis)] - layout.content_box.lo[int(layout.axis)]
+		if layout.justify == .Center {
+			move_object(object, axis_normal(layout.axis) * size * 0.5)
+		}
+		display_object(object)
+	}
+	when ODIN_DEBUG {
+		if global_state.debug.enabled {
+			vgo.stroke_box(layout.box, 1, paint = vgo.BLUE)
 		}
 	}
 }
 
-push_layout :: proc(layout: Layout) -> bool {
+push_layout :: proc(layout: ^Layout) -> bool {
+	push_stack(&global_state.layout_stack, layout) or_return
 	global_state.current_layout =
-	&global_state.layout_stack.items[global_state.layout_stack.height]
-	return push_stack(&global_state.layout_stack, layout)
+		global_state.layout_stack.items[global_state.layout_stack.height - 1]
+	return true
 }
 
 pop_layout :: proc() {
 	pop_stack(&global_state.layout_stack)
 	index := global_state.layout_stack.height - 1
 	if index >= 0 {
-		global_state.current_layout = &global_state.layout_stack.items[index]
+		global_state.current_layout = global_state.layout_stack.items[index]
 		return
 	}
 	global_state.current_layout = nil
@@ -116,10 +121,7 @@ pop_layout :: proc() {
 
 begin_layout_with_options :: proc(side: Side, size: f32, axis: Axis) -> bool {
 	layout := current_layout().? or_return
-	return begin_layout_with_box(
-		cut_box(&layout.content_box, side, size),
-		axis = axis,
-	)
+	return begin_layout_with_box(cut_box(&layout.content_box, side, size), axis = axis)
 }
 
 next_layout_axis :: proc() -> (axis: Axis, ok: bool) {
@@ -128,7 +130,10 @@ next_layout_axis :: proc() -> (axis: Axis, ok: bool) {
 }
 
 next_layout_array :: proc() -> ^[dynamic]^Object {
-	non_zero_resize(&global_state.layout_array_array, max(global_state.layout_array_count + 1, len(global_state.layout_array_array)))
+	resize(
+		&global_state.layout_array_array,
+		max(global_state.layout_array_count + 1, len(global_state.layout_array_array)),
+	)
 	array := &global_state.layout_array_array[global_state.layout_array_count]
 	assert(array != nil)
 	global_state.layout_array_count += 1
@@ -154,12 +159,10 @@ begin_layout_with_box :: proc(
 		content_box = box,
 		justify     = justify,
 		axis        = axis.? or_else (next_layout_axis() or_else Axis.X),
-	}
-	if layout_needs_array(&layout) {
-		layout.array = next_layout_array()
+		array       = next_layout_array(),
 	}
 	object.variant = layout
-	push_layout(layout) or_return
+	push_layout(&object.variant.(Layout)) or_return
 	begin_object(object) or_return
 	return true
 }
@@ -176,13 +179,6 @@ begin_layout :: proc {
 
 end_layout :: proc() {
 	layout := current_layout().?
-
-	when ODIN_DEBUG {
-		if global_state.debug.enabled {
-			vgo.stroke_box(layout.box, 1, paint = vgo.RED)
-		}
-	}
-
 	pop_layout()
 	end_object()
 
@@ -191,11 +187,7 @@ end_layout :: proc() {
 	if layout.isolated do return
 
 	if parent_layout, ok := current_layout().?; ok {
-		size := linalg.max(
-			layout.content_size + layout.spacing_size,
-			box_size(layout.box) *
-			[2]f32{1 - f32(i32(parent_layout.axis)), f32(i32(parent_layout.axis))},
-		)
+		size := layout.content_size + layout.spacing_size
 		if parent_layout.axis == .X {
 			parent_layout.content_size.y = max(parent_layout.content_size.y, size.y)
 			parent_layout.content_size.x += size.x
@@ -294,7 +286,8 @@ next_object_box :: proc(size: [2]f32) -> Box {
 			case .Far:
 				box.lo.x = box.hi.x - size.x
 			case .Center:
-				break
+				box.lo.x = box_center_x(box) - size.x / 2
+				box.hi.x = box.lo.x + size.x
 			}
 		}
 	} else {

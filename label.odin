@@ -26,10 +26,18 @@ label :: proc(
 	object := transient_object()
 	label := Label {
 		object      = object,
-		text_layout = vgo.make_text_layout(text, font, font_size),
+		text_layout = vgo.make_text_layout(
+			text,
+			font,
+			font_size,
+			{
+				max_width = box_width(layout_box()),
+				max_height = box_height(layout_box()),
+				wrap = .Word,
+			},
+		),
 	}
-	object.desired_size = label.text_layout.size
-	label.box = next_object_box(next_object_size(object.desired_size, fixed = true))
+	label.box = next_object_box(next_object_size({}))
 	object.variant = label
 	display_or_add_object(object)
 }

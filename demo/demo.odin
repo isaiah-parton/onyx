@@ -21,6 +21,9 @@ import "core:time"
 import "vendor:glfw"
 import "vendor:wgpu"
 
+FILLER_TEXT ::
+`1. In the beginning was the Word, and the Word was with God, and the Word was God.  2. The same was in the beginning with God.  3. All things were made by him; and without him was not any thing made that was made.  4. In him was life; and the life was the light of men.  5. And the light shineth in darkness; and the darkness comprehended it not.`
+
 main :: proc() {
 
 	when ODIN_DEBUG {
@@ -91,9 +94,15 @@ main :: proc() {
 					label("this is a label")
 					for i in 1..=5 {
 						push_id(i)
+							add_space(10)
 							button(fmt.tprintf("Button %i", i))
 						pop_id()
 					}
+				}
+				if begin_row(100, .Left) {
+					defer end_row()
+
+					label(FILLER_TEXT)
 				}
 				if begin_row(200, .Center) {
 					defer end_row()
@@ -103,6 +112,7 @@ main :: proc() {
 
 						for i in 1..=5 {
 							push_id(i)
+								if i > 1 do add_space(10)
 								boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
 							pop_id()
 						}
@@ -112,6 +122,7 @@ main :: proc() {
 
 						for i in 1..=5 {
 							push_id(i)
+								if i > 1 do add_space(10)
 								boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
 							pop_id()
 						}

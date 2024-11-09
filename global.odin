@@ -112,7 +112,7 @@ Global_State :: struct {
 	layout_array_array:       [dynamic][dynamic]^Object,
 	layout_array_count:       int,
 	current_layout:           ^Layout,
-	layout_stack:             Stack(Layout, MAX_LAYOUTS),
+	layout_stack:             Stack(^Layout, MAX_LAYOUTS),
 	active_container:         Id,
 	next_active_container:    Id,
 	// Panels
@@ -492,12 +492,18 @@ shutdown :: proc() {
 
 	for _, object in global_state.object_map {
 		destroy_object(object)
+		free(object)
 	}
 
 	for layer in global_state.layers {
 		destroy_layer(layer)
 		free(layer)
 	}
+
+	for array in global_state.layout_array_array {
+		delete(array)
+	}
+	delete(global_state.layout_array_array)
 
 	delete(global_state.layers)
 	delete(global_state.object_map)
@@ -524,9 +530,9 @@ __get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
 draw_shadow :: proc(box: vgo.Box) {
 	if vgo.disable_scissor() {
 		vgo.box_shadow(
-			move_box(box, 2),
+			move_box(box, 3),
 			global_state.style.rounding,
-			4,
+			6,
 			global_state.style.color.shadow,
 		)
 	}
