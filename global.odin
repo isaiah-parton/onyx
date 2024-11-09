@@ -59,12 +59,6 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 	stack.height = 0
 }
 
-Debug_State :: struct {
-	enabled, objects, panels, layers: bool,
-	delta_time:                       [dynamic]f32,
-	deferred_objects:                 int,
-}
-
 @(private)
 global_state: Global_State
 

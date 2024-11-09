@@ -66,8 +66,9 @@ Object :: struct {
 	click_time:     time.Time,
 	click_point:    [2]f32,
 	click_button:   Mouse_Button,
+	margin: Object_Margin,
+	size:           [2]f32,
 	desired_size:   [2]f32,
-	margin:         Object_Margin,
 	variant:        Object_Variant,
 }
 
@@ -138,15 +139,20 @@ current_object :: proc() -> Maybe(^Object) {
 
 new_persistent_object :: proc(id: Id) -> ^Object {
 	object := new(Object)
+
 	object.id = id
 	object.out_state_mask = OBJECT_STATE_ALL
+
 	global_state.object_map[id] = object
 	global_state.draw_this_frame = true
+
 	assert(object != nil)
+
 	return object
 }
 
 destroy_object :: proc(object: ^Object) {
+	// uhh..
 }
 
 persistent_object :: proc(id: Id) -> ^Object {
@@ -214,7 +220,7 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 	}
 }
 
-is_object_visible :: proc(object: ^Object) -> bool {
+object_is_visible :: proc(object: ^Object) -> bool {
 	return global_state.visible && get_clip(object.layer.box, object.box) != .Full
 }
 
@@ -234,29 +240,19 @@ begin_object :: proc(object: ^Object) -> bool {
 	object.dead = false
 
 	if object_was_updated_this_frame(object) {
-		vgo.fill_box(
-			object.box,
-			paint = vgo.Color {
-				0 = 255,
-				3 = u8(
-					128.0 +
-					math.sin(time.duration_seconds(time.since(global_state.start_time)) * 12.0) *
-						64.0,
-				),
-			},
-		)
 		when ODIN_DEBUG {
 			fmt.printfln("Object ID collision: %i", object.id)
 		}
 		return false
 	}
+
 	object.frames = global_state.frames
 	object.layer = current_layer().? or_return
-	object.visible = is_object_visible(object)
 	update_object_state(object)
 	if global_state.disable_objects do object.disabled = true
 
 	if layout, ok := current_layout().?; ok {
+		object.margin = layout.margin
 		// If the user set an explicit size with either `set_width()` or `set_height()` the object's desired size should reflect that
 		// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
 		if layout.object_size.x == 0 || layout.object_size.x != box_width(layout.content_box) {
@@ -274,10 +270,17 @@ begin_object :: proc(object: ^Object) -> bool {
 
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
+		if layout, ok := current_layout().?; ok {
+			display_or_add_object(object, layout)
+		} else {
+			display_object(object)
+		}
 		when ODIN_DEBUG {
 			if global_state.debug.enabled {
+				hovered := point_in_box(mouse_point(), object.box)
+				color := vgo.fade(vgo.GREEN, 1.0 if hovered else 0.5)
 				if vgo.disable_scissor() {
-					vgo.stroke_box(object.box, 1, paint = vgo.GREEN)
+					vgo.stroke_box(object.box, 1, paint = color)
 				}
 			}
 		}

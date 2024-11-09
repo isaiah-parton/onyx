@@ -10,11 +10,8 @@ Label :: struct {
 }
 
 display_label :: proc(label: ^Label) {
-	if begin_object(label) {
-		defer end_object()
-		if label.visible {
-			vgo.fill_text_layout(label.text_layout, label.box.lo, colors().content)
-		}
+	if object_is_visible(label) {
+		vgo.fill_text_layout(label.text_layout, label.box.lo, colors().content)
 	}
 }
 
@@ -25,18 +22,20 @@ label :: proc(
 	loc := #caller_location,
 ) {
 	object := transient_object()
-	label := Label {
-		object      = object,
-		text_layout = vgo.make_text_layout(
-			text,
-			font,
-			font_size,
-		),
+	if begin_object(object) {
+		defer end_object()
+
+		label := Label {
+			object      = object,
+			text_layout = vgo.make_text_layout(
+				text,
+				font,
+				font_size,
+			),
+		}
+		label.desired_size = label.text_layout.size
+		object.variant = label
 	}
-	label.box = next_object_box(next_object_size(label.text_layout.size))
-	label.desired_size = label.text_layout.size
-	object.variant = label
-	display_or_add_object(object)
 }
 
 header :: proc(text: string, loc := #caller_location) {

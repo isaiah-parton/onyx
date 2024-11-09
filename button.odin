@@ -2,6 +2,7 @@ package onyx
 
 import "../vgo"
 import "core:container/small_array"
+import "core:fmt"
 import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
@@ -34,105 +35,101 @@ make_button_text_layout :: proc(text: string, font_size: Maybe(f32) = nil) -> vg
 	)
 }
 
-button :: proc(text: string, style: Button_Style = .Primary, loc := #caller_location) -> Id {
-	id := hash(loc)
-	object := persistent_object(id)
-	if object.variant == nil {
-		object.variant = Button {
-			object = object,
+button :: proc(text: string, style: Button_Style = .Primary, name: string = "", loc := #caller_location) -> ^Object {
+	object := persistent_object(hash(loc))
+	if begin_object(object) {
+		defer end_object()
+
+		if object.variant == nil {
+			object.variant = Button {
+				object = object,
+			}
 		}
+		button := &object.variant.(Button)
+		button.text_layout = make_button_text_layout(text)
+		button.desired_size = button.text_layout.size + global_state.style.text_padding * 2
+		button.style = style
 	}
-	button := &object.variant.(Button)
-	button.text_layout = make_button_text_layout(text)
-	button.desired_size = button.text_layout.size + global_state.style.text_padding * 2
-	button.box = next_object_box(next_object_size(button.desired_size))
-	button.style = style
-	display_or_add_object(object)
-	return id
+	return object
 }
 
 display_button :: proc(button: ^Button) {
-	if begin_object(button) {
-		defer end_object()
+	handle_object_click(button)
+	button_behavior(button)
+	if object_is_visible(button) {
+		text_color: vgo.Color
+		radius: [4]f32 = global_state.style.rounding
 
-		handle_object_click(button)
-		button_behavior(button)
-
-		if button.visible {
-			text_color: vgo.Color
-			radius: [4]f32 = global_state.style.rounding
-
-			switch button.style {
-			case .Outlined:
+		switch button.style {
+		case .Outlined:
+			vgo.fill_box(
+				button.box,
+				radius,
+				vgo.fade(
+					button.color.? or_else global_state.style.color.substance,
+					0.5 if .Hovered in button.state else 0.25,
+				),
+			)
+			vgo.stroke_box(
+				button.box,
+				2,
+				radius,
+				button.color.? or_else global_state.style.color.substance,
+			)
+			text_color = global_state.style.color.content
+		case .Secondary:
+			bg_color := button.color.? or_else global_state.style.color.substance
+			vgo.fill_box(
+				button.box,
+				radius,
+				vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in button.state else bg_color,
+			)
+			text_color = global_state.style.color.accent_content
+		case .Primary:
+			vgo.fill_box(
+				button.box,
+				radius,
+				vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in button.state else global_state.style.color.accent,
+			)
+			text_color = global_state.style.color.accent_content
+		case .Ghost:
+			if .Hovered in button.state {
 				vgo.fill_box(
 					button.box,
 					radius,
-					vgo.fade(
+					paint = vgo.fade(
 						button.color.? or_else global_state.style.color.substance,
-						0.5 if .Hovered in button.state else 0.25,
+						0.2,
 					),
 				)
-				vgo.stroke_box(
-					button.box,
-					2,
-					radius,
-					button.color.? or_else global_state.style.color.substance,
-				)
-				text_color = global_state.style.color.content
-			case .Secondary:
-				bg_color := button.color.? or_else global_state.style.color.substance
-				vgo.fill_box(
-					button.box,
-					radius,
-					vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in button.state else bg_color,
-				)
-				text_color = global_state.style.color.accent_content
-			case .Primary:
-				vgo.fill_box(
-					button.box,
-					radius,
-					vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in button.state else global_state.style.color.accent,
-				)
-				text_color = global_state.style.color.accent_content
-			case .Ghost:
-				if .Hovered in button.state {
-					vgo.fill_box(
-						button.box,
-						radius,
-						paint = vgo.fade(
-							button.color.? or_else global_state.style.color.substance,
-							0.2,
-						),
-					)
-				}
-				text_color = global_state.style.color.content
 			}
+			text_color = global_state.style.color.content
+		}
 
-			if button.press_time > 0 {
-				scale := button.press_time if .Pressed in button.state else f32(1)
-				opacity := f32(1) if .Pressed in button.state else button.press_time
-				vgo.push_scissor(vgo.make_box(button.box, radius))
-				vgo.fill_circle(
-					button.click_point,
-					linalg.length(button.box.hi - button.box.lo) * scale,
-					paint = vgo.fade(vgo.WHITE, opacity * 0.2),
-				)
-				vgo.pop_scissor()
-			}
+		if button.press_time > 0 {
+			scale := button.press_time if .Pressed in button.state else f32(1)
+			opacity := f32(1) if .Pressed in button.state else button.press_time
+			vgo.push_scissor(vgo.make_box(button.box, radius))
+			vgo.fill_circle(
+				button.click_point,
+				linalg.length(button.box.hi - button.box.lo) * scale,
+				paint = vgo.fade(vgo.WHITE, opacity * 0.2),
+			)
+			vgo.pop_scissor()
+		}
 
-			if !button.is_loading {
-				vgo.fill_text_layout_aligned(
-					button.text_layout,
-					box_center(button.box),
-					.Center,
-					.Center,
-					text_color,
-				)
-			}
+		if !button.is_loading {
+			vgo.fill_text_layout_aligned(
+				button.text_layout,
+				box_center(button.box),
+				.Center,
+				.Center,
+				text_color,
+			)
+		}
 
-			if button.is_loading {
-				vgo.spinner(box_center(button.box), box_height(button.box) * 0.3, text_color)
-			}
+		if button.is_loading {
+			vgo.spinner(box_center(button.box), box_height(button.box) * 0.3, text_color)
 		}
 	}
 }

@@ -46,36 +46,46 @@ V_Align :: enum {
 
 Layout :: struct {
 	using object:   ^Object,
+	parent:         ^Layout,
 	axis:           Axis,
 	content_box:    Box,
 	justify:        Align,
 	align:          Align,
-	content_size:   [2]f32,
-	spacing_size:   [2]f32,
+	padding:   [2]f32,
 	isolated:       bool,
 	mode:           Layout_Mode,
+	content_size: [2]f32,
+	spacing_size: [2]f32,
 	object_size:    [2]f32,
 	object_padding: [2]f32,
-	array:          ^[dynamic]^Object,
+	object_margin: Object_Margin,
+	contents:          []^Object,
 }
 
 axis_normal :: proc(axis: Axis) -> [2]f32 {
 	return {f32(1 - i32(axis)), f32(i32(axis))}
 }
 
-display_or_add_object :: proc(object: ^Object) {
-	if layout, ok := current_layout().?; ok {
-		add_layout_content_size(
-			layout,
-			box_size(object.box) if object.fixed else object.desired_size,
-		)
-		if layout_needs_array(layout) {
-			append(layout.array, object)
-			when ODIN_DEBUG {
-				global_state.debug.deferred_objects += 1
-			}
-			return
+display_or_add_object :: proc(object: ^Object, layout: ^Layout) {
+	switch layout.axis {
+	case .X:
+		layout.desired_size.x += object.desired_size.x
+		layout.desired_size.y = max(layout.desired_size.y, object.desired_size.y)
+	case .Y:
+		layout.desired_size.y += object.desired_size.y
+		layout.desired_size.x = max(layout.desired_size.x, object.desired_size.x)
+	}
+
+	if layout_is_deferred(layout) {
+		append(layout.array, object)
+		when ODIN_DEBUG {
+			global_state.debug.deferred_objects += 1
 		}
+		return
+	}
+
+	if !object.fixed {
+		apply_object_layout(object, layout)
 	}
 	display_object(object)
 }
@@ -90,18 +100,28 @@ move_object :: proc(object: ^Object, delta: [2]f32) {
 	}
 }
 
+apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
+	object.box = next_object_box(layout, linalg.max(object.size, object.desired_size))
+}
+
 display_layout :: proc(layout: ^Layout) {
 	if layout.array == nil do return
-	for object in layout.array {
-		size := layout.content_box.hi[int(layout.axis)] - layout.content_box.lo[int(layout.axis)]
-		if layout.justify == .Center {
-			move_object(object, axis_normal(layout.axis) * size * 0.5)
+	layout.content_box = shrink_box(layout.box, layout.padding)
+
+	delta := axis_normal(layout.axis) * (box_size(layout.box) - layout.desired_size)
+	if layout.justify == .Far {
+		for object in layout.array {
+			apply_object_layout(object, layout)
+			move_object(object, delta)
+			display_object(object)
 		}
-		display_object(object)
-	}
-	when ODIN_DEBUG {
-		if global_state.debug.enabled {
-			vgo.stroke_box(layout.box, 1, paint = vgo.BLUE)
+	} else {
+		for object in layout.array {
+			apply_object_layout(object, layout)
+			if layout.justify == .Center {
+				move_object(object, delta * 0.5)
+			}
+			display_object(object)
 		}
 	}
 }
@@ -145,18 +165,22 @@ next_layout_array :: proc() -> ^[dynamic]^Object {
 	return array
 }
 
-layout_needs_array :: proc(layout: ^Layout) -> bool {
-	return layout.justify == .Center
+layout_is_deferred :: proc(layout: ^Layout) -> bool {
+	return layout.justify != .Near || !layout.fixed
 }
 
 begin_layout_with_box :: proc(
 	box: Box,
 	axis: Maybe(Axis) = nil,
 	justify: Align = .Near,
+	fixed: bool = true,
+	size: [2]f32 = {},
 	isolated: bool = false,
 ) -> bool {
 	object := transient_object()
 	object.box = box
+	object.fixed = fixed
+	object.size = size
 	layout := Layout {
 		object      = object,
 		isolated    = isolated,
@@ -164,10 +188,11 @@ begin_layout_with_box :: proc(
 		justify     = justify,
 		axis        = axis.? or_else (next_layout_axis() or_else Axis.X),
 		array       = next_layout_array(),
+		parent      = current_layout().? or_else nil,
 	}
 	object.variant = layout
-	push_layout(&object.variant.(Layout)) or_return
 	begin_object(object) or_return
+	push_layout(&object.variant.(Layout)) or_return
 	return true
 }
 
@@ -182,24 +207,19 @@ begin_layout :: proc {
 }
 
 end_layout :: proc() {
-	layout := current_layout().?
 	pop_layout()
-
-	layout.desired_size = linalg.max(
-		layout.content_size + layout.spacing_size,
-		box_size(layout.box) * axis_normal(Axis(1 - int(layout.axis))),
-	)
-
-	display_or_add_object(layout)
-
 	end_object()
 }
 
-begin_row :: proc(height: f32, justify: H_Align) -> bool {
+begin_row :: proc(height: Maybe(f32) = nil, justify: H_Align = .Left) -> bool {
 	layout := current_layout().?
 	return begin_layout_with_box(
-		cut_layout(layout, size = [2]f32{box_width(layout.content_box), height}),
+		{} if height == nil else cut_layout(layout, size = [2]f32{box_width(layout.content_box), height.?}),
 		axis = .X,
+		size = {
+			0 = box_width(layout.content_box),
+		},
+		fixed = height != nil,
 		justify = Align(justify),
 	)
 }
@@ -208,11 +228,15 @@ end_row :: proc() {
 	end_layout()
 }
 
-begin_column :: proc(width: f32, justify: V_Align) -> bool {
+begin_column :: proc(width: Maybe(f32) = nil, justify: V_Align = .Top) -> bool {
 	layout := current_layout().?
 	return begin_layout_with_box(
-		cut_layout(layout, size = [2]f32{width, box_height(layout.content_box)}),
+		{} if width == nil else cut_layout(layout, size = [2]f32{width.?, box_height(layout.content_box)}),
 		axis = .Y,
+		size = {
+			1 = box_height(layout.content_box),
+		},
+		fixed = width != nil,
 		justify = Align(justify),
 	)
 }
@@ -233,13 +257,10 @@ layout_box :: proc() -> Box {
 }
 
 layout_cut_side :: proc(layout: ^Layout) -> Side {
-	side: Side
 	if layout.axis == .X {
-		side = .Right if layout.justify == .Far else .Left
-	} else {
-		side = .Bottom if layout.justify == .Far else .Top
+		return .Left
 	}
-	return side
+	return .Top
 }
 
 cut_layout :: proc(layout: ^Layout, side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -> Box {
@@ -256,7 +277,7 @@ cut_current_layout :: proc(side: Maybe(Side) = nil, size: Maybe([2]f32) = nil) -
 	return cut_layout(current_layout().?, side, size)
 }
 
-next_object_size :: proc(desired_size: [2]f32, fixed: bool = false) -> [2]f32 {
+next_object_size :: proc(layout: ^Layout, desired_size: [2]f32, fixed: bool = false) -> [2]f32 {
 	non_fixed_size :: proc(layout: ^Layout, desired_size: [2]f32) -> [2]f32 {
 		if layout.mode == .Maximum {
 			return linalg.max(layout.object_size, desired_size)
@@ -265,16 +286,14 @@ next_object_size :: proc(desired_size: [2]f32, fixed: bool = false) -> [2]f32 {
 		}
 		return layout.object_size
 	}
-	layout := current_layout().?
 	return linalg.min(
 		desired_size if fixed else non_fixed_size(layout, desired_size),
 		layout.content_box.hi - layout.content_box.lo,
 	)
 }
 
-next_object_box :: proc(size: [2]f32) -> Box {
-	layout := current_layout().?
-	box := cut_layout(layout, nil, size)
+next_object_box :: proc(layout: ^Layout, size: [2]f32) -> Box {
+	box := cut_box(&layout.content_box, layout_cut_side(layout), size[int(layout.axis)])
 	if layout.axis == .Y {
 		if size.x < box_width(box) {
 			switch layout.align {
@@ -357,6 +376,16 @@ set_padding :: proc(amount: f32) {
 	current_layout().?.object_padding = amount
 }
 
+add_padding :: proc(amount: f32) {
+	layout := current_layout().?
+	if layout_is_deferred(layout) {
+		layout.padding = amount
+	} else {
+		layout.content_box.lo += amount
+		layout.content_box.hi -= amount
+	}
+}
+
 set_width_to_height :: proc() {
 	layout := current_layout().?
 	layout.object_size.x = layout.object_size.y
@@ -367,41 +396,6 @@ set_height_to_width :: proc() {
 	layout.object_size.y = layout.object_size.x
 }
 
-add_padding :: proc(amount: [2]f32) {
-	layout := current_layout().?
-	layout.content_box.lo += amount
-	layout.content_box.hi -= amount
-	layout.spacing_size += amount * 2
-}
-
-add_padding_x :: proc(amount: f32) {
-	layout := current_layout().?
-	layout.content_box.lo.x += amount
-	layout.content_box.hi.x -= amount
-}
-
-add_padding_y :: proc(amount: f32) {
-	layout := current_layout().?
-	layout.content_box.lo.y += amount
-	layout.content_box.hi.y -= amount
-}
-
-add_space :: proc(amount: f32) {
-	layout := current_layout().?
-	cut_box(&layout.content_box, layout_cut_side(layout), amount)
-	layout.spacing_size[int(layout.axis)] += amount
-}
-
 layout_is_vertical :: proc(layout: ^Layout) -> bool {
 	return layout.axis == .Y
-}
-
-add_layout_content_size :: proc(layout: ^Layout, size: [2]f32) {
-	if layout_is_vertical(layout) {
-		layout.content_size.x = max(layout.content_size.x, size.x)
-		layout.content_size.y += size.y
-	} else {
-		layout.content_size.y = max(layout.content_size.y, size.y)
-		layout.content_size.x += size.x
-	}
 }

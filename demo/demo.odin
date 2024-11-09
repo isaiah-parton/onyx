@@ -88,41 +88,33 @@ main :: proc() {
 				defer end_panel()
 
 				add_padding(50)
-				if begin_row(100, .Left) {
+				if begin_row(height = 100) {
 					defer end_row()
 
 					label("Label")
 					for i in 1..=5 {
 						push_id(i)
-							add_space(10)
 							button(fmt.tprintf("Button %i", i))
 						pop_id()
 					}
 				}
-				if begin_row(100, .Left) {
+				if begin_row(justify = .Center) {
 					defer end_row()
 
-					label("Some filler text")
-				}
-				if begin_row(200, .Center) {
-					defer end_row()
-
-					if begin_column(120, .Center) {
+					if begin_column(160, .Center) {
 						defer end_column()
 
 						for i in 1..=5 {
 							push_id(i)
-								if i > 1 do add_space(10)
 								boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
 							pop_id()
 						}
 					}
-					if begin_column(120, .Center) {
+					if begin_column(160, .Center) {
 						defer end_column()
 
 						for i in 1..=5 {
 							push_id(i)
-								if i > 1 do add_space(10)
 								boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
 							pop_id()
 						}
