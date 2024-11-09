@@ -2,6 +2,7 @@ package onyx
 
 import "../vgo"
 import "core:fmt"
+import "core:math/linalg"
 
 Label :: struct {
 	using object: ^Object,
@@ -30,14 +31,10 @@ label :: proc(
 			text,
 			font,
 			font_size,
-			{
-				max_width = box_width(layout_box()),
-				max_height = box_height(layout_box()),
-				wrap = .Word,
-			},
 		),
 	}
-	label.box = next_object_box(next_object_size({}))
+	label.box = next_object_box(next_object_size(label.text_layout.size))
+	label.desired_size = label.text_layout.size
 	object.variant = label
 	display_or_add_object(object)
 }

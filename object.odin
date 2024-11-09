@@ -1,5 +1,8 @@
 package onyx
-
+// Fixes for objects
+// 	- Property to control when an object attempts to be fully displayed by
+// 		modifying its parent layout or not
+//  - What is the purpose of begin and end object?
 import "../vgo"
 import "base:intrinsics"
 import "base:runtime"
@@ -68,15 +71,8 @@ Object :: struct {
 	variant:        Object_Variant,
 }
 
-Object_Input :: struct {}
-
 Object_Margin :: struct {
 	left, right, top, bottom: f32,
-}
-
-Object_Placement :: struct {
-	size:   [2]f32,
-	margin: Object_Margin,
 }
 
 clean_up_objects :: proc() {
@@ -94,7 +90,6 @@ clean_up_objects :: proc() {
 	clear(&global_state.transient_objects)
 }
 
-// Animation
 animate :: proc(value, duration: f32, condition: bool) -> f32 {
 	value := value
 
@@ -219,8 +214,22 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 	}
 }
 
+is_object_visible :: proc(object: ^Object) -> bool {
+	return global_state.visible && get_clip(object.layer.box, object.box) != .Full
+}
+
+update_object_state :: proc(object: ^Object) {
+	object.last_state = object.state
+	object.state -= {.Clicked, .Focused, .Changed}
+	if global_state.focused_object == object.id {
+		object.state += {.Focused}
+	}
+	object.state += object.next_state
+	object.next_state = {}
+}
+
 begin_object :: proc(object: ^Object) -> bool {
-	if object == nil do return false
+	assert(object != nil)
 
 	object.dead = false
 
@@ -242,52 +251,29 @@ begin_object :: proc(object: ^Object) -> bool {
 		return false
 	}
 	object.frames = global_state.frames
-
-	// Push to the stack
-	push_stack(&global_state.object_stack, object) or_return
-	// Object must have a valid layer
 	object.layer = current_layer().? or_return
-	// Set visible flag
-	object.visible = global_state.visible && get_clip(object.layer.box, object.box) != .Full
-	// Reset state
-	object.last_state = object.state
-	object.state -= {.Clicked, .Focused, .Changed}
-	// Disabled?
+	object.visible = is_object_visible(object)
+	update_object_state(object)
 	if global_state.disable_objects do object.disabled = true
-	// Compute next frame's layout
-	layout := current_layout().?
-	// If the user set an explicit size with either `set_width()` or `set_height()` the object's desired size should reflect that
-	// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
-	if layout.object_size.x == 0 || layout.object_size.x != box_width(layout.box) {
-		object.desired_size.x = max(object.desired_size.x, layout.object_size.x)
+
+	if layout, ok := current_layout().?; ok {
+		// If the user set an explicit size with either `set_width()` or `set_height()` the object's desired size should reflect that
+		// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
+		if layout.object_size.x == 0 || layout.object_size.x != box_width(layout.content_box) {
+			object.desired_size.x = max(object.desired_size.x, layout.object_size.x)
+		}
+		if layout.object_size.y == 0 || layout.object_size.y != box_height(layout.content_box) {
+			object.desired_size.y = max(object.desired_size.y, layout.object_size.y)
+		}
 	}
-	if layout.object_size.y == 0 || layout.object_size.y != box_height(layout.box) {
-		object.desired_size.y = max(object.desired_size.y, layout.object_size.y)
-	}
-	// Focus state
-	if global_state.focused_object == object.id {
-		object.state += {.Focused}
-	}
-	// Update form
-	// if global_state.form_active {
-	// 	if global_state.form.first == nil {
-	// 		global_state.form.first = object
-	// 	}
-	// 	if global_state.form.last != nil {
-	// 		object.prev = global_state.form.last
-	// 		global_state.form.last.next = object
-	// 	}
-	// 	global_state.form.last = object
-	// }
-	// Reset next state
-	object.state += object.next_state
-	object.next_state = {}
+
+	push_stack(&global_state.object_stack, object) or_return
+
 	return true
 }
 
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
-		// Draw debug box
 		when ODIN_DEBUG {
 			if global_state.debug.enabled {
 				if vgo.disable_scissor() {
@@ -295,18 +281,8 @@ end_object :: proc() {
 				}
 			}
 		}
-		// Transfer state to layer
 		object.layer.state += object.state
-		// Update layout
-		if layout, ok := current_layout().?; ok {
-			add_layout_content_size(
-				layout,
-				box_size(object.box) if object.fixed else object.desired_size,
-			)
-		}
-		// Pop the stack
 		pop_stack(&global_state.object_stack)
-		// Transfer state to parent
 		if parent, ok := current_object().?; ok {
 			transfer_object_state_to_parent(object, parent)
 		}

@@ -65,6 +65,10 @@ axis_normal :: proc(axis: Axis) -> [2]f32 {
 
 display_or_add_object :: proc(object: ^Object) {
 	if layout, ok := current_layout().?; ok {
+		add_layout_content_size(
+			layout,
+			box_size(object.box) if object.fixed else object.desired_size,
+		)
 		if layout_needs_array(layout) {
 			append(layout.array, object)
 			when ODIN_DEBUG {
@@ -180,22 +184,15 @@ begin_layout :: proc {
 end_layout :: proc() {
 	layout := current_layout().?
 	pop_layout()
-	end_object()
+
+	layout.desired_size = linalg.max(
+		layout.content_size + layout.spacing_size,
+		box_size(layout.box) * axis_normal(Axis(1 - int(layout.axis))),
+	)
 
 	display_or_add_object(layout)
 
-	if layout.isolated do return
-
-	if parent_layout, ok := current_layout().?; ok {
-		size := layout.content_size + layout.spacing_size
-		if parent_layout.axis == .X {
-			parent_layout.content_size.y = max(parent_layout.content_size.y, size.y)
-			parent_layout.content_size.x += size.x
-		} else {
-			parent_layout.content_size.x = max(parent_layout.content_size.x, size.x)
-			parent_layout.content_size.y += size.y
-		}
-	}
+	end_object()
 }
 
 begin_row :: proc(height: f32, justify: H_Align) -> bool {
@@ -311,47 +308,60 @@ next_object_box :: proc(size: [2]f32) -> Box {
 set_mode :: proc(mode: Layout_Mode) {
 	current_layout().?.mode = mode
 }
+
 set_width :: proc(width: f32) {
 	current_layout().?.object_size.x = width
 }
+
 set_width_auto :: proc() {
 	current_layout().?.object_size.x = 0
 }
+
 set_width_fill :: proc() {
 	layout := current_layout().?
 	layout.object_size.x = box_width(layout.content_box)
 }
+
 set_width_percent :: proc(width: f32) {
 	layout := current_layout().?
 	layout.object_size.x = box_width(layout.content_box) * (width / 100)
 }
+
 set_height :: proc(height: f32) {
 	current_layout().?.object_size.y = height
 }
+
 set_height_auto :: proc() {
 	current_layout().?.object_size.y = 0
 }
+
 set_height_fill :: proc() {
 	layout := current_layout().?
 	layout.object_size.y = box_height(layout.content_box)
 }
+
 set_height_percent :: proc(height: f32) {
 	layout := current_layout().?
 	layout.object_size.y = box_height(layout.content_box) * (height / 100)
 }
+
 set_padding_x :: proc(amount: f32) {
 	current_layout().?.object_padding.x = amount
 }
+
 set_padding_y :: proc(amount: f32) {
 	current_layout().?.object_padding.y = amount
 }
+
 set_padding :: proc(amount: f32) {
 	current_layout().?.object_padding = amount
 }
+
 set_width_to_height :: proc() {
 	layout := current_layout().?
 	layout.object_size.x = layout.object_size.y
 }
+
 set_height_to_width :: proc() {
 	layout := current_layout().?
 	layout.object_size.y = layout.object_size.x
@@ -363,16 +373,19 @@ add_padding :: proc(amount: [2]f32) {
 	layout.content_box.hi -= amount
 	layout.spacing_size += amount * 2
 }
+
 add_padding_x :: proc(amount: f32) {
 	layout := current_layout().?
 	layout.content_box.lo.x += amount
 	layout.content_box.hi.x -= amount
 }
+
 add_padding_y :: proc(amount: f32) {
 	layout := current_layout().?
 	layout.content_box.lo.y += amount
 	layout.content_box.hi.y -= amount
 }
+
 add_space :: proc(amount: f32) {
 	layout := current_layout().?
 	cut_box(&layout.content_box, layout_cut_side(layout), amount)

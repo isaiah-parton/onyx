@@ -210,16 +210,12 @@ begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
 	vgo.rotate(info.rotation)
 	vgo.translate(-info.origin)
 
-	// Push layout
-	begin_layout_with_box(info.self.box, axis = .Y, isolated = true)
-
 	return true
 }
 
 end_layer :: proc() {
 	vgo.pop_matrix()
 	vgo.restore_scissor()
-	end_layout()
 	if layer, ok := current_layer().?; ok {
 		// Remove draw calls if invisible
 		if .Invisible in layer.options {

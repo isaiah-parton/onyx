@@ -91,7 +91,7 @@ main :: proc() {
 				if begin_row(100, .Left) {
 					defer end_row()
 
-					label("this is a label")
+					label("Label")
 					for i in 1..=5 {
 						push_id(i)
 							add_space(10)
@@ -102,7 +102,7 @@ main :: proc() {
 				if begin_row(100, .Left) {
 					defer end_row()
 
-					label(FILLER_TEXT)
+					label("Some filler text")
 				}
 				if begin_row(200, .Center) {
 					defer end_row()

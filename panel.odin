@@ -42,6 +42,8 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, lo
 	MIN_SIZE :: [2]f32{100, 100}
 
 	id := hash(loc)
+	push_id(id)
+
 	panel, ok := global_state.panel_map[id]
 	if !ok {
 		panel = create_panel(id).? or_return
@@ -54,10 +56,7 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, lo
 		panel.can_resize = true
 	}
 
-	// Push to stack
 	push_stack(&global_state.panel_stack, panel)
-
-	push_id(id)
 
 	if panel.moving == true {
 		panel.moving = false
@@ -68,7 +67,6 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, lo
 		global_state.draw_next_frame = true
 	}
 
-	// Handle panel transforms
 	min_size := linalg.max(MIN_SIZE, panel.min_size)
 	if panel.resizing {
 		panel.resizing = false
@@ -77,14 +75,12 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, lo
 	panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + min_size)
 	panel.box = snapped_box(panel.box)
 
-	// Reset min_size to be calculated again
 	if panel.last_min_size != panel.min_size {
 		global_state.draw_this_frame = true
 	}
 	panel.last_min_size = panel.min_size
 	panel.min_size = {}
 
-	// Begin the panel layer
 	layer_info := Layer_Info {
 		id   = id,
 		kind = .Floating,
@@ -93,9 +89,6 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, lo
 	begin_layer(&layer_info) or_return
 	panel.layer = layer_info.self
 
-	vgo.push_scissor(vgo.make_box(panel.box, global_state.style.rounding))
-
-	// Background
 	{
 		object := persistent_object(panel.layer.id)
 		if begin_object(object) {
@@ -109,7 +102,7 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, lo
 			handle_object_click(object, sticky = true)
 
 			draw_shadow(object.box)
-			vgo.fill_box(object.box, paint = global_state.style.color.fg)
+			vgo.fill_box(object.box, global_state.style.rounding, paint = global_state.style.color.fg)
 
 			if point_in_box(global_state.mouse_pos, object.box) {
 				hover_object(object)
@@ -119,19 +112,21 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, lo
 				panel.moving = true
 				panel.move_offset = global_state.mouse_pos - panel.box.lo
 			}
+			if .Clicked in object.state && object.click_count == 2 {
+				panel.box.hi = panel.box.lo + panel.last_min_size
+			}
 		}
 	}
 
-	// The content layout box
-	inner_box := panel.box
-
+	vgo.push_scissor(vgo.make_box(panel.box, global_state.style.rounding))
+	begin_layout_with_box(panel.box, axis = .Y, isolated = true) or_return
 	return true
 }
 
 end_panel :: proc() {
-
+	layout := current_layout().?
+	end_layout()
 	panel := current_panel()
-	// Resizing
 	if panel.can_resize {
 		object := persistent_object(hash("resize"))
 		if object.variant == nil {
@@ -179,7 +174,6 @@ end_panel :: proc() {
 		panel.layer.index < global_state.last_highest_layer_index,
 	)
 
-	layout := current_layout().?
 	panel.min_size += layout.content_size + layout.spacing_size
 
 	pop_id()
