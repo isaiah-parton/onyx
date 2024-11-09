@@ -22,6 +22,7 @@ import "vendor:glfw"
 import "vendor:wgpu"
 
 main :: proc() {
+
 	when ODIN_DEBUG {
 		track: mem.Tracking_Allocator
 		mem.tracking_allocator_init(&track, context.allocator)
@@ -80,11 +81,12 @@ main :: proc() {
 					),
 				)
 			}
-			if panel({}) {
+			if begin_panel() {
+				defer end_panel()
+
 				add_padding(50)
-				if begin_row(100) {
+				if begin_row(100, .Left) {
 					defer end_row()
-					justify(.Center)
 
 					label("this is a label")
 					for i in 1..=5 {
@@ -93,14 +95,26 @@ main :: proc() {
 						pop_id()
 					}
 				}
-				if begin_row(100) {
+				if begin_row(200, .Center) {
 					defer end_row()
-					justify(.Center)
 
-					for i in 1..=5 {
-						push_id(i)
-							boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
-						pop_id()
+					if begin_column(120, .Center) {
+						defer end_column()
+
+						for i in 1..=5 {
+							push_id(i)
+								boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
+							pop_id()
+						}
+					}
+					if begin_column(120, .Center) {
+						defer end_column()
+
+						for i in 1..=5 {
+							push_id(i)
+								boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
+							pop_id()
+						}
 					}
 				}
 			}

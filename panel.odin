@@ -37,7 +37,7 @@ create_panel :: proc(id: Id) -> Maybe(^Panel) {
 	return nil
 }
 
-begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
+begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, loc := #caller_location) -> bool {
 
 	MIN_SIZE :: [2]f32{100, 100}
 
@@ -46,8 +46,8 @@ begin_panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
 	if !ok {
 		panel = create_panel(id).? or_return
 
-		position := info.position.? or_else get_next_panel_position()
-		size := info.size.? or_else MIN_SIZE
+		position := position.? or_else get_next_panel_position()
+		size := size.? or_else MIN_SIZE
 		panel.box = {position, position + size}
 
 		panel.can_move = true
@@ -186,18 +186,6 @@ end_panel :: proc() {
 	vgo.pop_scissor()
 	end_layer()
 	pop_stack(&global_state.panel_stack)
-}
-
-@(deferred_out = __panel)
-panel :: proc(info: Panel_Info, loc := #caller_location) -> bool {
-	return begin_panel(info, loc)
-}
-
-@(private)
-__panel :: proc(ok: bool) {
-	if ok {
-		end_panel()
-	}
 }
 
 current_panel :: proc(loc := #caller_location) -> ^Panel {

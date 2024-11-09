@@ -151,7 +151,6 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 }
 
 destroy_object :: proc(object: ^Object) {
-
 }
 
 persistent_object :: proc(id: Id) -> ^Object {
@@ -405,11 +404,11 @@ divider :: proc() {
 
 display_object :: proc(object: ^Object) {
 	switch &v in object.variant {
+	case Container:
 	case Button:
 		display_button(&v)
 	case Boolean:
 		display_boolean(&v)
-	case Container:
 	case Layout:
 		display_layout(&v)
 	case Label:

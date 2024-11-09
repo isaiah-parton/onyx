@@ -54,37 +54,53 @@ Layout :: struct {
 	mode:           Layout_Mode,
 	object_size:    [2]f32,
 	object_padding: [2]f32,
-	array:          ^[dynamic]^Object,
+	array:          Maybe(^[dynamic]^Object),
+}
+
+axis_normal :: proc(axis: Axis) -> [2]f32 {
+	return {f32(1 - i32(axis)), f32(i32(axis))}
 }
 
 display_or_add_object :: proc(object: ^Object) {
-	layout := current_layout().?
-	if layout.justify == .Center {
-		append(layout.array, object)
-		when ODIN_DEBUG {
-			global_state.debug.deferred_objects += 1
+	if layout, ok := current_layout().?; ok {
+		if layout_needs_array(layout) {
+			append(layout.array.?, object)
+			when ODIN_DEBUG {
+				global_state.debug.deferred_objects += 1
+			}
+			return
 		}
-	} else {
-		display_object(object)
+	}
+	display_object(object)
+}
+
+move_object :: proc(object: ^Object, delta: [2]f32) {
+	object.box.lo += delta
+	object.box.hi += delta
+	if layout, ok := object.variant.(Layout); ok {
+		for child in layout.array.? {
+			move_object(child, delta)
+		}
 	}
 }
 
 display_layout :: proc(layout: ^Layout) {
-	for object in layout.array {
-		offset := layout.content_box.hi[int(layout.axis)] - layout.content_box.lo[int(layout.axis)]
-		if layout.justify == .Center {
-			object.box.lo[int(layout.axis)] += offset / 2
-			object.box.hi[int(layout.axis)] += offset / 2
-		} else if layout.justify == .Far {
-			object.box.lo[int(layout.axis)] += offset
-			object.box.hi[int(layout.axis)] += offset
+	if array, ok := layout.array.?; ok {
+		for object in array {
+			size := layout.content_box.hi[int(layout.axis)] - layout.content_box.lo[int(layout.axis)]
+			if layout.justify == .Center {
+				move_object(object, size * axis_normal(layout.axis) * 0.5)
+			} else if layout.justify == .Far {
+				move_object(object, size * axis_normal(layout.axis))
+			}
+			display_object(object)
 		}
-		display_object(object)
 	}
 }
 
 push_layout :: proc(layout: Layout) -> bool {
-	global_state.current_layout = &global_state.layout_stack.items[global_state.layout_stack.height]
+	global_state.current_layout =
+	&global_state.layout_stack.items[global_state.layout_stack.height]
 	return push_stack(&global_state.layout_stack, layout)
 }
 
@@ -102,7 +118,6 @@ begin_layout_with_options :: proc(side: Side, size: f32, axis: Axis) -> bool {
 	layout := current_layout().? or_return
 	return begin_layout_with_box(
 		cut_box(&layout.content_box, side, size),
-		side = side,
 		axis = axis,
 	)
 }
@@ -112,10 +127,23 @@ next_layout_axis :: proc() -> (axis: Axis, ok: bool) {
 	return Axis(1 - int(layout.axis)), true
 }
 
+next_layout_array :: proc() -> ^[dynamic]^Object {
+	non_zero_resize(&global_state.layout_array_array, max(global_state.layout_array_count + 1, len(global_state.layout_array_array)))
+	array := &global_state.layout_array_array[global_state.layout_array_count]
+	assert(array != nil)
+	global_state.layout_array_count += 1
+	clear(array)
+	return array
+}
+
+layout_needs_array :: proc(layout: ^Layout) -> bool {
+	return layout.justify == .Center
+}
+
 begin_layout_with_box :: proc(
 	box: Box,
-	side: Side = .Left,
 	axis: Maybe(Axis) = nil,
+	justify: Align = .Near,
 	isolated: bool = false,
 ) -> bool {
 	object := transient_object()
@@ -124,10 +152,12 @@ begin_layout_with_box :: proc(
 		object      = object,
 		isolated    = isolated,
 		content_box = box,
+		justify     = justify,
 		axis        = axis.? or_else (next_layout_axis() or_else Axis.X),
-		array       = &global_state.layout_arrays[global_state.layout_stack.height],
 	}
-	clear(layout.array)
+	if layout_needs_array(&layout) {
+		layout.array = next_layout_array()
+	}
 	object.variant = layout
 	push_layout(layout) or_return
 	begin_object(object) or_return
@@ -147,8 +177,6 @@ begin_layout :: proc {
 end_layout :: proc() {
 	layout := current_layout().?
 
-	display_layout(layout)
-
 	when ODIN_DEBUG {
 		if global_state.debug.enabled {
 			vgo.stroke_box(layout.box, 1, paint = vgo.RED)
@@ -157,6 +185,8 @@ end_layout :: proc() {
 
 	pop_layout()
 	end_object()
+
+	display_or_add_object(layout)
 
 	if layout.isolated do return
 
@@ -176,12 +206,29 @@ end_layout :: proc() {
 	}
 }
 
-begin_row :: proc(height: f32) -> bool {
+begin_row :: proc(height: f32, justify: H_Align) -> bool {
 	layout := current_layout().?
-	return begin_layout_with_box(cut_layout(layout, layout_cut_side(layout), [2]f32{0, height}))
+	return begin_layout_with_box(
+		cut_layout(layout, size = [2]f32{box_width(layout.content_box), height}),
+		axis = .X,
+		justify = Align(justify),
+	)
 }
 
 end_row :: proc() {
+	end_layout()
+}
+
+begin_column :: proc(width: f32, justify: V_Align) -> bool {
+	layout := current_layout().?
+	return begin_layout_with_box(
+		cut_layout(layout, size = [2]f32{width, box_height(layout.content_box)}),
+		axis = .Y,
+		justify = Align(justify),
+	)
+}
+
+end_column :: proc() {
 	end_layout()
 }
 
@@ -270,9 +317,6 @@ next_object_box :: proc(size: [2]f32) -> Box {
 
 set_mode :: proc(mode: Layout_Mode) {
 	current_layout().?.mode = mode
-}
-justify :: proc(justify: Align) {
-	current_layout().?.justify = justify
 }
 set_width :: proc(width: f32) {
 	current_layout().?.object_size.x = width

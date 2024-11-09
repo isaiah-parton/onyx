@@ -62,7 +62,7 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 Debug_State :: struct {
 	enabled, objects, panels, layers: bool,
 	delta_time:                       [dynamic]f32,
-	deferred_objects: int,
+	deferred_objects:                 int,
 }
 
 @(private)
@@ -93,7 +93,7 @@ Global_State :: struct {
 	// Hashing
 	id_stack:                 Stack(Id, MAX_IDS),
 	// Objects
-	transient_objects:         [dynamic]Object,
+	transient_objects:        [dynamic]Object,
 	objects:                  [dynamic]^Object,
 	object_map:               map[Id]^Object,
 	object_stack:             Stack(^Object, 10),
@@ -109,9 +109,10 @@ Global_State :: struct {
 	form:                     Form,
 	form_active:              bool,
 	// Layout
-	current_layout: ^Layout,
+	layout_array_array:       [dynamic][dynamic]^Object,
+	layout_array_count:       int,
+	current_layout:           ^Layout,
 	layout_stack:             Stack(Layout, MAX_LAYOUTS),
-	layout_arrays:            [MAX_LAYOUTS][dynamic]^Object,
 	active_container:         Id,
 	next_active_container:    Id,
 	// Panels
@@ -437,6 +438,8 @@ new_frame :: proc() {
 	global_state.layout_stack.height = 0
 	global_state.object_stack.height = 0
 	global_state.panel_stack.height = 0
+
+	global_state.layout_array_count = 0
 
 	global_state.active_container = global_state.next_active_container
 	global_state.next_active_container = 0
