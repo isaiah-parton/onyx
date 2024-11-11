@@ -19,30 +19,30 @@ label :: proc(
 	text: string,
 	font := global_state.style.default_font,
 	font_size := global_state.style.default_text_size,
-	loc := #caller_location,
 ) {
 	object := transient_object()
 	if begin_object(object) {
 		defer end_object()
 
-		label := Label {
-			object      = object,
-			text_layout = vgo.make_text_layout(
-				text,
-				font,
-				font_size,
-			),
+		if object.variant == nil {
+			object.variant = Label{
+				object = object,
+			}
 		}
+		label := &object.variant.(Label)
+		label.text_layout = vgo.make_text_layout(
+			text,
+			font,
+			font_size,
+		)
 		label.desired_size = label.text_layout.size
-		object.variant = label
 	}
 }
 
-header :: proc(text: string, loc := #caller_location) {
+header :: proc(text: string) {
 	label(
 		text,
 		font = global_state.style.header_font.? or_else global_state.style.default_font,
 		font_size = global_state.style.header_text_size,
-		loc = loc,
 	)
 }

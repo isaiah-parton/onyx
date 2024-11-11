@@ -20,7 +20,7 @@ Boolean :: struct {
 	side:            Side,
 	text:            string,
 	text_layout:     vgo.Text_Layout,
-	icon_size:            f32,
+	icon_size:       f32,
 }
 
 boolean :: proc(
@@ -35,12 +35,13 @@ boolean :: proc(
 		defer end_object()
 
 		if object.variant == nil {
-			object.variant = Boolean{
-				base = object
+			object.variant = Boolean {
+				base = object,
 			}
 		}
 		boolean := &object.variant.(Boolean)
 		boolean.value = state
+		boolean.margin = 4
 		boolean.icon_size = global_state.style.visual_size.y * 0.8
 		boolean.type = type
 		boolean.text = text
@@ -55,8 +56,10 @@ boolean :: proc(
 				object.desired_size.y = boolean.icon_size + boolean.text_layout.size.y
 			} else {
 				object.desired_size.x =
-					boolean.icon_size + boolean.text_layout.size.x + global_state.style.text_padding.x * 2
-					object.desired_size.y = boolean.icon_size
+					boolean.icon_size +
+					boolean.text_layout.size.x +
+					global_state.style.text_padding.x * 2
+				object.desired_size.y = boolean.icon_size
 			}
 		}
 	}
@@ -81,7 +84,10 @@ display_boolean :: proc(boolean: ^Boolean) {
 			case .Left:
 				icon_box = {boolean.box.lo, boolean.icon_size}
 			case .Right:
-				icon_box = {{boolean.box.hi.x - boolean.icon_size, boolean.box.lo.y}, boolean.icon_size}
+				icon_box = {
+					{boolean.box.hi.x - boolean.icon_size, boolean.box.lo.y},
+					boolean.icon_size,
+				}
 			case .Top:
 				icon_box = {
 					{

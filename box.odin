@@ -216,7 +216,40 @@ move_box :: proc(a: Box, delta: [2]f32) -> Box {
 	return {a.lo + delta, a.hi + delta}
 }
 
-// cut a box and return the cut piece
+split_box_left :: proc(box: Box, left: f32) -> (left_box, right_box: Box) {
+	left_box = {box.lo, {box.lo.x + left, box.hi.y}}
+	right_box = {{left_box.hi.x, left_box.lo.y}, box.hi}
+	return
+}
+split_box_right :: proc(box: Box, right: f32) -> (right_box, left_box: Box) {
+	left_box = {box.lo, {box.hi.x - right, box.hi.y}}
+	right_box = {{left_box.hi.x, left_box.lo.y}, box.hi}
+	return
+}
+split_box_top :: proc(box: Box, top: f32) -> (top_box, bottom_box: Box) {
+	top_box = {box.lo, {box.hi.x, box.lo.y + top}}
+	bottom_box = {{top_box.lo.x, top_box.hi.y}, box.hi}
+	return
+}
+split_box_bottom :: proc(box: Box, bottom: f32) -> (bottom_box, top_box: Box) {
+	top_box = {box.lo, {box.hi.x, box.hi.y - bottom}}
+	bottom_box = {{top_box.lo.x, top_box.hi.y}, box.hi}
+	return
+}
+split_box :: proc(box: Box, side: Side, amount: f32) -> (new_box, remainder: Box) {
+	switch side {
+	case .Bottom:
+		return split_box_bottom(box, amount)
+	case .Top:
+		return split_box_top(box, amount)
+	case .Left:
+		return split_box_left(box, amount)
+	case .Right:
+		return split_box_right(box, amount)
+	}
+	return
+}
+
 cut_box_left :: proc(box: ^Box, a: f32) -> (res: Box) {
 	a := min(a, box.hi.x - box.lo.x)
 	res = {box.lo, {box.lo.x + a, box.hi.y}}

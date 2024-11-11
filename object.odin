@@ -14,6 +14,7 @@ import "core:mem"
 import "core:reflect"
 import "core:strings"
 import "core:time"
+import "core:container/small_array"
 import "tedit"
 
 MAX_CLICK_DELAY :: time.Millisecond * 450
@@ -66,7 +67,7 @@ Object :: struct {
 	click_time:     time.Time,
 	click_point:    [2]f32,
 	click_button:   Mouse_Button,
-	margin: Object_Margin,
+	margin: [4]f32,
 	size:           [2]f32,
 	desired_size:   [2]f32,
 	variant:        Object_Variant,
@@ -88,7 +89,7 @@ clean_up_objects :: proc() {
 			object.dead = true
 		}
 	}
-	clear(&global_state.transient_objects)
+	small_array.clear(&global_state.transient_objects)
 }
 
 animate :: proc(value, duration: f32, condition: bool) -> f32 {
@@ -160,8 +161,8 @@ persistent_object :: proc(id: Id) -> ^Object {
 }
 
 transient_object :: proc() -> ^Object {
-	append(&global_state.transient_objects, Object{})
-	object := &global_state.transient_objects[len(global_state.transient_objects) - 1]
+	small_array.append(&global_state.transient_objects, Object{})
+	object := small_array.get_ptr_safe(&global_state.transient_objects, global_state.transient_objects.len - 1) or_else nil
 	assert(object != nil)
 	return object
 }
@@ -245,8 +246,8 @@ begin_object :: proc(object: ^Object) -> bool {
 		}
 		return false
 	}
-
 	object.frames = global_state.frames
+
 	object.layer = current_layer().? or_return
 	update_object_state(object)
 	if global_state.disable_objects do object.disabled = true
@@ -271,18 +272,18 @@ begin_object :: proc(object: ^Object) -> bool {
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
 		if layout, ok := current_layout().?; ok {
+			layout.desired_size += (object.margin.xy + object.margin.zw) * axis_normal(layout.axis)
+			switch layout.axis {
+			case .X:
+				layout.content_size.x += object.desired_size.x
+				layout.content_size.y = max(layout.content_size.y, object.desired_size.y)
+			case .Y:
+				layout.content_size.y += object.desired_size.y
+				layout.content_size.x = max(layout.content_size.x, object.desired_size.x)
+			}
 			display_or_add_object(object, layout)
 		} else {
 			display_object(object)
-		}
-		when ODIN_DEBUG {
-			if global_state.debug.enabled {
-				hovered := point_in_box(mouse_point(), object.box)
-				color := vgo.fade(vgo.GREEN, 1.0 if hovered else 0.5)
-				if vgo.disable_scissor() {
-					vgo.stroke_box(object.box, 1, paint = color)
-				}
-			}
 		}
 		object.layer.state += object.state
 		pop_stack(&global_state.object_stack)
@@ -377,10 +378,10 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 	global_state.draw_this_frame = true
 }
 
-divider :: proc() {
-	cut := snapped_box(cut_current_layout(size = [2]f32{1, 1}))
-	vgo.fill_box(cut, paint = global_state.style.color.substance)
-}
+// divider :: proc() {
+// 	cut := snapped_box(cut_current_layout(size = [2]f32{1, 1}))
+// 	vgo.fill_box(cut, paint = global_state.style.color.substance)
+// }
 
 display_object :: proc(object: ^Object) {
 	switch &v in object.variant {

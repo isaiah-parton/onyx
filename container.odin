@@ -109,7 +109,7 @@ begin_container :: proc(
 	layout_origin := object.box.lo - linalg.max(linalg.floor(container.scroll), 0)
 	layout_box := Box{layout_origin, layout_origin + linalg.max(layout_size, box_size(object.box))}
 
-	begin_layout(layout_box, isolated = true) or_return
+	begin_layout(box = layout_box) or_return
 
 	return true
 }

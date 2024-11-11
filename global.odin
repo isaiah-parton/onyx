@@ -2,6 +2,7 @@ package onyx
 
 import "../vgo"
 import "base:runtime"
+import "core:container/small_array"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -59,7 +60,7 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 	stack.height = 0
 }
 
-@(private)
+// @(private)
 global_state: Global_State
 
 @(private)
@@ -87,10 +88,10 @@ Global_State :: struct {
 	// Hashing
 	id_stack:                 Stack(Id, MAX_IDS),
 	// Objects
-	transient_objects:        [dynamic]Object,
+	transient_objects:        small_array.Small_Array(512, Object),
 	objects:                  [dynamic]^Object,
 	object_map:               map[Id]^Object,
-	object_stack:             Stack(^Object, 10),
+	object_stack:             Stack(^Object, 128),
 	last_hovered_object:      Id,
 	hovered_object:           Id,
 	next_hovered_object:      Id,
@@ -103,7 +104,7 @@ Global_State :: struct {
 	form:                     Form,
 	form_active:              bool,
 	// Layout
-	layout_array_array:       [dynamic][dynamic]^Object,
+	layout_array_array:       [128][dynamic]^Object,
 	layout_array_count:       int,
 	current_layout:           ^Layout,
 	layout_stack:             Stack(^Layout, MAX_LAYOUTS),
@@ -464,12 +465,16 @@ present :: proc() {
 	profiler_end_scope(.Construct)
 	profiler_scope(.Render)
 
-	// Render debug info rq
-	if global_state.debug.enabled {
-		if key_pressed(.F6) {
-			global_state.disable_frame_skip = !global_state.disable_frame_skip
+	when ODIN_DEBUG {
+		if global_state.debug.enabled {
+			if key_pressed(.F6) {
+				global_state.disable_frame_skip = !global_state.disable_frame_skip
+			}
+			if key_pressed(.F7) {
+				global_state.debug.wireframe = !global_state.debug.wireframe
+			}
+			draw_debug_stuff()
 		}
-		do_debug_layer()
 	}
 
 	if global_state.draw_this_frame && global_state.visible {
@@ -497,7 +502,6 @@ shutdown :: proc() {
 	for array in global_state.layout_array_array {
 		delete(array)
 	}
-	delete(global_state.layout_array_array)
 
 	delete(global_state.layers)
 	delete(global_state.object_map)

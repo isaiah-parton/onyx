@@ -37,7 +37,7 @@ create_panel :: proc(id: Id) -> Maybe(^Panel) {
 	return nil
 }
 
-begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, loc := #caller_location) -> bool {
+begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, axis: Axis = .Y, loc := #caller_location) -> bool {
 
 	MIN_SIZE :: [2]f32{100, 100}
 
@@ -119,7 +119,7 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, lo
 	}
 
 	vgo.push_scissor(vgo.make_box(panel.box, global_state.style.rounding))
-	begin_layout_with_box(panel.box, axis = .Y, isolated = true) or_return
+	begin_layout(box = panel.box, axis = axis) or_return
 	return true
 }
 
@@ -129,36 +129,29 @@ end_panel :: proc() {
 	panel := current_panel()
 	if panel.can_resize {
 		object := persistent_object(hash("resize"))
-		if object.variant == nil {
-			object.variant = Button{
-				object = object
-			}
-		}
-		button := &object.variant.(Button)
-		if begin_object(button) {
+		if begin_object(object) {
 			defer end_object()
-			button.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
-			handle_object_click(button, sticky = true)
-			button_behavior(button)
-			if .Hovered in button.state {
+			object.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
+			handle_object_click(object, sticky = true)
+			if point_in_box(mouse_point(), object.box) {
+				hover_object(object)
+			}
+			icon_color := global_state.style.color.substance
+			if .Hovered in object.state {
+				icon_color = global_state.style.color.accent
 				global_state.cursor_type = .Resize_NWSE
 			}
-			icon_color := vgo.blend(
-				global_state.style.color.substance,
-				global_state.style.color.content,
-				0.5,
-			)
 			vgo.fill_polygon(
 				{
-					{button.box.hi.x, button.box.lo.y},
-					button.box.hi,
-					{button.box.lo.x, button.box.hi.y},
+					{object.box.hi.x, object.box.lo.y},
+					object.box.hi,
+					{object.box.lo.x, object.box.hi.y},
 				},
 				paint = icon_color,
 			)
-			if .Pressed in button.state {
+			if .Pressed in object.state {
 				panel.resizing = true
-				if .Pressed not_in button.last_state {
+				if .Pressed not_in object.last_state {
 					panel.resize_offset = panel.box.hi - global_state.mouse_pos
 				}
 			}

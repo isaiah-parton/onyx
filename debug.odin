@@ -2,8 +2,8 @@ package onyx
 
 import "../vgo"
 import "core:fmt"
-import "core:time"
 import "core:reflect"
+import "core:time"
 
 Profiler_Scope :: enum {
 	New_Frame,
@@ -17,10 +17,11 @@ Profiler :: struct {
 }
 
 Debug_State :: struct {
-	enabled, objects, panels, layers: bool,
-	delta_time:                       [dynamic]f32,
-	deferred_objects:                 int,
-	hovered_object: Maybe(^Object),
+	enabled:          bool,
+	delta_time:       [dynamic]f32,
+	deferred_objects: int,
+	hovered_object:   Maybe(^Object),
+	wireframe:        bool,
 }
 
 @(private = "file")
@@ -41,8 +42,23 @@ profiler_end_scope :: proc(scope: Profiler_Scope) {
 	__prof.d[scope] = time.since(__prof.t[scope])
 }
 
+draw_object_debug_boxes :: proc() {
+	for _, object in global_state.object_map {
+		vgo.stroke_box(object.box, 1, paint = vgo.GREEN)
+	}
+	for &object in global_state.transient_objects.data[:global_state.transient_objects.len] {
+		vgo.stroke_box(object.box, 1, paint = vgo.BLUE)
+	}
+}
+
 @(private)
-do_debug_layer :: proc() {
+draw_debug_stuff :: proc() {
+
+	if global_state.debug.wireframe {
+		vgo.reset_drawing()
+		draw_object_debug_boxes()
+	}
+
 	DEBUG_TEXT_SIZE :: 16
 	vgo.set_paint(vgo.WHITE)
 
@@ -52,19 +68,10 @@ do_debug_layer :: proc() {
 			pos += print_layer_debug(child, left + 20, pos)
 		}
 		pos +=
-			vgo.fill_text_aligned(fmt.tprintf("%i - %v %i", layer.id, layer.kind, layer.index), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {left, global_state.view.y - pos}, .Left, .Bottom, paint = vgo.GOLD if layer.index == global_state.highest_layer_index else nil).y
+			vgo.fill_text(fmt.tprintf("%i - %v %i", layer.id, layer.kind, layer.index), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {left, pos}, paint = vgo.GOLD if layer.index == global_state.highest_layer_index else nil).y
 		return pos
 	}
 
-	// Layers
-	{
-		pos := f32(0)
-		for layer in global_state.layers {
-			pos += print_layer_debug(layer, 0, pos)
-		}
-	}
-
-	// Timings
 	{
 		total: time.Duration
 		offset := f32(0)
@@ -77,19 +84,20 @@ do_debug_layer :: proc() {
 		}
 		offset +=
 			vgo.fill_text(fmt.tprintf("Total: %.3fms", time.duration_milliseconds(total)), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
-	}
-
-	if object, ok := global_state.debug.hovered_object.?; ok {
-		if layout, ok := object.variant.(Layout); ok {
-			vgo.fill_text_aligned(
-				fmt.tprintf("Layout:\naxis: %v\nbox: %.2f, %.2f", layout.axis, layout.box.lo, layout.box.hi),
-				global_state.style.monospace_font,
-				DEBUG_TEXT_SIZE,
-				{0, global_state.view.y / 2},
-				.Left,
-				.Center,
-			)
+		for layer in global_state.layers {
+			offset += print_layer_debug(layer, 0, offset)
 		}
 	}
-	global_state.debug.hovered_object = nil
+
+	vgo.fill_text_aligned(
+		fmt.tprintf(
+			"F6 = Turn %s FPS cap\nF7 = Toggle wireframes",
+			"on" if global_state.disable_frame_skip else "off",
+		),
+		global_state.style.monospace_font,
+		DEBUG_TEXT_SIZE,
+		{0, global_state.view.y},
+		.Left,
+		.Bottom,
+	)
 }

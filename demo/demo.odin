@@ -84,39 +84,69 @@ main :: proc() {
 					),
 				)
 			}
-			if begin_panel() {
+			if begin_panel(axis = .X) {
 				defer end_panel()
 
-				add_padding(50)
-				if begin_row(height = 100) {
-					defer end_row()
+				if begin_layout(size = Fixed(30), axis = .Y, align = .Center) {
+					defer end_layout()
 
-					label("Label")
-					for i in 1..=5 {
-						push_id(i)
-							button(fmt.tprintf("Button %i", i))
-						pop_id()
-					}
+					button("\uf449", style = .Ghost)
 				}
-				if begin_row(justify = .Center) {
-					defer end_row()
 
-					if begin_column(160, .Center) {
-						defer end_column()
+				if begin_layout(size = At_Least(0), axis = .Y) {
+					defer end_layout()
 
+					add_padding(50)
+					if begin_layout(justify = .Far, size = Fixed(50), axis = .X) {
+						defer end_layout()
+
+						label("Label")
 						for i in 1..=5 {
 							push_id(i)
-								boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
+								button(fmt.tprintf("Button %i", i))
 							pop_id()
 						}
 					}
-					if begin_column(160, .Center) {
-						defer end_column()
+					if begin_layout(justify = .Center, size = Fixed(50), axis = .X) {
+						defer end_layout()
 
+						label("Label")
 						for i in 1..=5 {
 							push_id(i)
-								boolean(&checkbox_value, fmt.tprintf("Checkbox %i", i))
+								button(fmt.tprintf("Button %i", i))
 							pop_id()
+						}
+					}
+					if begin_layout(justify = .Near, size = Fixed(50), axis = .X) {
+						defer end_layout()
+
+						label("Label")
+						for i in 1..=5 {
+							push_id(i)
+								button(fmt.tprintf("Button %i", i))
+							pop_id()
+						}
+					}
+					if begin_layout(justify = .Center, axis = .X) {
+						defer end_layout()
+
+						if begin_layout(axis = .Y) {
+							defer end_layout()
+
+							for i in 1..=5 {
+								push_id(i)
+									boolean(&checkbox_value, fmt.tprintf("Checkbox A%i", i))
+								pop_id()
+							}
+						}
+						if begin_layout(axis = .Y) {
+							defer end_layout()
+
+							for i in 1..=5 {
+								push_id(i)
+									boolean(&checkbox_value, fmt.tprintf("Checkbox B%i", i))
+								pop_id()
+							}
 						}
 					}
 				}
