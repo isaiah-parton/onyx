@@ -87,17 +87,19 @@ main :: proc() {
 			if begin_panel(axis = .X) {
 				defer end_panel()
 
-				if begin_layout(size = Fixed(30), axis = .Y, align = .Center) {
+				if begin_layout(size = Fixed(36), axis = .Y, align = .Center) {
 					defer end_layout()
 
-					button("\uf449", style = .Ghost)
+					button("\uf578", style = .Ghost, font_size = 16)
+					button("\uf044", style = .Ghost, font_size = 16)
+					button("\uEDC0", style = .Ghost, font_size = 16)
 				}
 
 				if begin_layout(size = At_Least(0), axis = .Y) {
 					defer end_layout()
 
 					add_padding(50)
-					if begin_layout(justify = .Far, size = Fixed(50), axis = .X) {
+					if begin_layout(justify = .Far, align = .Center, size = Fixed(50), axis = .X) {
 						defer end_layout()
 
 						label("Label")
@@ -107,7 +109,7 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, size = Fixed(50), axis = .X) {
+					if begin_layout(justify = .Center, align = .Center, size = Fixed(50), axis = .X) {
 						defer end_layout()
 
 						label("Label")
@@ -117,7 +119,7 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Near, size = Fixed(50), axis = .X) {
+					if begin_layout(justify = .Near, align = .Center, size = Fixed(50), axis = .X) {
 						defer end_layout()
 
 						label("Label")

@@ -27,15 +27,7 @@ Button :: struct {
 	text_layout:  vgo.Text_Layout,
 }
 
-make_button_text_layout :: proc(text: string, font_size: Maybe(f32) = nil) -> vgo.Text_Layout {
-	return vgo.make_text_layout(
-		text,
-		global_state.style.default_font,
-		font_size.? or_else global_state.style.default_text_size,
-	)
-}
-
-button :: proc(text: string, style: Button_Style = .Primary, name: string = "", loc := #caller_location) {
+button :: proc(text: string, style: Button_Style = .Primary, font_size: f32 = global_state.style.default_text_size, loc := #caller_location) {
 	object := persistent_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
@@ -47,7 +39,11 @@ button :: proc(text: string, style: Button_Style = .Primary, name: string = "", 
 		}
 		button := &object.variant.(Button)
 		button.margin = 4
-		button.text_layout = make_button_text_layout(text)
+		button.text_layout = vgo.make_text_layout(
+			text,
+			global_state.style.default_font,
+			font_size,
+		)
 		button.desired_size = button.text_layout.size + global_state.style.text_padding * 2
 		button.style = style
 	}
