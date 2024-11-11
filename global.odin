@@ -92,6 +92,7 @@ Global_State :: struct {
 	objects:                  [dynamic]^Object,
 	object_map:               map[Id]^Object,
 	object_stack:             Stack(^Object, 128),
+	object_index: int,
 	last_hovered_object:      Id,
 	hovered_object:           Id,
 	next_hovered_object:      Id,
@@ -421,23 +422,19 @@ new_frame :: proc() {
 
 	reset_input()
 	glfw.PollEvents()
-	if global_state.cursor_type == .None {
-		glfw.SetInputMode(global_state.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
-	} else {
-		glfw.SetInputMode(global_state.window, glfw.CURSOR, glfw.CURSOR_NORMAL)
-		glfw.SetCursor(global_state.window, global_state.cursors[global_state.cursor_type])
-	}
-	global_state.cursor_type = .Normal
 
 	global_state.layer_stack.height = 0
 	global_state.layout_stack.height = 0
 	global_state.object_stack.height = 0
 	global_state.panel_stack.height = 0
 
+	global_state.object_index = 0
 	global_state.layout_array_count = 0
 
 	global_state.active_container = global_state.next_active_container
 	global_state.next_active_container = 0
+
+	clear(&global_state.debug.hovered_objects)
 
 	clean_up_layers()
 	update_layer_references()
@@ -465,17 +462,26 @@ present :: proc() {
 	profiler_end_scope(.Construct)
 	profiler_scope(.Render)
 
-	when ODIN_DEBUG {
+	when DEBUG {
 		if global_state.debug.enabled {
+			set_cursor(.Crosshair)
 			if key_pressed(.F6) {
 				global_state.disable_frame_skip = !global_state.disable_frame_skip
 			}
 			if key_pressed(.F7) {
 				global_state.debug.wireframe = !global_state.debug.wireframe
 			}
-			draw_debug_stuff()
+			draw_debug_stuff(&global_state.debug)
 		}
 	}
+
+	if global_state.cursor_type == .None {
+		glfw.SetInputMode(global_state.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+	} else {
+		glfw.SetInputMode(global_state.window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+		glfw.SetCursor(global_state.window, global_state.cursors[global_state.cursor_type])
+	}
+	global_state.cursor_type = .Normal
 
 	if global_state.draw_this_frame && global_state.visible {
 		vgo.present()

@@ -6,6 +6,21 @@ import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
+Layout_Content_Placement :: struct {
+	axis:   Axis,
+	justfy: Align,
+	align:  Align,
+}
+
+Layout_Metrics :: struct {
+	box: Box,
+}
+
+Fixed :: distinct f32
+At_Least :: distinct f32
+At_Most :: distinct f32
+Between :: distinct [2]f32
+
 Axis :: enum {
 	X,
 	Y,
@@ -15,11 +30,6 @@ Object_Size_Method :: enum {
 	Maximum,
 	Minimum,
 	Fixed,
-}
-
-Layout_Size_Mode :: enum {
-	Fixed,
-	Available,
 }
 
 Layout_Info :: struct {
@@ -50,20 +60,19 @@ V_Align :: enum {
 }
 
 Layout :: struct {
-	using object:   ^Object,
-	axis:           Axis,
-	content_box:    Box,
-	justify:        Align,
-	align:          Align,
-	padding:        [2]f32,
-	isolated:       bool,
-	mode:           Object_Size_Method,
-	content_size:   [2]f32,
-	spacing_size:   [2]f32,
-	object_size:    [2]f32,
-	object_padding: [2]f32,
-	object_margin:  [4]f32,
-	objects:        ^[dynamic]^Object,
+	using object:  ^Object,
+	isolated:      bool,
+	axis:          Axis,
+	content_box:   Box,
+	justify:       Align,
+	align:         Align,
+	method:        Object_Size_Method,
+	padding:       [4]f32,
+	content_size:  [2]f32,
+	spacing_size:  [2]f32,
+	object_size:   [2]f32,
+	object_margin: [4]f32,
+	objects:       ^[dynamic]^Object,
 }
 
 Object_Placement :: struct {
@@ -154,16 +163,18 @@ apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
 			}
 		}
 	}
-	box.lo += layout.object_padding
-	box.hi -= layout.object_padding
+
 	object.box = snapped_box(box)
 }
 
 display_layout :: proc(layout: ^Layout) {
-	if layout.objects == nil do return
-	layout.content_box = shrink_box(layout.box, layout.padding)
+	layout.content_box.lo += layout.padding.xy
+	layout.content_box.hi -= layout.padding.zw
 
 	delta := axis_normal(layout.axis) * (box_size(layout.box) - layout.desired_size)
+
+	if layout.objects == nil do return
+
 	for object in layout.objects {
 		apply_object_layout(object, layout)
 		if layout.justify == .Center {
@@ -205,30 +216,15 @@ next_layout_array :: proc() -> ^[dynamic]^Object {
 }
 
 layout_is_deferred :: proc(layout: ^Layout) -> bool {
-	return layout.justify != .Near || !layout.fixed
+	return (layout.justify != .Near) || !layout.fixed
 }
-
-Layout_Content_Placement :: struct {
-	axis:   Axis,
-	justfy: Align,
-	align:  Align,
-}
-
-Layout_Metrics :: struct {
-	box: Box,
-}
-
-Fixed :: distinct f32
-At_Least :: distinct f32
-At_Most :: distinct f32
-Between :: distinct [2]f32
 
 begin_layout :: proc(size: union {
 		Fixed,
 		At_Least,
 		At_Most,
 		Between,
-	} = nil, axis: Axis = .X, box: Maybe(Box) = nil, justify: Align = .Near, align: Align = .Near) -> bool {
+	} = nil, axis: Axis = .X, box: Maybe(Box) = nil, justify: Align = .Near, align: Align = .Near, padding: [4]f32 = {}) -> bool {
 	object := transient_object()
 	object.variant = Layout {
 		object  = object,
@@ -245,13 +241,18 @@ begin_layout :: proc(size: union {
 	} else {
 		available_space: [2]f32
 		parent_layout := current_layout()
+
 		i := int(axis)
 		j := 1 - int(axis)
+
+		layout.fixed = true
 		if parent_layout, ok := parent_layout.?; ok {
 			available_space = box_size(parent_layout.content_box)
 			j = int(parent_layout.axis)
+			if layout_is_deferred(parent_layout) {
+				layout.fixed = false
+			}
 		}
-		object.fixed = true
 		switch size in size {
 		case Fixed:
 			object.size[j] = f32(size)
@@ -279,7 +280,18 @@ begin_layout :: proc(size: union {
 			}
 		}
 	}
+
 	layout.content_box = layout.box
+
+	layout.spacing_size += padding.xy + padding.zw
+
+	if layout_is_deferred(layout) {
+		layout.padding = padding
+	} else {
+		layout.content_box.lo += padding.xy
+		layout.content_box.hi -= padding.zw
+	}
+
 	begin_object(object) or_return
 	push_layout(&object.variant.(Layout)) or_return
 	return true
@@ -287,7 +299,10 @@ begin_layout :: proc(size: union {
 
 end_layout :: proc() {
 	layout := current_layout().?
-	layout.desired_size = linalg.max(layout.desired_size, layout.content_size + layout.spacing_size)
+	layout.desired_size = linalg.max(
+		layout.desired_size,
+		layout.content_size + layout.spacing_size,
+	)
 	pop_layout()
 	end_object()
 }
@@ -310,23 +325,8 @@ axis_cut_side :: proc(axis: Axis) -> Side {
 	return .Top
 }
 
-// next_object_size :: proc(layout: ^Layout, desired_size: [2]f32, fixed: bool = false) -> [2]f32 {
-// 	non_fixed_size :: proc(layout: ^Layout, desired_size: [2]f32) -> [2]f32 {
-// 		if layout.mode == .Maximum {
-// 			return linalg.max(layout.object_size, desired_size)
-// 		} else if layout.mode == .Minimum {
-// 			return linalg.min(layout.object_size, desired_size)
-// 		}
-// 		return layout.object_size
-// 	}
-// 	return linalg.min(
-// 		desired_size if fixed else non_fixed_size(layout, desired_size),
-// 		layout.content_box.hi - layout.content_box.lo,
-// 	)
-// }
-
-set_mode :: proc(mode: Object_Size_Method) {
-	current_layout().?.mode = mode
+set_size_method :: proc(method: Object_Size_Method) {
+	current_layout().?.method = method
 }
 
 set_width :: proc(width: f32) {
@@ -365,27 +365,17 @@ set_height_percent :: proc(height: f32) {
 	layout.object_size.y = box_height(layout.content_box) * (height / 100)
 }
 
-set_padding_x :: proc(amount: f32) {
-	current_layout().?.object_padding.x = amount
-}
-
-set_padding_y :: proc(amount: f32) {
-	current_layout().?.object_padding.y = amount
-}
-
-set_padding :: proc(amount: f32) {
-	current_layout().?.object_padding = amount
-}
-
-add_padding :: proc(amount: f32) {
+set_margin :: proc(
+	left: Maybe(f32) = nil,
+	right: Maybe(f32) = nil,
+	top: Maybe(f32) = nil,
+	bottom: Maybe(f32) = nil,
+) {
 	layout := current_layout().?
-	layout.spacing_size += amount * 2
-	if layout_is_deferred(layout) {
-		layout.padding = amount
-	} else {
-		layout.content_box.lo += amount
-		layout.content_box.hi -= amount
-	}
+	if left, ok := left.?; ok do layout.margin.x = left
+	if top, ok := top.?; ok do layout.margin.y = top
+	if right, ok := right.?; ok do layout.margin.z = right
+	if bottom, ok := bottom.?; ok do layout.margin.w = bottom
 }
 
 set_width_to_height :: proc() {
@@ -396,8 +386,4 @@ set_width_to_height :: proc() {
 set_height_to_width :: proc() {
 	layout := current_layout().?
 	layout.object_size.y = layout.object_size.x
-}
-
-layout_is_vertical :: proc(layout: ^Layout) -> bool {
-	return layout.axis == .Y
 }

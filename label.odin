@@ -11,14 +11,14 @@ Label :: struct {
 
 display_label :: proc(label: ^Label) {
 	if object_is_visible(label) {
-		vgo.fill_text_layout(label.text_layout, label.box.lo, colors().content)
+		vgo.fill_text_layout(label.text_layout, label.box.lo, paint = colors().content)
 	}
 }
 
 label :: proc(
 	text: string,
-	font := global_state.style.default_font,
 	font_size := global_state.style.default_text_size,
+	font := global_state.style.default_font,
 ) {
 	object := transient_object()
 	if begin_object(object) {
@@ -32,8 +32,8 @@ label :: proc(
 		label := &object.variant.(Label)
 		label.text_layout = vgo.make_text_layout(
 			text,
-			font,
 			font_size,
+			font,
 		)
 		label.desired_size = label.text_layout.size
 	}
@@ -42,7 +42,7 @@ label :: proc(
 header :: proc(text: string) {
 	label(
 		text,
-		font = global_state.style.header_font.? or_else global_state.style.default_font,
 		font_size = global_state.style.header_text_size,
+		font = global_state.style.header_font.? or_else global_state.style.default_font,
 	)
 }

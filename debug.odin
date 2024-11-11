@@ -2,8 +2,13 @@ package onyx
 
 import "../vgo"
 import "core:fmt"
+import "core:math/linalg"
 import "core:reflect"
+import "core:slice"
+import "core:strings"
 import "core:time"
+
+DEBUG :: #config(ONYX_DEBUG, ODIN_DEBUG)
 
 Profiler_Scope :: enum {
 	New_Frame,
@@ -17,87 +22,193 @@ Profiler :: struct {
 }
 
 Debug_State :: struct {
-	enabled:          bool,
-	delta_time:       [dynamic]f32,
-	deferred_objects: int,
-	hovered_object:   Maybe(^Object),
-	wireframe:        bool,
+	enabled:               bool,
+	deferred_objects:      int,
+	hovered_objects:       [dynamic]^Object,
+	last_top_object_index: int,
+	top_object_index:      int,
+	hovered_object_index:  int,
+	wireframe:             bool,
 }
 
 @(private = "file")
 __prof: Profiler
 
 @(deferred_in = __profiler_scope)
+@(private)
 profiler_scope :: proc(scope: Profiler_Scope) {
 	profiler_begin_scope(scope)
 }
+
+@(private)
 __profiler_scope :: proc(scope: Profiler_Scope) {
 	profiler_end_scope(scope)
 }
 
+@(private)
 profiler_begin_scope :: proc(scope: Profiler_Scope) {
 	__prof.t[scope] = time.now()
 }
+
+@(private)
 profiler_end_scope :: proc(scope: Profiler_Scope) {
 	__prof.d[scope] = time.since(__prof.t[scope])
 }
 
-draw_object_debug_boxes :: proc() {
-	for _, object in global_state.object_map {
-		vgo.stroke_box(object.box, 1, paint = vgo.GREEN)
+@(private)
+draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
+	color := vgo.GREEN
+	variant := reflect.union_variant_typeid(object.variant)
+	if variant == Layout {
+		color = vgo.BLUE
 	}
-	for &object in global_state.transient_objects.data[:global_state.transient_objects.len] {
-		vgo.stroke_box(object.box, 1, paint = vgo.BLUE)
+	vgo.stroke_box(object.box, 1, paint = color)
+	if object_is_being_debugged(state, object) {
+		vgo.fill_box(object.box, paint = vgo.fade(color, 0.5))
 	}
 }
 
 @(private)
-draw_debug_stuff :: proc() {
+draw_object_debug_boxes :: proc(state: Debug_State) {
+	for _, object in global_state.object_map {
+		draw_object_debug_box(state, object)
+	}
+	for &object in global_state.transient_objects.data[:global_state.transient_objects.len] {
+		draw_object_debug_box(state, &object)
+	}
+}
 
-	if global_state.debug.wireframe {
+@(private)
+object_is_being_debugged :: proc(state: Debug_State, object: ^Object) -> bool {
+	return(
+		len(state.hovered_objects) > 0 &&
+		object == state.hovered_objects[state.hovered_object_index] \
+	)
+}
+
+@(private)
+currently_debugged_object :: proc(state: Debug_State) -> (object: ^Object, ok: bool) {
+	if len(state.hovered_objects) == 0 || len(state.hovered_objects) <= state.hovered_object_index do return
+	return state.hovered_objects[state.hovered_object_index], true
+}
+
+@(private)
+top_hovered_object :: proc(state: Debug_State) -> (object: ^Object, ok: bool) {
+	if len(state.hovered_objects) == 0 || len(state.hovered_objects) <= state.top_object_index do return
+	return state.hovered_objects[state.top_object_index], true
+}
+
+@(private)
+validate_debug_object_index :: proc(state: Debug_State) -> int {
+	return max(min(state.hovered_object_index, len(state.hovered_objects) - 1), 0)
+}
+
+@(private)
+draw_debug_stuff :: proc(state: ^Debug_State) {
+
+	if state.top_object_index != state.last_top_object_index {
+		state.last_top_object_index = state.top_object_index
+		state.hovered_object_index = state.top_object_index
+		// slice.reverse_sort_by(state.hovered_objects[:], object_is_in_front_of)
+	}
+
+	state.hovered_object_index += int(global_state.mouse_scroll.y)
+	state.hovered_object_index = validate_debug_object_index(state^)
+
+	if state.wireframe {
 		vgo.reset_drawing()
-		draw_object_debug_boxes()
+		draw_object_debug_boxes(state^)
 	}
 
 	DEBUG_TEXT_SIZE :: 16
 	vgo.set_paint(vgo.WHITE)
-
-	print_layer_debug :: proc(layer: ^Layer, left, pos: f32) -> f32 {
-		pos := pos
-		for child in layer.children {
-			pos += print_layer_debug(child, left + 20, pos)
-		}
-		pos +=
-			vgo.fill_text(fmt.tprintf("%i - %v %i", layer.id, layer.kind, layer.index), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {left, pos}, paint = vgo.GOLD if layer.index == global_state.highest_layer_index else nil).y
-		return pos
-	}
+	vgo.set_font(global_state.style.monospace_font)
 
 	{
 		total: time.Duration
-		offset := f32(0)
-		offset +=
-			vgo.fill_text(fmt.tprintf("FPS: %.0f", vgo.get_fps()), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
+		b := strings.builder_make(context.temp_allocator)
+		fmt.sbprintf(&b, "FPS: %.0f", vgo.get_fps())
 		for scope, s in Profiler_Scope {
 			total += __prof.d[scope]
-			offset +=
-				vgo.fill_text(fmt.tprintf("%v: %.3fms", scope, time.duration_milliseconds(__prof.d[scope])), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
+			fmt.sbprintf(&b, "\n%v: %.3fms", scope, time.duration_milliseconds(__prof.d[scope]))
 		}
-		offset +=
-			vgo.fill_text(fmt.tprintf("Total: %.3fms", time.duration_milliseconds(total)), global_state.style.monospace_font, DEBUG_TEXT_SIZE, {0, offset}).y
-		for layer in global_state.layers {
-			offset += print_layer_debug(layer, 0, offset)
-		}
+		fmt.sbprintf(&b, "\nTotal: %.3fms", time.duration_milliseconds(total))
+		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, {})
 	}
 
-	vgo.fill_text_aligned(
-		fmt.tprintf(
-			"F6 = Turn %s FPS cap\nF7 = Toggle wireframes",
-			"on" if global_state.disable_frame_skip else "off",
-		),
-		global_state.style.monospace_font,
-		DEBUG_TEXT_SIZE,
-		{0, global_state.view.y},
-		.Left,
-		.Bottom,
-	)
+	{
+		text_layout := vgo.make_text_layout(
+			fmt.tprintf(
+				"F3 = Exit debug\nF6 = Turn %s FPS cap\nF7 = Toggle wireframes",
+				"on" if global_state.disable_frame_skip else "off",
+			),
+			DEBUG_TEXT_SIZE,
+			font = global_state.style.monospace_font,
+		)
+		origin := [2]f32{0, global_state.view.y}
+		vgo.fill_text_layout(
+			text_layout,
+			origin + 2,
+			align_x = .Left,
+			align_y = .Bottom,
+			paint = vgo.BLACK,
+		)
+		vgo.fill_text_layout(
+			text_layout,
+			origin,
+			align_x = .Left,
+			align_y = .Bottom,
+		)
+	}
+
+	if len(state.hovered_objects) > 0 {
+		b := strings.builder_make(context.temp_allocator)
+		if object, ok := currently_debugged_object(state^); ok {
+			if !state.wireframe {
+				draw_object_debug_box(state^, object)
+			}
+			variant_typeid := reflect.union_variant_typeid(object.variant)
+			fmt.sbprintf(
+				&b,
+				"%v\nIndex: %v\nId: %v\nBox: %.1f, %.1f",
+				variant_typeid if variant_typeid != nil else typeid_of(Object),
+				object.index + 1,
+				object.id,
+				object.box.lo,
+				object.box.hi,
+			)
+			if layout, ok := object.variant.(Layout); ok {
+				fmt.sbprintf(
+					&b,
+					"\nAxis: %v\nJustify: %v\nAlign: %v\nFixed: %v\nIs deferred: %v\nChildren: %i",
+					layout.axis,
+					layout.justify,
+					layout.align,
+					layout.fixed,
+					layout_is_deferred(&layout),
+					len(layout.objects),
+				)
+			}
+		}
+
+		header_text_layout := vgo.make_text_layout(
+			fmt.tprintf(
+				"Object %i/%i",
+				state.hovered_object_index + 1,
+				len(state.hovered_objects),
+			),
+			DEBUG_TEXT_SIZE,
+		)
+		info_text_layout := vgo.make_text_layout(strings.to_string(b), DEBUG_TEXT_SIZE)
+		size := info_text_layout.size + {0, header_text_layout.size.y}
+		origin := linalg.clamp(mouse_point(), 0, global_state.view - size)
+
+		vgo.fill_box({origin, origin + size}, paint = vgo.fade(vgo.BLACK, 0.75))
+		vgo.fill_text_layout(header_text_layout, origin, paint = vgo.GOLD)
+		vgo.fill_text_layout(
+			info_text_layout,
+			origin + {0, header_text_layout.size.y},
+			paint = vgo.WHITE,
+		)
+	}
 }

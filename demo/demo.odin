@@ -90,15 +90,14 @@ main :: proc() {
 				if begin_layout(size = Fixed(36), axis = .Y, align = .Center) {
 					defer end_layout()
 
-					button("\uf578", style = .Ghost, font_size = 16)
-					button("\uf044", style = .Ghost, font_size = 16)
-					button("\uEDC0", style = .Ghost, font_size = 16)
+					button("\uf578", style = .Ghost, font_size = 18)
+					button("\uf044", style = .Ghost, font_size = 18)
+					button("\uEDC0", style = .Ghost, font_size = 18)
 				}
 
-				if begin_layout(size = At_Least(0), axis = .Y) {
+				if begin_layout(size = At_Least(0), axis = .Y, padding = 30) {
 					defer end_layout()
 
-					add_padding(50)
 					if begin_layout(justify = .Far, align = .Center, size = Fixed(50), axis = .X) {
 						defer end_layout()
 
@@ -129,10 +128,10 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, axis = .X) {
+					if begin_layout(justify = .Center, axis = .X, size = Fixed(200)) {
 						defer end_layout()
 
-						if begin_layout(axis = .Y) {
+						if begin_layout(axis = .Y, size = Fixed(100)) {
 							defer end_layout()
 
 							for i in 1..=5 {
@@ -141,7 +140,7 @@ main :: proc() {
 								pop_id()
 							}
 						}
-						if begin_layout(axis = .Y) {
+						if begin_layout(axis = .Y, size = Fixed(100)) {
 							defer end_layout()
 
 							for i in 1..=5 {

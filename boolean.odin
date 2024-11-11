@@ -41,15 +41,14 @@ boolean :: proc(
 		}
 		boolean := &object.variant.(Boolean)
 		boolean.value = state
-		boolean.margin = 4
 		boolean.icon_size = global_state.style.visual_size.y * 0.8
 		boolean.type = type
 		boolean.text = text
 		if len(text) > 0 {
 			boolean.text_layout = vgo.make_text_layout(
 				text,
-				global_state.style.default_font,
 				global_state.style.default_text_size,
+				global_state.style.default_font,
 			)
 			if int(text_side) > 1 {
 				object.desired_size.x = max(boolean.icon_size, boolean.text_layout.size.x)
@@ -164,12 +163,12 @@ display_boolean :: proc(boolean: ^Boolean) {
 			case .Bottom:
 				text_pos = {boolean.box.lo.x, boolean.box.hi.y}
 			}
-			vgo.fill_text_layout_aligned(
+			vgo.fill_text_layout(
 				boolean.text_layout,
 				text_pos,
-				.Left,
-				.Center,
-				vgo.fade(global_state.style.color.content, opacity),
+				align_x = .Left,
+				align_y = .Center,
+				paint = vgo.fade(global_state.style.color.content, opacity),
 			)
 		}
 	}

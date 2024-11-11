@@ -38,11 +38,10 @@ button :: proc(text: string, style: Button_Style = .Primary, font_size: f32 = gl
 			}
 		}
 		button := &object.variant.(Button)
-		button.margin = 4
 		button.text_layout = vgo.make_text_layout(
 			text,
-			global_state.style.default_font,
 			font_size,
+			global_state.style.default_font,
 		)
 		button.desired_size = button.text_layout.size + global_state.style.text_padding * 2
 		button.style = style
@@ -115,12 +114,12 @@ display_button :: proc(button: ^Button) {
 		}
 
 		if !button.is_loading {
-			vgo.fill_text_layout_aligned(
+			vgo.fill_text_layout(
 				button.text_layout,
 				box_center(button.box),
-				.Center,
-				.Center,
-				text_color,
+				align_x = .Center,
+				align_y = .Center,
+				paint = text_color,
 			)
 		}
 

@@ -50,6 +50,7 @@ Object_Variant :: union {
 
 Object :: struct {
 	id:             Id,
+	index: int,
 	box:            Box,
 	layer:          ^Layer,
 	frames:         int,
@@ -141,13 +142,13 @@ current_object :: proc() -> Maybe(^Object) {
 new_persistent_object :: proc(id: Id) -> ^Object {
 	object := new(Object)
 
+	assert(object != nil)
+
 	object.id = id
 	object.out_state_mask = OBJECT_STATE_ALL
 
 	global_state.object_map[id] = object
 	global_state.draw_this_frame = true
-
-	assert(object != nil)
 
 	return object
 }
@@ -164,6 +165,7 @@ transient_object :: proc() -> ^Object {
 	small_array.append(&global_state.transient_objects, Object{})
 	object := small_array.get_ptr_safe(&global_state.transient_objects, global_state.transient_objects.len - 1) or_else nil
 	assert(object != nil)
+	object.id = Id(global_state.transient_objects.len)
 	return object
 }
 
@@ -238,6 +240,9 @@ update_object_state :: proc(object: ^Object) {
 begin_object :: proc(object: ^Object) -> bool {
 	assert(object != nil)
 
+	object.index = global_state.object_index
+	global_state.object_index += 1
+
 	object.dead = false
 
 	if object_was_updated_this_frame(object) {
@@ -302,6 +307,9 @@ transfer_object_state_to_parent :: proc(child: ^Object, parent: ^Object) {
 }
 
 hover_object :: proc(object: ^Object) {
+	when DEBUG {
+		if global_state.debug.enabled do return
+	}
 	if object.disabled do return
 	if object.layer.index < global_state.hovered_layer_index do return
 	if !point_in_box(global_state.mouse_pos, object.layer.box) do return
@@ -361,16 +369,6 @@ spinner :: proc(loc := #caller_location) {
 	}
 }
 
-// skeleton :: proc(loc := #caller_location) {
-// 	info := Object_Info {
-// 		id = hash(loc),
-// 	}
-// 	if begin_object(&info) {
-// 		defer end_object()
-// 		draw_skeleton(info.self.box, core.style.rounding)
-// 	}
-// }
-
 draw_skeleton :: proc(box: Box, rounding: f32) {
 	vgo.fill_box(box, rounding, global_state.style.color.substance)
 	vgo.fill_box(box, rounding, vgo.Paint{kind = .Skeleton})
@@ -378,12 +376,21 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 	global_state.draw_this_frame = true
 }
 
-// divider :: proc() {
-// 	cut := snapped_box(cut_current_layout(size = [2]f32{1, 1}))
-// 	vgo.fill_box(cut, paint = global_state.style.color.substance)
-// }
+object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {
+	if (object == nil) || (other == nil) do return true
+	return (object.index > other.index) && (object.layer.index >= other.layer.index)
+}
 
 display_object :: proc(object: ^Object) {
+	when DEBUG {
+		if point_in_box(mouse_point(), object.box) {
+			if object_is_in_front_of(object, top_hovered_object(global_state.debug) or_else nil) {
+				global_state.debug.top_object_index = len(global_state.debug.hovered_objects)
+			}
+			append(&global_state.debug.hovered_objects, object)
+		}
+	}
+
 	switch &v in object.variant {
 	case Container:
 	case Button:
