@@ -90,6 +90,8 @@ main :: proc() {
 				if begin_layout(size = Fixed(36), axis = .Y, align = .Center) {
 					defer end_layout()
 
+					set_width_fill()
+					set_height_to_width()
 					button("\uf578", style = .Ghost, font_size = 18)
 					button("\uf044", style = .Ghost, font_size = 18)
 					button("\uEDC0", style = .Ghost, font_size = 18)
@@ -101,6 +103,7 @@ main :: proc() {
 					if begin_layout(justify = .Far, align = .Center, size = Fixed(50), axis = .X) {
 						defer end_layout()
 
+						set_margin(left = 4, right = 4)
 						label("Label")
 						for i in 1..=5 {
 							push_id(i)
@@ -111,6 +114,7 @@ main :: proc() {
 					if begin_layout(justify = .Center, align = .Center, size = Fixed(50), axis = .X) {
 						defer end_layout()
 
+						set_margin(left = 4, right = 4)
 						label("Label")
 						for i in 1..=5 {
 							push_id(i)
@@ -121,6 +125,7 @@ main :: proc() {
 					if begin_layout(justify = .Near, align = .Center, size = Fixed(50), axis = .X) {
 						defer end_layout()
 
+						set_margin(left = 4, right = 4)
 						label("Label")
 						for i in 1..=5 {
 							push_id(i)
@@ -128,21 +133,23 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, axis = .X, size = Fixed(200)) {
+					if begin_layout(justify = .Center, axis = .X, size = At_Most(200)) {
 						defer end_layout()
 
-						if begin_layout(axis = .Y, size = Fixed(100)) {
+						if begin_layout(axis = .Y, size = Fixed(100), justify = .Center) {
 							defer end_layout()
 
+							set_margin(top = 5)
 							for i in 1..=5 {
 								push_id(i)
 									boolean(&checkbox_value, fmt.tprintf("Checkbox A%i", i))
 								pop_id()
 							}
 						}
-						if begin_layout(axis = .Y, size = Fixed(100)) {
+						if begin_layout(axis = .Y, size = Fixed(100), justify = .Center) {
 							defer end_layout()
 
+							set_margin(top = 5)
 							for i in 1..=5 {
 								push_id(i)
 									boolean(&checkbox_value, fmt.tprintf("Checkbox B%i", i))

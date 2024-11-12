@@ -250,69 +250,6 @@ split_box :: proc(box: Box, side: Side, amount: f32) -> (new_box, remainder: Box
 	return
 }
 
-cut_box_left :: proc(box: ^Box, a: f32) -> (res: Box) {
-	a := min(a, box.hi.x - box.lo.x)
-	res = {box.lo, {box.lo.x + a, box.hi.y}}
-	box.lo.x += a
-	return
-}
-cut_box_top :: proc(box: ^Box, a: f32) -> (res: Box) {
-	a := min(a, box.hi.y - box.lo.y)
-	res = {box.lo, {box.hi.x, box.lo.y + a}}
-	box.lo.y += a
-	return
-}
-cut_box_right :: proc(box: ^Box, a: f32) -> (res: Box) {
-	a := min(a, box.hi.x - box.lo.x)
-	res = {{box.hi.x - a, box.lo.y}, box.hi}
-	box.hi.x -= a
-	return
-}
-cut_box_bottom :: proc(box: ^Box, a: f32) -> (res: Box) {
-	a := min(a, box.hi.y - box.lo.y)
-	res = {{box.lo.x, box.hi.y - a}, box.hi}
-	box.hi.y -= a
-	return
-}
-cut_box :: proc(box: ^Box, side: Side, amount: f32) -> Box {
-	switch side {
-	case .Bottom:
-		return cut_box_bottom(box, amount)
-	case .Top:
-		return cut_box_top(box, amount)
-	case .Left:
-		return cut_box_left(box, amount)
-	case .Right:
-		return cut_box_right(box, amount)
-	}
-	return {}
-}
-// extend a box and return the attached piece
-grow_box_left :: proc(box: ^Box, a: f32) {
-	box.hi.x = max(box.hi.x, box.lo.x + a)
-}
-grow_box_top :: proc(box: ^Box, a: f32) {
-	box.hi.y = max(box.hi.y, box.lo.y + a)
-}
-grow_box_right :: proc(box: ^Box, a: f32) {
-	box.lo.x = min(box.lo.x, box.hi.x - a)
-}
-grow_box_bottom :: proc(box: ^Box, a: f32) {
-	box.lo.y = min(box.lo.y, box.hi.y - a)
-}
-grow_box :: proc(box: ^Box, side: Side, amount: f32) {
-	switch side {
-	case .Bottom:
-		grow_box_top(box, amount)
-	case .Top:
-		grow_box_bottom(box, amount)
-	case .Right:
-		grow_box_left(box, amount)
-	case .Left:
-		grow_box_right(box, amount)
-	}
-}
-
 // get a cut piece of a box
 get_box_cut_left :: proc(b: Box, a: f32) -> Box {
 	return {b.lo, {b.lo.x + a, b.hi.y}}

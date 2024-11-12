@@ -1,6 +1,7 @@
 package onyx
 
 import "../vgo"
+import "base:runtime"
 import "core:fmt"
 import "core:math/linalg"
 import "core:reflect"
@@ -65,6 +66,11 @@ draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
 	vgo.stroke_box(object.box, 1, paint = color)
 	if object_is_being_debugged(state, object) {
 		vgo.fill_box(object.box, paint = vgo.fade(color, 0.5))
+		vgo.set_paint(vgo.fade(vgo.YELLOW, 0.5))
+		if object.margin.x > 0 do vgo.fill_box(attach_box_left(object.box, object.margin.x))
+		if object.margin.y > 0 do vgo.fill_box(attach_box_top(object.box, object.margin.y))
+		if object.margin.z > 0 do vgo.fill_box(attach_box_right(object.box, object.margin.z))
+		if object.margin.w > 0 do vgo.fill_box(attach_box_bottom(object.box, object.margin.w))
 	}
 }
 
@@ -139,7 +145,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 	{
 		text_layout := vgo.make_text_layout(
 			fmt.tprintf(
-				"F3 = Exit debug\nF6 = Turn %s FPS cap\nF7 = Toggle wireframes",
+				"Scroll = Cycle objects\nF3 = Exit debug\nF6 = Turn %s FPS cap\nF7 = Toggle wireframes",
 				"on" if global_state.disable_frame_skip else "off",
 			),
 			DEBUG_TEXT_SIZE,
@@ -153,58 +159,58 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			align_y = .Bottom,
 			paint = vgo.BLACK,
 		)
-		vgo.fill_text_layout(
-			text_layout,
-			origin,
-			align_x = .Left,
-			align_y = .Bottom,
-		)
+		vgo.fill_text_layout(text_layout, origin, align_x = .Left, align_y = .Bottom)
 	}
-
-	if len(state.hovered_objects) > 0 {
+	if object, ok := currently_debugged_object(state^); ok {
 		b := strings.builder_make(context.temp_allocator)
-		if object, ok := currently_debugged_object(state^); ok {
-			if !state.wireframe {
-				draw_object_debug_box(state^, object)
-			}
-			variant_typeid := reflect.union_variant_typeid(object.variant)
-			fmt.sbprintf(
-				&b,
-				"%v\nIndex: %v\nId: %v\nBox: %.1f, %.1f",
-				variant_typeid if variant_typeid != nil else typeid_of(Object),
-				object.index + 1,
-				object.id,
-				object.box.lo,
-				object.box.hi,
-			)
+		if !state.wireframe {
+			draw_object_debug_box(state^, object)
 			if layout, ok := object.variant.(Layout); ok {
-				fmt.sbprintf(
-					&b,
-					"\nAxis: %v\nJustify: %v\nAlign: %v\nFixed: %v\nIs deferred: %v\nChildren: %i",
-					layout.axis,
-					layout.justify,
-					layout.align,
-					layout.fixed,
-					layout_is_deferred(&layout),
-					len(layout.objects),
-				)
+				for child in layout.objects {
+					draw_object_debug_box(state^, child)
+				}
 			}
 		}
+		fmt.sbprintf(
+			&b,
+			" index: %v\n id: %v\n box: [%.1f, %.1f]\n size: %.1f\n desired_size: %.1f",
+			object.index + 1,
+			object.id,
+			object.box.lo,
+			object.box.hi,
+			object.size,
+			object.desired_size,
+		)
+		if layout, ok := object.variant.(Layout); ok {
+			fmt.sbprintf(
+				&b,
+				"\n axis: %v\n justify: %v\n align: %v\n fixed: %v\n deferred: %v\n children: %i",
+				layout.axis,
+				layout.justify,
+				layout.align,
+				layout.fixed,
+				layout_is_deferred(&layout),
+				len(layout.objects),
+			)
+		}
 
+		variant_typeid := reflect.union_variant_typeid(object.variant)
 		header_text_layout := vgo.make_text_layout(
 			fmt.tprintf(
-				"Object %i/%i",
+				"%i/%i: %v",
 				state.hovered_object_index + 1,
 				len(state.hovered_objects),
+				variant_typeid if variant_typeid != nil else typeid_of(Object),
 			),
 			DEBUG_TEXT_SIZE,
 		)
 		info_text_layout := vgo.make_text_layout(strings.to_string(b), DEBUG_TEXT_SIZE)
 		size := info_text_layout.size + {0, header_text_layout.size.y}
-		origin := linalg.clamp(mouse_point(), 0, global_state.view - size)
+		origin := linalg.clamp(mouse_point() + 10, 0, global_state.view - size)
 
 		vgo.fill_box({origin, origin + size}, paint = vgo.fade(vgo.BLACK, 0.75))
-		vgo.fill_text_layout(header_text_layout, origin, paint = vgo.GOLD)
+		vgo.fill_box({origin, origin + header_text_layout.size}, paint = vgo.RED)
+		vgo.fill_text_layout(header_text_layout, origin, paint = vgo.BLACK)
 		vgo.fill_text_layout(
 			info_text_layout,
 			origin + {0, header_text_layout.size.y},

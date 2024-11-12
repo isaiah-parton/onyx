@@ -6,6 +6,7 @@ package onyx
 import "../vgo"
 import "base:intrinsics"
 import "base:runtime"
+import "core:container/small_array"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -14,7 +15,6 @@ import "core:mem"
 import "core:reflect"
 import "core:strings"
 import "core:time"
-import "core:container/small_array"
 import "tedit"
 
 MAX_CLICK_DELAY :: time.Millisecond * 450
@@ -50,13 +50,12 @@ Object_Variant :: union {
 
 Object :: struct {
 	id:             Id,
-	index: int,
+	index:          int,
 	box:            Box,
 	layer:          ^Layer,
 	frames:         int,
-	visible:        bool,
-	disabled:       bool,
 	dead:           bool,
+	disabled:       bool,
 	fixed:          bool,
 	flags:          Object_Flags,
 	last_state:     Object_State,
@@ -68,10 +67,18 @@ Object :: struct {
 	click_time:     time.Time,
 	click_point:    [2]f32,
 	click_button:   Mouse_Button,
-	margin: [4]f32,
+	margin:         [4]f32,
 	size:           [2]f32,
 	desired_size:   [2]f32,
 	variant:        Object_Variant,
+}
+
+Object_States :: struct {
+	previous: Object_State,
+	current:  Object_State,
+	next:     Object_State,
+	in_mask:  Object_State,
+	out_mask: Object_State,
 }
 
 Object_Margin :: struct {
@@ -163,7 +170,11 @@ persistent_object :: proc(id: Id) -> ^Object {
 
 transient_object :: proc() -> ^Object {
 	small_array.append(&global_state.transient_objects, Object{})
-	object := small_array.get_ptr_safe(&global_state.transient_objects, global_state.transient_objects.len - 1) or_else nil
+	object :=
+		small_array.get_ptr_safe(
+			&global_state.transient_objects,
+			global_state.transient_objects.len - 1,
+		) or_else nil
 	assert(object != nil)
 	object.id = Id(global_state.transient_objects.len)
 	return object
@@ -258,7 +269,7 @@ begin_object :: proc(object: ^Object) -> bool {
 	if global_state.disable_objects do object.disabled = true
 
 	if layout, ok := current_layout().?; ok {
-		object.margin = layout.margin
+		object.margin = layout.object_margin
 		// If the user set an explicit size with either `set_width()` or `set_height()` the object's desired size should reflect that
 		// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
 		if layout.object_size.x == 0 || layout.object_size.x != box_width(layout.content_box) {
