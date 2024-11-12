@@ -56,7 +56,7 @@ Object :: struct {
 	frames:         int,
 	dead:           bool,
 	disabled:       bool,
-	fixed:          bool,
+	has_known_box: bool,
 	flags:          Object_Flags,
 	last_state:     Object_State,
 	next_state:     Object_State,

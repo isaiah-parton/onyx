@@ -60,19 +60,19 @@ V_Align :: enum {
 }
 
 Layout :: struct {
-	using object:  ^Object,
-	isolated:      bool,
-	axis:          Axis,
-	content_box:   Box,
-	justify:       Align,
-	align:         Align,
-	method:        Object_Size_Method,
-	padding:       [4]f32,
-	content_size:  [2]f32,
-	spacing_size:  [2]f32,
-	object_size:   [2]f32,
-	object_margin: [4]f32,
-	objects:       ^[dynamic]^Object,
+	using object:       ^Object,
+	isolated:           bool,
+	axis:               Axis,
+	content_box:        Box,
+	justify:            Align,
+	align:              Align,
+	padding:            [4]f32,
+	content_size:       [2]f32,
+	spacing_size:       [2]f32,
+	object_size:        [2]f32,
+	object_size_method: Object_Size_Method,
+	object_margin:      [4]f32,
+	objects:            ^[dynamic]^Object,
 }
 
 Object_Placement :: struct {
@@ -105,7 +105,7 @@ display_or_add_object :: proc(object: ^Object, layout: ^Layout) {
 		return
 	}
 
-	if !object.fixed {
+	if !object.has_known_box {
 		apply_object_layout(object, layout)
 	}
 	display_object(object)
@@ -219,22 +219,15 @@ next_layout_array :: proc() -> ^[dynamic]^Object {
 }
 
 layout_is_deferred :: proc(layout: ^Layout) -> bool {
-	return (layout.justify != .Near) || !layout.fixed
+	return (layout.justify != .Near) || !layout.has_known_box
 }
 
-begin_layout :: proc(
-	size: union {
+begin_layout :: proc(size: union {
 		Fixed,
 		At_Least,
 		At_Most,
 		Between,
-	} = nil,
-	axis: Axis = .X,
-	box: Maybe(Box) = nil,
-	justify: Align = .Near,
-	align: Align = .Near,
-	padding: [4]f32 = {},
-) -> bool {
+	} = nil, axis: Axis = .X, box: Maybe(Box) = nil, justify: Align = .Near, align: Align = .Near, padding: [4]f32 = {}) -> bool {
 	object := transient_object()
 	object.variant = Layout {
 		object  = object,
@@ -246,7 +239,7 @@ begin_layout :: proc(
 	layout := &object.variant.(Layout)
 	if box, ok := box.?; ok {
 		layout.isolated = true
-		layout.fixed = true
+		layout.has_known_box = true
 		layout.box = box
 	} else {
 		available_space: [2]f32
@@ -255,13 +248,15 @@ begin_layout :: proc(
 		i := int(axis)
 		j := 1 - int(axis)
 
-		layout.fixed = true
+		layout.has_known_box = true
 		if parent_layout, ok := parent_layout.?; ok {
 			// FIXME: `content_box` does not reflect the amount of available space at this point
-			available_space = box_size(parent_layout.content_box) - (parent_layout.padding.xy + parent_layout.padding.zw)
+			available_space =
+				box_size(parent_layout.content_box) -
+				(parent_layout.padding.xy + parent_layout.padding.zw)
 			j = int(parent_layout.axis)
 			if layout_is_deferred(parent_layout) {
-				layout.fixed = false
+				layout.has_known_box = false
 			}
 		}
 		switch size in size {
@@ -273,16 +268,17 @@ begin_layout :: proc(
 			layout.desired_size[j] = f32(size)
 		case At_Most:
 			layout.size[j] = min(available_space[j], f32(size))
+			layout.desired_size[j] = f32(size)
 		case Between:
 			layout.size[j] = min(available_space[j], size[0], size[1])
 			layout.desired_size[j] = size[0]
 		case nil:
-			layout.fixed = false
+			layout.has_known_box = false
 		}
 
 		layout.size[i] = available_space[i]
 
-		if layout.fixed {
+		if layout.has_known_box {
 			if parent_layout, ok := parent_layout.?; ok {
 				layout.box, parent_layout.content_box = split_box(
 					parent_layout.content_box,
@@ -337,7 +333,7 @@ axis_cut_side :: proc(axis: Axis) -> Side {
 }
 
 set_size_method :: proc(method: Object_Size_Method) {
-	current_layout().?.method = method
+	current_layout().?.object_size_method = method
 }
 
 set_width :: proc(width: f32) {

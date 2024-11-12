@@ -184,11 +184,11 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		if layout, ok := object.variant.(Layout); ok {
 			fmt.sbprintf(
 				&b,
-				"\n axis: %v\n justify: %v\n align: %v\n fixed: %v\n deferred: %v\n children: %i",
+				"\n axis: %v\n justify: %v\n align: %v\n has_known_box: %v\n deferred: %v\n children: %i",
 				layout.axis,
 				layout.justify,
 				layout.align,
-				layout.fixed,
+				layout.has_known_box,
 				layout_is_deferred(&layout),
 				len(layout.objects),
 			)
@@ -209,7 +209,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		origin := linalg.clamp(mouse_point() + 10, 0, global_state.view - size)
 
 		vgo.fill_box({origin, origin + size}, paint = vgo.fade(vgo.BLACK, 0.75))
-		vgo.fill_box({origin, origin + header_text_layout.size}, paint = vgo.RED)
+		vgo.fill_box({origin, origin + header_text_layout.size}, paint = vgo.BLUE if variant_typeid == Layout else vgo.GREEN)
 		vgo.fill_text_layout(header_text_layout, origin, paint = vgo.BLACK)
 		vgo.fill_text_layout(
 			info_text_layout,

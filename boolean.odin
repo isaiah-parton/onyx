@@ -20,7 +20,7 @@ Boolean :: struct {
 	side:            Side,
 	text:            string,
 	text_layout:     vgo.Text_Layout,
-	icon_size:       f32,
+	gadget_size:       [2]f32,
 }
 
 boolean :: proc(
@@ -41,7 +41,8 @@ boolean :: proc(
 		}
 		boolean := &object.variant.(Boolean)
 		boolean.value = state
-		boolean.icon_size = global_state.style.visual_size.y * 0.8
+		boolean.gadget_size = global_state.style.visual_size.y * 0.8
+		if type == .Switch do boolean.gadget_size *= [2]f32{2, 1}
 		boolean.type = type
 		boolean.text = text
 		if len(text) > 0 {
@@ -51,14 +52,14 @@ boolean :: proc(
 				global_state.style.default_font,
 			)
 			if int(text_side) > 1 {
-				object.desired_size.x = max(boolean.icon_size, boolean.text_layout.size.x)
-				object.desired_size.y = boolean.icon_size + boolean.text_layout.size.y
+				object.desired_size.x = max(boolean.gadget_size.x, boolean.text_layout.size.x)
+				object.desired_size.y = boolean.gadget_size.x + boolean.text_layout.size.y
 			} else {
 				object.desired_size.x =
-					boolean.icon_size +
+					boolean.gadget_size.x +
 					boolean.text_layout.size.x +
 					global_state.style.text_padding.x * 2
-				object.desired_size.y = boolean.icon_size
+				object.desired_size.y = boolean.gadget_size.y
 			}
 		}
 	}
@@ -76,73 +77,111 @@ display_boolean :: proc(boolean: ^Boolean) {
 	boolean.animation_timer = animate(boolean.animation_timer, 0.2, boolean.value^)
 
 	if object_is_visible(boolean) {
-		icon_box: Box
+		gadget_box: Box
 
 		if len(boolean.text) > 0 {
 			switch boolean.side {
 			case .Left:
-				icon_box = {boolean.box.lo, boolean.icon_size}
+				gadget_box = {boolean.box.lo, boolean.gadget_size}
 			case .Right:
-				icon_box = {
-					{boolean.box.hi.x - boolean.icon_size, boolean.box.lo.y},
-					boolean.icon_size,
+				gadget_box = {
+					{boolean.box.hi.x - boolean.gadget_size.x, boolean.box.lo.y},
+					boolean.gadget_size,
 				}
 			case .Top:
-				icon_box = {
+				gadget_box = {
 					{
-						box_center_x(boolean.box) - boolean.icon_size / 2,
-						boolean.box.hi.y - boolean.icon_size,
+						box_center_x(boolean.box) - boolean.gadget_size.x / 2,
+						boolean.box.hi.y - boolean.gadget_size.y,
 					},
-					boolean.size,
+					boolean.gadget_size,
 				}
 			case .Bottom:
-				icon_box = {
-					{box_center_x(boolean.box) - boolean.icon_size / 2, boolean.box.lo.y},
-					boolean.icon_size,
+				gadget_box = {
+					{box_center_x(boolean.box) - boolean.gadget_size.x / 2, boolean.box.lo.y},
+					boolean.gadget_size,
 				}
 			}
-			icon_box.hi += icon_box.lo
+			gadget_box.hi += gadget_box.lo
 		} else {
-			icon_box = boolean.box
+			gadget_box = boolean.box
 		}
+
+		gadget_center := box_center(gadget_box)
 
 		if .Hovered in boolean.state {
 			vgo.fill_box(
-				boolean.box,
-				global_state.style.rounding,
-				vgo.fade(global_state.style.color.substance, 0.2),
+				{{gadget_center.x, boolean.box.lo.y}, boolean.box.hi},
+				{0, global_state.style.rounding, 0, global_state.style.rounding},
+				vgo.fade(colors().substance, 0.2),
 			)
 		}
 
 		opacity: f32 = 0.5 if boolean.disabled else 1
 
 		state_time := ease.quadratic_in_out(boolean.animation_timer)
-		if state_time < 1 {
-			vgo.fill_box(icon_box, global_state.style.rounding, global_state.style.color.field)
-		}
-		if state_time > 0 && state_time < 1 {
-			vgo.push_scissor(vgo.make_box(boolean.box, global_state.style.rounding))
-		}
-		vgo.fill_box(
-			icon_box,
-			global_state.style.rounding,
-			vgo.fade(global_state.style.color.accent, state_time),
-		)
 		// Paint icon
-		if state_time > 0 {
-			icon_box := move_box(
-				icon_box,
-				{
-					0,
-					box_height(icon_box) *
-					((1 - state_time) if boolean.value^ else -(1 - state_time)),
-				},
+		switch boolean.type {
+		case .Checkbox:
+			if state_time < 1 {
+				vgo.fill_box(gadget_box, global_state.style.rounding, colors().field)
+			}
+			if state_time > 0 && state_time < 1 {
+				vgo.push_scissor(vgo.make_box(boolean.box, global_state.style.rounding))
+			}
+			vgo.fill_box(
+				gadget_box,
+				global_state.style.rounding,
+				vgo.fade(colors().accent, state_time),
 			)
-			center := box_center(icon_box)
-			vgo.check(center, boolean.icon_size / 4, global_state.style.color.field)
-		}
-		if state_time > 0 && state_time < 1 {
-			vgo.pop_scissor()
+			if state_time > 0 {
+				gadget_box := move_box(
+				gadget_box,
+					{
+						0,
+						box_height(gadget_box) *
+						((1 - state_time) if boolean.value^ else -(1 - state_time)),
+					},
+				)
+				vgo.check(gadget_center, boolean.gadget_size.y / 4, colors().field)
+			}
+			if state_time > 0 && state_time < 1 {
+				vgo.pop_scissor()
+			}
+		case .Radio:
+			gadget_center := box_center(gadget_box)
+			radius := boolean.gadget_size.y / 2
+			vgo.fill_circle(
+				gadget_center,
+				radius,
+				vgo.mix(state_time, colors().field, colors().accent),
+			)
+			if state_time > 0 {
+				vgo.fill_circle(
+					gadget_center,
+					(radius - 5) * state_time,
+					vgo.fade(colors().field, state_time),
+				)
+			}
+		case .Switch:
+			inner_box := shrink_box(gadget_box, 2)
+			outer_radius := box_height(gadget_box) / 2
+			inner_radius := box_height(inner_box) / 2
+			lever_center: [2]f32 = {
+				inner_box.lo.x +
+				inner_radius +
+				(box_width(inner_box) - box_height(inner_box)) * state_time,
+				box_center_y(inner_box),
+			}
+			if state_time < 1 {
+				vgo.fill_box(gadget_box, paint = colors().field, radius = outer_radius)
+			}
+			vgo.fill_box(
+				{gadget_box.lo, lever_center + outer_radius},
+				radius = outer_radius,
+				paint = vgo.fade(colors().accent, state_time),
+			)
+			vgo.fill_circle(lever_center, inner_radius, vgo.mix(state_time, colors().fg, colors().field))
 		}
 		// Paint text
 		text_pos: [2]f32
@@ -150,12 +189,12 @@ display_boolean :: proc(boolean: ^Boolean) {
 			switch boolean.side {
 			case .Left:
 				text_pos = {
-					icon_box.hi.x + global_state.style.text_padding.x,
+					gadget_box.hi.x + global_state.style.text_padding.x,
 					box_center_y(boolean.box),
 				}
 			case .Right:
 				text_pos = {
-					icon_box.lo.x - global_state.style.text_padding.x,
+					gadget_box.lo.x - global_state.style.text_padding.x,
 					box_center_y(boolean.box),
 				}
 			case .Top:
@@ -168,7 +207,7 @@ display_boolean :: proc(boolean: ^Boolean) {
 				text_pos,
 				align_x = .Left,
 				align_y = .Center,
-				paint = vgo.fade(global_state.style.color.content, opacity),
+				paint = vgo.fade(colors().content, opacity),
 			)
 		}
 	}
@@ -239,26 +278,18 @@ display_boolean :: proc(boolean: ^Boolean) {
 // 			vgo.fill_box(
 // 				self.box,
 // 				outer_radius,
-// 				vgo.fade(core.style.color.substance, 0.2),
+// 				vgo.fade(colors().substance, 0.2),
 // 			)
 // 		}
 
-// 		if how_on < 1 {
-// 			vgo.fill_box(switch_box, paint = core.style.color.field, radius = outer_radius)
-// 		}
-// 		vgo.fill_box(
-// 			{switch_box.lo, lever_center + outer_radius},
-// 			radius = outer_radius,
-// 			paint = vgo.fade(core.style.color.accent, how_on),
-// 		)
-// 		vgo.fill_circle(lever_center, inner_radius, vgo.mix(how_on, core.style.color.fg, core.style.color.field))
+//
 
 // 		switch text_side {
 // 		case .Left:
 // 			vgo.fill_text_layout(
 // 				text_layout,
 // 				{self.box.lo.x, box_center_y(self.box) - text_layout.size.y / 2},
-// 				core.style.color.content,
+// 				colors().content,
 // 			)
 // 		case .Right:
 // 			vgo.fill_text_layout(
@@ -267,7 +298,7 @@ display_boolean :: proc(boolean: ^Boolean) {
 // 					switch_box.hi.x + core.style.text_padding.x,
 // 					box_center_y(self.box) - text_layout.size.y / 2,
 // 				},
-// 				core.style.color.content,
+// 				colors().content,
 // 			)
 // 		}
 // 	}
@@ -300,49 +331,37 @@ display_boolean :: proc(boolean: ^Boolean) {
 // 	button_behavior(self)
 
 // 	if self.visible {
-// 		icon_box: Box
+// 		gadget_box: Box
 // 		if len(info.text) > 0 {
 // 			switch info.text_side {
 // 			case .Left:
-// 				icon_box = {self.box.lo, info.size}
+// 				gadget_box = {self.box.lo, info.size}
 // 			case .Right:
-// 				icon_box = {{self.box.hi.x - info.size, self.box.lo.y}, info.size}
+// 				gadget_box = {{self.box.hi.x - info.size, self.box.lo.y}, info.size}
 // 			case .Top:
-// 				icon_box = {
+// 				gadget_box = {
 // 					{box_center_x(self.box) - info.size / 2, self.box.hi.y - info.size},
 // 					info.size,
 // 				}
 // 			case .Bottom:
-// 				icon_box = {{box_center_x(self.box) - info.size / 2, self.box.lo.y}, info.size}
+// 				gadget_box = {{box_center_x(self.box) - info.size / 2, self.box.lo.y}, info.size}
 // 			}
-// 			icon_box.lo = linalg.floor(icon_box.lo)
-// 			icon_box.hi += icon_box.lo
+// 			gadget_box.lo = linalg.floor(gadget_box.lo)
+// 			gadget_box.hi += gadget_box.lo
 // 		} else {
-// 			icon_box = self.box
+// 			gadget_box = self.box
 // 		}
-// 		icon_center := box_center(icon_box)
+// 		icon_center := box_center(gadget_box)
 
 // 		if .Hovered in self.state {
 // 			vgo.fill_box(
 // 				{{self.box.lo.x, self.box.lo.y}, self.box.hi},
 // 				box_height(self.box) / 2,
-// 				paint = vgo.fade(core.style.color.substance, 0.2),
+// 				paint = vgo.fade(colors().substance, 0.2),
 // 			)
 // 		}
 
-// 		state_time := ease.quadratic_in_out(kind.state_time)
-// 		vgo.fill_circle(
-// 			icon_center,
-// 			info.size / 2,
-// 			vgo.mix(state_time, core.style.color.field, core.style.color.accent),
-// 		)
-// 		if state_time > 0 {
-// 			vgo.fill_circle(
-// 				icon_center,
-// 				(info.size / 2 - 5) * kind.state_time,
-// 				vgo.fade(core.style.color.field, state_time),
-// 			)
-// 		}
+//
 // 		// Paint text
 // 		if len(info.text) > 0 {
 // 			switch info.text_side {
@@ -350,32 +369,32 @@ display_boolean :: proc(boolean: ^Boolean) {
 // 				vgo.fill_text_layout(
 // 					info.text_layout,
 // 					{
-// 						icon_box.hi.x + core.style.text_padding.x,
+// 						gadget_box.hi.x + core.style.text_padding.x,
 // 						icon_center.y - info.text_layout.size.y / 2,
 // 					},
-// 					core.style.color.content,
+// 					colors().content,
 // 				)
 // 			case .Right:
 // 				vgo.fill_text_layout(
 // 					info.text_layout,
 // 					{
-// 						icon_box.lo.x - core.style.text_padding.x,
+// 						gadget_box.lo.x - core.style.text_padding.x,
 // 						icon_center.y - info.text_layout.size.y / 2,
 // 					},
-// 					core.style.color.content,
+// 					colors().content,
 // 				)
 // 			case .Top:
-// 				vgo.fill_text_layout(info.text_layout, self.box.lo, core.style.color.content)
+// 				vgo.fill_text_layout(info.text_layout, self.box.lo, colors().content)
 // 			case .Bottom:
 // 				vgo.fill_text_layout(
 // 					info.text_layout,
 // 					{self.box.lo.x, self.box.hi.y - info.text_layout.size.y},
-// 					core.style.color.content,
+// 					colors().content,
 // 				)
 // 			}
 // 		}
 // 		if self.disable_time > 0 {
-// 			vgo.fill_box(self.box, paint = vgo.fade(core.style.color.fg, self.disable_time * 0.5))
+// 			vgo.fill_box(self.box, paint = vgo.fade(colors().fg, self.disable_time * 0.5))
 // 		}
 // 	}
 

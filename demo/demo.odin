@@ -122,7 +122,7 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Near, align = .Center, size = Fixed(50), axis = .X) {
+					if begin_layout(justify = .Near, align = .Center, size = At_Most(50), axis = .X) {
 						defer end_layout()
 
 						set_margin(left = 4, right = 4)
@@ -136,26 +136,9 @@ main :: proc() {
 					if begin_layout(justify = .Center, axis = .X, size = At_Most(200)) {
 						defer end_layout()
 
-						if begin_layout(axis = .Y, size = Fixed(100), justify = .Center) {
-							defer end_layout()
-
-							set_margin(top = 5)
-							for i in 1..=5 {
-								push_id(i)
-									boolean(&checkbox_value, fmt.tprintf("Checkbox A%i", i))
-								pop_id()
-							}
-						}
-						if begin_layout(axis = .Y, size = Fixed(100), justify = .Center) {
-							defer end_layout()
-
-							set_margin(top = 5)
-							for i in 1..=5 {
-								push_id(i)
-									boolean(&checkbox_value, fmt.tprintf("Checkbox B%i", i))
-								pop_id()
-							}
-						}
+						boolean(&checkbox_value, "Switch", type = .Switch)
+						boolean(&checkbox_value, "Checkbox")
+						boolean(&checkbox_value, "Radio", type = .Radio)
 					}
 				}
 			}
