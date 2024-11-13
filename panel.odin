@@ -18,8 +18,9 @@ Panel :: struct {
 	min_size:      [2]f32,
 	moving:        bool,
 	resizing:      bool,
-	dismissed:     bool,
 	resize_offset: [2]f32,
+	is_snapped:    bool,
+	non_snapped_size: [2]f32,
 	fade:          f32,
 	can_move:      bool,
 	can_resize:    bool,
@@ -37,7 +38,12 @@ create_panel :: proc(id: Id) -> Maybe(^Panel) {
 	return nil
 }
 
-begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, axis: Axis = .Y, loc := #caller_location) -> bool {
+begin_panel :: proc(
+	position: Maybe([2]f32) = nil,
+	size: Maybe([2]f32) = nil,
+	axis: Axis = .Y,
+	loc := #caller_location,
+) -> bool {
 
 	MIN_SIZE :: [2]f32{100, 100}
 
@@ -59,11 +65,12 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, ax
 	push_stack(&global_state.panel_stack, panel)
 
 	if panel.moving == true {
+		mouse_point := mouse_point()
 		panel.moving = false
 		size := panel.box.hi - panel.box.lo
-		panel.box.lo = global_state.mouse_pos - panel.move_offset
+		panel.box.lo = mouse_point - panel.move_offset
 		panel.box.hi = panel.box.lo + size
-
+		global_state.held_panel = panel
 		draw_frames(1)
 	}
 
@@ -89,6 +96,8 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, ax
 	begin_layer(&layer_info) or_return
 	panel.layer = layer_info.self
 
+	rounding := f32(0 if panel.is_snapped else global_state.style.rounding)
+
 	{
 		object := persistent_object(panel.layer.id)
 		if begin_object(object) {
@@ -101,14 +110,28 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, ax
 
 			handle_object_click(object, sticky = true)
 
-			draw_shadow(object.box)
-			vgo.fill_box(object.box, global_state.style.rounding, paint = global_state.style.color.fg)
+			if !panel.is_snapped {
+				draw_shadow(object.box)
+			}
+			vgo.fill_box(
+				object.box,
+				rounding,
+				paint = global_state.style.color.fg,
+			)
 
 			if point_in_box(global_state.mouse_pos, object.box) {
 				hover_object(object)
 			}
 
-			if .Pressed in object.state {
+			if object_is_dragged(object, beyond = 100 if panel.is_snapped else 1) {
+				if !panel.moving {
+					if panel.is_snapped {
+						panel.box.lo = mouse_point() - panel.non_snapped_size / 2
+						panel.box.hi = mouse_point() + panel.non_snapped_size / 2
+						panel.is_snapped = false
+					}
+					panel.non_snapped_size = box_size(panel.box)
+				}
 				panel.moving = true
 				panel.move_offset = global_state.mouse_pos - panel.box.lo
 			}
@@ -118,7 +141,7 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, ax
 		}
 	}
 
-	vgo.push_scissor(vgo.make_box(panel.box, global_state.style.rounding))
+	vgo.push_scissor(vgo.make_box(panel.box, rounding))
 	begin_layout(box = panel.box, axis = axis) or_return
 	return true
 }
@@ -126,6 +149,7 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, ax
 end_panel :: proc() {
 	layout := current_layout().?
 	end_layout()
+
 	panel := current_panel()
 	if panel.can_resize {
 		object := persistent_object(hash("resize"))

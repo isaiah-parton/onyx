@@ -65,6 +65,7 @@ Layout :: struct {
 	isolated:           bool,
 	axis:               Axis,
 	content_box:        Box,
+	total_space:              [2]f32,
 	justify:            Align,
 	align:              Align,
 	padding:            [4]f32,
@@ -169,7 +170,7 @@ apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
 		}
 	}
 
-	object.box = snapped_box(box)
+	object.box = box
 }
 
 display_layout :: proc(layout: ^Layout) {
@@ -184,7 +185,7 @@ display_layout :: proc(layout: ^Layout) {
 	for object in layout.objects {
 		apply_object_layout(object, layout)
 		if layout.justify == .Center {
-			move_object(object, linalg.floor(delta * 0.5))
+			move_object(object, delta * 0.5)
 		} else if layout.justify == .Far {
 			move_object(object, delta)
 		}
@@ -245,8 +246,10 @@ begin_layout :: proc(size: union {
 		layout.isolated = true
 		layout.has_known_box = true
 		layout.box = box
+		layout.size = box_size(box)
 	} else {
 		available_space: [2]f32
+		total_space: [2]f32
 		parent_layout := current_layout()
 
 		i := int(axis)
@@ -254,10 +257,8 @@ begin_layout :: proc(size: union {
 
 		layout.has_known_box = true
 		if parent_layout, ok := parent_layout.?; ok {
-			// FIXME: `content_box` does not reflect the amount of available space at this point
-			available_space =
-				box_size(parent_layout.content_box) -
-				(parent_layout.padding.xy + parent_layout.padding.zw)
+			available_space = box_size(parent_layout.content_box)
+			total_space = parent_layout.total_space
 			j = int(parent_layout.axis)
 			if layout_is_deferred(parent_layout) {
 				layout.has_known_box = false
@@ -265,7 +266,7 @@ begin_layout :: proc(size: union {
 		}
 		switch size in size {
 		case Percent:
-			layout.size[j] = available_space[j] * f32(size) * 0.01
+			layout.size[j] = total_space[j] * f32(size) * 0.01
 		case Fixed:
 			layout.size[j] = f32(size)
 			layout.desired_size[j] = f32(size)
@@ -297,13 +298,15 @@ begin_layout :: proc(size: union {
 
 	layout.spacing_size += padding.xy + padding.zw
 
+
 	layout.content_box = layout.box
-	if layout_is_deferred(layout) {
-		layout.padding = padding
-	} else {
-		layout.content_box.lo += padding.xy
-		layout.content_box.hi -= padding.zw
+	layout.padding = padding
+	if !layout_is_deferred(layout) {
+		layout.content_box.lo += layout.padding.xy
+		layout.content_box.hi -= layout.padding.zw
 	}
+
+	layout.total_space = layout.size - (layout.padding.xy + layout.padding.zw)
 
 	begin_object(layout) or_return
 	push_layout(layout) or_return

@@ -66,6 +66,7 @@ raw_input :: proc(
 		input.borrowed_string = content
 		input.placeholder = placeholder
 		input.prefix = prefix
+		input.decal = decal
 		if .Active in input.state {
 			input.content = strings.to_string(input.builder)
 		} else {
@@ -374,9 +375,10 @@ display_input :: proc(input: ^Input) {
 			case .None:
 				break
 			case .Check:
-				vgo.check(center, 5, vgo.GREEN)
+				vgo.check(center, 7, vgo.GREEN)
 			case .Spinner:
-				vgo.spinner(center, 5, colors.content)
+				vgo.spinner(center, 7, colors.content)
+				draw_frames(1)
 			}
 		}
 

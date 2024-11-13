@@ -18,6 +18,7 @@ import "core:strconv"
 import "core:strings"
 import "core:sys/windows"
 import "core:time"
+import "core:c/libc"
 import "vendor:glfw"
 import "vendor:wgpu"
 
@@ -64,7 +65,6 @@ main :: proc() {
 	slider_values: f64 = 3
 	color: vgo.Color = vgo.GOLD
 	enum_value: runtime.Odin_OS_Type
-
 	boolean_value: [onyx.Boolean_Type]bool
 
 	for {
@@ -98,10 +98,12 @@ main :: proc() {
 					set_height_to_width()
 					button("\uf578", style = .Ghost, font_size = 20)
 					button("\uf044", style = .Ghost, font_size = 20)
-					button("\uedca", style = .Ghost, font_size = 20)
+					if button("\uedca", style = .Ghost, font_size = 20).clicked {
+						libc.system("explorer \"https://github.com/isaiah-parton/onyx\"")
+					}
 				}
 
-				if begin_layout(size = At_Least(0), axis = .Y, padding = 30) {
+				if begin_layout(size = At_Least(0), axis = .Y, padding = 15) {
 					defer end_layout()
 
 					if begin_layout(justify = .Near, align = .Center, size = Percent(25), axis = .X) {
@@ -114,12 +116,12 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, align = .Center, size = Percent(33.33), axis = .X) {
+					if begin_layout(justify = .Center, align = .Center, size = Percent(25), axis = .X) {
 						defer end_layout()
 
-						raw_input(&input_value, placeholder = "sample text")
+						raw_input(&input_value, placeholder = "sample text", decal = .Spinner)
 					}
-					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(50)) {
+					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(25)) {
 						defer end_layout()
 
 						set_margin_all(4)
@@ -129,7 +131,7 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(100)) {
+					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(25)) {
 						defer end_layout()
 
 						set_margin_all(4)

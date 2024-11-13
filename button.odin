@@ -27,7 +27,12 @@ Button :: struct {
 	text_layout:  vgo.Text_Layout,
 }
 
-button :: proc(text: string, style: Button_Style = .Primary, font_size: f32 = global_state.style.default_text_size, loc := #caller_location) {
+Button_Result :: struct {
+	clicked: bool,
+	hovered: bool,
+}
+
+button :: proc(text: string, style: Button_Style = .Primary, font_size: f32 = global_state.style.default_text_size, loc := #caller_location) -> (result: Button_Result) {
 	object := persistent_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
@@ -45,7 +50,11 @@ button :: proc(text: string, style: Button_Style = .Primary, font_size: f32 = gl
 		)
 		button.desired_size = button.text_layout.size + global_state.style.text_padding * 2
 		button.style = style
+
+		result.clicked = object_was_clicked(button, with = .Left)
+		result.hovered = .Hovered in button.last_state
 	}
+	return
 }
 
 display_button :: proc(button: ^Button) {

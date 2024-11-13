@@ -31,6 +31,7 @@ Object_Status :: enum {
 	Clicked,
 	Open,
 	Active,
+	Dragged,
 }
 
 Object_State :: bit_set[Object_Status;u8]
@@ -221,9 +222,9 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 	}
 	if object.state >= {.Pressed} {
 		released_buttons := global_state.last_mouse_bits - global_state.mouse_bits
-		if global_state.mouse_button in released_buttons {
+		if object.click_button in released_buttons {
 			object.state += {.Clicked}
-			object.state -= {.Pressed}
+			object.state -= {.Pressed, .Dragged}
 			global_state.dragged_object = 0
 		}
 	} else {
