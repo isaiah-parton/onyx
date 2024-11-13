@@ -21,22 +21,28 @@ Input_Decal :: enum {
 }
 
 Input :: struct {
-	using object: ^Object,
-	editor:       tedit.Editor,
-	builder:      strings.Builder,
-	content:      string,
-	prefix:       string,
-	placeholder:  string,
-	is_multiline: bool,
-	is_monospace: bool,
-	decal:        Input_Decal,
-	anchor:       int,
-	active_time:  f32,
-	offset:       [2]f32,
+	using object:    ^Object,
+	editor:          tedit.Editor,
+	builder:         strings.Builder,
+	borrowed_string: ^string,
+	content:         string,
+	prefix:          string,
+	placeholder:     string,
+	is_multiline:    bool,
+	is_monospace:    bool,
+	decal:           Input_Decal,
+	anchor:          int,
+	active_time:     f32,
+	offset:          [2]f32,
+}
+
+destroy_input :: proc(input: ^Input) {
+	tedit.destroy_editor(&input.editor)
+	strings.builder_destroy(&input.builder)
 }
 
 raw_input :: proc(
-	content: string,
+	content: ^string,
 	placeholder: string = "",
 	prefix: string = "",
 	obfuscate: bool = false,
@@ -57,10 +63,13 @@ raw_input :: proc(
 
 		input := &object.variant.(Input)
 		input.desired_size = global_state.style.visual_size
+		input.borrowed_string = content
+		input.placeholder = placeholder
+		input.prefix = prefix
 		if .Active in input.state {
 			input.content = strings.to_string(input.builder)
 		} else {
-			input.content = content
+			input.content = content^
 		}
 	}
 }
@@ -92,10 +101,8 @@ display_input :: proc(input: ^Input) {
 	editor := &input.editor
 	content_layout: vgo.Text_Layout
 
-	font := (global_state.style.monospace_font if input.is_monospace else global_state.style.default_font)
-	vgo.set_font(
-		font,
-	)
+	font := (global_state.style.monospace_font if (input.is_monospace) else global_state.style.default_font)
+	vgo.set_font(font)
 
 	prefix_layout: vgo.Text_Layout
 	if len(input.prefix) > 0 {
@@ -154,6 +161,7 @@ display_input :: proc(input: ^Input) {
 			for char, c in global_state.runes {
 				tedit.input_runes(&input.editor, {char})
 				draw_frames(1)
+				input.state += {.Changed}
 			}
 		}
 		if key_pressed(.Backspace) do cmd = .Delete_Word_Left if control_down else .Backspace
@@ -378,5 +386,10 @@ display_input :: proc(input: ^Input) {
 			global_state.style.rounding,
 			paint = vgo.fade(colors.accent, input.active_time),
 		)
+	}
+
+	if .Changed in input.state {
+		delete(input.borrowed_string^)
+		input.borrowed_string^ = strings.clone(strings.to_string(input.builder))
 	}
 }

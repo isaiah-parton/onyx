@@ -493,10 +493,12 @@ shutdown :: proc() {
 		return
 	}
 
-	for _, object in global_state.object_map {
+	for object in global_state.objects {
 		destroy_object(object)
 		free(object)
 	}
+	delete(global_state.objects)
+	delete(global_state.object_map)
 
 	for layer in global_state.layers {
 		destroy_layer(layer)
@@ -508,10 +510,18 @@ shutdown :: proc() {
 	}
 
 	delete(global_state.layers)
-	delete(global_state.object_map)
 	delete(global_state.panel_map)
 	delete(global_state.layer_map)
 	delete(global_state.runes)
+
+	vgo.destroy_font(&global_state.style.default_font)
+	vgo.destroy_font(&global_state.style.monospace_font)
+	vgo.destroy_font(&global_state.style.icon_font)
+	if font, ok := global_state.style.header_font.?; ok {
+		vgo.destroy_font(&font)
+	}
+
+	destroy_debug_state(&global_state.debug)
 
 	vgo.shutdown()
 }

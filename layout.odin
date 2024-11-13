@@ -18,6 +18,7 @@ Layout_Metrics :: struct {
 
 Fixed :: distinct f32
 At_Least :: distinct f32
+Percent :: distinct f32
 At_Most :: distinct f32
 Between :: distinct [2]f32
 
@@ -229,6 +230,7 @@ begin_layout :: proc(size: union {
 		At_Least,
 		At_Most,
 		Between,
+		Percent,
 	} = nil, axis: Axis = .X, box: Maybe(Box) = nil, justify: Align = .Near, align: Align = .Near, padding: [4]f32 = {}) -> bool {
 	object := transient_object()
 	object.variant = Layout {
@@ -262,6 +264,8 @@ begin_layout :: proc(size: union {
 			}
 		}
 		switch size in size {
+		case Percent:
+			layout.size[j] = available_space[j] * f32(size) * 0.01
 		case Fixed:
 			layout.size[j] = f32(size)
 			layout.desired_size[j] = f32(size)

@@ -1,8 +1,5 @@
 package onyx
-// Fixes for objects
-// 	- Property to control when an object attempts to be fully displayed by
-// 		modifying its parent layout or not
-//  - What is the purpose of begin and end object?
+
 import "../vgo"
 import "base:intrinsics"
 import "base:runtime"
@@ -47,6 +44,7 @@ Object_Variant :: union {
 	Layout,
 	Label,
 	Input,
+	Slider,
 }
 
 Object :: struct {
@@ -155,6 +153,7 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 	object.id = id
 	object.out_state_mask = OBJECT_STATE_ALL
 
+	append(&global_state.objects, object)
 	global_state.object_map[id] = object
 	draw_frames(1)
 
@@ -162,7 +161,12 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 }
 
 destroy_object :: proc(object: ^Object) {
-	// uhh..
+	#partial switch &v in object.variant {
+	case Input:
+		destroy_input(&v)
+	case:
+		break
+	}
 }
 
 persistent_object :: proc(id: Id) -> ^Object {
@@ -413,5 +417,7 @@ display_object :: proc(object: ^Object) {
 		display_layout(&v)
 	case Label:
 		display_label(&v)
+	case Slider:
+		display_slider(&v)
 	}
 }

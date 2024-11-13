@@ -32,6 +32,10 @@ Debug_State :: struct {
 	wireframe:             bool,
 }
 
+destroy_debug_state :: proc(state: ^Debug_State) {
+	delete(state.hovered_objects)
+}
+
 @(private = "file")
 __prof: Profiler
 
@@ -76,7 +80,7 @@ draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
 
 @(private)
 draw_object_debug_boxes :: proc(state: Debug_State) {
-	for _, object in global_state.object_map {
+	for object in global_state.objects {
 		draw_object_debug_box(state, object)
 	}
 	for &object in global_state.transient_objects.data[:global_state.transient_objects.len] {

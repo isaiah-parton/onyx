@@ -61,9 +61,11 @@ main :: proc() {
 	toggle_value: bool
 	radio_value: bool
 	input_value: string
-	slider_values: [2]f32
+	slider_values: f64 = 3
 	color: vgo.Color = vgo.GOLD
 	enum_value: runtime.Odin_OS_Type
+
+	boolean_value: [onyx.Boolean_Type]bool
 
 	for {
 		if glfw.WindowShouldClose(window) {
@@ -90,17 +92,19 @@ main :: proc() {
 				if begin_layout(size = Fixed(36), axis = .Y, align = .Center) {
 					defer end_layout()
 
+					vgo.fill_box(layout_box(), paint = colors().field)
+
 					set_width_fill()
 					set_height_to_width()
-					button("\uf578", style = .Ghost, font_size = 18)
-					button("\uf044", style = .Ghost, font_size = 18)
-					button("\uEDC0", style = .Ghost, font_size = 18)
+					button("\uf578", style = .Ghost, font_size = 20)
+					button("\uf044", style = .Ghost, font_size = 20)
+					button("\uedca", style = .Ghost, font_size = 20)
 				}
 
 				if begin_layout(size = At_Least(0), axis = .Y, padding = 30) {
 					defer end_layout()
 
-					if begin_layout(justify = .Far, align = .Center, size = Fixed(50), axis = .X) {
+					if begin_layout(justify = .Near, align = .Center, size = Percent(25), axis = .X) {
 						defer end_layout()
 
 						set_margin(left = 4, right = 4)
@@ -110,18 +114,26 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, align = .Center, size = Fixed(50), axis = .X) {
+					if begin_layout(justify = .Center, align = .Center, size = Percent(33.33), axis = .X) {
 						defer end_layout()
 
-						raw_input(input_value, placeholder = "placeholder fr")
+						raw_input(&input_value, placeholder = "sample text")
 					}
-					if begin_layout(justify = .Center, axis = .X) {
+					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(50)) {
 						defer end_layout()
 
 						set_margin_all(4)
-						boolean(&checkbox_value, "Switch", type = .Switch)
-						boolean(&checkbox_value, "Checkbox")
-						boolean(&checkbox_value, "Radio", type = .Radio)
+						for type, i in Boolean_Type {
+							push_id(i)
+									boolean(&boolean_value[type], fmt.tprint(type), type = type)
+							pop_id()
+						}
+					}
+					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(100)) {
+						defer end_layout()
+
+						set_margin_all(4)
+						slider(&slider_values, 0, 10)
 					}
 				}
 			}
