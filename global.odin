@@ -149,11 +149,14 @@ Global_State :: struct {
 	// Scratch text editor
 	text_editor:              tedit.Editor,
 	// Drawing
-	draw_this_frame:          bool,
-	draw_next_frame:          bool,
+	frames_to_draw: int,
 	frames:                   int,
 	drawn_frames:             int,
 	cursors:                  [Mouse_Cursor]glfw.CursorHandle,
+}
+
+draw_frames :: proc(how_many: int) {
+	global_state.frames_to_draw = max(global_state.frames_to_draw, how_many)
 }
 
 colors :: proc() -> ^Color_Scheme {
@@ -187,6 +190,7 @@ load_default_fonts :: proc() -> bool {
 	MONOSPACE_FONT_JSON :: #load(FONT_PATH + "/" + MONOSPACE_FONT + ".json", []u8)
 	HEADER_FONT_JSON :: #load(FONT_PATH + "/" + HEADER_FONT + ".json", []u8)
 	ICON_FONT_JSON :: #load(FONT_PATH + "/" + ICON_FONT + ".json", []u8)
+
 	global_state.style.default_font = vgo.load_font_from_slices(
 		DEFAULT_FONT_IMAGE,
 		DEFAULT_FONT_JSON,
@@ -203,6 +207,7 @@ load_default_fonts :: proc() -> bool {
 		ICON_FONT_IMAGE,
 		ICON_FONT_JSON,
 	) or_return
+
 	vgo.set_fallback_font(global_state.style.icon_font)
 
 	return true
@@ -218,7 +223,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	global_state.focused = true
 	global_state.view = {f32(width), f32(height)}
 	global_state.last_frame_time = time.now()
-	global_state.draw_next_frame = true
+	draw_frames(1)
 	global_state.start_time = time.now()
 
 	global_state.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
@@ -243,9 +248,9 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		proc "c" (_: glfw.WindowHandle, _: i32) {global_state.visible = true},
 	)
 	glfw.SetScrollCallback(global_state.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
+		context = runtime.default_context()
 		global_state.mouse_scroll = {f32(x), f32(y)}
-		global_state.draw_this_frame = true
-		global_state.draw_next_frame = true
+		draw_frames(2)
 	})
 	glfw.SetWindowSizeCallback(
 		global_state.window,
@@ -257,21 +262,19 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 			wgpu.SurfaceConfigure(global_state.surface, &global_state.surface_config)
 
 			global_state.view = {f32(width), f32(height)}
-			global_state.draw_this_frame = true
-			global_state.draw_next_frame = true
+			draw_frames(2)
 		},
 	)
 	glfw.SetCharCallback(global_state.window, proc "c" (_: glfw.WindowHandle, char: rune) {
 		context = runtime.default_context()
 		append(&global_state.runes, char)
-		global_state.draw_this_frame = true
-		global_state.draw_next_frame = true
+		draw_frames(2)
 	})
 	glfw.SetKeyCallback(
 		global_state.window,
 		proc "c" (_: glfw.WindowHandle, key, _, action, _: i32) {
-			global_state.draw_this_frame = true
-			global_state.draw_next_frame = true
+			context = runtime.default_context()
+			draw_frames(2)
 			if key < 0 {
 				return
 			}
@@ -287,14 +290,15 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		},
 	)
 	glfw.SetCursorPosCallback(global_state.window, proc "c" (_: glfw.WindowHandle, x, y: f64) {
+		context = runtime.default_context()
 		global_state.mouse_pos = {f32(x), f32(y)}
-		global_state.draw_this_frame = true
+		draw_frames(2)
 	})
 	glfw.SetMouseButtonCallback(
 		global_state.window,
 		proc "c" (_: glfw.WindowHandle, button, action, _: i32) {
-			global_state.draw_this_frame = true
-			global_state.draw_next_frame = true
+			context = runtime.default_context()
+			draw_frames(2)
 			switch action {
 			case glfw.PRESS:
 				global_state.mouse_button = Mouse_Button(button)
@@ -415,11 +419,6 @@ new_frame :: proc() {
 		global_state.frames_so_far = 0
 	}
 
-	if global_state.draw_next_frame {
-		global_state.draw_next_frame = false
-		global_state.draw_this_frame = true
-	}
-
 	reset_input()
 	glfw.PollEvents()
 
@@ -449,7 +448,7 @@ new_frame :: proc() {
 
 	if key_pressed(.F3) {
 		global_state.debug.enabled = !global_state.debug.enabled
-		global_state.draw_this_frame = true
+		draw_frames(1)
 	}
 
 	vgo.new_frame()
@@ -457,7 +456,6 @@ new_frame :: proc() {
 	profiler_begin_scope(.Construct)
 }
 
-// Render queued draw calls and reset draw state
 present :: proc() {
 	profiler_end_scope(.Construct)
 	profiler_scope(.Render)
@@ -483,10 +481,10 @@ present :: proc() {
 	}
 	global_state.cursor_type = .Normal
 
-	if global_state.draw_this_frame && global_state.visible {
+	if global_state.frames_to_draw > 0 && global_state.visible {
 		vgo.present()
 		global_state.drawn_frames += 1
-		global_state.draw_this_frame = false
+		global_state.frames_to_draw -= 1
 	}
 }
 
@@ -516,6 +514,10 @@ shutdown :: proc() {
 	delete(global_state.runes)
 
 	vgo.shutdown()
+}
+
+user_focus_just_changed :: proc() -> bool {
+	return global_state.focused_object != global_state.last_focused_object
 }
 
 __set_clipboard_string :: proc(_: rawptr, str: string) -> bool {

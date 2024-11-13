@@ -160,7 +160,7 @@ end_container :: proc() {
 		delta_zoom := container.target_zoom - container.zoom
 		// Hint next frame to be drawn if delta sufficient
 		if abs(delta_zoom) > 0.001 {
-			global_state.draw_next_frame = true
+		draw_frames(1)
 		}
 		container.zoom += delta_zoom * 15 * global_state.delta_time
 	}
@@ -178,7 +178,7 @@ end_container :: proc() {
 	container.scroll += delta_scroll
 	// Hint next frame to be drawn if delta sufficient
 	if abs(delta_scroll.x) > 0.01 || abs(delta_scroll.y) > 0.01 {
-		global_state.draw_next_frame = true
+	draw_frames(1)
 	}
 	// Enable/disable scrollbars
 	enable_scroll_x :=

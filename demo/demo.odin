@@ -104,38 +104,21 @@ main :: proc() {
 						defer end_layout()
 
 						set_margin(left = 4, right = 4)
-						label("Label")
-						for i in 1..=5 {
+						for style, i in Button_Style {
 							push_id(i)
-								button(fmt.tprintf("Button %i", i))
+								button(fmt.tprint(style), style = style)
 							pop_id()
 						}
 					}
 					if begin_layout(justify = .Center, align = .Center, size = Fixed(50), axis = .X) {
 						defer end_layout()
 
-						set_margin(left = 4, right = 4)
-						label("Label")
-						for i in 1..=5 {
-							push_id(i)
-								button(fmt.tprintf("Button %i", i))
-							pop_id()
-						}
+						raw_input(input_value, placeholder = "placeholder fr")
 					}
-					if begin_layout(justify = .Near, align = .Center, size = At_Most(50), axis = .X) {
+					if begin_layout(justify = .Center, axis = .X) {
 						defer end_layout()
 
-						set_margin(left = 4, right = 4)
-						label("Label")
-						for i in 1..=5 {
-							push_id(i)
-								button(fmt.tprintf("Button %i", i))
-							pop_id()
-						}
-					}
-					if begin_layout(justify = .Center, axis = .X, size = At_Most(200)) {
-						defer end_layout()
-
+						set_margin_all(4)
 						boolean(&checkbox_value, "Switch", type = .Switch)
 						boolean(&checkbox_value, "Checkbox")
 						boolean(&checkbox_value, "Radio", type = .Radio)

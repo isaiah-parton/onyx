@@ -64,7 +64,7 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, ax
 		panel.box.lo = global_state.mouse_pos - panel.move_offset
 		panel.box.hi = panel.box.lo + size
 
-		global_state.draw_next_frame = true
+		draw_frames(1)
 	}
 
 	min_size := linalg.max(MIN_SIZE, panel.min_size)
@@ -76,7 +76,7 @@ begin_panel :: proc(position: Maybe([2]f32) = nil, size: Maybe([2]f32) = nil, ax
 	panel.box = snapped_box(panel.box)
 
 	if panel.last_min_size != panel.min_size {
-		global_state.draw_this_frame = true
+		draw_frames(1)
 	}
 	panel.last_min_size = panel.min_size
 	panel.min_size = {}

@@ -96,7 +96,7 @@ clean_up_layers :: proc() {
 
 			delete_key(&global_state.layer_map, id)
 			free(layer)
-			global_state.draw_next_frame = true
+			draw_frames(1)
 		} else {
 			layer.dead = true
 		}

@@ -125,10 +125,8 @@ apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
 	size := linalg.max(object.size, object.desired_size)
 	if layout.axis == .X {
 		layout.content_box.lo.x += object.margin.x
-		size.y -= object.margin.y + object.margin.w
 	} else {
 		layout.content_box.lo.y += object.margin.y
-		size.x -= object.margin.x + object.margin.z
 	}
 
 	box: Box
@@ -140,6 +138,8 @@ apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
 
 	if layout.axis == .X {
 		layout.content_box.lo.x += object.margin.z
+		box.lo.y += object.margin.y
+		box.hi.y -= object.margin.w
 		if size.y < box_height(box) {
 			switch layout.align {
 			case .Near:
@@ -153,6 +153,8 @@ apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
 		}
 	} else {
 		layout.content_box.lo.y += object.margin.w
+		box.lo.x += object.margin.x
+		box.hi.x -= object.margin.z
 		if size.x < box_width(box) {
 			switch layout.align {
 			case .Near:
@@ -372,7 +374,7 @@ set_height_percent :: proc(height: f32) {
 	layout.object_size.y = box_height(layout.content_box) * (height / 100)
 }
 
-set_margin :: proc(
+set_margin_sides :: proc(
 	left: Maybe(f32) = nil,
 	right: Maybe(f32) = nil,
 	top: Maybe(f32) = nil,
@@ -383,6 +385,15 @@ set_margin :: proc(
 	if top, ok := top.?; ok do layout.object_margin.y = top
 	if right, ok := right.?; ok do layout.object_margin.z = right
 	if bottom, ok := bottom.?; ok do layout.object_margin.w = bottom
+}
+
+set_margin_all :: proc(amount: f32) {
+	current_layout().?.object_margin = amount
+}
+
+set_margin :: proc {
+	set_margin_sides,
+	set_margin_all,
 }
 
 set_width_to_height :: proc() {

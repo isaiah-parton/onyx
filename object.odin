@@ -46,6 +46,7 @@ Object_Variant :: union {
 	Container,
 	Layout,
 	Label,
+	Input,
 }
 
 Object :: struct {
@@ -56,7 +57,7 @@ Object :: struct {
 	frames:         int,
 	dead:           bool,
 	disabled:       bool,
-	has_known_box: bool,
+	has_known_box:  bool,
 	flags:          Object_Flags,
 	last_state:     Object_State,
 	next_state:     Object_State,
@@ -92,7 +93,7 @@ clean_up_objects :: proc() {
 			delete_key(&global_state.object_map, object.id)
 			ordered_remove(&global_state.objects, index)
 			free(object)
-			global_state.draw_this_frame = true
+			draw_frames(1)
 		} else {
 			object.dead = true
 		}
@@ -105,13 +106,13 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 
 	if condition {
 		if value < 1 {
-			global_state.draw_this_frame = true
-			global_state.draw_next_frame = true
+			draw_frames(1)
+			draw_frames(1)
 			value = min(1, value + global_state.delta_time * (1 / duration))
 		}
 	} else if value > 0 {
-		global_state.draw_this_frame = true
-		global_state.draw_next_frame = true
+		draw_frames(1)
+		draw_frames(1)
 		value = max(0, value - global_state.delta_time * (1 / duration))
 	}
 
@@ -155,7 +156,7 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 	object.out_state_mask = OBJECT_STATE_ALL
 
 	global_state.object_map[id] = object
-	global_state.draw_this_frame = true
+	draw_frames(1)
 
 	return object
 }
@@ -201,9 +202,8 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 			object.click_point = global_state.mouse_pos
 			object.click_time = time.now()
 			object.state += {.Pressed}
-			global_state.draw_this_frame = true
+			draw_frames(1)
 			global_state.focused_object = object.id
-			// Set the globally dragged object
 			if sticky do global_state.dragged_object = object.id
 		}
 		// TODO: Lose click if mouse moved too much (allow for dragging containers by their contents)
@@ -211,14 +211,11 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 		// 	object.state -= {.Pressed}
 		// 	object.click_count = 0
 		// }
-	} else if global_state.dragged_object !=
-	   object.id  /* Keep hover and press state if dragged */{
+	} else if global_state.dragged_object != object.id {
 		object.state -= {.Pressed, .Hovered}
 		object.click_count = 0
 	}
-	// Mouse press
 	if object.state >= {.Pressed} {
-		// Check for released buttons
 		released_buttons := global_state.last_mouse_bits - global_state.mouse_bits
 		if global_state.mouse_button in released_buttons {
 			object.state += {.Clicked}
@@ -226,7 +223,6 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 			global_state.dragged_object = 0
 		}
 	} else {
-		// Reset click time if cursor is moved beyond a threshold
 		if object.click_count > 0 &&
 		   linalg.length(global_state.mouse_pos - global_state.last_mouse_pos) > 2 {
 			object.click_count = 0
@@ -240,10 +236,12 @@ object_is_visible :: proc(object: ^Object) -> bool {
 
 update_object_state :: proc(object: ^Object) {
 	object.last_state = object.state
+
 	object.state -= {.Clicked, .Focused, .Changed}
 	if global_state.focused_object == object.id {
 		object.state += {.Focused}
 	}
+
 	object.state += object.next_state
 	object.next_state = {}
 }
@@ -288,14 +286,15 @@ begin_object :: proc(object: ^Object) -> bool {
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
 		if layout, ok := current_layout().?; ok {
-			layout.desired_size += (object.margin.xy + object.margin.zw) * axis_normal(layout.axis)
+			object.size = linalg.max(object.size, object.desired_size, layout.object_size)
+			effective_size := object.desired_size + object.margin.xy + object.margin.zw
 			switch layout.axis {
 			case .X:
-				layout.content_size.x += object.desired_size.x
-				layout.content_size.y = max(layout.content_size.y, object.desired_size.y)
+				layout.content_size.x += effective_size.x
+				layout.content_size.y = max(layout.content_size.y, effective_size.y)
 			case .Y:
-				layout.content_size.y += object.desired_size.y
-				layout.content_size.x = max(layout.content_size.x, object.desired_size.x)
+				layout.content_size.y += effective_size.y
+				layout.content_size.x = max(layout.content_size.x, effective_size.x)
 			}
 			display_or_add_object(object, layout)
 		} else {
@@ -314,7 +313,7 @@ transfer_object_state_to_parent :: proc(child: ^Object, parent: ^Object) {
 	if .Pressed in child.state && child.id == global_state.dragged_object {
 		state_mask -= {.Pressed}
 	}
-	parent.next_state += child.state & state_mask
+	parent.next_state += child.next_state & state_mask
 }
 
 hover_object :: proc(object: ^Object) {
@@ -384,7 +383,7 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 	vgo.fill_box(box, rounding, global_state.style.color.substance)
 	vgo.fill_box(box, rounding, vgo.Paint{kind = .Skeleton})
 
-	global_state.draw_this_frame = true
+	draw_frames(1)
 }
 
 object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {
@@ -404,6 +403,8 @@ display_object :: proc(object: ^Object) {
 
 	switch &v in object.variant {
 	case Container:
+	case Input:
+		display_input(&v)
 	case Button:
 		display_button(&v)
 	case Boolean:
