@@ -1,5 +1,5 @@
 # Onyx
-Beautiful immediate-mode gui that runs as fast as your monitor.
+**The vision**: Beautiful immediate-mode gui with advanced layouts that runs as fast as your monitor.
 
 ![image](preview.png)
 
