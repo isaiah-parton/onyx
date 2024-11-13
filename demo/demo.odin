@@ -106,7 +106,7 @@ main :: proc() {
 				if begin_layout(size = At_Least(0), axis = .Y, padding = 15) {
 					defer end_layout()
 
-					if begin_layout(justify = .Near, align = .Center, size = Percent(25), axis = .X) {
+					if begin_layout(justify = .Near, align = .Center, size = Percent(25), axis = .X, padding = 10) {
 						defer end_layout()
 
 						set_margin(left = 4, right = 4)
@@ -116,12 +116,12 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, align = .Center, size = Percent(25), axis = .X) {
+					if begin_layout(justify = .Center, align = .Center, size = Percent(25), axis = .X, padding = 10) {
 						defer end_layout()
 
 						raw_input(&input_value, placeholder = "sample text", decal = .Spinner)
 					}
-					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(25)) {
+					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(25), padding = 10) {
 						defer end_layout()
 
 						set_margin_all(4)
@@ -131,7 +131,7 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(25)) {
+					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(25), padding = 10) {
 						defer end_layout()
 
 						set_margin_all(4)

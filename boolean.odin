@@ -20,7 +20,7 @@ Boolean :: struct {
 	side:            Side,
 	text:            string,
 	text_layout:     vgo.Text_Layout,
-	gadget_size:       [2]f32,
+	gadget_size:     [2]f32,
 }
 
 boolean :: proc(
@@ -137,14 +137,11 @@ display_boolean :: proc(boolean: ^Boolean) {
 				vgo.fade(colors().accent, state_time),
 			)
 			if state_time > 0 {
-				gadget_box := move_box(
-				gadget_box,
-					{
-						0,
-						box_height(gadget_box) *
-						((1 - state_time) if boolean.value^ else -(1 - state_time)),
-					},
-				)
+				gadget_center += {
+					0,
+					box_height(gadget_box) *
+					((1 - state_time) if boolean.value^ else -(1 - state_time)),
+				}
 				vgo.check(gadget_center, boolean.gadget_size.y / 4, colors().field)
 			}
 			if state_time > 0 && state_time < 1 {
@@ -183,7 +180,11 @@ display_boolean :: proc(boolean: ^Boolean) {
 				radius = outer_radius,
 				paint = vgo.fade(colors().accent, state_time),
 			)
-			vgo.fill_circle(lever_center, inner_radius, vgo.mix(state_time, colors().fg, colors().field))
+			vgo.fill_circle(
+				lever_center,
+				inner_radius,
+				vgo.mix(state_time, colors().fg, colors().field),
+			)
 		}
 		// Paint text
 		text_pos: [2]f32

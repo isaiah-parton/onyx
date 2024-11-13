@@ -23,7 +23,6 @@ EMBED_DEFAULT_FONTS :: #config(ONYX_EMBED_FONTS, false)
 FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx/fonts")
 MAX_IDS :: 32
 MAX_LAYERS :: 100
-MAX_WIDGETS :: 4000
 MAX_LAYOUTS :: 100
 MAX_PANELS :: 100
 DEFAULT_DESIRED_FPS :: 75
@@ -60,7 +59,7 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 	stack.height = 0
 }
 
-// @(private)
+@(private)
 global_state: Global_State
 
 @(private)

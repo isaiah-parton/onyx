@@ -32,9 +32,9 @@ Corners :: bit_set[Corner;u8]
 ALL_CORNERS :: Corners{.Top_Left, .Top_Right, .Bottom_Left, .Bottom_Right}
 
 Clip :: enum {
-	None, // completely visible
-	Partial, // partially visible
-	Full, // hidden
+	None,
+	Partial,
+	Full,
 }
 
 box_width :: proc(box: Box) -> f32 {
@@ -108,27 +108,68 @@ box_center :: proc(a: Box) -> [2]f32 {
 	return {(a.lo.x + a.hi.x) * 0.5, (a.lo.y + a.hi.y) * 0.5}
 }
 
-// Shrink a box by pushing one of its sides
+cut_box_left :: proc(box: ^Box, a: f32) -> (res: Box) {
+	res = {box.lo, {box.lo.x + a, box.hi.y}}
+	box.lo.x += a
+	return
+}
+
+cut_box_top :: proc(box: ^Box, a: f32) -> (res: Box) {
+	res = {box.lo, {box.hi.x, box.lo.y + a}}
+	box.lo.y += a
+	return
+}
+
+cut_box_right :: proc(box: ^Box, a: f32) -> (res: Box) {
+	res = {{box.hi.x - a, box.lo.y}, box.hi}
+	box.hi.x -= a
+	return
+}
+
+cut_box_bottom :: proc(box: ^Box, a: f32) -> (res: Box) {
+	res = {{box.lo.x, box.hi.y - a}, box.hi}
+	box.hi.y -= a
+	return
+}
+
+cut_box :: proc(box: ^Box, side: Side, amount: f32) -> Box {
+	switch side {
+	case .Bottom:
+		return cut_box_bottom(box, amount)
+	case .Top:
+		return cut_box_top(box, amount)
+	case .Left:
+		return cut_box_left(box, amount)
+	case .Right:
+		return cut_box_right(box, amount)
+	}
+	return {}
+}
+
 squish_box_left :: proc(box: Box, amount: f32) -> Box {
 	box := box
 	box.lo.x += amount
 	return box
 }
+
 squish_box_right :: proc(box: Box, amount: f32) -> Box {
 	box := box
 	box.hi.x -= amount
 	return box
 }
+
 squish_box_top :: proc(box: Box, amount: f32) -> Box {
 	box := box
 	box.lo.y += amount
 	return box
 }
+
 squish_box_bottom :: proc(box: Box, amount: f32) -> Box {
 	box := box
 	box.hi.y -= amount
 	return box
 }
+
 squish_box :: proc(box: Box, side: Side, amount: f32) -> (result: Box) {
 	switch side {
 	case .Bottom:
@@ -250,19 +291,22 @@ split_box :: proc(box: Box, side: Side, amount: f32) -> (new_box, remainder: Box
 	return
 }
 
-// get a cut piece of a box
 get_box_cut_left :: proc(b: Box, a: f32) -> Box {
 	return {b.lo, {b.lo.x + a, b.hi.y}}
 }
+
 get_box_cut_top :: proc(b: Box, a: f32) -> Box {
 	return {b.lo, {b.hi.x, b.lo.y + a}}
 }
+
 get_box_cut_right :: proc(b: Box, a: f32) -> Box {
 	return {{b.hi.x - a, b.lo.y}, b.hi}
 }
+
 get_box_cut_bottom :: proc(b: Box, a: f32) -> Box {
 	return {{b.lo.x, b.hi.y - a}, b.hi}
 }
+
 get_box_cut :: proc(box: Box, side: Side, amount: f32) -> Box {
 	switch side {
 	case .Bottom:
@@ -319,7 +363,6 @@ side_corners :: proc(side: Side) -> Corners {
 	return ALL_CORNERS
 }
 
-// attach a box
 get_attached_box :: proc(box: Box, side: Side, size: [2]f32, offset: f32) -> Box {
 	switch side {
 
@@ -352,61 +395,4 @@ get_attached_box :: proc(box: Box, side: Side, size: [2]f32, offset: f32) -> Box
 		}
 	}
 	return {}
-}
-
-Ray_Box_Info :: struct {
-	point, normal: [2]f32,
-	time:          f32,
-}
-box_touches_line :: proc(box: Box, a, b: [2]f32) -> (info: Ray_Box_Info, ok: bool) {
-	start := a
-	direction := b - a
-
-	normal: [2]f32
-
-	inv_direction := 1.0 / direction
-	t_near := (box.lo - start) * inv_direction
-	t_far := (box.hi - start) * inv_direction
-
-	if math.is_nan(t_far.y) || math.is_nan(t_far.x) {
-		return
-	}
-	if math.is_nan(t_near.y) || math.is_nan(t_near.x) {
-		return
-	}
-
-	if t_near[0] > t_far[0] {t_near[0], t_far[0] = t_far[0], t_near[0]}
-	if t_near[1] > t_far[1] {t_near[1], t_far[1] = t_far[1], t_near[1]}
-
-	if t_near[0] > t_far[1] || t_near[1] > t_far[0] {
-		return
-	}
-
-	info.time = max(t_near[0], t_near[1])
-
-	t_hit_far := min(t_far[0], t_far[1])
-
-	if t_hit_far < 0 {
-		return
-	}
-
-	info.point = start + info.time * direction
-
-	if t_near[0] > t_near[1] {
-		if inv_direction[0] < 0 {
-			info.normal = {1, 0}
-		} else {
-			info.normal = {-1, 0}
-		}
-	} else if t_near[0] < t_near[1] {
-		if inv_direction[1] < 0 {
-			info.normal = {0, 1}
-		} else {
-			info.normal = {0, -1}
-		}
-	}
-
-	ok = info.time >= 0 && info.time <= 1
-
-	return
 }

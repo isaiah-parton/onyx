@@ -110,20 +110,14 @@ begin_panel :: proc(
 
 			handle_object_click(object, sticky = true)
 
-			if !panel.is_snapped {
-				draw_shadow(object.box)
-			}
-			vgo.fill_box(
-				object.box,
-				rounding,
-				paint = global_state.style.color.fg,
-			)
 
 			if point_in_box(global_state.mouse_pos, object.box) {
 				hover_object(object)
 			}
 
-			if object_is_dragged(object, beyond = 100 if panel.is_snapped else 1) {
+			if .Clicked in object.state && object.click_count == 2 {
+				panel.box.hi = panel.box.lo + panel.last_min_size
+			} else if object_is_dragged(object, beyond = 100 if panel.is_snapped else 1) {
 				if !panel.moving {
 					if panel.is_snapped {
 						panel.box.lo = mouse_point() - panel.non_snapped_size / 2
@@ -135,9 +129,16 @@ begin_panel :: proc(
 				panel.moving = true
 				panel.move_offset = global_state.mouse_pos - panel.box.lo
 			}
-			if .Clicked in object.state && object.click_count == 2 {
-				panel.box.hi = panel.box.lo + panel.last_min_size
+
+			if !panel.is_snapped {
+				draw_shadow(panel.box)
 			}
+
+			vgo.fill_box(
+				panel.box,
+				rounding,
+				paint = global_state.style.color.fg,
+			)
 		}
 	}
 

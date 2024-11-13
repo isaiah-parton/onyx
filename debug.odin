@@ -75,6 +75,14 @@ draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
 		if object.margin.y > 0 do vgo.fill_box(attach_box_top(object.box, object.margin.y))
 		if object.margin.z > 0 do vgo.fill_box(attach_box_right(object.box, object.margin.z))
 		if object.margin.w > 0 do vgo.fill_box(attach_box_bottom(object.box, object.margin.w))
+		if layout, ok := object.variant.(Layout); ok {
+			box := object.box
+			vgo.set_paint(vgo.fade(vgo.TURQUOISE, 0.5))
+			vgo.fill_box(cut_box_left(&box, layout.padding.x))
+			vgo.fill_box(cut_box_top(&box, layout.padding.y))
+			vgo.fill_box(cut_box_right(&box, layout.padding.z))
+			vgo.fill_box(cut_box_bottom(&box, layout.padding.w))
+		}
 	}
 }
 
