@@ -5,6 +5,7 @@ import "base:runtime"
 import "core:container/small_array"
 import "core:fmt"
 import "core:math"
+import "core:math/ease"
 import "core:math/linalg"
 import "core:mem"
 import "core:os"
@@ -476,7 +477,7 @@ present :: proc() {
 
 	if panel, ok := global_state.held_panel.?; ok {
 		OFFSET_FROM_EDGE :: 20
-		RADIUS :: 18
+		RADIUS :: 35
 
 		Snap_Orb :: struct {
 			position: [2]f32,
@@ -508,7 +509,7 @@ present :: proc() {
 		for orb in orbs {
 			distance_to_mouse := linalg.length(mouse_point() - orb.position)
 			if distance_to_mouse <= RADIUS {
-				vgo.stroke_box(orb.box, 2, global_state.style.rounding, paint = colors().accent)
+				vgo.stroke_box(orb.box, 2, paint = colors().accent)
 				if mouse_released(.Left) {
 					panel.box = orb.box
 					panel.is_snapped = true

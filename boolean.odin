@@ -122,7 +122,7 @@ display_boolean :: proc(boolean: ^Boolean) {
 		opacity: f32 = 0.5 if boolean.disabled else 1
 
 		state_time := ease.quadratic_in_out(boolean.animation_timer)
-		// Paint icon
+
 		switch boolean.type {
 		case .Checkbox:
 			if state_time < 1 {

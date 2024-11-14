@@ -62,10 +62,10 @@ V_Align :: enum {
 
 Layout :: struct {
 	using object:       ^Object,
-	isolated:           bool,
 	axis:               Axis,
 	content_box:        Box,
-	total_space:              [2]f32,
+	future_placement:   Maybe(Future_Box_Placement),
+	total_space:        [2]f32,
 	justify:            Align,
 	align:              Align,
 	padding:            [4]f32,
@@ -93,13 +93,15 @@ axis_normal :: proc(axis: Axis) -> [2]f32 {
 }
 
 display_or_add_object :: proc(object: ^Object, layout: ^Layout) {
-	switch layout.axis {
-	case .X:
-		layout.desired_size.x += object.desired_size.x
-		layout.desired_size.y = max(layout.desired_size.y, object.desired_size.y)
-	case .Y:
-		layout.desired_size.y += object.desired_size.y
-		layout.desired_size.x = max(layout.desired_size.x, object.desired_size.x)
+	if !object.isolated {
+		switch layout.axis {
+		case .X:
+			layout.desired_size.x += object.desired_size.x
+			layout.desired_size.y = max(layout.desired_size.y, object.desired_size.y)
+		case .Y:
+			layout.desired_size.y += object.desired_size.y
+			layout.desired_size.x = max(layout.desired_size.x, object.desired_size.x)
+		}
 	}
 
 	if layout_is_deferred(layout) {
@@ -170,10 +172,15 @@ apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
 		}
 	}
 
-	object.box = box
+	object.box = snapped_box(box)
 }
 
 display_layout :: proc(layout: ^Layout) {
+	if placement, ok := layout.future_placement.?; ok {
+		layout.box.lo = placement.origin - placement.offset * layout.size
+		layout.box.hi = layout.box.lo + layout.size
+	}
+
 	layout.content_box = layout.box
 	layout.content_box.lo += layout.padding.xy
 	layout.content_box.hi -= layout.padding.zw
@@ -223,16 +230,35 @@ next_layout_array :: proc() -> ^[dynamic]^Object {
 }
 
 layout_is_deferred :: proc(layout: ^Layout) -> bool {
-	return (layout.justify != .Near) || !layout.has_known_box
+	return (layout.justify != .Near) || (!layout.has_known_box)
 }
 
-begin_layout :: proc(size: union {
-		Fixed,
-		At_Least,
-		At_Most,
-		Between,
-		Percent,
-	} = nil, axis: Axis = .X, box: Maybe(Box) = nil, justify: Align = .Near, align: Align = .Near, padding: [4]f32 = {}) -> bool {
+Future_Box_Placement :: struct {
+	origin: [2]f32,
+	offset: [2]f32,
+}
+
+Layout_Size :: union {
+	Fixed,
+	At_Least,
+	At_Most,
+	Between,
+	Percent,
+}
+
+Layout_Placement :: union {
+	Box,
+	Future_Box_Placement,
+}
+
+begin_layout :: proc(
+	size: Layout_Size = nil,
+	placement: Layout_Placement = nil,
+	axis: Axis = .X,
+	justify: Align = .Near,
+	align: Align = .Near,
+	padding: [4]f32 = {},
+) -> bool {
 	object := transient_object()
 	object.variant = Layout {
 		object  = object,
@@ -242,49 +268,23 @@ begin_layout :: proc(size: union {
 		objects = next_layout_array(),
 	}
 	layout := &object.variant.(Layout)
-	if box, ok := box.?; ok {
+
+	switch v in placement {
+	case Box:
 		layout.isolated = true
 		layout.has_known_box = true
-		layout.box = box
-		layout.size = box_size(box)
-	} else {
-		available_space: [2]f32
-		total_space: [2]f32
+		layout.box = v
+		layout.size = box_size(v)
+	case Future_Box_Placement:
+		layout.isolated = true
+		layout.future_placement = v
+	case nil:
 		parent_layout := current_layout()
-
-		i := int(axis)
-		j := 1 - int(axis)
-
-		layout.has_known_box = true
-		if parent_layout, ok := parent_layout.?; ok {
-			available_space = box_size(parent_layout.content_box)
-			total_space = parent_layout.total_space
-			j = int(parent_layout.axis)
-			if layout_is_deferred(parent_layout) {
-				layout.has_known_box = false
-			}
-		}
-		switch size in size {
-		case Percent:
-			layout.size[j] = total_space[j] * f32(size) * 0.01
-		case Fixed:
-			layout.size[j] = f32(size)
-			layout.desired_size[j] = f32(size)
-		case At_Least:
-			layout.size[j] = max(available_space[j], f32(size))
-			layout.desired_size[j] = f32(size)
-		case At_Most:
-			layout.size[j] = min(available_space[j], f32(size))
-			layout.desired_size[j] = f32(size)
-		case Between:
-			layout.size[j] = min(available_space[j], size[0], size[1])
-			layout.desired_size[j] = size[0]
-		case nil:
-			layout.has_known_box = false
-		}
-
-		layout.size[i] = available_space[i]
-
+		layout.size, layout.desired_size, layout.has_known_box = determine_layout_size(
+			size,
+			parent_layout,
+			layout.axis,
+		)
 		if layout.has_known_box {
 			if parent_layout, ok := parent_layout.?; ok {
 				layout.box, parent_layout.content_box = split_box(
@@ -297,7 +297,6 @@ begin_layout :: proc(size: union {
 	}
 
 	layout.spacing_size += padding.xy + padding.zw
-
 
 	layout.content_box = layout.box
 	layout.padding = padding
@@ -321,6 +320,49 @@ end_layout :: proc() {
 	)
 	pop_layout()
 	end_object()
+}
+
+determine_layout_size :: proc(
+	size: Layout_Size,
+	parent_layout: Maybe(^Layout),
+	axis: Axis,
+) -> (
+	actual_size, desired_size: [2]f32,
+	known: bool,
+) {
+	available_space: [2]f32
+	total_space: [2]f32
+	i := int(axis)
+	j := 1 - int(axis)
+	known = true
+	if parent_layout, ok := parent_layout.?; ok {
+		available_space = box_size(parent_layout.content_box)
+		total_space = parent_layout.total_space
+		j = int(parent_layout.axis)
+		if layout_is_deferred(parent_layout) {
+			known = false
+		}
+	}
+	switch size in size {
+	case Percent:
+		actual_size[j] = total_space[j] * f32(size) * 0.01
+	case Fixed:
+		actual_size[j] = f32(size)
+		desired_size[j] = f32(size)
+	case At_Least:
+		actual_size[j] = max(available_space[j], f32(size))
+		desired_size[j] = f32(size)
+	case At_Most:
+		actual_size[j] = min(available_space[j], f32(size))
+		desired_size[j] = f32(size)
+	case Between:
+		actual_size[j] = min(available_space[j], size[0], size[1])
+		desired_size[j] = size[0]
+	case nil:
+		known = false
+	}
+	actual_size[i] = available_space[i]
+	return
 }
 
 current_layout :: proc() -> Maybe(^Layout) {

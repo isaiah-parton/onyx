@@ -13,6 +13,7 @@ Slider :: struct {
 	upper: f64,
 	new_value: Maybe(f64),
 	format: string,
+	axis: Axis,
 }
 
 slider :: proc(value: ^$T, lower, upper: T, format: string = "%v", loc := #caller_location) where intrinsics.type_is_numeric(T) {

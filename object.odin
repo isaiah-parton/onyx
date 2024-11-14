@@ -46,6 +46,9 @@ Object_Variant :: union {
 	Label,
 	Input,
 	Slider,
+	HSV_Wheel,
+	Alpha_Slider,
+	Color_Picker,
 }
 
 Object :: struct {
@@ -56,6 +59,7 @@ Object :: struct {
 	frames:         int,
 	dead:           bool,
 	disabled:       bool,
+	isolated: bool,
 	has_known_box:  bool,
 	flags:          Object_Flags,
 	last_state:     Object_State,
@@ -292,15 +296,7 @@ end_object :: proc() {
 	if object, ok := current_object().?; ok {
 		if layout, ok := current_layout().?; ok {
 			object.size = linalg.max(object.size, object.desired_size, layout.object_size)
-			effective_size := object.desired_size + object.margin.xy + object.margin.zw
-			switch layout.axis {
-			case .X:
-				layout.content_size.x += effective_size.x
-				layout.content_size.y = max(layout.content_size.y, effective_size.y)
-			case .Y:
-				layout.content_size.y += effective_size.y
-				layout.content_size.x = max(layout.content_size.x, effective_size.x)
-			}
+			transfer_object_metrics_unless_isolated(object, layout)
 			display_or_add_object(object, layout)
 		} else {
 			display_object(object)
@@ -310,6 +306,19 @@ end_object :: proc() {
 		if parent, ok := current_object().?; ok {
 			transfer_object_state_to_parent(object, parent)
 		}
+	}
+}
+
+transfer_object_metrics_unless_isolated :: proc(object: ^Object, layout: ^Layout) {
+	if object.isolated do return
+	effective_size := object.desired_size + object.margin.xy + object.margin.zw
+	switch layout.axis {
+	case .X:
+		layout.content_size.x += effective_size.x
+		layout.content_size.y = max(layout.content_size.y, effective_size.y)
+	case .Y:
+		layout.content_size.y += effective_size.y
+		layout.content_size.x = max(layout.content_size.x, effective_size.x)
 	}
 }
 
@@ -420,5 +429,11 @@ display_object :: proc(object: ^Object) {
 		display_label(&v)
 	case Slider:
 		display_slider(&v)
+	case HSV_Wheel:
+		display_hsv_wheel(&v)
+	case Alpha_Slider:
+		display_alpha_slider(&v)
+	case Color_Picker:
+		display_color_picker(&v)
 	}
 }

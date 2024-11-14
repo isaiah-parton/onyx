@@ -136,6 +136,7 @@ main :: proc() {
 
 						set_margin_all(4)
 						slider(&slider_values, 0, 10)
+						color_picker(&color)
 					}
 				}
 			}
