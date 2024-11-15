@@ -105,7 +105,6 @@ Global_State :: struct {
 	form:                     Form,
 	form_active:              bool,
 	// Layout
-	layout_array_array:       [128][dynamic]^Object,
 	layout_array_count:       int,
 	current_layout:           ^Layout,
 	layout_stack:             Stack(^Layout, MAX_LAYOUTS),
@@ -550,10 +549,6 @@ shutdown :: proc() {
 	for layer in global_state.layers {
 		destroy_layer(layer)
 		free(layer)
-	}
-
-	for array in global_state.layout_array_array {
-		delete(array)
 	}
 
 	delete(global_state.layers)

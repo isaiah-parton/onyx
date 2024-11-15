@@ -43,6 +43,7 @@ Object_Variant :: union {
 	Boolean,
 	Container,
 	Layout,
+	Layer,
 	Label,
 	Input,
 	Slider,
@@ -74,6 +75,7 @@ Object :: struct {
 	margin:         [4]f32,
 	size:           [2]f32,
 	desired_size:   [2]f32,
+	children: 			[dynamic]^Object,
 	variant:        Object_Variant,
 }
 
@@ -109,13 +111,11 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 
 	if condition {
 		if value < 1 {
-			draw_frames(1)
-			draw_frames(1)
+			draw_frames(2)
 			value = min(1, value + global_state.delta_time * (1 / duration))
 		}
 	} else if value > 0 {
-		draw_frames(1)
-		draw_frames(1)
+		draw_frames(2)
 		value = max(0, value - global_state.delta_time * (1 / duration))
 	}
 
@@ -156,6 +156,7 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 	assert(object != nil)
 
 	object.id = id
+	object.children = make([dynamic]^Object, allocator = context.temp_allocator)
 	object.out_state_mask = OBJECT_STATE_ALL
 
 	append(&global_state.objects, object)
@@ -166,6 +167,7 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 }
 
 destroy_object :: proc(object: ^Object) {
+	delete(object.children)
 	#partial switch &v in object.variant {
 	case Input:
 		destroy_input(&v)
@@ -187,6 +189,7 @@ transient_object :: proc() -> ^Object {
 		) or_else nil
 	assert(object != nil)
 	object.id = Id(global_state.transient_objects.len)
+	object.children = make([dynamic]^Object, allocator = context.temp_allocator)
 	return object
 }
 
@@ -294,7 +297,7 @@ begin_object :: proc(object: ^Object) -> bool {
 
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
-		if layout, ok := current_layout().?; ok {
+		if layout, ok := current_layout().?; ok && !object.isolated {
 			object.size = linalg.max(object.size, object.desired_size, layout.object_size)
 			transfer_object_metrics_unless_isolated(object, layout)
 			display_or_add_object(object, layout)
@@ -417,6 +420,8 @@ display_object :: proc(object: ^Object) {
 
 	switch &v in object.variant {
 	case Container:
+	case Layer:
+		display_layer(&v)
 	case Input:
 		display_input(&v)
 	case Button:

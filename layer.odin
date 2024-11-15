@@ -16,45 +16,35 @@ import "core:math/linalg"
 import "core:slice"
 
 Layer_Kind :: enum int {
-	// Stuff in the background
 	Background,
-	// Panels and things that are reordered by clicking on them
 	Floating,
-	// Tooltips and such
 	Topmost,
-	// Debug layer, allways on top
 	Debug,
 }
 
 
 Layer_Option :: enum {
-	// State isolated
 	Isolated,
-	// Locked in front of parent
 	Attached,
-	// Can't be brought to front by clicking
 	No_Sorting,
-	// Contents will not be rendered
 	Invisible,
 }
 
 Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
-	id:              Id,
-	parent:          ^Layer,
-	children:        [dynamic]^Layer,
-	state:           Object_State,
-	last_state:      Object_State,
-	options:         Layer_Options,
-	box:             Box,
-	// Will be deleted at the end of this frame
-	dead:            bool,
-	// Render order
-	kind:            Layer_Kind,
-	index:           int,
-	// Frame
-	frames:          int,
+	using object: ^Object,
+	parent:       ^Layer,
+	child_layers: [dynamic]^Layer,
+	state:        Object_State,
+	last_state:   Object_State,
+	options:      Layer_Options,
+	box:          Box,
+	dead:         bool,
+	deferred:     bool,
+	kind:         Layer_Kind,
+	index:        int,
+	frames:       int,
 }
 
 Layer_Info :: struct {
@@ -67,6 +57,14 @@ Layer_Info :: struct {
 	scale:    Maybe([2]f32),
 	rotation: f32,
 	opacity:  Maybe(f32),
+}
+
+display_layer :: proc(layer: ^Layer) {
+	begin_displaying_layer(layer)
+	for child in layer.children {
+		display_object(child)
+	}
+	end_displaying_layer()
 }
 
 clean_up_layers :: proc() {
@@ -134,18 +132,17 @@ create_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
 }
 
 destroy_layer :: proc(layer: ^Layer) {
-	for child in layer.children {
+	for child in layer.child_layers {
 		destroy_layer(child)
 		free(child)
 	}
 	delete(layer.children)
 }
 
-get_layer :: proc(info: ^Layer_Info) -> (layer: ^Layer, ok: bool) {
-	assert(info != nil)
-	layer, ok = get_layer_by_id(info.id)
+get_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
+	layer, ok = get_layer_by_id(id)
 	if !ok {
-		layer = create_layer(info.id) or_return
+		layer = create_layer(id) or_return
 		if parent, ok := current_layer().?; ok {
 			layer.parent = parent
 			append(&parent.children, layer)
@@ -160,91 +157,83 @@ get_layer :: proc(info: ^Layer_Info) -> (layer: ^Layer, ok: bool) {
 	return
 }
 
-begin_layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
-	assert(info != nil)
-	if info.id == 0 do info.id = hash(loc)
+begin_layer :: proc(
+	placement: Object_Placement = nil,
+	options: Layer_Options = {},
+	kind: Layer_Kind = .Floating,
+	loc := #caller_location,
+) -> bool {
+	id := hash(loc)
 
-	info.self = get_layer(info) or_return
+	object := persistent_object(id)
+	if object.variant == nil {
+		object.variant = Layer{
+			object = object,
+		}
+	}
+	layer := &object.variant.(Layer)
 
-	if info.self.frames == global_state.frames {
+	if layer.frames == global_state.frames {
 		when ODIN_DEBUG {
-			fmt.println("Layer ID collision: %i", info.id)
+			fmt.println("Layer ID collision: %i", id)
 		}
 		return false
 	}
 
-	info.self.frames = global_state.frames
-	info.self.dead = false
-	info.self.id = info.id
-	info.self.box = info.box
-	info.self.options = info.options
-	info.self.kind = info.kind.? or_else .Floating
-	info.self.last_state = info.self.state
-	info.self.state = {}
+	layer.frames = global_state.frames
+	layer.dead = false
+	layer.id = id
+	layer.box = placement.(Box) or_else {}
+	layer.options = options
+	layer.kind = kind
+	layer.last_state = layer.state
+	layer.state = {}
 
-	// Set input state
-	if global_state.hovered_layer == info.self.id {
-		info.self.state += {.Hovered}
-		// Re-order layers if clicked
-		if mouse_pressed(.Left) && info.self.kind == .Floating {
-			bring_layer_to_front(info.self)
+	if global_state.hovered_layer == layer.id {
+		layer.state += {.Hovered}
+		if mouse_pressed(.Left) && layer.kind == .Floating {
+		bring_layer_to_front(layer)
 		}
 	}
 
-	if global_state.focused_layer == info.self.id {
-		info.self.state += {.Focused}
+	if global_state.focused_layer == layer.id {
+		layer.state += {.Focused}
 	}
 
-	global_state.highest_layer_index = max(global_state.highest_layer_index, info.self.index)
+	global_state.highest_layer_index = max(global_state.highest_layer_index, layer.index)
 
-	// Push layer
-	push_stack(&global_state.layer_stack, info.self)
-
-	// Set draw order
-	vgo.set_draw_order(info.self.index)
-	vgo.save_scissor()
-	scale: [2]f32 = info.scale.? or_else 1
-	vgo.push_matrix()
-	vgo.translate(info.origin)
-	vgo.scale(scale)
-	vgo.rotate(info.rotation)
-	vgo.translate(-info.origin)
+	push_stack(&global_state.layer_stack, layer)
 
 	return true
 }
 
 end_layer :: proc() {
-	vgo.pop_matrix()
-	vgo.restore_scissor()
-	if layer, ok := current_layer().?; ok {
-		// Remove draw calls if invisible
-		if .Invisible in layer.options {
-			// remove_range(&core.draw_calls, layer.draw_call_index, len(core.draw_calls))
-		}
-	}
 	pop_stack(&global_state.layer_stack)
 	if layer, ok := current_layer().?; ok {
 		vgo.set_draw_order(layer.index)
 	}
 }
 
-@(deferred_out = __layer)
-layer :: proc(info: ^Layer_Info, loc := #caller_location) -> bool {
-	info := info
-	return begin_layer(info, loc)
+begin_displaying_layer :: proc(layer: ^Layer) {
+	vgo.set_draw_order(layer.index)
+	vgo.save_scissor()
+	vgo.push_matrix()
+	// scale: [2]f32 = scale.? or_else 1
+	// vgo.translate(origin)
+	// vgo.scale(scale)
+	// vgo.rotate(rotation)
+	// vgo.translate(-origin)
 }
 
-@(private)
-__layer :: proc(ok: bool) {
-	if ok {
-		end_layer()
-	}
+end_displaying_layer :: proc() {
+	vgo.pop_matrix()
+	vgo.restore_scissor()
 }
 
 get_highest_layer_child :: proc(layer: ^Layer, kind: Layer_Kind) -> int {
 	if layer == nil do return 0
 	highest := int(0)
-	for child in layer.children {
+	for child in layer.child_layers {
 		if int(child.kind) <= int(kind) {
 			highest = max(highest, child.index)
 		}
@@ -254,7 +243,7 @@ get_highest_layer_child :: proc(layer: ^Layer, kind: Layer_Kind) -> int {
 
 bring_layer_to_front :: proc(layer: ^Layer) {
 	assert(layer != nil)
-	list: []^Layer = global_state.layers[:] if layer.parent == nil else layer.parent.children[:]
+	list: []^Layer = global_state.layers[:] if layer.parent == nil else layer.parent.child_layers[:]
 	new_index := len(list)
 	if layer.index >= new_index do return
 	// Second pass lowers other layers

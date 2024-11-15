@@ -44,7 +44,6 @@ begin_panel :: proc(
 	axis: Axis = .Y,
 	loc := #caller_location,
 ) -> bool {
-
 	MIN_SIZE :: [2]f32{100, 100}
 
 	id := hash(loc)
@@ -88,18 +87,13 @@ begin_panel :: proc(
 	panel.last_min_size = panel.min_size
 	panel.min_size = {}
 
-	layer_info := Layer_Info {
-		id   = id,
-		kind = .Floating,
-		box  = panel.box,
-	}
-	begin_layer(&layer_info) or_return
-	panel.layer = layer_info.self
+	begin_layer(placement = panel.box, kind = .Floating) or_return
+	panel.layer = current_layer().?
 
 	rounding := f32(0 if panel.is_snapped else global_state.style.rounding)
 
 	{
-		object := persistent_object(panel.layer.id)
+		object := persistent_object(hash("panelbg"))
 		if begin_object(object) {
 			defer end_object()
 

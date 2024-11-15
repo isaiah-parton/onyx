@@ -158,32 +158,16 @@ display_color_picker :: proc(self: ^Color_Picker) {
 		push_id(hash(uintptr(self.value)))
 		defer pop_id()
 
-		menu_layer := get_popup_layer_info(self, 200, side = .Right)
-		menu_layer.kind = .Background
-		menu_layer.options += {.Attached}
-		if layer(&menu_layer) {
-			defer {
-				vgo.fill_box(
-					current_layer().?.box,
-					global_state.style.rounding,
-					vgo.fade(global_state.style.color.fg, 1 - self.open_time),
-				)
-			}
-			if begin_layout(
-				axis = .X,
-				placement = Future_Box_Placement{origin = self.box.hi},
-				padding = global_state.style.menu_padding,
-			) {
-				defer end_layout()
+		if begin_layout(
+			axis = .X,
+			placement = Future_Box_Placement{origin = self.box.hi},
+			padding = global_state.style.menu_padding,
+		) {
+			defer end_layout()
 
-				alpha_slider(&self.hsva.w)
-				hsv := self.hsva.xyz
-				hsv_wheel(&hsv)
-			}
-
-			if menu_layer.self.state & {.Hovered, .Focused} == {} && .Focused not_in self.state {
-				self.state -= {.Open}
-			}
+			alpha_slider(&self.hsva.w)
+			hsv := self.hsva.xyz
+			hsv_wheel(&hsv)
 		}
 	}
 }

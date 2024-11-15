@@ -149,8 +149,18 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		for scope, s in Profiler_Scope {
 			total += __prof.d[scope]
 			fmt.sbprintf(&b, "\n%v: %.3fms", scope, time.duration_milliseconds(__prof.d[scope]))
+			if scope == .Render {
+				for timer in vgo.Debug_Timer {
+					fmt.sbprintf(&b, "\n  %v: %.3fms", timer, time.duration_milliseconds(vgo.renderer().timers[timer]))
+				}
+			}
 		}
 		fmt.sbprintf(&b, "\nTotal: %.3fms", time.duration_milliseconds(total))
+		fmt.sbprintf(&b, "\nShapes: %i", len(vgo.renderer().shapes.data))
+		fmt.sbprintf(&b, "\nPaints: %i", len(vgo.renderer().paints.data))
+		fmt.sbprintf(&b, "\nMatrices: %i", len(vgo.renderer().xforms.data))
+		fmt.sbprintf(&b, "\nControl Vertices: %i", len(vgo.renderer().cvs.data))
+
 		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, {})
 	}
 
@@ -177,10 +187,8 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		b := strings.builder_make(context.temp_allocator)
 		if !state.wireframe {
 			draw_object_debug_box(state^, object)
-			if layout, ok := object.variant.(Layout); ok {
-				for child in layout.objects {
-					draw_object_debug_box(state^, child)
-				}
+			for child in object.children {
+				draw_object_debug_box(state^, child)
 			}
 		}
 		fmt.sbprintf(
@@ -202,7 +210,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 				layout.align,
 				layout.has_known_box,
 				layout_is_deferred(&layout),
-				len(layout.objects),
+				len(layout.children),
 			)
 		}
 

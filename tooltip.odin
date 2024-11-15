@@ -85,7 +85,7 @@ begin_tooltip :: proc(
 	bg_color := global_state.style.color.bg[0]
 
 	draw_shadow(box)
-	begin_layer(&{box = box, kind = .Topmost}, loc)
+	begin_layer(placement = box, kind = .Topmost, loc = loc)
 	vgo.fill_box(box, global_state.style.rounding, bg_color)
 
 	#partial switch side {

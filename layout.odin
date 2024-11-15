@@ -74,18 +74,15 @@ Layout :: struct {
 	object_size:        [2]f32,
 	object_size_method: Object_Size_Method,
 	object_margin:      [4]f32,
-	objects:            ^[dynamic]^Object,
 }
 
-Object_Placement :: struct {
-	size:    [2]f32,
-	padding: [2]f32,
-	margin:  [4]f32,
-	mode:    Object_Size_Method,
+Object_Placement :: union {
+	Box,
+	Future_Box_Placement,
 }
 
 store_object_in_layout :: proc(object: ^Object, layout: ^Layout) {
-	append(layout.objects, object)
+	append(&layout.children, object)
 }
 
 axis_normal :: proc(axis: Axis) -> [2]f32 {
@@ -119,7 +116,7 @@ move_object :: proc(object: ^Object, delta: [2]f32) {
 	object.box.lo += delta
 	object.box.hi += delta
 	if layout, ok := object.variant.(Layout); ok {
-		for child in layout.objects {
+		for child in layout.children {
 			move_object(child, delta)
 		}
 	}
@@ -187,9 +184,9 @@ display_layout :: proc(layout: ^Layout) {
 
 	delta := axis_normal(layout.axis) * (box_size(layout.box) - layout.desired_size)
 
-	if layout.objects == nil do return
+	if layout.children == nil do return
 
-	for object in layout.objects {
+	for object in layout.children {
 		apply_object_layout(object, layout)
 		if layout.justify == .Center {
 			move_object(object, delta * 0.5)
@@ -219,14 +216,6 @@ pop_layout :: proc() {
 
 inverse_axis :: proc(axis: Axis) -> Axis {
 	return Axis(1 - int(axis))
-}
-
-next_layout_array :: proc() -> ^[dynamic]^Object {
-	array := &global_state.layout_array_array[global_state.layout_array_count]
-	global_state.layout_array_count += 1
-	assert(array != nil)
-	clear(array)
-	return array
 }
 
 layout_is_deferred :: proc(layout: ^Layout) -> bool {
@@ -265,7 +254,6 @@ begin_layout :: proc(
 		axis    = axis,
 		justify = justify,
 		align   = align,
-		objects = next_layout_array(),
 	}
 	layout := &object.variant.(Layout)
 
