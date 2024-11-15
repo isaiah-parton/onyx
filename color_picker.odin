@@ -158,16 +158,20 @@ display_color_picker :: proc(self: ^Color_Picker) {
 		push_id(hash(uintptr(self.value)))
 		defer pop_id()
 
-		if begin_layout(
-			axis = .X,
-			placement = Future_Box_Placement{origin = self.box.hi},
-			padding = global_state.style.menu_padding,
-		) {
-			defer end_layout()
+		if begin_layer(options = {.Attached}, kind = .Background) {
+			defer end_layer()
 
-			alpha_slider(&self.hsva.w)
-			hsv := self.hsva.xyz
-			hsv_wheel(&hsv)
+			if begin_layout(
+				axis = .X,
+				placement = Future_Box_Placement{origin = self.box.hi},
+				padding = global_state.style.menu_padding,
+			) {
+				defer end_layout()
+
+				alpha_slider(&self.hsva.w)
+				hsv := self.hsva.xyz
+				hsv_wheel(&hsv)
+			}
 		}
 	}
 }

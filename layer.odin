@@ -149,7 +149,6 @@ get_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
 }
 
 begin_layer :: proc(
-	placement: Object_Placement = nil,
 	options: Layer_Options = {},
 	kind: Layer_Kind = .Floating,
 	loc := #caller_location,

@@ -72,8 +72,8 @@ Layout :: struct {
 	content_size:       [2]f32,
 	spacing_size:       [2]f32,
 	object_size:        [2]f32,
-	object_size_method: Object_Size_Method,
 	object_margin:      [4]f32,
+	object_size_method: Object_Size_Method,
 }
 
 Object_Placement :: union {
@@ -174,6 +174,7 @@ apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
 
 display_layout :: proc(layout: ^Layout) {
 	if placement, ok := layout.future_placement.?; ok {
+		layout.size = layout.desired_size
 		layout.box.lo = placement.origin - placement.offset * layout.size
 		layout.box.hi = layout.box.lo + layout.size
 	}
@@ -186,6 +187,10 @@ display_layout :: proc(layout: ^Layout) {
 
 	if layout.children == nil do return
 
+	vgo.save_scissor()
+	vgo.push_scissor(vgo.make_box(layout.box))
+	push_clip(layout.box)
+
 	for object in layout.children {
 		apply_object_layout(object, layout)
 		if layout.justify == .Center {
@@ -195,6 +200,9 @@ display_layout :: proc(layout: ^Layout) {
 		}
 		display_object(object)
 	}
+
+	pop_clip()
+	vgo.restore_scissor()
 }
 
 push_layout :: proc(layout: ^Layout) -> bool {

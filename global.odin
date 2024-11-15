@@ -127,6 +127,7 @@ Global_State :: struct {
 	next_hovered_layer:       Id,
 	focused_layer:            Id,
 	clip_stack: Stack(Box, 128),
+	current_object_clip: Box,
 	// IO
 	cursor_type:              Mouse_Cursor,
 	mouse_button:             Mouse_Button,

@@ -87,7 +87,7 @@ begin_panel :: proc(
 	panel.last_min_size = panel.min_size
 	panel.min_size = {}
 
-	begin_layer(placement = panel.box, kind = .Floating) or_return
+	begin_layer(kind = .Floating) or_return
 	panel.layer = current_layer().?
 
 	rounding := f32(0 if panel.is_snapped else global_state.style.rounding)
