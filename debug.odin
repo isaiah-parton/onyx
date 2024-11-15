@@ -160,7 +160,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		fmt.sbprintf(&b, "\nPaints: %i", len(vgo.renderer().paints.data))
 		fmt.sbprintf(&b, "\nMatrices: %i", len(vgo.renderer().xforms.data))
 		fmt.sbprintf(&b, "\nControl Vertices: %i", len(vgo.renderer().cvs.data))
-
+		fmt.sbprintf(&b, "\nLayer: %i", global_state.last_hovered_layer)
 		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, {})
 	}
 

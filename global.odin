@@ -114,7 +114,7 @@ Global_State :: struct {
 	panels:                   [MAX_PANELS]Maybe(Panel),
 	panel_map:                map[Id]^Panel,
 	panel_stack:              Stack(^Panel, MAX_PANELS),
-	held_panel:               Maybe(^Panel),
+	panel_snapping: Panel_Snap_State,
 	// Layers are
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
@@ -126,6 +126,7 @@ Global_State :: struct {
 	hovered_layer:            Id,
 	next_hovered_layer:       Id,
 	focused_layer:            Id,
+	clip_stack: Stack(Box, 128),
 	// IO
 	cursor_type:              Mouse_Cursor,
 	mouse_button:             Mouse_Button,
@@ -426,7 +427,8 @@ new_frame :: proc() {
 	global_state.layout_stack.height = 0
 	global_state.object_stack.height = 0
 	global_state.panel_stack.height = 0
-	global_state.held_panel = nil
+
+	reset_panel_snap_state(&global_state.panel_snapping)
 
 	global_state.object_index = 0
 	global_state.layout_array_count = 0
@@ -471,51 +473,6 @@ present :: proc() {
 				global_state.debug.wireframe = !global_state.debug.wireframe
 			}
 			draw_debug_stuff(&global_state.debug)
-		}
-	}
-
-	if panel, ok := global_state.held_panel.?; ok {
-		OFFSET_FROM_EDGE :: 20
-		RADIUS :: 35
-
-		Snap_Orb :: struct {
-			position: [2]f32,
-			box:      Box,
-		}
-
-		screen_size := global_state.view
-
-		orbs: [5]Snap_Orb = {
-			{
-				position = {OFFSET_FROM_EDGE + RADIUS, screen_size.y / 2},
-				box = {{}, {screen_size.x / 2, screen_size.y}},
-			},
-			{
-				position = {screen_size.x - (OFFSET_FROM_EDGE + RADIUS), screen_size.y / 2},
-				box = {{screen_size.x / 2, 0}, screen_size},
-			},
-			{
-				position = {screen_size.x / 2, OFFSET_FROM_EDGE + RADIUS},
-				box = {{}, {screen_size.x, screen_size.y / 2}},
-			},
-			{
-				position = {screen_size.x / 2, screen_size.y - (OFFSET_FROM_EDGE + RADIUS)},
-				box = {{0, screen_size.y / 2}, screen_size},
-			},
-			{position = screen_size / 2, box = view_box()},
-		}
-
-		for orb in orbs {
-			distance_to_mouse := linalg.length(mouse_point() - orb.position)
-			if distance_to_mouse <= RADIUS {
-				vgo.stroke_box(orb.box, 2, paint = colors().accent)
-				if mouse_released(.Left) {
-					panel.box = orb.box
-					panel.is_snapped = true
-				}
-			} else {
-				vgo.fill_circle(orb.position, RADIUS, vgo.fade(colors().accent, 0.5))
-			}
 		}
 	}
 

@@ -86,6 +86,9 @@ main :: proc() {
 					),
 				)
 			}
+			if begin_panel() {
+				defer end_panel()
+			}
 			if begin_panel(axis = .X) {
 				defer end_panel()
 

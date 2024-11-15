@@ -69,7 +69,7 @@ begin_panel :: proc(
 		size := panel.box.hi - panel.box.lo
 		panel.box.lo = mouse_point - panel.move_offset
 		panel.box.hi = panel.box.lo + size
-		global_state.held_panel = panel
+		global_state.panel_snapping.active_panel = panel
 		draw_frames(1)
 	}
 
@@ -137,6 +137,7 @@ begin_panel :: proc(
 	}
 
 	vgo.push_scissor(vgo.make_box(panel.box, rounding))
+	push_clip(panel.box)
 	begin_layout(placement = panel.box, axis = axis) or_return
 	return true
 }
@@ -144,12 +145,14 @@ begin_panel :: proc(
 end_panel :: proc() {
 	layout := current_layout().?
 	end_layout()
+	pop_clip()
 
 	panel := current_panel()
 	if panel.can_resize {
 		object := persistent_object(hash("resize"))
 		if begin_object(object) {
 			defer end_object()
+
 			object.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
 			handle_object_click(object, sticky = true)
 			if point_in_box(mouse_point(), object.box) {
@@ -178,7 +181,7 @@ end_panel :: proc() {
 	}
 
 	if panel.fade > 0 {
-		vgo.fill_box(panel.layer.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.15))
+		vgo.fill_box(panel.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.15))
 	}
 	panel.fade = animate(
 		panel.fade,
@@ -209,4 +212,69 @@ get_next_panel_position :: proc() -> [2]f32 {
 		}
 	}
 	return pos
+}
+
+Panel_Snap_State :: struct {
+	active_panel: Maybe(^Panel),
+	snaps: [8]Panel_Snap,
+	snap_count: int,
+}
+
+Panel_Snap :: enum {
+	Top,
+	Bottom,
+	Left,
+	Right,
+	Center,
+}
+
+reset_panel_snap_state :: proc(state: ^Panel_Snap_State) {
+	state.active_panel = nil
+}
+
+draw_panel_snap_widgets :: proc(state: Panel_Snap_State) {
+	if panel, ok := state.active_panel.?; ok {
+		OFFSET_FROM_EDGE :: 20
+		RADIUS :: 35
+
+		Snap_Orb :: struct {
+			position: [2]f32,
+			box:      Box,
+		}
+
+		screen_size := global_state.view
+
+		orbs: [5]Snap_Orb = {
+			{
+				position = {OFFSET_FROM_EDGE + RADIUS, screen_size.y / 2},
+				box = {{}, {screen_size.x / 2, screen_size.y}},
+			},
+			{
+				position = {screen_size.x - (OFFSET_FROM_EDGE + RADIUS), screen_size.y / 2},
+				box = {{screen_size.x / 2, 0}, screen_size},
+			},
+			{
+				position = {screen_size.x / 2, OFFSET_FROM_EDGE + RADIUS},
+				box = {{}, {screen_size.x, screen_size.y / 2}},
+			},
+			{
+				position = {screen_size.x / 2, screen_size.y - (OFFSET_FROM_EDGE + RADIUS)},
+				box = {{0, screen_size.y / 2}, screen_size},
+			},
+			{position = screen_size / 2, box = view_box()},
+		}
+
+		for orb in orbs {
+			distance_to_mouse := linalg.length(mouse_point() - orb.position)
+			if distance_to_mouse <= RADIUS {
+				vgo.stroke_box(orb.box, 2, paint = colors().accent)
+				if mouse_released(.Left) {
+					panel.box = orb.box
+					panel.is_snapped = true
+				}
+			} else {
+				vgo.fill_circle(orb.position, RADIUS, vgo.fade(colors().accent, 0.5))
+			}
+		}
+	}
 }

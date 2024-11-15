@@ -33,13 +33,12 @@ Layer_Option :: enum {
 Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
-	using object: ^Object,
+	id: Id,
 	parent:       ^Layer,
-	child_layers: [dynamic]^Layer,
+	children: [dynamic]^Layer,
 	state:        Object_State,
 	last_state:   Object_State,
 	options:      Layer_Options,
-	box:          Box,
 	dead:         bool,
 	deferred:     bool,
 	kind:         Layer_Kind,
@@ -51,7 +50,6 @@ Layer_Info :: struct {
 	id:       Id,
 	self:     ^Layer,
 	options:  Layer_Options,
-	box:      Box,
 	kind:     Maybe(Layer_Kind),
 	origin:   [2]f32,
 	scale:    Maybe([2]f32),
@@ -59,13 +57,6 @@ Layer_Info :: struct {
 	opacity:  Maybe(f32),
 }
 
-display_layer :: proc(layer: ^Layer) {
-	begin_displaying_layer(layer)
-	for child in layer.children {
-		display_object(child)
-	}
-	end_displaying_layer()
-}
 
 clean_up_layers :: proc() {
 	for id, layer in global_state.layer_map {
@@ -132,7 +123,7 @@ create_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
 }
 
 destroy_layer :: proc(layer: ^Layer) {
-	for child in layer.child_layers {
+	for child in layer.children {
 		destroy_layer(child)
 		free(child)
 	}
@@ -165,13 +156,7 @@ begin_layer :: proc(
 ) -> bool {
 	id := hash(loc)
 
-	object := persistent_object(id)
-	if object.variant == nil {
-		object.variant = Layer{
-			object = object,
-		}
-	}
-	layer := &object.variant.(Layer)
+	layer := get_layer(id) or_return
 
 	if layer.frames == global_state.frames {
 		when ODIN_DEBUG {
@@ -183,7 +168,6 @@ begin_layer :: proc(
 	layer.frames = global_state.frames
 	layer.dead = false
 	layer.id = id
-	layer.box = placement.(Box) or_else {}
 	layer.options = options
 	layer.kind = kind
 	layer.last_state = layer.state
@@ -192,7 +176,7 @@ begin_layer :: proc(
 	if global_state.hovered_layer == layer.id {
 		layer.state += {.Hovered}
 		if mouse_pressed(.Left) && layer.kind == .Floating {
-		bring_layer_to_front(layer)
+			bring_layer_to_front(layer)
 		}
 	}
 
@@ -203,6 +187,7 @@ begin_layer :: proc(
 	global_state.highest_layer_index = max(global_state.highest_layer_index, layer.index)
 
 	push_stack(&global_state.layer_stack, layer)
+	vgo.set_draw_order(layer.index)
 
 	return true
 }
@@ -215,7 +200,6 @@ end_layer :: proc() {
 }
 
 begin_displaying_layer :: proc(layer: ^Layer) {
-	vgo.set_draw_order(layer.index)
 	vgo.save_scissor()
 	vgo.push_matrix()
 	// scale: [2]f32 = scale.? or_else 1
@@ -233,7 +217,7 @@ end_displaying_layer :: proc() {
 get_highest_layer_child :: proc(layer: ^Layer, kind: Layer_Kind) -> int {
 	if layer == nil do return 0
 	highest := int(0)
-	for child in layer.child_layers {
+	for child in layer.children {
 		if int(child.kind) <= int(kind) {
 			highest = max(highest, child.index)
 		}
@@ -243,7 +227,7 @@ get_highest_layer_child :: proc(layer: ^Layer, kind: Layer_Kind) -> int {
 
 bring_layer_to_front :: proc(layer: ^Layer) {
 	assert(layer != nil)
-	list: []^Layer = global_state.layers[:] if layer.parent == nil else layer.parent.child_layers[:]
+	list: []^Layer = global_state.layers[:] if layer.parent == nil else layer.parent.children[:]
 	new_index := len(list)
 	if layer.index >= new_index do return
 	// Second pass lowers other layers

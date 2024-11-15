@@ -43,7 +43,6 @@ Object_Variant :: union {
 	Boolean,
 	Container,
 	Layout,
-	Layer,
 	Label,
 	Input,
 	Slider,
@@ -243,7 +242,7 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 }
 
 object_is_visible :: proc(object: ^Object) -> bool {
-	return global_state.visible && get_clip(object.layer.box, object.box) != .Full
+	return global_state.visible && get_clip(current_clip(), object.box) != .Full
 }
 
 update_object_state :: proc(object: ^Object) {
@@ -339,7 +338,7 @@ hover_object :: proc(object: ^Object) {
 	}
 	if object.disabled do return
 	if object.layer.index < global_state.hovered_layer_index do return
-	if !point_in_box(global_state.mouse_pos, object.layer.box) do return
+	if !point_in_box(global_state.mouse_pos, current_clip()) do return
 	global_state.next_hovered_object = object.id
 	global_state.next_hovered_layer = object.layer.id
 	global_state.hovered_layer_index = object.layer.index
@@ -420,8 +419,6 @@ display_object :: proc(object: ^Object) {
 
 	switch &v in object.variant {
 	case Container:
-	case Layer:
-		display_layer(&v)
 	case Input:
 		display_input(&v)
 	case Button:
