@@ -161,7 +161,6 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 	assert(object != nil)
 
 	object.id = id
-	object.children = make([dynamic]^Object, allocator = context.temp_allocator)
 	object.out_state_mask = OBJECT_STATE_ALL
 
 	append(&global_state.objects, object)
@@ -182,8 +181,14 @@ destroy_object :: proc(object: ^Object) {
 	}
 }
 
+make_object_children_array :: proc() -> [dynamic]^Object {
+	return make_dynamic_array_len_cap([dynamic]^Object, 0, 16, allocator = context.temp_allocator)
+}
+
 persistent_object :: proc(id: Id) -> ^Object {
-	return global_state.object_map[id] or_else new_persistent_object(id)
+	object := global_state.object_map[id] or_else new_persistent_object(id)
+	object.children = make_object_children_array()
+	return object
 }
 
 transient_object :: proc() -> ^Object {
@@ -195,7 +200,7 @@ transient_object :: proc() -> ^Object {
 		) or_else nil
 	assert(object != nil)
 	object.id = Id(global_state.transient_objects.len)
-	object.children = make([dynamic]^Object, allocator = context.temp_allocator)
+	object.children = make_object_children_array()
 	object.out_state_mask = OBJECT_STATE_ALL
 	return object
 }

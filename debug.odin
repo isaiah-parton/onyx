@@ -136,6 +136,8 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 	if state.wireframe {
 		vgo.reset_drawing()
 		draw_object_debug_boxes(state^)
+	} else {
+		vgo.set_draw_order(1000)
 	}
 
 	DEBUG_TEXT_SIZE :: 16
