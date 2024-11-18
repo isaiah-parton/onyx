@@ -67,69 +67,70 @@ boolean :: proc(
 	}
 }
 
-display_boolean :: proc(boolean: ^Boolean) {
-	handle_object_click(boolean)
+display_boolean :: proc(self: ^Boolean, layout: ^Layout) {
+	apply_layout_placement(self, layout)
+	handle_object_click(self)
 
-	if .Hovered in boolean.state {
+	if .Hovered in self.state {
 		set_cursor(.Pointing_Hand)
 	}
-	if point_in_box(global_state.mouse_pos, boolean.box) {
-		hover_object(boolean)
+	if point_in_box(global_state.mouse_pos, self.box) {
+		hover_object(self)
 	}
-	boolean.animation_timer = animate(boolean.animation_timer, 0.2, boolean.value^)
+	self.animation_timer = animate(self.animation_timer, 0.2, self.value^)
 
-	if object_is_visible(boolean) {
+	if object_is_visible(self) {
 		gadget_box: Box
 
-		if len(boolean.text) > 0 {
-			switch boolean.side {
+		if len(self.text) > 0 {
+			switch self.side {
 			case .Left:
-				gadget_box = {boolean.box.lo, boolean.gadget_size}
+				gadget_box = {self.box.lo, self.gadget_size}
 			case .Right:
 				gadget_box = {
-					{boolean.box.hi.x - boolean.gadget_size.x, boolean.box.lo.y},
-					boolean.gadget_size,
+					{self.box.hi.x - self.gadget_size.x, self.box.lo.y},
+					self.gadget_size,
 				}
 			case .Top:
 				gadget_box = {
 					{
-						box_center_x(boolean.box) - boolean.gadget_size.x / 2,
-						boolean.box.hi.y - boolean.gadget_size.y,
+						box_center_x(self.box) - self.gadget_size.x / 2,
+						self.box.hi.y - self.gadget_size.y,
 					},
-					boolean.gadget_size,
+					self.gadget_size,
 				}
 			case .Bottom:
 				gadget_box = {
-					{box_center_x(boolean.box) - boolean.gadget_size.x / 2, boolean.box.lo.y},
-					boolean.gadget_size,
+					{box_center_x(self.box) - self.gadget_size.x / 2, self.box.lo.y},
+					self.gadget_size,
 				}
 			}
 			gadget_box.hi += gadget_box.lo
 		} else {
-			gadget_box = boolean.box
+			gadget_box = self.box
 		}
 
 		gadget_center := box_center(gadget_box)
 
-		if .Hovered in boolean.state {
+		if .Hovered in self.state {
 			vgo.fill_box(
-				{{gadget_center.x, boolean.box.lo.y}, boolean.box.hi},
+				{{gadget_center.x, self.box.lo.y}, self.box.hi},
 				{0, global_state.style.rounding, 0, global_state.style.rounding},
 				vgo.fade(colors().substance, 0.2),
 			)
 		}
 
-		opacity: f32 = 0.5 if boolean.disabled else 1
+		opacity: f32 = 0.5 if self.disabled else 1
 
-		state_time := ease.quadratic_in_out(boolean.animation_timer)
+		state_time := ease.quadratic_in_out(self.animation_timer)
 
-		switch boolean.type {
+		switch self.type {
 		case .Checkbox:
 			if state_time < 1 {
 				vgo.fill_box(gadget_box, global_state.style.rounding, colors().field)
 			}
 			if state_time > 0 && state_time < 1 {
-				vgo.push_scissor(vgo.make_box(boolean.box, global_state.style.rounding))
+				vgo.push_scissor(vgo.make_box(self.box, global_state.style.rounding))
 			}
 			vgo.fill_box(
 				gadget_box,
@@ -140,16 +141,16 @@ display_boolean :: proc(boolean: ^Boolean) {
 				gadget_center += {
 					0,
 					box_height(gadget_box) *
-					((1 - state_time) if boolean.value^ else -(1 - state_time)),
+					((1 - state_time) if self.value^ else -(1 - state_time)),
 				}
-				vgo.check(gadget_center, boolean.gadget_size.y / 4, colors().field)
+				vgo.check(gadget_center, self.gadget_size.y / 4, colors().field)
 			}
 			if state_time > 0 && state_time < 1 {
 				vgo.pop_scissor()
 			}
 		case .Radio:
 			gadget_center := box_center(gadget_box)
-			radius := boolean.gadget_size.y / 2
+			radius := self.gadget_size.y / 2
 			vgo.fill_circle(
 				gadget_center,
 				radius,
@@ -188,25 +189,25 @@ display_boolean :: proc(boolean: ^Boolean) {
 		}
 		// Paint text
 		text_pos: [2]f32
-		if len(boolean.text) > 0 {
-			switch boolean.side {
+		if len(self.text) > 0 {
+			switch self.side {
 			case .Left:
 				text_pos = {
 					gadget_box.hi.x + global_state.style.text_padding.x,
-					box_center_y(boolean.box),
+					box_center_y(self.box),
 				}
 			case .Right:
 				text_pos = {
 					gadget_box.lo.x - global_state.style.text_padding.x,
-					box_center_y(boolean.box),
+					box_center_y(self.box),
 				}
 			case .Top:
-				text_pos = boolean.box.lo
+				text_pos = self.box.lo
 			case .Bottom:
-				text_pos = {boolean.box.lo.x, boolean.box.hi.y}
+				text_pos = {self.box.lo.x, self.box.hi.y}
 			}
 			vgo.fill_text_layout(
-				boolean.text_layout,
+				self.text_layout,
 				text_pos,
 				align_x = .Left,
 				align_y = .Center,
@@ -215,7 +216,7 @@ display_boolean :: proc(boolean: ^Boolean) {
 		}
 	}
 
-	if .Clicked in boolean.state {
-		boolean.value^ = !boolean.value^
+	if .Clicked in self.state {
+		self.value^ = !self.value^
 	}
 }

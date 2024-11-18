@@ -39,35 +39,36 @@ slider :: proc(value: ^$T, lower, upper: T, format: string = "%v", loc := #calle
 	}
 }
 
-display_slider :: proc(slider: ^Slider) {
-	box := slider.box
+display_slider :: proc(self: ^Slider, layout: ^Layout) {
+	apply_layout_placement(self, layout)
+	box := self.box
 	h := box_height(box)
 	box = shrink_box(box, h / 4)
 	radius := box_height(box) / 2
 	range_width := box_width(box) - radius * 2
 	colors := colors()
 	mouse := mouse_point()
-	is_visible := object_is_visible(slider)
-	handle_object_click(slider, true)
+	is_visible := object_is_visible(self)
+	handle_object_click(self, true)
 
 	if is_visible {
 		vgo.fill_box(box, radius, paint = colors.field)
 	}
 
-	if (.Pressed in slider.state) {
+	if (.Pressed in self.state) {
 		new_time := clamp((mouse.x - box.lo.x - radius) / range_width, 0, 1)
-		slider.new_value = slider.lower + f64(new_time) * (slider.upper - slider.lower)
+		self.new_value = self.lower + f64(new_time) * (self.upper - self.lower)
 		draw_frames(1)
 	}
 
-	time := clamp((slider.value - slider.lower) / (slider.upper - slider.lower), 0, 1)
+	time := clamp((self.value - self.lower) / (self.upper - self.lower), 0, 1)
 
 	knob_center := box.lo + radius + {f32(time) * range_width, 0}
 	knob_radius := h / 2
 
 	if point_in_box(mouse, box) ||
 	   linalg.distance(knob_center, mouse) <= knob_radius {
-		hover_object(slider)
+		hover_object(self)
 	}
 
 	if is_visible {

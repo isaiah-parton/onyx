@@ -57,52 +57,53 @@ button :: proc(text: string, style: Button_Style = .Primary, font_size: f32 = gl
 	return
 }
 
-display_button :: proc(button: ^Button) {
-	handle_object_click(button)
-	button_behavior(button)
-	if object_is_visible(button) {
+display_button :: proc(self: ^Button, layout: ^Layout) {
+	apply_layout_placement(self, layout)
+	handle_object_click(self)
+	button_behavior(self)
+	if object_is_visible(self) {
 		text_color: vgo.Color
 		radius: [4]f32 = global_state.style.rounding
 
-		switch button.style {
+		switch self.style {
 		case .Outlined:
 			vgo.fill_box(
-				button.box,
+				self.box,
 				radius,
 				vgo.fade(
-					button.color.? or_else global_state.style.color.substance,
-					0.5 if .Hovered in button.state else 0.25,
+					self.color.? or_else global_state.style.color.substance,
+					0.5 if .Hovered in self.state else 0.25,
 				),
 			)
 			vgo.stroke_box(
-				button.box,
+				self.box,
 				2,
 				radius,
-				button.color.? or_else global_state.style.color.substance,
+				self.color.? or_else global_state.style.color.substance,
 			)
 			text_color = global_state.style.color.content
 		case .Secondary:
-			bg_color := button.color.? or_else global_state.style.color.substance
+			bg_color := self.color.? or_else global_state.style.color.substance
 			vgo.fill_box(
-				button.box,
+				self.box,
 				radius,
-				vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in button.state else bg_color,
+				vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in self.state else bg_color,
 			)
 			text_color = global_state.style.color.accent_content
 		case .Primary:
 			vgo.fill_box(
-				button.box,
+				self.box,
 				radius,
-				vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in button.state else global_state.style.color.accent,
+				vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in self.state else global_state.style.color.accent,
 			)
 			text_color = global_state.style.color.accent_content
 		case .Ghost:
-			if .Hovered in button.state {
+			if .Hovered in self.state {
 				vgo.fill_box(
-					button.box,
+					self.box,
 					radius,
 					paint = vgo.fade(
-						button.color.? or_else global_state.style.color.substance,
+						self.color.? or_else global_state.style.color.substance,
 						0.2,
 					),
 				)
@@ -110,30 +111,30 @@ display_button :: proc(button: ^Button) {
 			text_color = global_state.style.color.content
 		}
 
-		if button.press_time > 0 {
-			scale := button.press_time if .Pressed in button.state else f32(1)
-			opacity := f32(1) if .Pressed in button.state else button.press_time
-			vgo.push_scissor(vgo.make_box(button.box, radius))
+		if self.press_time > 0 {
+			scale := self.press_time if .Pressed in self.state else f32(1)
+			opacity := f32(1) if .Pressed in self.state else self.press_time
+			vgo.push_scissor(vgo.make_box(self.box, radius))
 			vgo.fill_circle(
-				button.click_point,
-				linalg.length(button.box.hi - button.box.lo) * scale,
+				self.click_point,
+				linalg.length(self.box.hi - self.box.lo) * scale,
 				paint = vgo.fade(vgo.WHITE, opacity * 0.2),
 			)
 			vgo.pop_scissor()
 		}
 
-		if !button.is_loading {
+		if !self.is_loading {
 			vgo.fill_text_layout(
-				button.text_layout,
-				box_center(button.box),
+				self.text_layout,
+				box_center(self.box),
 				align_x = .Center,
 				align_y = .Center,
 				paint = text_color,
 			)
 		}
 
-		if button.is_loading {
-			vgo.spinner(box_center(button.box), box_height(button.box) * 0.3, text_color)
+		if self.is_loading {
+			vgo.spinner(box_center(self.box), box_height(self.box) * 0.3, text_color)
 		}
 	}
 }

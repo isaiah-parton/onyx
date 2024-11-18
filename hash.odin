@@ -1,6 +1,7 @@
 package onyx
 
 import "base:runtime"
+import "core:fmt"
 
 Id :: u32
 

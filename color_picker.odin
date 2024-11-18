@@ -79,12 +79,13 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: vg
 Color_Picker :: struct {
 	using object: ^Object,
 	hsva:         [4]f32,
-	value:        ^vgo.Color,
+	value:        vgo.Color,
 	open_time:    f32,
 }
 
-color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_location) {
-	object := persistent_object(hash(loc))
+color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_location) -> Id {
+	id := hash(loc)
+	object := persistent_object(id)
 	if begin_object(object) {
 		defer end_object()
 
@@ -96,14 +97,21 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 			}
 		}
 		variant := &object.variant.(Color_Picker)
-		variant.value = value
+
+		if .Changed in variant.last_state {
+			value^ = variant.value
+			draw_frames(1)
+		} else {
+			variant.value = value^
+		}
 	}
+	return id
 }
 
-display_color_picker :: proc(self: ^Color_Picker) {
-	if self.value == nil do return
-
+display_color_picker :: proc(self: ^Color_Picker, layout: ^Layout) {
+	apply_layout_placement(self, layout)
 	handle_object_click(self)
+
 	if .Open in self.state {
 		self.open_time = animate(self.open_time, 0.3, true)
 	} else {
@@ -135,16 +143,16 @@ display_color_picker :: proc(self: ^Color_Picker) {
 		draw_checkerboard_pattern(
 			self.box,
 			box_height(self.box) / 2,
-			vgo.blend(global_state.style.color.checker_bg[0], self.value^, vgo.WHITE),
-			vgo.blend(global_state.style.color.checker_bg[1], self.value^, vgo.WHITE),
+			vgo.blend(global_state.style.color.checker_bg[0], self.value, vgo.WHITE),
+			vgo.blend(global_state.style.color.checker_bg[1], self.value, vgo.WHITE),
 		)
 		vgo.fill_text(
-			fmt.tprintf("#%6x", vgo.hex_from_color(self.value^)),
+			fmt.tprintf("#%6x", vgo.hex_from_color(self.value)),
 			global_state.style.default_text_size,
 			box_center(self.box),
 			align_x = .Center,
 			align_y = .Center,
-			paint = vgo.BLACK if max(vgo.luminance_of(self.value^), 1 - f32(self.value.a) / 255) > 0.45 else vgo.WHITE,
+			paint = vgo.BLACK if max(vgo.luminance_of(self.value), 1 - f32(self.value.a) / 255) > 0.45 else vgo.WHITE,
 		)
 		vgo.pop_scissor()
 	}
@@ -152,10 +160,10 @@ display_color_picker :: proc(self: ^Color_Picker) {
 	PADDING :: 10
 	if .Open in self.state {
 		if .Open not_in self.last_state {
-			self.hsva = vgo.hsva_from_color(self.value^)
+			self.hsva = vgo.hsva_from_color(self.value)
 		}
 
-		push_id(hash(uintptr(self.value)))
+		push_id(self.id)
 		defer pop_id()
 
 		if begin_layer(options = {.Attached}, kind = .Background) {
@@ -163,14 +171,25 @@ display_color_picker :: proc(self: ^Color_Picker) {
 
 			if begin_layout(
 				axis = .X,
-				placement = Future_Box_Placement{origin = self.box.hi},
-				padding = global_state.style.menu_padding,
+				placement = Future_Box_Placement{origin = {self.box.hi.x + global_state.style.popup_margin, box_center_y(self.box)}, offset = {0, 0.5}},
+				padding = 10,
+				clip_contents = true,
 			) {
 				defer end_layout()
 
+				foreground()
 				alpha_slider(&self.hsva.w)
-				hsv := self.hsva.xyz
-				hsv_wheel(&hsv)
+				set_margin(left = 10)
+				hsv_wheel((^[3]f32)(&self.hsva))
+			}
+
+			if object_was_just_changed(last_object().?) {
+				self.value = vgo.color_from_hsva(self.hsva)
+				self.state += {.Changed}
+			}
+
+			if .Focused not_in current_layer().?.state && .Focused not_in self.state {
+				self.state -= {.Open}
 			}
 		}
 	}
@@ -178,7 +197,7 @@ display_color_picker :: proc(self: ^Color_Picker) {
 
 Alpha_Slider :: struct {
 	using object: ^Object,
-	value:        ^f32,
+	value:        f32,
 	axis:         Axis,
 	color:        vgo.Color,
 }
@@ -188,39 +207,48 @@ alpha_slider :: proc(
 	color: vgo.Color = vgo.BLACK,
 	axis: Axis = .Y,
 	loc := #caller_location,
-) {
-	if value == nil do return
-	object := persistent_object(hash(loc))
+) -> Id {
+	id := hash(loc)
+	object := persistent_object(id)
 	if begin_object(object) {
 		defer end_object()
 
 		if object.variant == nil {
 			object.variant = Alpha_Slider {
 				object = object,
-				value  = value,
 			}
 		}
-		slider := &object.variant.(Alpha_Slider)
-		slider.axis = axis
-		slider.color = color
-		slider.desired_size = global_state.style.visual_size
-		if slider.axis == .Y {
-			slider.desired_size.xy = slider.desired_size.yx
+		variant := &object.variant.(Alpha_Slider)
+		variant.axis = axis
+		variant.color = color
+
+		if .Changed in variant.last_state {
+			value^ = variant.value
+		}
+		variant.value = value^
+
+		variant.desired_size = global_state.style.visual_size
+		if variant.axis == .Y {
+			variant.desired_size.xy = variant.desired_size.yx
 		}
 	}
+	return id
 }
 
-display_alpha_slider :: proc(self: ^Alpha_Slider) {
+display_alpha_slider :: proc(self: ^Alpha_Slider, layout: ^Layout) {
+	apply_layout_placement(self, layout)
+	handle_object_click(self, true)
 
 	i := int(self.axis)
 	j := 1 - i
 
 	if .Pressed in self.state {
-		self.value^ = clamp(
+		self.value = clamp(
 			(global_state.mouse_pos[i] - self.box.lo[i]) / (self.box.hi[i] - self.box.lo[i]),
 			0,
 			1,
 		)
+		self.state += {.Changed}
 	}
 
 	if object_is_visible(self) {
@@ -233,7 +261,7 @@ display_alpha_slider :: proc(self: ^Alpha_Slider) {
 			global_state.style.color.checker_bg[1],
 		)
 		self.color.a = 255
-		time := clamp(self.value^, 0, 1)
+		time := clamp(self.value, 0, 1)
 		pos := box.lo[i] + (box.hi[i] - box.lo[i]) * time
 		if self.axis == .Y {
 			vgo.fill_box(
@@ -259,11 +287,12 @@ display_alpha_slider :: proc(self: ^Alpha_Slider) {
 
 HSV_Wheel :: struct {
 	using object: ^Object,
-	hsv:          ^[3]f32,
+	value:        [3]f32,
 }
 
-hsv_wheel :: proc(hsv: ^[3]f32, loc := #caller_location) {
-	object := persistent_object(hash(loc))
+hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) -> Id {
+	id := hash(loc)
+	object := persistent_object(id)
 	if begin_object(object) {
 		defer end_object()
 
@@ -272,10 +301,16 @@ hsv_wheel :: proc(hsv: ^[3]f32, loc := #caller_location) {
 				object = object,
 			}
 		}
-		hsva_wheel := &object.variant.(HSV_Wheel)
-		hsva_wheel.hsv = hsv
-		hsva_wheel.desired_size = 200
+		variant := &object.variant.(HSV_Wheel)
+
+		if .Changed in variant.last_state {
+			value^ = variant.value
+		}
+		variant.value = value^
+
+		variant.desired_size = 200
 	}
+	return id
 }
 
 TRIANGLE_STEP :: math.TAU / 3
@@ -287,50 +322,51 @@ make_a_triangle :: proc(center: [2]f32, angle: f32, radius: f32) -> (a, b, c: [2
 	return
 }
 
-display_hsv_wheel :: proc(object: ^HSV_Wheel) {
-	handle_object_click(object, sticky = true)
+display_hsv_wheel :: proc(self: ^HSV_Wheel, layout: ^Layout) {
+	apply_layout_placement(self, layout)
+	handle_object_click(self, sticky = true)
 
-	size := min(box_width(object.box), box_height(object.box))
+	size := min(box_width(self.box), box_height(self.box))
 	outer_radius := size / 2
 	inner_radius := outer_radius * 0.75
 
-	center := box_center(object.box)
-	angle := object.hsv.x * math.RAD_PER_DEG
-
-	point_a, point_b, point_c := make_a_triangle(center, angle, inner_radius)
+	center := box_center(self.box)
+	angle := self.value.x * math.RAD_PER_DEG
 
 	delta_to_mouse := global_state.mouse_pos - center
 	distance_to_mouse := linalg.length(delta_to_mouse)
 
 	if distance_to_mouse <= outer_radius {
-		hover_object(object)
+		hover_object(self)
 	}
 
-	if .Pressed in (object.state - object.last_state) {
+	if .Pressed in (self.state - self.last_state) {
 		if distance_to_mouse > inner_radius {
-			object.state += {.Active}
+			self.state += {.Active}
 		}
 	}
-	if .Pressed in object.state {
-		if .Active in object.state {
-			object.hsv.x = math.atan2(delta_to_mouse.y, delta_to_mouse.x) / math.RAD_PER_DEG
-			if object.hsv.x < 0 {
-				object.hsv.x += 360
+	if .Pressed in self.state {
+		if .Active in self.state {
+			self.value.x = math.atan2(delta_to_mouse.y, delta_to_mouse.x) / math.RAD_PER_DEG
+			if self.value.x < 0 {
+				self.value.x += 360
 			}
 		} else {
 			point := global_state.mouse_pos
+			point_a, point_b, point_c := make_a_triangle(center, angle, inner_radius)
 			if !triangle_contains_point(point_a, point_b, point_c, point) {
 				point = triangle_closest_point(point_a, point_b, point_c, point)
 			}
 			u, v, w := triangle_barycentric(point_a, point_b, point_c, point)
-			object.hsv.z = clamp(1 - v, 0, 1)
-			object.hsv.y = clamp(u / object.hsv.z, 0, 1)
+			self.value.z = clamp(1 - v, 0, 1)
+			self.value.y = clamp(u / self.value.z, 0, 1)
 		}
+		self.state += {.Changed}
 	} else {
-		object.state -= {.Active}
+		self.state -= {.Active}
 	}
 
-	if object_is_visible(object) {
+	if object_is_visible(self) {
 		vgo.stroke_circle(
 			center,
 			outer_radius,
@@ -340,7 +376,7 @@ display_hsv_wheel :: proc(object: ^HSV_Wheel) {
 
 		point_a, point_b, point_c := make_a_triangle(
 			center,
-			object.hsv.x * math.RAD_PER_DEG,
+			self.value.x * math.RAD_PER_DEG,
 			inner_radius,
 		)
 
@@ -348,21 +384,21 @@ display_hsv_wheel :: proc(object: ^HSV_Wheel) {
 			{point_a, point_b, point_c},
 			paint = vgo.make_tri_gradient(
 				{point_a, point_b, point_c},
-				{vgo.color_from_hsva({object.hsv.x, 1, 1, 1}), vgo.BLACK, vgo.WHITE},
+				{vgo.color_from_hsva({self.value.x, 1, 1, 1}), vgo.BLACK, vgo.WHITE},
 			),
 		)
 
 		point := linalg.lerp(
-			linalg.lerp(point_c, point_a, clamp(object.hsv.y, 0, 1)),
+			linalg.lerp(point_c, point_a, clamp(self.value.y, 0, 1)),
 			point_b,
-			clamp(1 - object.hsv.z, 0, 1),
+			clamp(1 - self.value.z, 0, 1),
 		)
-		r: f32 = 9 if (object.state >= {.Pressed} && .Active not_in object.state) else 7
-		vgo.fill_circle(point, r + 1, paint = vgo.BLACK if object.hsv.z > 0.5 else vgo.WHITE)
+		r: f32 = 9 if (self.state >= {.Pressed} && .Active not_in self.state) else 7
+		vgo.fill_circle(point, r + 1, paint = vgo.BLACK if self.value.z > 0.5 else vgo.WHITE)
 		vgo.fill_circle(
 			point,
 			r,
-			paint = vgo.color_from_hsva({object.hsv.x, object.hsv.y, object.hsv.z, 1}),
+			paint = vgo.color_from_hsva({self.value.x, self.value.y, self.value.z, 1}),
 		)
 	}
 }

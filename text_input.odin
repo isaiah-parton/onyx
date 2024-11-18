@@ -82,71 +82,71 @@ input_text_origin_from :: proc(box: Box, multiline: bool = false) -> [2]f32 {
 	return {box.lo.x + global_state.style.text_padding.x, box_center_y(box)}
 }
 
-display_input :: proc(input: ^Input) {
+display_input :: proc(self: ^Input, layout: ^Layout) {
+	apply_layout_placement(self, layout)
+	handle_object_click(self, true)
 
-	handle_object_click(input, true)
+	is_visible := object_is_visible(self)
 
-	is_visible := object_is_visible(input)
-
-	box := input.box
+	box := self.box
 	text_size := global_state.style.content_text_size
 	colors := colors()
-	state := input.state
+	state := self.state
 
 	if is_visible {
 		vgo.fill_box(box, global_state.style.rounding, colors.field)
 	}
 
-	text_origin := input_text_origin_from(box, input.is_multiline)
-	submitted := !(!key_down(.Left_Control) && input.is_multiline) && key_pressed(.Enter)
-	editor := &input.editor
+	text_origin := input_text_origin_from(box, self.is_multiline)
+	submitted := !(!key_down(.Left_Control) && self.is_multiline) && key_pressed(.Enter)
+	editor := &self.editor
 	content_layout: vgo.Text_Layout
 
-	font := (global_state.style.monospace_font if (input.is_monospace) else global_state.style.default_font)
+	font := (global_state.style.monospace_font if (self.is_monospace) else global_state.style.default_font)
 	vgo.set_font(font)
 
 	prefix_layout: vgo.Text_Layout
-	if len(input.prefix) > 0 {
-		prefix_layout = vgo.make_text_layout(input.prefix, text_size)
+	if len(self.prefix) > 0 {
+		prefix_layout = vgo.make_text_layout(self.prefix, text_size)
 		text_origin.x += prefix_layout.size.x
 	}
 
-	if is_visible || .Active in input.state {
+	if is_visible || .Active in self.state {
 		content_layout = vgo.make_text_layout(
-			input.content,
+			self.content,
 			text_size,
 			selection = editor.selection,
-			local_mouse = mouse_point() - (text_origin - input.offset),
+			local_mouse = mouse_point() - (text_origin - self.offset),
 		)
 	}
 	//
 	if editor.builder == nil {
 		tedit.make_editor(editor, context.allocator, context.allocator)
-		tedit.begin(editor, 0, &input.builder)
+		tedit.begin(editor, 0, &self.builder)
 		editor.set_clipboard = __set_clipboard_string
 		editor.get_clipboard = __get_clipboard_string
 	}
 	// Animations
-	input.active_time = animate(input.active_time, 0.15, .Active in input.state)
+	self.active_time = animate(self.active_time, 0.15, .Active in self.state)
 	// Hover cursor
-	if .Hovered in input.state {
+	if .Hovered in self.state {
 		set_cursor(.I_Beam)
 	}
-	if .Active in input.state {
+	if .Active in self.state {
 		if user_focus_just_changed() && !key_down(.Left_Control) {
-			input.state -= {.Active}
+			self.state -= {.Active}
 		}
 	} else {
-		if .Pressed in (input.state - input.last_state) {
-			input.state += {.Active}
+		if .Pressed in (self.state - self.last_state) {
+			self.state += {.Active}
 		}
 	}
 	if key_pressed(.Escape) {
-		input.state -= {.Active}
-	} else if .Active in (input.last_state - input.state) {
+		self.state -= {.Active}
+	} else if .Active in (self.last_state - self.state) {
 		submitted = true
 	}
-	if .Active in input.state {
+	if .Active in self.state {
 		cmd: tedit.Command
 		control_down := key_down(.Left_Control) || key_down(.Right_Control)
 		shift_down := key_down(.Left_Shift) || key_down(.Right_Shift)
@@ -160,16 +160,16 @@ display_input :: proc(input: ^Input) {
 		}
 		if len(global_state.runes) > 0 {
 			for char, c in global_state.runes {
-				tedit.input_runes(&input.editor, {char})
+				tedit.input_runes(&self.editor, {char})
 				draw_frames(1)
-				input.state += {.Changed}
+				self.state += {.Changed}
 			}
 		}
 		if key_pressed(.Backspace) do cmd = .Delete_Word_Left if control_down else .Backspace
 		if key_pressed(.Delete) do cmd = .Delete_Word_Right if control_down else .Delete
 		if key_pressed(.Enter) {
 			cmd = .New_Line
-			if input.is_multiline {
+			if self.is_multiline {
 				if control_down {
 					submitted = true
 				}
@@ -199,12 +199,12 @@ display_input :: proc(input: ^Input) {
 		if key_pressed(.End) {
 			cmd = .Select_Line_End if control_down else .Line_End
 		}
-		if !input.is_multiline && (cmd in tedit.MULTILINE_COMMANDS) {
+		if !self.is_multiline && (cmd in tedit.MULTILINE_COMMANDS) {
 			cmd = .None
 		}
 		if cmd != .None {
-			tedit.editor_execute(&input.editor, cmd)
-			input.state += {.Changed}
+			tedit.editor_execute(&self.editor, cmd)
+			self.state += {.Changed}
 			draw_frames(1)
 		}
 	}
@@ -214,55 +214,55 @@ display_input :: proc(input: ^Input) {
 	}
 
 	last_selection := editor.selection
-	if .Pressed in input.state && content_layout.mouse_index >= 0 {
-		if .Pressed not_in input.last_state {
-			input.anchor = content_layout.mouse_index
-			if input.click_count == 3 {
+	if .Pressed in self.state && content_layout.mouse_index >= 0 {
+		if .Pressed not_in self.last_state {
+			self.anchor = content_layout.mouse_index
+			if self.click_count == 3 {
 				tedit.editor_execute(editor, .Select_All)
 			} else {
 				editor.selection = {content_layout.mouse_index, content_layout.mouse_index}
 			}
 		}
-		switch input.click_count {
+		switch self.click_count {
 		case 2:
-			if content_layout.mouse_index < input.anchor {
-				if input.content[content_layout.mouse_index] == ' ' {
+			if content_layout.mouse_index < self.anchor {
+				if self.content[content_layout.mouse_index] == ' ' {
 					editor.selection[0] = content_layout.mouse_index
 				} else {
 					editor.selection[0] = max(
 						0,
 						strings.last_index_proc(
-							input.content[:content_layout.mouse_index],
+							self.content[:content_layout.mouse_index],
 							is_separator,
 						) +
 						1,
 					)
 				}
 				editor.selection[1] = strings.index_proc(
-					input.content[input.anchor:],
+					self.content[self.anchor:],
 					is_separator,
 				)
 				if editor.selection[1] == -1 {
-					editor.selection[1] = len(input.content)
+					editor.selection[1] = len(self.content)
 				} else {
-					editor.selection[1] += input.anchor
+					editor.selection[1] += self.anchor
 				}
 			} else {
 				editor.selection[1] = max(
 					0,
-					strings.last_index_proc(input.content[:input.anchor], is_separator) + 1,
+					strings.last_index_proc(self.content[:self.anchor], is_separator) + 1,
 				)
 				if (content_layout.mouse_index > 0 &&
-					   input.content[content_layout.mouse_index - 1] == ' ') {
+					   self.content[content_layout.mouse_index - 1] == ' ') {
 					editor.selection[0] = 0
 				} else {
 					editor.selection[0] = strings.index_proc(
-						input.content[content_layout.mouse_index:],
+						self.content[content_layout.mouse_index:],
 						is_separator,
 					)
 				}
 				if editor.selection[0] == -1 {
-					editor.selection[0] = len(input.content) - content_layout.mouse_index
+					editor.selection[0] = len(self.content) - content_layout.mouse_index
 				}
 				editor.selection[0] += content_layout.mouse_index
 			}
@@ -270,53 +270,53 @@ display_input :: proc(input: ^Input) {
 			editor.selection[0] = content_layout.mouse_index
 		}
 	}
-	if .Active in input.last_state && len(content_layout.glyphs) > 0 {
+	if .Active in self.last_state && len(content_layout.glyphs) > 0 {
 		glyph := content_layout.glyphs[content_layout.glyph_selection[0]]
-		glyph_pos := (text_origin - input.offset) + glyph.offset
+		glyph_pos := (text_origin - self.offset) + glyph.offset
 		cursor_box := Box {
 			glyph_pos + {-1, -2},
 			glyph_pos + {1, content_layout.font.line_height + 2},
 		}
-		inner_box := shrink_box(input.box, 4)
-		input.offset.x += max(0, cursor_box.hi.x - inner_box.hi.x)
+		inner_box := shrink_box(self.box, 4)
+		self.offset.x += max(0, cursor_box.hi.x - inner_box.hi.x)
 		if box_width(inner_box) > box_width(cursor_box) {
-			input.offset.x -= max(0, inner_box.lo.x - cursor_box.lo.x)
+			self.offset.x -= max(0, inner_box.lo.x - cursor_box.lo.x)
 		}
-		if input.is_multiline {
-			input.offset.y += max(0, cursor_box.hi.y - inner_box.hi.y)
+		if self.is_multiline {
+			self.offset.y += max(0, cursor_box.hi.y - inner_box.hi.y)
 			if box_height(inner_box) > box_height(cursor_box) {
-				input.offset.y -= max(0, inner_box.lo.y - cursor_box.lo.y)
+				self.offset.y -= max(0, inner_box.lo.y - cursor_box.lo.y)
 			}
 		}
 	} else {
-		input.offset = {}
+		self.offset = {}
 	}
 	if last_selection != editor.selection {
 		draw_frames(1)
 	}
 	if submitted {
-		input.state -= {.Active}
+		self.state -= {.Active}
 	}
 
-	text_origin -= input.offset
+	text_origin -= self.offset
 
-	if point_in_box(mouse_point(), input.box) {
-		hover_object(input)
+	if point_in_box(mouse_point(), self.box) {
+		hover_object(self)
 	}
 
 	if is_visible {
-		vgo.push_scissor(vgo.make_box(input.box, global_state.style.rounding))
-		if len(input.content) == 0 {
+		vgo.push_scissor(vgo.make_box(self.box, global_state.style.rounding))
+		if len(self.content) == 0 {
 			vgo.fill_text(
-				input.placeholder,
+				self.placeholder,
 				text_size,
 				text_origin,
 				align_x = .Left,
-				align_y = .Top if input.is_multiline else .Center,
+				align_y = .Top if self.is_multiline else .Center,
 				paint = vgo.fade(colors.content, 0.5),
 			)
 		}
-		if len(input.prefix) > 0 {
+		if len(self.prefix) > 0 {
 			vgo.fill_text_layout(
 				prefix_layout,
 				text_origin + {-prefix_layout.size.x, 0},
@@ -324,7 +324,7 @@ display_input :: proc(input: ^Input) {
 			)
 		}
 		line_height := font.line_height * text_size
-		if .Active in input.last_state {
+		if .Active in self.last_state {
 			if content_layout.glyph_selection[0] != content_layout.glyph_selection[1] {
 				for &line in content_layout.lines {
 					range := [2]int {
@@ -352,10 +352,10 @@ display_input :: proc(input: ^Input) {
 			content_layout,
 			text_origin,
 			.Left,
-			.Top if input.is_multiline else .Center,
+			.Top if self.is_multiline else .Center,
 			colors.content,
 		)
-		if .Active in input.last_state && len(content_layout.glyphs) > 0 {
+		if .Active in self.last_state && len(content_layout.glyphs) > 0 {
 			cursor_origin :=
 				text_origin + content_layout.glyphs[content_layout.glyph_selection[0]].offset
 			vgo.fill_box(
@@ -368,10 +368,10 @@ display_input :: proc(input: ^Input) {
 		}
 		vgo.pop_scissor()
 
-		if input.decal != .None {
-			a := box_height(input.box) / 2
-			center := [2]f32{input.box.hi.x, input.box.lo.y} + [2]f32{-a, a}
-			switch input.decal {
+		if self.decal != .None {
+			a := box_height(self.box) / 2
+			center := [2]f32{self.box.hi.x, self.box.lo.y} + [2]f32{-a, a}
+			switch self.decal {
 			case .None:
 				break
 			case .Check:
@@ -383,15 +383,15 @@ display_input :: proc(input: ^Input) {
 		}
 
 		vgo.stroke_box(
-			input.box,
-			2 * input.active_time,
+			self.box,
+			2 * self.active_time,
 			global_state.style.rounding,
-			paint = vgo.fade(colors.accent, input.active_time),
+			paint = vgo.fade(colors.accent, self.active_time),
 		)
 	}
 
-	if .Changed in input.state {
-		delete(input.borrowed_string^)
-		input.borrowed_string^ = strings.clone(strings.to_string(input.builder))
+	if .Changed in self.state {
+		delete(self.borrowed_string^)
+		self.borrowed_string^ = strings.clone(strings.to_string(self.builder))
 	}
 }

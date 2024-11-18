@@ -55,15 +55,15 @@ Object :: struct {
 	id:             Id,
 	index:          int,
 	box:            Box,
+	name:           string,
 	layer:          ^Layer,
 	frames:         int,
 	dead:           bool,
 	disabled:       bool,
-	isolated: bool,
+	isolated:       bool,
 	has_known_box:  bool,
 	flags:          Object_Flags,
 	last_state:     Object_State,
-	next_state:     Object_State,
 	state:          Object_State,
 	in_state_mask:  Object_State,
 	out_state_mask: Object_State,
@@ -74,7 +74,9 @@ Object :: struct {
 	margin:         [4]f32,
 	size:           [2]f32,
 	desired_size:   [2]f32,
-	children: 			[dynamic]^Object,
+	parent: 	^Object,
+	children:       [dynamic]^Object,
+	display_proc:   proc(_: ^Object, _: ^Layout),
 	variant:        Object_Variant,
 }
 
@@ -149,6 +151,10 @@ current_object :: proc() -> Maybe(^Object) {
 	return nil
 }
 
+last_object :: proc() -> Maybe(^Object) {
+	return global_state.object_stack.items[global_state.object_stack.height]
+}
+
 new_persistent_object :: proc(id: Id) -> ^Object {
 	object := new(Object)
 
@@ -160,6 +166,7 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 
 	append(&global_state.objects, object)
 	global_state.object_map[id] = object
+
 	draw_frames(1)
 
 	return object
@@ -189,6 +196,7 @@ transient_object :: proc() -> ^Object {
 	assert(object != nil)
 	object.id = Id(global_state.transient_objects.len)
 	object.children = make([dynamic]^Object, allocator = context.temp_allocator)
+	object.out_state_mask = OBJECT_STATE_ALL
 	return object
 }
 
@@ -247,14 +255,11 @@ object_is_visible :: proc(object: ^Object) -> bool {
 
 update_object_state :: proc(object: ^Object) {
 	object.last_state = object.state
-
 	object.state -= {.Clicked, .Focused, .Changed}
+
 	if global_state.focused_object == object.id {
 		object.state += {.Focused}
 	}
-
-	object.state += object.next_state
-	object.next_state = {}
 }
 
 begin_object :: proc(object: ^Object) -> bool {
@@ -274,6 +279,7 @@ begin_object :: proc(object: ^Object) -> bool {
 	object.frames = global_state.frames
 
 	object.layer = current_layer().? or_return
+	object.parent = current_object().? or_else nil
 	update_object_state(object)
 	if global_state.disable_objects do object.disabled = true
 
@@ -301,13 +307,12 @@ end_object :: proc() {
 			transfer_object_metrics_unless_isolated(object, layout)
 			display_or_add_object(object, layout)
 		} else {
-			display_object(object)
+			display_object(object, layout)
 		}
+
 		object.layer.state += object.state
+
 		pop_stack(&global_state.object_stack)
-		if parent, ok := current_object().?; ok {
-			transfer_object_state_to_parent(object, parent)
-		}
 	}
 }
 
@@ -329,7 +334,7 @@ transfer_object_state_to_parent :: proc(child: ^Object, parent: ^Object) {
 	if .Pressed in child.state && child.id == global_state.dragged_object {
 		state_mask -= {.Pressed}
 	}
-	parent.next_state += child.next_state & state_mask
+	parent.state += child.state & state_mask
 }
 
 hover_object :: proc(object: ^Object) {
@@ -349,35 +354,40 @@ focus_object :: proc(object: ^Object) {
 }
 
 foreground :: proc(loc := #caller_location) {
-	layout, ok := current_layout().?
-	if !ok do return
 	object := persistent_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
-		if object.variant == nil {
-			object.in_state_mask = OBJECT_STATE_ALL
-		}
-		object.box = layout.box
-		vgo.fill_box(object.box, global_state.style.rounding, paint = global_state.style.color.fg)
-		if point_in_box(global_state.mouse_pos, object.box) {
-			hover_object(object)
+		object.in_state_mask = OBJECT_STATE_ALL
+		if object.display_proc == nil {
+			object.display_proc = proc(object: ^Object, layout: ^Layout) {
+				object.box = layout.box
+				draw_shadow(object.box)
+				vgo.fill_box(object.box, global_state.style.rounding, global_state.style.color.fg)
+				if point_in_box(global_state.mouse_pos, object.box) {
+					hover_object(object)
+				}
+			}
 		}
 	}
 }
 
 background :: proc(loc := #caller_location) {
-	layout, ok := current_layout().?
-	if !ok do return
 	object := persistent_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
-		if object.variant == nil {
-			object.in_state_mask = OBJECT_STATE_ALL
-		}
-		object.box = layout.box
-		vgo.fill_box(object.box, global_state.style.rounding, global_state.style.color.field)
-		if point_in_box(global_state.mouse_pos, object.box) {
-			hover_object(object)
+		object.in_state_mask = OBJECT_STATE_ALL
+		if object.display_proc == nil {
+			object.display_proc = proc(object: ^Object, layout: ^Layout) {
+				object.box = layout.box
+				vgo.fill_box(
+					object.box,
+					global_state.style.rounding,
+					global_state.style.color.field,
+				)
+				if point_in_box(global_state.mouse_pos, object.box) {
+					hover_object(object)
+				}
+			}
 		}
 	}
 }
@@ -407,7 +417,7 @@ object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {
 	return (object.index > other.index) && (object.layer.index >= other.layer.index)
 }
 
-display_object :: proc(object: ^Object) {
+display_object :: proc(object: ^Object, layout: ^Layout) {
 	when DEBUG {
 		if point_in_box(mouse_point(), object.box) {
 			if object_is_in_front_of(object, top_hovered_object(global_state.debug) or_else nil) {
@@ -420,22 +430,30 @@ display_object :: proc(object: ^Object) {
 	switch &v in object.variant {
 	case Container:
 	case Input:
-		display_input(&v)
+		display_input(&v, layout)
 	case Button:
-		display_button(&v)
+		display_button(&v, layout)
 	case Boolean:
-		display_boolean(&v)
+		display_boolean(&v, layout)
 	case Layout:
 		display_layout(&v)
 	case Label:
-		display_label(&v)
+		display_label(&v, layout)
 	case Slider:
-		display_slider(&v)
+		display_slider(&v, layout)
 	case HSV_Wheel:
-		display_hsv_wheel(&v)
+		display_hsv_wheel(&v, layout)
 	case Alpha_Slider:
-		display_alpha_slider(&v)
+		display_alpha_slider(&v, layout)
 	case Color_Picker:
-		display_color_picker(&v)
+		display_color_picker(&v, layout)
+	case nil:
+		if object.display_proc != nil {
+			object.display_proc(object, layout)
+		}
+	}
+
+	if object.parent != nil {
+		transfer_object_state_to_parent(object, object.parent)
 	}
 }

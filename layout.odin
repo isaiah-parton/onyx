@@ -62,10 +62,12 @@ V_Align :: enum {
 
 Layout :: struct {
 	using object:       ^Object,
+	clip_contents: bool,
 	axis:               Axis,
 	content_box:        Box,
 	future_placement:   Maybe(Future_Box_Placement),
 	total_space:        [2]f32,
+	space_left: [2]f32,
 	justify:            Align,
 	align:              Align,
 	padding:            [4]f32,
@@ -106,10 +108,7 @@ display_or_add_object :: proc(object: ^Object, layout: ^Layout) {
 		return
 	}
 
-	if !object.has_known_box {
-		apply_object_layout(object, layout)
-	}
-	display_object(object)
+	display_object(object, layout)
 }
 
 move_object :: proc(object: ^Object, delta: [2]f32) {
@@ -122,7 +121,8 @@ move_object :: proc(object: ^Object, delta: [2]f32) {
 	}
 }
 
-apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
+apply_layout_placement :: proc(object: ^Object, layout: ^Layout) {
+	if object.has_known_box do return
 	size := linalg.max(object.size, object.desired_size)
 	if layout.axis == .X {
 		layout.content_box.lo.x += object.margin.x
@@ -170,11 +170,17 @@ apply_object_layout :: proc(object: ^Object, layout: ^Layout) {
 	}
 
 	object.box = snapped_box(box)
+
+	if layout.justify == .Center {
+		move_object(object, layout.space_left * 0.5)
+	} else if layout.justify == .Far {
+		move_object(object, layout.space_left)
+	}
 }
 
 display_layout :: proc(layout: ^Layout) {
 	if placement, ok := layout.future_placement.?; ok {
-		layout.size = layout.desired_size
+		layout.size = linalg.max(layout.desired_size, layout.size)
 		layout.box.lo = placement.origin - placement.offset * layout.size
 		layout.box.hi = layout.box.lo + layout.size
 	}
@@ -183,26 +189,24 @@ display_layout :: proc(layout: ^Layout) {
 	layout.content_box.lo += layout.padding.xy
 	layout.content_box.hi -= layout.padding.zw
 
-	delta := axis_normal(layout.axis) * (box_size(layout.box) - layout.desired_size)
+	layout.space_left = axis_normal(layout.axis) * (box_size(layout.box) - layout.desired_size)
 
 	if layout.children == nil do return
 
-	vgo.save_scissor()
-	vgo.push_scissor(vgo.make_box(layout.box))
-	push_clip(layout.box)
-
-	for object in layout.children {
-		apply_object_layout(object, layout)
-		if layout.justify == .Center {
-			move_object(object, delta * 0.5)
-		} else if layout.justify == .Far {
-			move_object(object, delta)
-		}
-		display_object(object)
+	if layout.clip_contents {
+		vgo.save_scissor()
+		vgo.push_scissor(vgo.make_box(layout.box))
+		push_clip(layout.box)
 	}
 
-	pop_clip()
-	vgo.restore_scissor()
+	for object in layout.children {
+		display_object(object, layout)
+	}
+
+	if layout.clip_contents {
+		pop_clip()
+		vgo.restore_scissor()
+	}
 }
 
 push_layout :: proc(layout: ^Layout) -> bool {
@@ -255,13 +259,16 @@ begin_layout :: proc(
 	justify: Align = .Near,
 	align: Align = .Near,
 	padding: [4]f32 = {},
+	clip_contents: bool = false,
 ) -> bool {
 	object := transient_object()
+	object.in_state_mask = OBJECT_STATE_ALL
 	object.variant = Layout {
 		object  = object,
 		axis    = axis,
 		justify = justify,
 		align   = align,
+		clip_contents = clip_contents,
 	}
 	layout := &object.variant.(Layout)
 
@@ -323,7 +330,8 @@ determine_layout_size :: proc(
 	parent_layout: Maybe(^Layout),
 	axis: Axis,
 ) -> (
-	actual_size, desired_size: [2]f32,
+	actual_size: [2]f32,
+	desired_size: [2]f32,
 	known: bool,
 ) {
 	available_space: [2]f32

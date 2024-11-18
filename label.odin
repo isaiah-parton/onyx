@@ -9,9 +9,10 @@ Label :: struct {
 	text_layout:  vgo.Text_Layout,
 }
 
-display_label :: proc(label: ^Label) {
-	if object_is_visible(label) {
-		vgo.fill_text_layout(label.text_layout, label.box.lo, paint = colors().content)
+display_label :: proc(self: ^Label, layout: ^Layout) {
+	apply_layout_placement(self, layout)
+	if object_is_visible(self) {
+		vgo.fill_text_layout(self.text_layout, self.box.lo, paint = colors().content)
 	}
 }
 

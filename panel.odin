@@ -104,7 +104,6 @@ begin_panel :: proc(
 
 			handle_object_click(object, sticky = true)
 
-
 			if point_in_box(global_state.mouse_pos, object.box) {
 				hover_object(object)
 			}

@@ -122,7 +122,7 @@ main :: proc() {
 					if begin_layout(justify = .Center, align = .Center, size = Percent(25), axis = .X, padding = 10) {
 						defer end_layout()
 
-						raw_input(&input_value, placeholder = "sample text", decal = .Spinner)
+						raw_input(&input_value, placeholder = "sample text")
 					}
 					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(25), padding = 10) {
 						defer end_layout()
