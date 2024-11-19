@@ -44,6 +44,7 @@ Object_Variant :: union {
 	Container,
 	Layout,
 	Label,
+	Tabs,
 	Input,
 	Slider,
 	HSV_Wheel,
@@ -211,9 +212,7 @@ object_was_updated_this_frame :: proc(object: ^Object) -> bool {
 
 handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 	if global_state.hovered_object == object.id {
-		// Add hovered state
 		object.state += {.Hovered}
-		// Clicking
 		pressed_buttons := global_state.mouse_bits - global_state.last_mouse_bits
 		if pressed_buttons != {} {
 			if object.click_button == global_state.mouse_button &&
@@ -314,9 +313,7 @@ end_object :: proc() {
 		} else {
 			display_object(object, layout)
 		}
-
 		object.layer.state += object.state
-
 		pop_stack(&global_state.object_stack)
 	}
 }
@@ -452,6 +449,8 @@ display_object :: proc(object: ^Object, layout: ^Layout) {
 		display_alpha_slider(&v, layout)
 	case Color_Picker:
 		display_color_picker(&v, layout)
+	case Tabs:
+		display_tabs(&v, layout)
 	case nil:
 		if object.display_proc != nil {
 			object.display_proc(object, layout)

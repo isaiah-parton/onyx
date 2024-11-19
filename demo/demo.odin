@@ -58,6 +58,7 @@ main :: proc() {
 	onyx.start(window)
 	defer onyx.shutdown()
 
+	justify: onyx.Align
 	checkbox_value: bool
 	toggle_value: bool
 	radio_value: bool
@@ -109,6 +110,11 @@ main :: proc() {
 				if begin_layout(size = At_Least(0), axis = .Y, padding = 15) {
 					defer end_layout()
 
+					if begin_layout(axis = .X, size = Fixed(30), align = .Center) {
+						defer end_layout()
+
+						tabs(reflect.enum_field_names(Align), (^int)(&justify))
+					}
 					if begin_layout(justify = .Near, align = .Center, size = Percent(25), axis = .X, padding = 10) {
 						defer end_layout()
 

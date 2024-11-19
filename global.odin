@@ -259,12 +259,15 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		proc "c" (_: glfw.WindowHandle, width, height: i32) {
 			context = runtime.default_context()
 
+			width := max(width, 1)
+			height := max(height, 1)
+
 			global_state.surface_config.width = u32(width)
 			global_state.surface_config.height = u32(height)
 			wgpu.SurfaceConfigure(global_state.surface, &global_state.surface_config)
 
 			global_state.view = {f32(width), f32(height)}
-			draw_frames(2)
+			draw_frames(1)
 		},
 	)
 	glfw.SetCharCallback(global_state.window, proc "c" (_: glfw.WindowHandle, char: rune) {
