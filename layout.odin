@@ -66,7 +66,6 @@ Layout :: struct {
 	axis:               Axis,
 	content_box:        Box,
 	future_placement:   Maybe(Future_Box_Placement),
-	total_space:        [2]f32,
 	space_left: [2]f32,
 	justify:            Align,
 	align:              Align,
@@ -308,8 +307,6 @@ begin_layout :: proc(
 		layout.content_box.hi -= layout.padding.zw
 	}
 
-	layout.total_space = layout.size - (layout.padding.xy + layout.padding.zw)
-
 	begin_object(layout) or_return
 	push_layout(layout) or_return
 	return true
@@ -335,13 +332,11 @@ determine_layout_size :: proc(
 	known: bool,
 ) {
 	available_space: [2]f32
-	total_space: [2]f32
 	i := int(axis)
 	j := 1 - int(axis)
 	known = true
 	if parent_layout, ok := parent_layout.?; ok {
 		available_space = box_size(parent_layout.content_box)
-		total_space = parent_layout.total_space
 		j = int(parent_layout.axis)
 		if layout_is_deferred(parent_layout) {
 			known = false
@@ -349,7 +344,7 @@ determine_layout_size :: proc(
 	}
 	switch size in size {
 	case Percent:
-		actual_size[j] = total_space[j] * f32(size) * 0.01
+		actual_size[j] = available_space[j] * f32(size) * 0.01
 	case Fixed:
 		actual_size[j] = f32(size)
 		desired_size[j] = f32(size)
