@@ -47,9 +47,9 @@ begin_container :: proc(
 	loc := #caller_location,
 ) -> bool {
 	object := persistent_object(hash(loc))
-
 	if object.variant == nil {
 		object.variant = Container {
+			object = object,
 			min_zoom = 0.1,
 			max_zoom = 1.0,
 		}
@@ -58,57 +58,42 @@ begin_container :: proc(
 
 	begin_object(object) or_return
 
-	container := object.variant.(Container)
+	self := object.variant.(Container)
 
-	is_active := .Hovered in (object.state + object.last_state)
+	is_active := .Hovered in (self.state + self.last_state)
 
-	// TODO: Remove/fix this
-	// if force_aspect_ratio {
-	// 	size = size_ratio(size, box_size(object.box))
-	// }
-
-	// Hover
-	if point_in_box(global_state.mouse_pos, object.box) {
-		hover_object(object)
+	if point_in_box(global_state.mouse_pos, self.box) {
+		hover_object(self)
 	}
 
-	// Minimum size
-	container.space = space.? or_else linalg.max(box_size(object.box), container.space_needed)
-	container.space_needed = 0
+	self.space = space.? or_else linalg.max(box_size(self.box), self.space_needed)
+	self.space_needed = 0
 
-	// Determine layout size
-	layout_size := container.space
+	layout_size := self.space
 	if can_zoom {
-		layout_size *= container.zoom
+		layout_size *= self.zoom
 	} else {
-		container.zoom = 1
-		container.target_zoom = 1
+		self.zoom = 1
+		self.target_zoom = 1
 	}
 
-	// Pre-draw controls
 	if is_active {
-		// Mouse panning
-		if .Pressed in object.state {
-			if .Pressed not_in object.last_state {
-				container.pan_offset = global_state.mouse_pos - (object.box.lo - container.scroll)
+		if .Pressed in self.state {
+			if .Pressed not_in self.last_state {
+				self.pan_offset = global_state.mouse_pos - (self.box.lo - self.scroll)
 			}
-			//
 			new_scroll := linalg.clamp(
-				object.box.lo - (global_state.mouse_pos - container.pan_offset),
+				self.box.lo - (global_state.mouse_pos - self.pan_offset),
 				0,
-				layout_size - box_size(object.box),
+				layout_size - box_size(self.box),
 			)
-			container.scroll = new_scroll
-			container.target_scroll = new_scroll
+			self.scroll = new_scroll
+			self.target_scroll = new_scroll
 		}
 	}
 
-	// Push draw scissor
-	vgo.push_scissor(vgo.make_box(object.box, global_state.style.rounding))
-
-	// Determine layout box
-	layout_origin := object.box.lo - linalg.max(linalg.floor(container.scroll), 0)
-	layout_box := Box{layout_origin, layout_origin + linalg.max(layout_size, box_size(object.box))}
+	layout_origin := self.box.lo - linalg.max(linalg.floor(self.scroll), 0)
+	layout_box := Box{layout_origin, layout_origin + linalg.max(layout_size, box_size(self.box))}
 
 	begin_layout(placement = layout_box) or_return
 
@@ -117,13 +102,21 @@ begin_container :: proc(
 
 end_container :: proc() {
 	layout := current_layout().?
+	end_layout()
 	self := &current_object().?.variant.(Container)
-	// Update needed space
+
+	end_object()
+	pop_id()
+}
+
+display_container :: proc(self: ^Container, layout: ^Layout) {
+	apply_layout_placement(self, layout)
+
 	self.space_needed = linalg.max(
 		layout.content_size + layout.spacing_size,
 		self.space_needed,
 	)
-	// Controls
+
 	if self.is_active {
 		if self.enable_zoom &&
 		   (.Pressed not_in self.state) &&
@@ -218,8 +211,10 @@ end_container :: proc() {
 		// 	container.target_scroll.x = container.scroll.x
 		// }
 	}
-	end_layout()
+	vgo.push_scissor(vgo.make_box(self.box, global_state.style.rounding))
+	vgo.fill_box(self.box, paint = colors().field)
+	for child in self.children {
+		display_object(child, layout)
+	}
 	vgo.pop_scissor()
-	end_object()
-	pop_id()
 }

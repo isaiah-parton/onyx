@@ -87,8 +87,16 @@ main :: proc() {
 					),
 				)
 			}
-			if begin_panel() {
+			if begin_panel(padding = 20) {
 				defer end_panel()
+
+				set_width_fill()
+				set_height_fill()
+				if begin_container() {
+					defer end_container()
+
+
+				}
 			}
 			if begin_panel(axis = .X) {
 				defer end_panel()

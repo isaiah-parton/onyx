@@ -431,6 +431,7 @@ display_object :: proc(object: ^Object, layout: ^Layout) {
 
 	switch &v in object.variant {
 	case Container:
+		display_container(&v, layout)
 	case Input:
 		display_input(&v, layout)
 	case Button:

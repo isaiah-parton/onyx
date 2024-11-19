@@ -45,7 +45,7 @@ display_tabs :: proc(self: ^Tabs, layout: ^Layout) {
 	is_visible := object_is_visible(self)
 	inner_box := self.box
 	if is_visible {
-		vgo.fill_box(self.box, global_state.style.rounding, global_state.style.color.substance)
+		vgo.fill_box(self.box, global_state.style.rounding, global_state.style.color.field)
 	}
 	option_rounding := global_state.style.rounding * (box_height(inner_box) / box_height(self.box))
 	option_size := (inner_box.hi.x - inner_box.lo.x) / f32(len(self.items))
@@ -66,12 +66,6 @@ display_tabs :: proc(self: ^Tabs, layout: ^Layout) {
 				option_box,
 				option_rounding,
 				paint = vgo.fade(global_state.style.color.fg, f32(int(.Hovered in self.state))),
-			)
-			vgo.stroke_box(
-				option_box,
-				1,
-				option_rounding,
-				paint = vgo.fade(global_state.style.color.content, f32(int(.Hovered in self.state))),
 			)
 			vgo.fill_text(
 				item,

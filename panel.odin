@@ -42,6 +42,7 @@ begin_panel :: proc(
 	position: Maybe([2]f32) = nil,
 	size: Maybe([2]f32) = nil,
 	axis: Axis = .Y,
+	padding: f32 = 0,
 	loc := #caller_location,
 ) -> bool {
 	MIN_SIZE :: [2]f32{100, 100}
@@ -137,7 +138,7 @@ begin_panel :: proc(
 
 	vgo.push_scissor(vgo.make_box(panel.box, rounding))
 	push_clip(panel.box)
-	begin_layout(placement = panel.box, axis = axis) or_return
+	begin_layout(placement = panel.box, axis = axis, padding = padding) or_return
 	return true
 }
 
