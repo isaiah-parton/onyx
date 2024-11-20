@@ -311,8 +311,7 @@ display_input :: proc(self: ^Input, layout: ^Layout) {
 				self.placeholder,
 				text_size,
 				text_origin,
-				align_x = .Left,
-				align_y = .Top if self.is_multiline else .Center,
+				align = {0, f32(i32(!self.is_multiline)) * 0.5},
 				paint = vgo.fade(colors.content, 0.5),
 			)
 		}
@@ -351,8 +350,7 @@ display_input :: proc(self: ^Input, layout: ^Layout) {
 		vgo.fill_text_layout(
 			content_layout,
 			text_origin,
-			.Left,
-			.Top if self.is_multiline else .Center,
+			{0, f32(i32(!self.is_multiline)) * 0.5},
 			colors.content,
 		)
 		if .Active in self.last_state && len(content_layout.glyphs) > 0 {

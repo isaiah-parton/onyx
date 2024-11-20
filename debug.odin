@@ -179,11 +179,10 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		vgo.fill_text_layout(
 			text_layout,
 			origin + 2,
-			align_x = .Left,
-			align_y = .Bottom,
+			align = {0, 1},
 			paint = vgo.BLACK,
 		)
-		vgo.fill_text_layout(text_layout, origin, align_x = .Left, align_y = .Bottom)
+		vgo.fill_text_layout(text_layout, origin, align = {0, 1})
 	}
 	if object, ok := currently_debugged_object(state^); ok {
 		b := strings.builder_make(context.temp_allocator)
@@ -196,7 +195,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		fmt.sbprintf(
 			&b,
 			" index: %v\n id: %v\n box: [%.1f, %.1f]\n size: %.1f\n desired_size: %.1f",
-			object.index + 1,
+			object.call_index + 1,
 			object.id,
 			object.box.lo,
 			object.box.hi,

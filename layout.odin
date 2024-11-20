@@ -46,6 +46,7 @@ Align :: enum {
 	Near,
 	Center,
 	Far,
+	Equal_Space,
 }
 
 H_Align :: enum {
@@ -61,12 +62,9 @@ V_Align :: enum {
 }
 
 Layout :: struct {
-	using object:       ^Object,
-	clip_contents: bool,
 	axis:               Axis,
 	content_box:        Box,
-	future_placement:   Maybe(Future_Box_Placement),
-	space_left: [2]f32,
+	space_left: 				[2]f32,
 	justify:            Align,
 	align:              Align,
 	padding:            [4]f32,
@@ -77,20 +75,11 @@ Layout :: struct {
 	object_size_method: Object_Size_Method,
 }
 
-Object_Placement :: union {
-	Box,
-	Future_Box_Placement,
-}
-
-store_object_in_layout :: proc(object: ^Object, layout: ^Layout) {
-	append(&layout.children, object)
-}
-
 axis_normal :: proc(axis: Axis) -> [2]f32 {
 	return {f32(1 - i32(axis)), f32(i32(axis))}
 }
 
-display_or_add_object :: proc(object: ^Object, layout: ^Layout) {
+maybe_defer_object :: proc(object: ^Object) -> bool {
 	if !object.isolated {
 		switch layout.axis {
 		case .X:
@@ -102,21 +91,18 @@ display_or_add_object :: proc(object: ^Object, layout: ^Layout) {
 		}
 	}
 
-	if layout_is_deferred(layout) {
-		store_object_in_layout(object, layout)
-		return
+	if object.parent != nil && layout_is_deferred(&object.parent.layout) {
+		append(&object.parent.children, object)
+		return true
 	}
-
-	display_object(object, layout)
+	return false
 }
 
 move_object :: proc(object: ^Object, delta: [2]f32) {
 	object.box.lo += delta
 	object.box.hi += delta
-	if layout, ok := object.variant.(Layout); ok {
-		for child in layout.children {
-			move_object(child, delta)
-		}
+	for child in object.children {
+		move_object(child, delta)
 	}
 }
 
@@ -136,6 +122,10 @@ apply_layout_placement :: proc(object: ^Object, layout: ^Layout) {
 		size[int(layout.axis)],
 	)
 
+	if layout.justify == .Equal_Space {
+		layout.content_box.lo[int(layout.axis)] += layout.space_left[int(layout.axis)] / f32(len(layout.children) - 1)
+	}
+
 	if layout.axis == .X {
 		layout.content_box.lo.x += object.margin.z
 		box.lo.y += object.margin.y
@@ -149,6 +139,7 @@ apply_layout_placement :: proc(object: ^Object, layout: ^Layout) {
 			case .Center:
 				box.lo.y = box_center_y(box) - size.y / 2
 				box.hi.y = box.lo.y + size.y
+			case .Equal_Space:
 			}
 		}
 	} else {
@@ -164,6 +155,7 @@ apply_layout_placement :: proc(object: ^Object, layout: ^Layout) {
 			case .Center:
 				box.lo.x = box_center_x(box) - size.x / 2
 				box.hi.x = box.lo.x + size.x
+			case .Equal_Space:
 			}
 		}
 	}
@@ -175,54 +167,6 @@ apply_layout_placement :: proc(object: ^Object, layout: ^Layout) {
 	} else if layout.justify == .Far {
 		move_object(object, layout.space_left)
 	}
-}
-
-display_layout :: proc(layout: ^Layout) {
-	if placement, ok := layout.future_placement.?; ok {
-		layout.size = linalg.max(layout.desired_size, layout.size)
-		layout.box.lo = placement.origin - placement.offset * layout.size
-		layout.box.hi = layout.box.lo + layout.size
-	}
-
-	layout.content_box = layout.box
-	layout.content_box.lo += layout.padding.xy
-	layout.content_box.hi -= layout.padding.zw
-
-	layout.space_left = axis_normal(layout.axis) * (box_size(layout.box) - layout.desired_size)
-
-	if layout.children == nil do return
-
-	if layout.clip_contents {
-		vgo.save_scissor()
-		vgo.push_scissor(vgo.make_box(layout.box))
-		push_clip(layout.box)
-	}
-
-	for object in layout.children {
-		display_object(object, layout)
-	}
-
-	if layout.clip_contents {
-		pop_clip()
-		vgo.restore_scissor()
-	}
-}
-
-push_layout :: proc(layout: ^Layout) -> bool {
-	push_stack(&global_state.layout_stack, layout) or_return
-	global_state.current_layout =
-		global_state.layout_stack.items[global_state.layout_stack.height - 1]
-	return true
-}
-
-pop_layout :: proc() {
-	pop_stack(&global_state.layout_stack)
-	index := global_state.layout_stack.height - 1
-	if index >= 0 {
-		global_state.current_layout = global_state.layout_stack.items[index]
-		return
-	}
-	global_state.current_layout = nil
 }
 
 inverse_axis :: proc(axis: Axis) -> Axis {
@@ -246,14 +190,9 @@ Layout_Size :: union {
 	Percent,
 }
 
-Layout_Placement :: union {
-	Box,
-	Future_Box_Placement,
-}
-
 begin_layout :: proc(
 	size: Layout_Size = nil,
-	placement: Layout_Placement = nil,
+	placement: Object_Placement = nil,
 	axis: Axis = .X,
 	justify: Align = .Near,
 	align: Align = .Near,
@@ -338,6 +277,7 @@ determine_layout_size :: proc(
 	if parent_layout, ok := parent_layout.?; ok {
 		available_space = box_size(parent_layout.content_box)
 		j = int(parent_layout.axis)
+		i = 1 - j
 		if layout_is_deferred(parent_layout) {
 			known = false
 		}

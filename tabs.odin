@@ -2,17 +2,17 @@ package onyx
 
 import "../vgo"
 import "core:fmt"
-import "core:slice"
 import "core:math"
 import "core:math/linalg"
+import "core:slice"
 
 Tabs :: struct {
 	using object: ^Object,
 	index:        int,
-	items:      []string,
+	items:        []string,
 }
 
-tabs :: proc(items: []string, index: ^int, loc := #caller_location) {
+tabs :: proc(items: []string, index: ^$T, loc := #caller_location) {
 	object := persistent_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
@@ -27,9 +27,9 @@ tabs :: proc(items: []string, index: ^int, loc := #caller_location) {
 		variant.desired_size = global_state.style.visual_size
 
 		if object_was_changed(object) {
-			index^ = variant.index
+			index^ = T(variant.index)
 		} else {
-			variant.index = index^
+			variant.index = int(index^)
 		}
 	}
 }
@@ -43,17 +43,18 @@ display_tabs :: proc(self: ^Tabs, layout: ^Layout) {
 	}
 
 	is_visible := object_is_visible(self)
-	inner_box := self.box
+	inner_box := shrink_box(self.box, 1)
 	if is_visible {
 		vgo.fill_box(self.box, global_state.style.rounding, global_state.style.color.field)
 	}
-	option_rounding := global_state.style.rounding * (box_height(inner_box) / box_height(self.box))
+	option_rounding := global_state.style.rounding * ((box_height(self.box) - 4) / box_height(self.box))
 	option_size := (inner_box.hi.x - inner_box.lo.x) / f32(len(self.items))
 
 	for item, i in self.items {
 		option_box := cut_box_left(&inner_box, option_size)
+		hovered := (self.state >= {.Hovered}) && point_in_box(global_state.mouse_pos, option_box)
 		if self.index != i {
-			if self.state >= {.Hovered} && point_in_box(global_state.mouse_pos, option_box) {
+			if hovered {
 				if .Clicked in self.state {
 					self.index = i
 					self.state += {.Changed}
@@ -63,17 +64,19 @@ display_tabs :: proc(self: ^Tabs, layout: ^Layout) {
 		}
 		if is_visible {
 			vgo.fill_box(
-				option_box,
+				shrink_box(option_box, 1),
 				option_rounding,
-				paint = vgo.fade(global_state.style.color.fg, f32(int(.Hovered in self.state))),
+				paint = vgo.fade(
+					global_state.style.color.fg,
+					f32(int(hovered || self.index == i)),
+				),
 			)
 			vgo.fill_text(
 				item,
 				global_state.style.default_text_size,
 				box_center(option_box),
 				font = global_state.style.default_font,
-				align_x = .Center,
-				align_y = .Center,
+				align = 0.5,
 				paint = vgo.fade(global_state.style.color.content, 1 if self.index == i else 0.5),
 			)
 		}

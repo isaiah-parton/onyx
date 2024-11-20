@@ -150,8 +150,7 @@ display_color_picker :: proc(self: ^Color_Picker, layout: ^Layout) {
 			fmt.tprintf("#%6x", vgo.hex_from_color(self.value)),
 			global_state.style.default_text_size,
 			box_center(self.box),
-			align_x = .Center,
-			align_y = .Center,
+			align = 0.5,
 			paint = vgo.BLACK if max(vgo.luminance_of(self.value), 1 - f32(self.value.a) / 255) > 0.45 else vgo.WHITE,
 		)
 		vgo.pop_scissor()
@@ -171,7 +170,13 @@ display_color_picker :: proc(self: ^Color_Picker, layout: ^Layout) {
 
 			if begin_layout(
 				axis = .X,
-				placement = Future_Box_Placement{origin = {self.box.hi.x + global_state.style.popup_margin, box_center_y(self.box)}, offset = {0, 0.5}},
+				placement = Future_Box_Placement {
+					origin = {
+						self.box.hi.x + global_state.style.popup_margin,
+						box_center_y(self.box),
+					},
+					offset = {0, 0.5},
+				},
 				padding = 10,
 				clip_contents = true,
 			) {

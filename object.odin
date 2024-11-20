@@ -42,51 +42,67 @@ Object_Variant :: union {
 	Button,
 	Boolean,
 	Container,
-	Layout,
 	Label,
 	Tabs,
 	Input,
-	Slider,
 	HSV_Wheel,
+	Slider,
 	Alpha_Slider,
 	Color_Picker,
+	Date_Picker,
+	Calendar,
+	Calendar_Day,
+}
+
+Future_Layout_Placement :: struct {
+	size:   [2]Layout_Size,
+	margin: [4]f32,
+	align:  Align,
+}
+
+Object_Placement :: union {
+	Future_Layout_Placement,
+	Future_Box_Placement,
+	Box,
 }
 
 Object :: struct {
-	id:             Id,
-	index:          int,
-	box:            Box,
-	name:           string,
-	layer:          ^Layer,
-	frames:         int,
-	dead:           bool,
-	disabled:       bool,
-	isolated:       bool,
-	has_known_box:  bool,
-	flags:          Object_Flags,
-	last_state:     Object_State,
-	state:          Object_State,
-	in_state_mask:  Object_State,
-	out_state_mask: Object_State,
-	click_count:    int,
-	click_time:     time.Time,
-	click_point:    [2]f32,
-	click_button:   Mouse_Button,
-	margin:         [4]f32,
-	size:           [2]f32,
-	desired_size:   [2]f32,
-	parent: 	^Object,
-	children:       [dynamic]^Object,
-	display_proc:   proc(_: ^Object, _: ^Layout),
-	variant:        Object_Variant,
+	id:               Id,
+	call_index:       int,
+	frames:           int,
+	layer:            ^Layer,
+	layout_placement: Future_Layout_Placement,
+	box_or_placement: Object_Placement,
+	clip_children:    bool,
+	dead:             bool,
+	is_deferred:      bool,
+	disabled:         bool,
+	isolated:         bool,
+	has_known_box:    bool,
+	flags:            Object_Flags,
+	last_state:       Object_State,
+	state:            Object_State,
+	in_state_mask:    Object_State,
+	out_state_mask:   Object_State,
+	click_count:      int,
+	click_time:       time.Time,
+	click_point:      [2]f32,
+	click_button:     Mouse_Button,
+	margin:           [4]f32,
+	size:             [2]f32,
+	desired_size:     [2]f32,
+	layout:           Layout,
+	parent:           ^Object,
+	children:         [dynamic]^Object,
+	on_display:       proc(_: ^Object),
+	variant:          Object_Variant,
 }
 
-Object_States :: struct {
-	previous: Object_State,
-	current:  Object_State,
-	next:     Object_State,
-	in_mask:  Object_State,
-	out_mask: Object_State,
+Object_Input :: struct {
+	click_count:        int,
+	click_release_time: time.Time,
+	click_point:        [2]f32,
+	click_mouse_button: Mouse_Button,
 }
 
 Object_Margin :: struct {
@@ -269,7 +285,7 @@ update_object_state :: proc(object: ^Object) {
 begin_object :: proc(object: ^Object) -> bool {
 	assert(object != nil)
 
-	object.index = global_state.object_index
+	object.call_index = global_state.object_index
 	global_state.object_index += 1
 
 	object.dead = false
@@ -306,15 +322,19 @@ begin_object :: proc(object: ^Object) -> bool {
 
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
-		if layout, ok := current_layout().?; ok && !object.isolated {
-			object.size = linalg.max(object.size, object.desired_size, layout.object_size)
-			transfer_object_metrics_unless_isolated(object, layout)
-			display_or_add_object(object, layout)
-		} else {
-			display_object(object, layout)
-		}
 		object.layer.state += object.state
 		pop_stack(&global_state.object_stack)
+		if object.parent != nil && !object.isolated {
+			object.size = linalg.max(
+				object.size,
+				object.desired_size,
+				object.parent.layout.object_size,
+			)
+			transfer_object_metrics_unless_isolated(object, object.parent)
+			display_or_add_object(object)
+		} else {
+			display_object(object)
+		}
 	}
 }
 
@@ -360,8 +380,8 @@ foreground :: proc(loc := #caller_location) {
 	if begin_object(object) {
 		defer end_object()
 		object.in_state_mask = OBJECT_STATE_ALL
-		if object.display_proc == nil {
-			object.display_proc = proc(object: ^Object, layout: ^Layout) {
+		if object.on_display == nil {
+			object.on_display = proc(object: ^Object, layout: ^Layout) {
 				object.box = layout.box
 				draw_shadow(object.box)
 				vgo.fill_box(object.box, global_state.style.rounding, global_state.style.color.fg)
@@ -378,8 +398,8 @@ background :: proc(loc := #caller_location) {
 	if begin_object(object) {
 		defer end_object()
 		object.in_state_mask = OBJECT_STATE_ALL
-		if object.display_proc == nil {
-			object.display_proc = proc(object: ^Object, layout: ^Layout) {
+		if object.on_display == nil {
+			object.on_display = proc(object: ^Object, layout: ^Layout) {
 				object.box = layout.box
 				vgo.fill_box(
 					object.box,
@@ -416,7 +436,7 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 
 object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {
 	if (object == nil) || (other == nil) do return true
-	return (object.index > other.index) && (object.layer.index >= other.layer.index)
+	return (object.call_index > other.call_index) && (object.layer.index >= other.layer.index)
 }
 
 display_object :: proc(object: ^Object, layout: ^Layout) {
@@ -430,6 +450,8 @@ display_object :: proc(object: ^Object, layout: ^Layout) {
 	}
 
 	switch &v in object.variant {
+	case Date_Picker:
+		display_date_picker(&v, layout)
 	case Container:
 		display_container(&v, layout)
 	case Input:
@@ -452,10 +474,40 @@ display_object :: proc(object: ^Object, layout: ^Layout) {
 		display_color_picker(&v, layout)
 	case Tabs:
 		display_tabs(&v, layout)
-	case nil:
-		if object.display_proc != nil {
-			object.display_proc(object, layout)
+	case Calendar, Calendar_Day:
+		for child in object.children {
+			display_object(child, layout)
 		}
+	case nil:
+		if object.on_display != nil {
+			object.on_display(object, layout)
+		}
+	}
+
+	if placement, ok := layout.future_placement.?; ok {
+		layout.size = linalg.max(layout.desired_size, layout.size)
+		layout.box.lo = placement.origin - placement.offset * layout.size
+		layout.box.hi = layout.box.lo + layout.size
+	}
+
+	layout.content_box = layout.box
+	layout.content_box.lo += layout.padding.xy
+	layout.content_box.hi -= layout.padding.zw
+
+	layout.space_left = axis_normal(layout.axis) * (box_size(layout.box) - layout.desired_size)
+
+	if object.clip_children {
+		vgo.save_scissor()
+		vgo.push_scissor(vgo.make_box(layout.box))
+		push_clip(layout.box)
+	}
+
+	for object in layout.children {
+		display_object(object, layout)
+	}
+
+	if object.clip_children {
+		vgo.restore_scissor()
 	}
 
 	if object.parent != nil {

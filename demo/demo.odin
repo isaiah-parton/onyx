@@ -66,6 +66,7 @@ main :: proc() {
 	slider_values: f64 = 3
 	color: vgo.Color = vgo.GOLD
 	enum_value: runtime.Odin_OS_Type
+	date: Maybe(onyx.Date)
 	boolean_value: [onyx.Boolean_Type]bool
 
 	for {
@@ -90,13 +91,7 @@ main :: proc() {
 			if begin_panel(padding = 20) {
 				defer end_panel()
 
-				set_width_fill()
-				set_height_fill()
-				if begin_container() {
-					defer end_container()
-
-
-				}
+				calendar(&date, nil)
 			}
 			if begin_panel(axis = .X) {
 				defer end_panel()
@@ -118,12 +113,17 @@ main :: proc() {
 				if begin_layout(size = At_Least(0), axis = .Y, padding = 15) {
 					defer end_layout()
 
-					if begin_layout(axis = .X, size = Fixed(30), align = .Center) {
+					if begin_layout(axis = .Y, align = .Center, size = Fixed(20)) {
 						defer end_layout()
 
-						tabs(reflect.enum_field_names(Align), (^int)(&justify))
+						label("Content alignment")
 					}
-					if begin_layout(justify = .Near, align = .Center, size = Percent(25), axis = .X, padding = 10) {
+					if begin_layout(axis = .X, size = Fixed(30), justify = .Center) {
+						defer end_layout()
+
+						tabs(reflect.enum_field_names(Align), &justify)
+					}
+					if begin_layout(justify = justify, align = .Center, size = Percent(25), axis = .X, padding = 10) {
 						defer end_layout()
 
 						set_margin(left = 4, right = 4)
@@ -133,22 +133,22 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, align = .Center, size = Percent(100 / 3), axis = .X, padding = 10) {
+					if begin_layout(justify = justify, align = .Center, size = Percent(100 / 3), axis = .X, padding = 10) {
 						defer end_layout()
 
 						raw_input(&input_value, placeholder = "sample text")
 					}
-					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(50), padding = 10) {
+					if begin_layout(justify = justify, axis = .X, align = .Center, size = Percent(50), padding = 10) {
 						defer end_layout()
 
 						set_margin_all(4)
 						for type, i in Boolean_Type {
 							push_id(i)
-									boolean(&boolean_value[type], fmt.tprint(type), type = type)
+								boolean(&boolean_value[type], fmt.tprint(type), type = type)
 							pop_id()
 						}
 					}
-					if begin_layout(justify = .Center, axis = .X, align = .Center, size = Percent(100), padding = 10) {
+					if begin_layout(justify = justify, axis = .X, align = .Center, size = Percent(100), padding = 10) {
 						defer end_layout()
 
 						set_margin_all(4)

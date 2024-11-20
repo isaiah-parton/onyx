@@ -209,8 +209,7 @@ display_boolean :: proc(self: ^Boolean, layout: ^Layout) {
 			vgo.fill_text_layout(
 				self.text_layout,
 				text_pos,
-				align_x = .Left,
-				align_y = .Center,
+				align = {0, 0.5},
 				paint = vgo.fade(colors().content, opacity),
 			)
 		}

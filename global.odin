@@ -142,8 +142,6 @@ Global_State :: struct {
 	runes:                    [dynamic]rune,
 	visible:                  bool,
 	focused:                  bool,
-	// Events
-	events:                   [dynamic]Event,
 	// Style
 	style:                    Style,
 	// Source boxes of user images on the texture atlas
@@ -446,8 +444,6 @@ new_frame :: proc() {
 	update_layer_references()
 	clean_up_objects()
 	update_object_references()
-
-	clear(&global_state.events)
 
 	if key_pressed(.Escape) {
 		global_state.focused_object = 0

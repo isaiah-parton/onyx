@@ -127,8 +127,7 @@ display_button :: proc(self: ^Button, layout: ^Layout) {
 			vgo.fill_text_layout(
 				self.text_layout,
 				box_center(self.box),
-				align_x = .Center,
-				align_y = .Center,
+				align = 0.5,
 				paint = text_color,
 			)
 		}

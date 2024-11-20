@@ -189,7 +189,7 @@ end_panel :: proc() {
 		panel.layer.index < global_state.last_highest_layer_index,
 	)
 
-	panel.min_size += layout.content_size + layout.spacing_size
+	panel.min_size += layout.desired_size
 
 	pop_id()
 	vgo.pop_scissor()
