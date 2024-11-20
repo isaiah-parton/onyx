@@ -108,8 +108,8 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 	return id
 }
 
-display_color_picker :: proc(self: ^Color_Picker, layout: ^Layout) {
-	apply_layout_placement(self, layout)
+display_color_picker :: proc(self: ^Color_Picker) {
+	apply_layout_placement(self)
 	handle_object_click(self)
 
 	if .Open in self.state {
@@ -240,8 +240,8 @@ alpha_slider :: proc(
 	return id
 }
 
-display_alpha_slider :: proc(self: ^Alpha_Slider, layout: ^Layout) {
-	apply_layout_placement(self, layout)
+display_alpha_slider :: proc(self: ^Alpha_Slider) {
+	apply_layout_placement(self)
 	handle_object_click(self, true)
 
 	i := int(self.axis)
@@ -327,8 +327,8 @@ make_a_triangle :: proc(center: [2]f32, angle: f32, radius: f32) -> (a, b, c: [2
 	return
 }
 
-display_hsv_wheel :: proc(self: ^HSV_Wheel, layout: ^Layout) {
-	apply_layout_placement(self, layout)
+display_hsv_wheel :: proc(self: ^HSV_Wheel) {
+	apply_layout_placement(self)
 	handle_object_click(self, sticky = true)
 
 	size := min(box_width(self.box), box_height(self.box))

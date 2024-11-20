@@ -60,42 +60,48 @@ Future_Layout_Placement :: struct {
 	align:  Align,
 }
 
-Object_Placement :: union {
+Future_Object_Placement :: union {
 	Future_Layout_Placement,
 	Future_Box_Placement,
-	Box,
 }
 
 Object :: struct {
-	id:               Id,
-	call_index:       int,
-	frames:           int,
-	layer:            ^Layer,
-	layout_placement: Future_Layout_Placement,
-	box_or_placement: Object_Placement,
-	clip_children:    bool,
-	dead:             bool,
-	is_deferred:      bool,
-	disabled:         bool,
-	isolated:         bool,
-	has_known_box:    bool,
-	flags:            Object_Flags,
-	last_state:       Object_State,
-	state:            Object_State,
-	in_state_mask:    Object_State,
-	out_state_mask:   Object_State,
-	click_count:      int,
-	click_time:       time.Time,
-	click_point:      [2]f32,
-	click_button:     Mouse_Button,
-	margin:           [4]f32,
-	size:             [2]f32,
-	desired_size:     [2]f32,
-	layout:           Layout,
-	parent:           ^Object,
-	children:         [dynamic]^Object,
-	on_display:       proc(_: ^Object),
-	variant:          Object_Variant,
+	id:                     Id,
+	call_index:             int,
+	frames:                 int,
+	layer:                  ^Layer,
+	box:                    Box,
+	future_placement:       Future_Object_Placement,
+	clip_children:          bool,
+	dead:                   bool,
+	is_deferred:            bool,
+	disabled:               bool,
+	isolated:               bool,
+	has_known_box:          bool,
+	flags:                  Object_Flags,
+	last_state:             Object_State,
+	state:                  Object_State,
+	in_state_mask:          Object_State,
+	out_state_mask:         Object_State,
+	click_count:            int,
+	click_time:             time.Time,
+	click_point:            [2]f32,
+	click_button:           Mouse_Button,
+	margin:                 [4]f32,
+	padding:                [4]f32,
+	size:                   [2]f32,
+	desired_size:           [2]f32,
+	layout_axis:            Axis,
+	content_box:            Box,
+	content_justify:        Align,
+	content_align:          Align,
+	space_left_for_content: [2]f32,
+	content_size:           [2]f32,
+	spacing_size:           [2]f32,
+	parent:                 ^Object,
+	children:               [dynamic]^Object,
+	on_display:             proc(_: ^Object),
+	variant:                Object_Variant,
 }
 
 Object_Input :: struct {
@@ -324,6 +330,12 @@ end_object :: proc() {
 	if object, ok := current_object().?; ok {
 		object.layer.state += object.state
 		pop_stack(&global_state.object_stack)
+
+		object.desired_size = linalg.max(
+			object.desired_size,
+			object.content_size + object.spacing_size,
+		)
+
 		if object.parent != nil && !object.isolated {
 			object.size = linalg.max(
 				object.size,
@@ -338,7 +350,7 @@ end_object :: proc() {
 	}
 }
 
-transfer_object_metrics_unless_isolated :: proc(object: ^Object, layout: ^Layout) {
+transfer_object_metrics_unless_isolated :: proc(object: ^Object) {
 	if object.isolated do return
 	effective_size := object.desired_size + object.margin.xy + object.margin.zw
 	switch layout.axis {
@@ -439,7 +451,7 @@ object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {
 	return (object.call_index > other.call_index) && (object.layer.index >= other.layer.index)
 }
 
-display_object :: proc(object: ^Object, layout: ^Layout) {
+display_object :: proc(object: ^Object) {
 	when DEBUG {
 		if point_in_box(mouse_point(), object.box) {
 			if object_is_in_front_of(object, top_hovered_object(global_state.debug) or_else nil) {

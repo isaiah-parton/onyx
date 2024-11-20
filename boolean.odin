@@ -67,8 +67,8 @@ boolean :: proc(
 	}
 }
 
-display_boolean :: proc(self: ^Boolean, layout: ^Layout) {
-	apply_layout_placement(self, layout)
+display_boolean :: proc(self: ^Boolean) {
+	apply_layout_placement(self)
 	handle_object_click(self)
 
 	if .Hovered in self.state {

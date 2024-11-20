@@ -61,18 +61,11 @@ V_Align :: enum {
 	Bottom,
 }
 
-Layout :: struct {
-	axis:               Axis,
-	content_box:        Box,
-	space_left: 				[2]f32,
-	justify:            Align,
-	align:              Align,
-	padding:            [4]f32,
-	content_size:       [2]f32,
-	spacing_size:       [2]f32,
-	object_size:        [2]f32,
-	object_margin:      [4]f32,
-	object_size_method: Object_Size_Method,
+Object_Layout_Options :: struct {
+	size:   [2]Layout_Size,
+	margin: [4]f32,
+	align:  Align,
+	method: Object_Size_Method,
 }
 
 axis_normal :: proc(axis: Axis) -> [2]f32 {
@@ -106,24 +99,27 @@ move_object :: proc(object: ^Object, delta: [2]f32) {
 	}
 }
 
-apply_layout_placement :: proc(object: ^Object, layout: ^Layout) {
-	if object.has_known_box do return
+apply_object_placement :: proc(object: ^Object) {
+	assert(object != nil)
+	if object.has_known_box || object.parent == nil do return
+
 	size := linalg.max(object.size, object.desired_size)
-	if layout.axis == .X {
-		layout.content_box.lo.x += object.margin.x
+	if object.parent.layout.axis == .X {
+		parent.layout.content_box.lo.x += object.margin.x
 	} else {
-		layout.content_box.lo.y += object.margin.y
+		parent.layout.content_box.lo.y += object.margin.y
 	}
 
 	box: Box
-	box, layout.content_box = split_box(
-		layout.content_box,
-		axis_cut_side(layout.axis),
-		size[int(layout.axis)],
+	box, parent.layout.content_box = split_box(
+		parent.layout.content_box,
+		axis_cut_side(parent.layout.axis),
+		size[int(parent.layout.axis)],
 	)
 
-	if layout.justify == .Equal_Space {
-		layout.content_box.lo[int(layout.axis)] += layout.space_left[int(layout.axis)] / f32(len(layout.children) - 1)
+	if parent.layout.justify == .Equal_Space {
+		parent.layout.content_box.lo[int(layout.axis)] +=
+			parent.layout.space_left[int(layout.axis)] / f32(len(parent.children) - 1)
 	}
 
 	if layout.axis == .X {
@@ -173,8 +169,12 @@ inverse_axis :: proc(axis: Axis) -> Axis {
 	return Axis(1 - int(axis))
 }
 
-layout_is_deferred :: proc(layout: ^Layout) -> bool {
-	return (layout.justify != .Near) || (!layout.has_known_box)
+object_defers_children :: proc(object: ^Object) -> bool {
+	return (object.content_justify != .Near) || (!object.has_known_box)
+}
+
+object_is_deferred :: proc(object: ^Object) -> bool {
+	return (!object.has_known_box)
 }
 
 Future_Box_Placement :: struct {
@@ -192,7 +192,7 @@ Layout_Size :: union {
 
 begin_layout :: proc(
 	size: Layout_Size = nil,
-	placement: Object_Placement = nil,
+	placement: Future_Object_Placement = nil,
 	axis: Axis = .X,
 	justify: Align = .Near,
 	align: Align = .Near,
@@ -202,10 +202,10 @@ begin_layout :: proc(
 	object := transient_object()
 	object.in_state_mask = OBJECT_STATE_ALL
 	object.variant = Layout {
-		object  = object,
-		axis    = axis,
-		justify = justify,
-		align   = align,
+		object        = object,
+		axis          = axis,
+		justify       = justify,
+		align         = align,
 		clip_contents = clip_contents,
 	}
 	layout := &object.variant.(Layout)
@@ -253,17 +253,14 @@ begin_layout :: proc(
 
 end_layout :: proc() {
 	layout := current_layout().?
-	layout.desired_size = linalg.max(
-		layout.desired_size,
-		layout.content_size + layout.spacing_size,
-	)
+
 	pop_layout()
 	end_object()
 }
 
-determine_layout_size :: proc(
+determine_object_size :: proc(
 	size: Layout_Size,
-	parent_layout: Maybe(^Layout),
+	parent: Maybe(^Object),
 	axis: Axis,
 ) -> (
 	actual_size: [2]f32,
@@ -302,17 +299,6 @@ determine_layout_size :: proc(
 	}
 	actual_size[i] = available_space[i]
 	return
-}
-
-current_layout :: proc() -> Maybe(^Layout) {
-	if global_state.current_layout != nil {
-		return global_state.current_layout
-	}
-	return nil
-}
-
-layout_box :: proc() -> Box {
-	return current_layout().?.content_box
 }
 
 axis_cut_side :: proc(axis: Axis) -> Side {

@@ -198,10 +198,10 @@ calendar_day :: proc(
 		variant.is_this_month = is_this_month
 		variant.selection = selection
 
-		if object.display_proc == nil {
-			object.display_proc = proc(object: ^Object, layout: ^Layout) {
+		if object.on_display == nil {
+			object.on_display = proc(object: ^Object) {
 				self := &object.variant.(Calendar_Day)
-				apply_layout_placement(self, layout)
+				apply_layout_placement(self)
 				if object_is_visible(self) {
 					if self.time._nsec > self.selection[0]._nsec &&
 		   			self.time._nsec <= self.selection[1]._nsec + i64(t.Hour * 24) {
@@ -304,7 +304,7 @@ parse_date :: proc(s: string) -> (date: Date, ok: bool) {
 	return
 }
 
-display_date_picker :: proc(self: ^Date_Picker, layout: ^Layout) {
+display_date_picker :: proc(self: ^Date_Picker) {
 	if .Open in self.last_state {
 		if begin_layer(options = {.Attached}, kind = .Background) {
 			defer end_layer()

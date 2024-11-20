@@ -57,8 +57,8 @@ button :: proc(text: string, style: Button_Style = .Primary, font_size: f32 = gl
 	return
 }
 
-display_button :: proc(self: ^Button, layout: ^Layout) {
-	apply_layout_placement(self, layout)
+display_button :: proc(self: ^Button) {
+	apply_layout_placement(self)
 	handle_object_click(self)
 	button_behavior(self)
 	if object_is_visible(self) {

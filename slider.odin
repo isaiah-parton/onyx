@@ -39,8 +39,8 @@ slider :: proc(value: ^$T, lower, upper: T, format: string = "%v", loc := #calle
 	}
 }
 
-display_slider :: proc(self: ^Slider, layout: ^Layout) {
-	apply_layout_placement(self, layout)
+display_slider :: proc(self: ^Slider) {
+	apply_layout_placement(self)
 	box := self.box
 	h := box_height(box)
 	box = shrink_box(box, h / 4)

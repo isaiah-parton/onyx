@@ -9,7 +9,7 @@ import "core:math/linalg"
 import "core:reflect"
 
 Container :: struct {
-	using object: ^Object,
+	using object:    ^Object,
 	pan_offset:      [2]f32,
 	target_scroll:   [2]f32,
 	scroll:          [2]f32,
@@ -27,8 +27,7 @@ Container :: struct {
 	initialized:     bool,
 }
 
-zoom_container_anchored :: proc(self: ^Container, new_zoom: f32, anchor: [2]f32) {
-	layout := current_layout().?
+zoom_container_anchored :: proc(self: ^Container, layout: ^Object, new_zoom: f32, anchor: [2]f32) {
 	content_top_left := layout.box.lo
 	content_size := box_size(layout.box)
 	view_top_left := self.box.lo
@@ -49,7 +48,7 @@ begin_container :: proc(
 	object := persistent_object(hash(loc))
 	if object.variant == nil {
 		object.variant = Container {
-			object = object,
+			object   = object,
 			min_zoom = 0.1,
 			max_zoom = 1.0,
 		}
@@ -109,13 +108,10 @@ end_container :: proc() {
 	pop_id()
 }
 
-display_container :: proc(self: ^Container, layout: ^Layout) {
-	apply_layout_placement(self, layout)
+display_container :: proc(self: ^Container) {
+	apply_layout_placement(self)
 
-	self.space_needed = linalg.max(
-		layout.content_size + layout.spacing_size,
-		self.space_needed,
-	)
+	self.space_needed = linalg.max(layout.content_size + layout.spacing_size, self.space_needed)
 
 	if self.is_active {
 		if self.enable_zoom &&
@@ -145,15 +141,11 @@ display_container :: proc(self: ^Container, layout: ^Layout) {
 	}
 	// Update zoom
 	if false {
-		self.target_zoom = clamp(
-			self.target_zoom,
-			self.min_zoom,
-			self.max_zoom,
-		)
+		self.target_zoom = clamp(self.target_zoom, self.min_zoom, self.max_zoom)
 		delta_zoom := self.target_zoom - self.zoom
 		// Hint next frame to be drawn if delta sufficient
 		if abs(delta_zoom) > 0.001 {
-		draw_frames(1)
+			draw_frames(1)
 		}
 		self.zoom += delta_zoom * 15 * global_state.delta_time
 	}
@@ -162,11 +154,7 @@ display_container :: proc(self: ^Container, layout: ^Layout) {
 	target_content_size := self.space * self.target_zoom
 	view_size := box_size(self.box)
 	// Clamp target scroll
-	self.target_scroll = linalg.clamp(
-		self.target_scroll,
-		0,
-		target_content_size - view_size,
-	)
+	self.target_scroll = linalg.clamp(self.target_scroll, 0, target_content_size - view_size)
 	delta_scroll := (self.target_scroll - self.scroll) * global_state.delta_time * 15
 	self.scroll += delta_scroll
 	// Hint next frame to be drawn if delta sufficient
@@ -174,10 +162,8 @@ display_container :: proc(self: ^Container, layout: ^Layout) {
 		draw_frames(1)
 	}
 	// Enable/disable scrollbars
-	enable_scroll_x :=
-		math.floor(content_size.x) > box_width(self.box) && !self.hide_scrollbars
-	enable_scroll_y :=
-		math.floor(content_size.y) > box_height(self.box) && !self.hide_scrollbars
+	enable_scroll_x := math.floor(content_size.x) > box_width(self.box) && !self.hide_scrollbars
+	enable_scroll_y := math.floor(content_size.y) > box_height(self.box) && !self.hide_scrollbars
 	// Animate scrollbars
 	self.scroll_time.x = animate(self.scroll_time.x, 0.2, enable_scroll_x)
 	self.scroll_time.y = animate(self.scroll_time.y, 0.2, enable_scroll_y)

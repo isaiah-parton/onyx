@@ -82,8 +82,8 @@ input_text_origin_from :: proc(box: Box, multiline: bool = false) -> [2]f32 {
 	return {box.lo.x + global_state.style.text_padding.x, box_center_y(box)}
 }
 
-display_input :: proc(self: ^Input, layout: ^Layout) {
-	apply_layout_placement(self, layout)
+display_input :: proc(self: ^Input) {
+	apply_layout_placement(self)
 	handle_object_click(self, true)
 
 	is_visible := object_is_visible(self)
