@@ -83,7 +83,7 @@ input_text_origin_from :: proc(box: Box, multiline: bool = false) -> [2]f32 {
 }
 
 display_input :: proc(self: ^Input) {
-	place_object(self)
+
 	handle_object_click(self, true)
 
 	is_visible := object_is_visible(self)

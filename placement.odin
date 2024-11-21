@@ -1,8 +1,7 @@
 package onyx
 
 Placement_Options :: struct {
-	width:  Layout_Size,
-	height: Layout_Size,
+	size:  [2]Layout_Size,
 	align:  Align,
 	margin: [4]f32,
 }

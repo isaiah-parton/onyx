@@ -61,7 +61,7 @@ button :: proc(
 }
 
 display_button :: proc(self: ^Button) {
-	place_object(self)
+
 	handle_object_click(self)
 	button_behavior(self)
 	if object_is_visible(self) {

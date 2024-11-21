@@ -62,39 +62,38 @@ Object_Variant :: union {
 	Calendar_Day,
 }
 
-Future_Layout_Placement :: struct {
+Child_Placement_Options :: struct {
 	size:   [2]Layout_Size,
-	margin: [4]f32,
 	align:  Align,
 }
 
 Future_Object_Placement :: union {
-	Future_Layout_Placement,
+	Child_Placement_Options,
 	Future_Box_Placement,
 }
 
 Object :: struct {
-	id:               Id,
-	call_index:       int,
-	frames:           int,
-	layer:            ^Layer,
-	box:              Box,
-	future_placement: Future_Object_Placement,
-	clip_children:    bool,
-	dead:             bool,
-	is_deferred:      bool,
-	disabled:         bool,
-	isolated:         bool,
-	has_known_box:    bool,
-	flags:            Object_Flags,
-	state:            Object_State,
-	input:            Object_Input,
-	metrics:          Object_Metrics,
-	content:          Object_Content,
-	parent:           Maybe(^Object),
-	children:         [dynamic]^Object,
-	on_display:       proc(_: ^Object),
-	variant:          Object_Variant,
+	id:            Id,
+	call_index:    int,
+	frames:        int,
+	layer:         ^Layer,
+	box:           Box,
+	placement:     Object_Placement,
+	clip_children: bool,
+	dead:          bool,
+	is_deferred:   bool,
+	disabled:      bool,
+	isolated:      bool,
+	has_known_box: bool,
+	flags:         Object_Flags,
+	state:         Object_State,
+	input:         Object_Input,
+	metrics:       Object_Metrics,
+	content:       Object_Content,
+	parent:        Maybe(^Object),
+	children:      [dynamic]^Object,
+	on_display:    proc(_: ^Object),
+	variant:       Object_Variant,
 }
 
 Object_State :: struct {
@@ -322,8 +321,11 @@ begin_object :: proc(object: ^Object) -> bool {
 	update_object_state(object)
 	if global_state.disable_objects do object.disabled = true
 
-	if object.parent != nil {
-		object.metrics.margin = current_placement_options().margin
+	placement_options := current_placement_options()
+	object.metrics.margin = placement_options.margin
+	object.placement = Child_Placement_Options{
+		size = placement_options.size,
+		align = placement_options.align,
 	}
 
 	push_stack(&global_state.object_stack, object) or_return
@@ -514,17 +516,9 @@ display_object :: proc(object: ^Object) {
 		}
 	}
 
-	switch v in object.future_placement {
-	case Future_Box_Placement:
-		object.metrics.size = linalg.max(object.metrics.desired_size, object.metrics.size)
-		object.box.lo = v.origin - v.offset * object.metrics.size
-		object.box.hi = object.box.lo + object.metrics.size
-	case Future_Layout_Placement:
+	if !object.has_known_box {
+		place_object(object)
 	}
-
-	object.content.box = object.box
-	object.content.box.lo += object.content.padding.xy
-	object.content.box.hi -= object.content.padding.zw
 
 	object.content.space_left =
 		axis_normal(object.content.axis) * (box_size(object.box) - object.metrics.desired_size)
@@ -540,6 +534,7 @@ display_object :: proc(object: ^Object) {
 	}
 
 	if object.clip_children {
+		pop_clip()
 		vgo.restore_scissor()
 	}
 }

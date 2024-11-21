@@ -10,7 +10,7 @@ Label :: struct {
 }
 
 display_label :: proc(self: ^Label) {
-	place_object(self)
+
 	if object_is_visible(self) {
 		vgo.fill_text_layout(self.text_layout, self.box.lo, paint = colors().content)
 	}

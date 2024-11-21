@@ -88,11 +88,6 @@ main :: proc() {
 					),
 				)
 			}
-			if begin_panel(padding = 20) {
-				defer end_panel()
-
-				calendar(&date, nil)
-			}
 			if begin_panel(axis = .X) {
 				defer end_panel()
 

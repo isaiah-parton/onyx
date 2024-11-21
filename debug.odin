@@ -205,7 +205,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		)
 		fmt.sbprintf(
 			&b,
-			"\n axis: %v\n justify: %v\n align: %v\n has_known_box: %v\n deferred: %v\n children: %i",
+			"\n axis: %v\n justify: %v\n has_known_box: %v\n deferred: %v\n children: %i",
 			object.content.axis,
 			object.content.justify,
 			object.has_known_box,

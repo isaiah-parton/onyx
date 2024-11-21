@@ -106,7 +106,7 @@ end_container :: proc() {
 }
 
 display_container :: proc(self: ^Container) {
-	place_object(self)
+
 
 	self.space_needed = linalg.max(space_required_by_object_content(self.content), self.space_needed)
 

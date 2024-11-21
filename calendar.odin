@@ -203,7 +203,7 @@ calendar_day :: proc(
 		if object.on_display == nil {
 			object.on_display = proc(object: ^Object) {
 				self := &object.variant.(Calendar_Day)
-				place_object(self)
+
 				if object_is_visible(self) {
 					if self.time._nsec > self.selection[0]._nsec &&
 					   self.time._nsec <= self.selection[1]._nsec + i64(t.Hour * 24) {
@@ -321,7 +321,7 @@ display_date_picker :: proc(self: ^Date_Picker) {
 						self.box.hi.x + global_state.style.popup_margin,
 						box_center_y(self.box),
 					},
-					offset = {0, 0.5},
+					align = {0, 0.5},
 				},
 				padding = 10,
 				clip_contents = true,

@@ -68,7 +68,7 @@ boolean :: proc(
 }
 
 display_boolean :: proc(self: ^Boolean) {
-	place_object(self)
+
 	handle_object_click(self)
 
 	if .Hovered in self.state.current {

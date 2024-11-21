@@ -75,6 +75,7 @@ axis_normal :: proc(axis: Axis) -> [2]f32 {
 maybe_defer_object :: proc(object: ^Object) -> bool {
 	parent := object.parent.? or_return
 	object_defers_children(parent) or_return
+	object.is_deferred = true
 	append(&parent.children, object)
 	return true
 }
@@ -127,6 +128,31 @@ apply_object_alignment :: proc(box: Box, axis: Axis, align: Align, size: [2]f32)
 
 place_object :: proc(object: ^Object) -> bool {
 	assert(object != nil)
+
+	switch v in object.placement {
+	case nil:
+		parent := object.parent.? or_return
+		object.box = parent.box
+	case Box:
+		object.box = v
+	case Future_Box_Placement:
+		object.metrics.size = linalg.max(object.metrics.desired_size, object.metrics.size)
+		object.box.lo = v.origin - v.align * object.metrics.size
+		object.box.hi = object.box.lo + object.metrics.size
+	case Child_Placement_Options:
+		place_object_in_parent(object, v) or_return
+	}
+
+	object.content.box = {
+		object.box.lo + object.content.padding.xy,
+		object.box.hi - object.content.padding.zw,
+	}
+
+	return true
+}
+
+place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Options) -> bool {
+	assert(object != nil)
 	if object.has_known_box do return false
 	parent := object.parent.? or_return
 
@@ -164,9 +190,9 @@ place_object :: proc(object: ^Object) -> bool {
 	if parent.content.justify == .Equal_Space {
 		content_box.lo[int(parent.content.axis)] +=
 		parent.content.space_left[int(parent.content.axis)] / f32(len(parent.children) - 1)
-		} else if parent.content.justify == .Center {
+	} else if parent.content.justify == .Center {
 		move_object(object, parent.content.space_left * 0.5)
-		} else if parent.content.justify == .Far {
+	} else if parent.content.justify == .Far {
 		move_object(object, parent.content.space_left)
 	}
 
@@ -180,7 +206,7 @@ inverse_axis :: proc(axis: Axis) -> Axis {
 }
 
 object_defers_children :: proc(object: ^Object) -> bool {
-	return (object.content.justify != .Near) || (!object.has_known_box)
+	return (object.content.justify != .Near) || object_is_deferred(object)
 }
 
 object_is_deferred :: proc(object: ^Object) -> bool {
@@ -189,7 +215,7 @@ object_is_deferred :: proc(object: ^Object) -> bool {
 
 Future_Box_Placement :: struct {
 	origin: [2]f32,
-	offset: [2]f32,
+	align: [2]f32,
 }
 
 Layout_Size :: union {
@@ -203,7 +229,7 @@ Layout_Size :: union {
 Object_Placement :: union {
 	Box,
 	Future_Box_Placement,
-	Future_Layout_Placement,
+	Child_Placement_Options,
 }
 
 begin_row_layout :: proc(
@@ -212,7 +238,7 @@ begin_row_layout :: proc(
 	padding: [4]f32 = 0,
 ) -> bool {
 	return begin_layout(
-		placement = Future_Layout_Placement{
+		placement = Child_Placement_Options{
 			size = size,
 		},
 		axis = .X,
@@ -227,7 +253,7 @@ begin_column_layout :: proc(
 	padding: [4]f32 = 0,
 ) -> bool {
 	return begin_layout(
-		placement = Future_Layout_Placement{
+		placement = Child_Placement_Options{
 			size = size,
 		},
 		axis = .Y,
@@ -259,11 +285,11 @@ begin_layout :: proc(
 		self.metrics.size = box_size(v)
 	case Future_Box_Placement:
 		self.isolated = true
-		self.future_placement = v
-	case Future_Layout_Placement:
+		self.placement = v
+	case Child_Placement_Options:
 		self.metrics.size, self.metrics.desired_size, self.has_known_box = determine_object_size(
 			v.size[1 - int(self.content.axis)],
-			self.parent,
+			current_object().?,
 			self.content.axis,
 		)
 		if self.has_known_box {
@@ -345,11 +371,11 @@ axis_cut_side :: proc(axis: Axis) -> Side {
 }
 
 set_width :: proc(width: f32) {
-	current_placement_options().width = Fixed(width)
+	current_placement_options().size.x = Fixed(width)
 }
 
 set_width_auto :: proc() {
-	current_placement_options().width = nil
+	current_placement_options().size.x = nil
 }
 
 set_width_fill :: proc() {
@@ -357,15 +383,15 @@ set_width_fill :: proc() {
 }
 
 set_width_percent :: proc(percent: f32) {
-	current_placement_options().width = Percent(percent)
+	current_placement_options().size.x = Percent(percent)
 }
 
 set_height :: proc(height: f32) {
-	current_placement_options().height = Fixed(height)
+	current_placement_options().size.y = Fixed(height)
 }
 
 set_height_auto :: proc() {
-	current_placement_options().height = nil
+	current_placement_options().size.y = nil
 }
 
 set_height_fill :: proc() {
@@ -373,7 +399,7 @@ set_height_fill :: proc() {
 }
 
 set_height_percent :: proc(percent: f32) {
-	current_placement_options().height = Percent(percent)
+	current_placement_options().size.y = Percent(percent)
 }
 
 set_margin_sides :: proc(
@@ -400,10 +426,10 @@ set_margin :: proc {
 
 set_width_to_height :: proc() {
 	options := current_placement_options()
-	options.width = options.height
+	options.size.x = options.size.y
 }
 
 set_height_to_width :: proc() {
 	options := current_placement_options()
-	options.height = options.width
+	options.size.y = options.size.x
 }
