@@ -25,7 +25,7 @@ Input :: struct {
 	editor:          tedit.Editor,
 	builder:         strings.Builder,
 	borrowed_string: ^string,
-	content:         string,
+	content_text:         string,
 	prefix:          string,
 	placeholder:     string,
 	is_multiline:    bool,
@@ -61,16 +61,16 @@ raw_input :: proc(
 			}
 		}
 
-		input := &object.variant.(Input)
-		input.desired_size = global_state.style.visual_size
-		input.borrowed_string = content
-		input.placeholder = placeholder
-		input.prefix = prefix
-		input.decal = decal
-		if .Active in input.state {
-			input.content = strings.to_string(input.builder)
+		self := &object.variant.(Input)
+		self.metrics.desired_size = global_state.style.visual_size
+		self.borrowed_string = content
+		self.placeholder = placeholder
+		self.prefix = prefix
+		self.decal = decal
+		if .Active in self.state.current {
+			self.content_text = strings.to_string(self.builder)
 		} else {
-			input.content = content^
+			self.content_text = content^
 		}
 	}
 }
@@ -111,9 +111,9 @@ display_input :: proc(self: ^Input) {
 		text_origin.x += prefix_layout.size.x
 	}
 
-	if is_visible || .Active in self.state {
+	if is_visible || .Active in self.state.current {
 		content_layout = vgo.make_text_layout(
-			self.content,
+			self.content_text,
 			text_size,
 			selection = editor.selection,
 			local_mouse = mouse_point() - (text_origin - self.offset),
@@ -127,26 +127,26 @@ display_input :: proc(self: ^Input) {
 		editor.get_clipboard = __get_clipboard_string
 	}
 	// Animations
-	self.active_time = animate(self.active_time, 0.15, .Active in self.state)
+	self.active_time = animate(self.active_time, 0.15, .Active in self.state.current)
 	// Hover cursor
-	if .Hovered in self.state {
+	if .Hovered in self.state.current {
 		set_cursor(.I_Beam)
 	}
-	if .Active in self.state {
+	if .Active in self.state.current {
 		if user_focus_just_changed() && !key_down(.Left_Control) {
-			self.state -= {.Active}
+			self.state.current -= {.Active}
 		}
 	} else {
-		if .Pressed in (self.state - self.last_state) {
-			self.state += {.Active}
+		if .Pressed in new_state(self.state) {
+			self.state.current += {.Active}
 		}
 	}
 	if key_pressed(.Escape) {
-		self.state -= {.Active}
-	} else if .Active in (self.last_state - self.state) {
+		self.state.current -= {.Active}
+	} else if .Active in lost_state(self.state) {
 		submitted = true
 	}
-	if .Active in self.state {
+	if .Active in self.state.current {
 		cmd: tedit.Command
 		control_down := key_down(.Left_Control) || key_down(.Right_Control)
 		shift_down := key_down(.Left_Shift) || key_down(.Right_Shift)
@@ -162,7 +162,7 @@ display_input :: proc(self: ^Input) {
 			for char, c in global_state.runes {
 				tedit.input_runes(&self.editor, {char})
 				draw_frames(1)
-				self.state += {.Changed}
+				self.state.current += {.Changed}
 			}
 		}
 		if key_pressed(.Backspace) do cmd = .Delete_Word_Left if control_down else .Backspace
@@ -204,7 +204,7 @@ display_input :: proc(self: ^Input) {
 		}
 		if cmd != .None {
 			tedit.editor_execute(&self.editor, cmd)
-			self.state += {.Changed}
+			self.state.current += {.Changed}
 			draw_frames(1)
 		}
 	}
@@ -214,55 +214,55 @@ display_input :: proc(self: ^Input) {
 	}
 
 	last_selection := editor.selection
-	if .Pressed in self.state && content_layout.mouse_index >= 0 {
-		if .Pressed not_in self.last_state {
+	if .Pressed in self.state.current && content_layout.mouse_index >= 0 {
+		if .Pressed not_in self.state.previous {
 			self.anchor = content_layout.mouse_index
-			if self.click_count == 3 {
+			if self.input.click_count == 3 {
 				tedit.editor_execute(editor, .Select_All)
 			} else {
 				editor.selection = {content_layout.mouse_index, content_layout.mouse_index}
 			}
 		}
-		switch self.click_count {
+		switch self.input.click_count {
 		case 2:
 			if content_layout.mouse_index < self.anchor {
-				if self.content[content_layout.mouse_index] == ' ' {
+				if self.content_text[content_layout.mouse_index] == ' ' {
 					editor.selection[0] = content_layout.mouse_index
 				} else {
 					editor.selection[0] = max(
 						0,
 						strings.last_index_proc(
-							self.content[:content_layout.mouse_index],
+							self.content_text[:content_layout.mouse_index],
 							is_separator,
 						) +
 						1,
 					)
 				}
 				editor.selection[1] = strings.index_proc(
-					self.content[self.anchor:],
+					self.content_text[self.anchor:],
 					is_separator,
 				)
 				if editor.selection[1] == -1 {
-					editor.selection[1] = len(self.content)
+					editor.selection[1] = len(self.content_text)
 				} else {
 					editor.selection[1] += self.anchor
 				}
 			} else {
 				editor.selection[1] = max(
 					0,
-					strings.last_index_proc(self.content[:self.anchor], is_separator) + 1,
+					strings.last_index_proc(self.content_text[:self.anchor], is_separator) + 1,
 				)
 				if (content_layout.mouse_index > 0 &&
-					   self.content[content_layout.mouse_index - 1] == ' ') {
+					   self.content_text[content_layout.mouse_index - 1] == ' ') {
 					editor.selection[0] = 0
 				} else {
 					editor.selection[0] = strings.index_proc(
-						self.content[content_layout.mouse_index:],
+						self.content_text[content_layout.mouse_index:],
 						is_separator,
 					)
 				}
 				if editor.selection[0] == -1 {
-					editor.selection[0] = len(self.content) - content_layout.mouse_index
+					editor.selection[0] = len(self.content_text) - content_layout.mouse_index
 				}
 				editor.selection[0] += content_layout.mouse_index
 			}
@@ -270,7 +270,7 @@ display_input :: proc(self: ^Input) {
 			editor.selection[0] = content_layout.mouse_index
 		}
 	}
-	if .Active in self.last_state && len(content_layout.glyphs) > 0 {
+	if .Active in self.state.previous && len(content_layout.glyphs) > 0 {
 		glyph := content_layout.glyphs[content_layout.glyph_selection[0]]
 		glyph_pos := (text_origin - self.offset) + glyph.offset
 		cursor_box := Box {
@@ -295,7 +295,7 @@ display_input :: proc(self: ^Input) {
 		draw_frames(1)
 	}
 	if submitted {
-		self.state -= {.Active}
+		self.state.current -= {.Active}
 	}
 
 	text_origin -= self.offset
@@ -306,7 +306,7 @@ display_input :: proc(self: ^Input) {
 
 	if is_visible {
 		vgo.push_scissor(vgo.make_box(self.box, global_state.style.rounding))
-		if len(self.content) == 0 {
+		if len(self.content_text) == 0 {
 			vgo.fill_text(
 				self.placeholder,
 				text_size,
@@ -323,7 +323,7 @@ display_input :: proc(self: ^Input) {
 			)
 		}
 		line_height := font.line_height * text_size
-		if .Active in self.last_state {
+		if .Active in self.state.previous {
 			if content_layout.glyph_selection[0] != content_layout.glyph_selection[1] {
 				for &line in content_layout.lines {
 					range := [2]int {
@@ -353,7 +353,7 @@ display_input :: proc(self: ^Input) {
 			{0, f32(i32(!self.is_multiline)) * 0.5},
 			colors.content,
 		)
-		if .Active in self.last_state && len(content_layout.glyphs) > 0 {
+		if .Active in self.state.previous && len(content_layout.glyphs) > 0 {
 			cursor_origin :=
 				text_origin + content_layout.glyphs[content_layout.glyph_selection[0]].offset
 			vgo.fill_box(
@@ -388,7 +388,7 @@ display_input :: proc(self: ^Input) {
 		)
 	}
 
-	if .Changed in self.state {
+	if .Changed in self.state.current {
 		delete(self.borrowed_string^)
 		self.borrowed_string^ = strings.clone(strings.to_string(self.builder))
 	}

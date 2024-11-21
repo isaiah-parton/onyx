@@ -116,7 +116,7 @@ display_button :: proc(self: ^Button) {
 			opacity := f32(1) if .Pressed in self.state.current else self.press_time
 			vgo.push_scissor(vgo.make_box(self.box, radius))
 			vgo.fill_circle(
-				self.click_point,
+				self.input.click_point,
 				linalg.length(self.box.hi - self.box.lo) * scale,
 				paint = vgo.fade(vgo.WHITE, opacity * 0.2),
 			)

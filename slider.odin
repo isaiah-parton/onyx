@@ -35,7 +35,7 @@ slider :: proc(value: ^$T, lower, upper: T, format: string = "%v", loc := #calle
 		slider.upper = upper
 		slider.format = format
 		slider.value = f64(value^)
-		slider.desired_size = global_state.style.visual_size
+		slider.metrics.desired_size = global_state.style.visual_size
 	}
 }
 
@@ -55,7 +55,7 @@ display_slider :: proc(self: ^Slider) {
 		vgo.fill_box(box, radius, paint = colors.field)
 	}
 
-	if (.Pressed in self.state) {
+	if (.Pressed in self.state.current) {
 		new_time := clamp((mouse.x - box.lo.x - radius) / range_width, 0, 1)
 		self.new_value = self.lower + f64(new_time) * (self.upper - self.lower)
 		draw_frames(1)

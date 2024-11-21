@@ -53,11 +53,11 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 		HOURS_PER_DAY :: 24
 
 		self := &object.variant.(Calendar)
-		self.desired_size = 200
-		self.desired_size.x = 280
+		self.metrics.desired_size = 200
+		self.metrics.desired_size.x = 280
 
-		self.row_height = self.desired_size.x / DAYS_PER_WEEK
-		self.desired_size.y = self.row_height * 2
+		self.row_height = self.metrics.desired_size.x / DAYS_PER_WEEK
+		self.metrics.desired_size.y = self.row_height * 2
 
 		date := date.? or_else todays_date()
 
@@ -90,15 +90,18 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			self.days = int(_days)
 		}
 
-		self.days = int((month_start._nsec - calendar_start) / i64(t.Hour * HOURS_PER_DAY) + i64(self.days))
+		self.days = int(
+			(month_start._nsec - calendar_start) / i64(t.Hour * HOURS_PER_DAY) + i64(self.days),
+		)
 		self.days = int(math.ceil(f32(self.days) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
 		weeks := math.ceil(f32(self.days) / DAYS_PER_WEEK)
-		self.desired_size.y += weeks * self.row_height + (weeks + 1) * CALENDAR_WEEK_SPACING
+		self.metrics.desired_size.y +=
+			weeks * self.row_height + (weeks + 1) * CALENDAR_WEEK_SPACING
 
-		if begin_layout(axis = .Y) {
+		if begin_column_layout() {
 			defer end_layout()
 
-			if begin_layout(axis = .X, justify = .Equal_Space, size = Fixed(self.row_height)) {
+			if begin_row_layout(justify = .Equal_Space, size = Fixed(self.row_height)) {
 				defer end_layout()
 
 				if button(text = "<", style = .Outlined).clicked {
@@ -110,26 +113,25 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 				label(text = fmt.tprintf("%s %i", t.Month(self.month), self.year))
 			}
 
-			if begin_layout(axis = .X, size = Fixed(self.row_height)) {
+			if begin_row_layout(size = Fixed(self.row_height)) {
 				defer end_layout()
 
 				set_height_fill()
 				set_width_to_height()
-				set_size_method(.Fixed)
 				WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
 				for weekday in WEEKDAY_ABBREVIATIONS {
 					label(text = weekday)
 				}
 			}
 
-			if begin_layout(axis = .X, size = Fixed(self.row_height)) {
+			if begin_row_layout(size = Fixed(self.row_height)) {
 				defer end_layout()
 
 				time: t.Time = self.calendar_start
 				for i in 0 ..< self.days {
 					if (i > 0) && (i % 7 == 0) {
 						end_layout()
-						begin_layout(axis = .Y, size = Fixed(self.row_height))
+						begin_column_layout(size = Fixed(self.row_height))
 					}
 					year, month, day := t.date(time)
 					date := Date{i64(year), i8(month), i8(day)}
@@ -137,7 +139,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 
 					today_year, today_month, today_day := t.date(t.now())
 
-					if .Clicked in self.state {
+					if .Clicked in self.state.current {
 						if self.allow_range {
 							if self.selection[0] == nil {
 								self.selection[0] = date
@@ -165,13 +167,13 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 }
 
 Calendar_Day :: struct {
-	using object: ^Object,
-	day:          int,
-	is_today: bool,
+	using object:  ^Object,
+	day:           int,
+	is_today:      bool,
 	is_this_month: bool,
-	time: t.Time,
-	selection:    [2]t.Time,
-	focus_time: f32,
+	time:          t.Time,
+	selection:     [2]t.Time,
+	focus_time:    f32,
 }
 
 calendar_day :: proc(
@@ -204,7 +206,7 @@ calendar_day :: proc(
 				place_object(self)
 				if object_is_visible(self) {
 					if self.time._nsec > self.selection[0]._nsec &&
-		   			self.time._nsec <= self.selection[1]._nsec + i64(t.Hour * 24) {
+					   self.time._nsec <= self.selection[1]._nsec + i64(t.Hour * 24) {
 						corners: [4]f32
 						if self.time._nsec == self.selection[0]._nsec + i64(t.Hour * 24) {
 							corners[0] = global_state.style.rounding
@@ -217,10 +219,13 @@ calendar_day :: proc(
 						vgo.fill_box(
 							self.box,
 							corners,
-							vgo.fade(global_state.style.color.substance, 1 if self.is_this_month else 0.5),
+							vgo.fade(
+								global_state.style.color.substance,
+								1 if self.is_this_month else 0.5,
+							),
 						)
 					} else {
-						if .Hovered in self.state {
+						if .Hovered in self.state.current {
 							vgo.fill_box(
 								self.box,
 								global_state.style.shape.rounding,
@@ -305,7 +310,7 @@ parse_date :: proc(s: string) -> (date: Date, ok: bool) {
 }
 
 display_date_picker :: proc(self: ^Date_Picker) {
-	if .Open in self.last_state {
+	if .Open in self.state.previous {
 		if begin_layer(options = {.Attached}, kind = .Background) {
 			defer end_layer()
 
@@ -329,14 +334,14 @@ display_date_picker :: proc(self: ^Date_Picker) {
 				calendar(date = self.first, until = self.second)
 
 				if (current_layer().?.state & {.Hovered, .Focused} == {}) &&
-				   (.Focused not_in self.state) {
-					self.state -= {.Open}
+				   (.Focused not_in self.state.current) {
+					self.state.current -= {.Open}
 				}
 			}
 		}
 	} else {
-		if .Pressed in (self.state - self.last_state) {
-			self.state += {.Open}
+		if .Pressed in new_state(self.state) {
+			self.state.current += {.Open}
 		}
 	}
 }

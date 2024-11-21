@@ -12,12 +12,12 @@ button_behavior :: proc(button: ^Button) {
 	button.press_time = animate(
 	button.press_time,
 		0.2,
-		.Pressed in button.state,
+		.Pressed in button.state.current,
 	)
-	if .Pressed in (button.last_state - button.state) {
+	if .Pressed in lost_state(button.state) {
 		button.press_time = 1
 	}
-	if .Hovered in button.state {
+	if .Hovered in button.state.current {
 		set_cursor(.Pointing_Hand)
 	}
 	if point_in_box(global_state.mouse_pos, button.box) {
@@ -27,7 +27,7 @@ button_behavior :: proc(button: ^Button) {
 
 horizontal_slider_behavior :: proc(object: ^Object) {
 	// object.hover_time = animate(object.hover_time, 0.1, .Hovered in object.state)
-	if .Hovered in object.state {
+	if .Hovered in object.state.current {
 		global_state.cursor_type = .Resize_EW
 	}
 	if point_in_box(global_state.mouse_pos, object.box) {

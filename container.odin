@@ -27,9 +27,9 @@ Container :: struct {
 	initialized:     bool,
 }
 
-zoom_container_anchored :: proc(self: ^Container, layout: ^Object, new_zoom: f32, anchor: [2]f32) {
-	content_top_left := layout.box.lo
-	content_size := box_size(layout.box)
+zoom_container_anchored :: proc(self: ^Container, new_zoom: f32, anchor: [2]f32) {
+	content_top_left := self.content.box.lo
+	content_size := box_size(self.content.box)
 	view_top_left := self.box.lo
 	view_size := box_size(self.box)
 	view_coordinates := (anchor - view_top_left) / view_size
@@ -52,14 +52,14 @@ begin_container :: proc(
 			min_zoom = 0.1,
 			max_zoom = 1.0,
 		}
-		object.in_state_mask = OBJECT_STATE_ALL
+		object.state.input_mask = OBJECT_STATE_ALL
 	}
 
 	begin_object(object) or_return
 
 	self := object.variant.(Container)
 
-	is_active := .Hovered in (self.state + self.last_state)
+	is_active := .Hovered in new_state(self.state)
 
 	if point_in_box(global_state.mouse_pos, self.box) {
 		hover_object(self)
@@ -77,8 +77,8 @@ begin_container :: proc(
 	}
 
 	if is_active {
-		if .Pressed in self.state {
-			if .Pressed not_in self.last_state {
+		if .Pressed in self.state.current {
+			if .Pressed not_in self.state.previous {
 				self.pan_offset = global_state.mouse_pos - (self.box.lo - self.scroll)
 			}
 			new_scroll := linalg.clamp(
@@ -100,10 +100,7 @@ begin_container :: proc(
 }
 
 end_container :: proc() {
-	layout := current_layout().?
 	end_layout()
-	self := &current_object().?.variant.(Container)
-
 	end_object()
 	pop_id()
 }
@@ -111,11 +108,11 @@ end_container :: proc() {
 display_container :: proc(self: ^Container) {
 	place_object(self)
 
-	self.space_needed = linalg.max(layout.content_size + layout.spacing_size, self.space_needed)
+	self.space_needed = linalg.max(space_required_by_object_content(self.content), self.space_needed)
 
 	if self.is_active {
 		if self.enable_zoom &&
-		   (.Pressed not_in self.state) &&
+		   (.Pressed not_in self.state.current) &&
 		   (key_down(.Left_Control) || key_down(.Right_Control)) {
 			// Determine old and new zoom levels
 			old_zoom := self.target_zoom
@@ -200,7 +197,7 @@ display_container :: proc(self: ^Container) {
 	vgo.push_scissor(vgo.make_box(self.box, global_state.style.rounding))
 	vgo.fill_box(self.box, paint = colors().field)
 	for child in self.children {
-		display_object(child, layout)
+		display_object(child)
 	}
 	vgo.pop_scissor()
 }

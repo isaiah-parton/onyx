@@ -99,7 +99,7 @@ begin_panel :: proc(
 			defer end_object()
 
 			if object.variant == nil {
-				object.in_state_mask = OBJECT_STATE_ALL
+				object.state.input_mask = OBJECT_STATE_ALL
 			}
 			object.box = panel.box
 
@@ -109,7 +109,7 @@ begin_panel :: proc(
 				hover_object(object)
 			}
 
-			if .Clicked in object.state && object.click_count == 2 {
+			if .Clicked in object.state.current && object.input.click_count == 2 {
 				panel.box.hi = panel.box.lo + panel.last_min_size
 			} else if object_is_dragged(object, beyond = 100 if panel.is_snapped else 1) {
 				if !panel.moving {
@@ -143,7 +143,7 @@ begin_panel :: proc(
 }
 
 end_panel :: proc() {
-	layout := current_layout().?
+	layout_object := current_object().?
 	end_layout()
 	pop_clip()
 
@@ -159,7 +159,7 @@ end_panel :: proc() {
 				hover_object(object)
 			}
 			icon_color := global_state.style.color.substance
-			if .Hovered in object.state {
+			if .Hovered in object.state.current {
 				icon_color = global_state.style.color.accent
 				global_state.cursor_type = .Resize_NWSE
 			}
@@ -171,9 +171,9 @@ end_panel :: proc() {
 				},
 				paint = icon_color,
 			)
-			if .Pressed in object.state {
+			if .Pressed in object.state.current {
 				panel.resizing = true
-				if .Pressed not_in object.last_state {
+				if .Pressed not_in object.state.previous {
 					panel.resize_offset = panel.box.hi - global_state.mouse_pos
 				}
 			}
@@ -189,7 +189,7 @@ end_panel :: proc() {
 		panel.layer.index < global_state.last_highest_layer_index,
 	)
 
-	panel.min_size += layout.desired_size
+	panel.min_size += layout_object.metrics.desired_size
 
 	pop_id()
 	vgo.pop_scissor()

@@ -36,7 +36,7 @@ label :: proc(
 			font_size,
 			font,
 		)
-		label.desired_size = label.text_layout.size
+		label.metrics.desired_size = label.text_layout.size
 	}
 }
 

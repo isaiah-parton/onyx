@@ -96,10 +96,10 @@ main :: proc() {
 			if begin_panel(axis = .X) {
 				defer end_panel()
 
-				if begin_layout(size = Fixed(36), axis = .Y, align = .Center) {
+				if begin_column_layout(size = Fixed(36)) {
 					defer end_layout()
 
-					vgo.fill_box(layout_box(), paint = colors().field)
+					vgo.fill_box(current_object().?.box, paint = colors().field)
 
 					set_width_fill()
 					set_height_to_width()
@@ -110,20 +110,20 @@ main :: proc() {
 					}
 				}
 
-				if begin_layout(size = At_Least(0), axis = .Y, padding = 15) {
+				if begin_column_layout(size = At_Least(0), padding = 15) {
 					defer end_layout()
 
-					if begin_layout(axis = .Y, align = .Center, size = Fixed(20)) {
+					if begin_row_layout(size = Fixed(20)) {
 						defer end_layout()
 
 						label("Content alignment")
 					}
-					if begin_layout(axis = .X, size = Fixed(30), justify = .Center) {
+					if begin_row_layout(size = Fixed(30), justify = .Center) {
 						defer end_layout()
 
 						tabs(reflect.enum_field_names(Align), &justify)
 					}
-					if begin_layout(justify = justify, align = .Center, size = Percent(25), axis = .X, padding = 10) {
+					if begin_row_layout(justify = justify, size = Percent(25), padding = 10) {
 						defer end_layout()
 
 						set_margin(left = 4, right = 4)
@@ -133,12 +133,12 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = justify, align = .Center, size = Percent(100 / 3), axis = .X, padding = 10) {
+					if begin_row_layout(justify = justify, size = Percent(100 / 3), padding = 10) {
 						defer end_layout()
 
 						raw_input(&input_value, placeholder = "sample text")
 					}
-					if begin_layout(justify = justify, axis = .X, align = .Center, size = Percent(50), padding = 10) {
+					if begin_row_layout(justify = justify, size = Percent(50), padding = 10) {
 						defer end_layout()
 
 						set_margin_all(4)
@@ -148,7 +148,7 @@ main :: proc() {
 							pop_id()
 						}
 					}
-					if begin_layout(justify = justify, axis = .X, align = .Center, size = Percent(100), padding = 10) {
+					if begin_row_layout(justify = justify, size = Percent(100), padding = 10) {
 						defer end_layout()
 
 						set_margin_all(4)

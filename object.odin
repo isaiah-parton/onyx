@@ -91,7 +91,7 @@ Object :: struct {
 	input:            Object_Input,
 	metrics:          Object_Metrics,
 	content:          Object_Content,
-	parent:           ^Object,
+	parent:           Maybe(^Object),
 	children:         [dynamic]^Object,
 	on_display:       proc(_: ^Object),
 	variant:          Object_Variant,
@@ -197,7 +197,7 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 	assert(object != nil)
 
 	object.id = id
-	object.out_state_mask = OBJECT_STATE_ALL
+	object.state.output_mask = OBJECT_STATE_ALL
 
 	append(&global_state.objects, object)
 	global_state.object_map[id] = object
@@ -237,7 +237,7 @@ transient_object :: proc() -> ^Object {
 	assert(object != nil)
 	object.id = Id(global_state.transient_objects.len)
 	object.children = make_object_children_array()
-	object.out_state_mask = OBJECT_STATE_ALL
+	object.state.output_mask = OBJECT_STATE_ALL
 	return object
 }
 
@@ -251,15 +251,15 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 		pressed_buttons := global_state.mouse_bits - global_state.last_mouse_bits
 		if pressed_buttons != {} {
 			if object.input.click_mouse_button == global_state.mouse_button &&
-			   time.since(object.input.click_time) <= MAX_CLICK_DELAY {
-				object.input.click_count = max((object.click_count + 1) % 4, 1)
+			   time.since(object.input.click_release_time) <= MAX_CLICK_DELAY {
+				object.input.click_count = max((object.input.click_count + 1) % 4, 1)
 			} else {
-				object.click_count = 1
+				object.input.click_count = 1
 			}
-			object.click_button = global_state.mouse_button
-			object.click_point = global_state.mouse_pos
-			object.click_time = time.now()
-			object.state += {.Pressed}
+			object.input.click_mouse_button = global_state.mouse_button
+			object.input.click_point = global_state.mouse_pos
+			object.input.click_release_time = time.now()
+			object.state.current += {.Pressed}
 			draw_frames(1)
 			global_state.focused_object = object.id
 			if sticky do global_state.dragged_object = object.id
@@ -270,12 +270,12 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 		// 	object.click_count = 0
 		// }
 	} else if global_state.dragged_object != object.id {
-		object.state -= {.Pressed, .Hovered}
-		object.click_count = 0
+		object.state.current -= {.Pressed, .Hovered}
+		object.input.click_count = 0
 	}
-	if object.state >= {.Pressed} {
+	if object.state.current >= {.Pressed} {
 		released_buttons := global_state.last_mouse_bits - global_state.mouse_bits
-		if object.click_button in released_buttons {
+		if object.input.click_mouse_button in released_buttons {
 			object.state.current += {.Clicked}
 			object.state.current -= {.Pressed, .Dragged}
 			global_state.dragged_object = 0
@@ -293,7 +293,7 @@ object_is_visible :: proc(object: ^Object) -> bool {
 }
 
 update_object_state :: proc(object: ^Object) {
-	object.last_state = object.state
+	object.state.previous = object.state.current
 	object.state.current -= {.Clicked, .Focused, .Changed}
 
 	if global_state.focused_object == object.id {
@@ -323,15 +323,7 @@ begin_object :: proc(object: ^Object) -> bool {
 	if global_state.disable_objects do object.disabled = true
 
 	if object.parent != nil {
-		object.metrics.margin = current_placement().margin
-		// If the user set an explicit size with either `set_width()` or `set_height()` the object's desired size should reflect that
-		// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
-		if layout.object_size.x == 0 || layout.object_size.x != box_width(layout.content_box) {
-			object.desired_size.x = max(object.desired_size.x, layout.object_size.x)
-		}
-		if layout.object_size.y == 0 || layout.object_size.y != box_height(layout.content_box) {
-			object.desired_size.y = max(object.desired_size.y, layout.object_size.y)
-		}
+		object.metrics.margin = current_placement_options().margin
 	}
 
 	push_stack(&global_state.object_stack, object) or_return
@@ -348,14 +340,13 @@ end_object :: proc() {
 
 		object.metrics.desired_size = linalg.max(
 			object.metrics.desired_size,
-			occupied_space_of_object_content(object.content),
+			space_required_by_object_content(object.content),
 		)
 
-		if object.parent != nil {
+		if parent, ok := object.parent.?; ok {
 			object.metrics.size = solve_object_size(object.metrics)
 			update_object_parent_metrics(object)
-			object.parent.state.current +=
-				object_state_output(object.state) & object.parent.state.input_mask
+			parent.state.current += object_state_output(object.state) & parent.state.input_mask
 		}
 
 		if !maybe_defer_object(object) {
@@ -364,7 +355,7 @@ end_object :: proc() {
 	}
 }
 
-occupied_space_of_object_content :: proc(content: Object_Content) -> [2]f32 {
+space_required_by_object_content :: proc(content: Object_Content) -> [2]f32 {
 	return content.desired_size + content.padding.xy + content.padding.zw
 }
 
@@ -379,20 +370,25 @@ occupied_space_of_object :: proc(metrics: Object_Metrics) -> [2]f32 {
 update_object_parent_metrics :: proc(object: ^Object) {
 	effective_size := occupied_space_of_object(object.metrics)
 
-	assert(object.parent != nil)
+	parent := object.parent.?
 
-	i := int(object.parent.content.axis)
+	i := int(parent.content.axis)
 	j := 1 - i
 
-	object.parent.content.desired_size[i] += effective_size[i]
-	object.parent.content.desired_size[j] += max(
-		object.parent.content.desired_size[j],
-		effective_size[j],
-	)
+	parent.content.desired_size[i] += effective_size[i]
+	parent.content.desired_size[j] += max(parent.content.desired_size[j], effective_size[j])
 }
 
 object_state_output :: proc(state: Object_State) -> Object_Status_Set {
 	return state.current & state.output_mask
+}
+
+new_state :: proc(state: Object_State) -> Object_Status_Set {
+	return state.current - state.previous
+}
+
+lost_state :: proc(state: Object_State) -> Object_Status_Set {
+	return state.previous - state.current
 }
 
 hover_object :: proc(object: ^Object) {
@@ -417,8 +413,8 @@ foreground :: proc(loc := #caller_location) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
 		if object.on_display == nil {
-			object.on_display = proc(object: ^Object, layout: ^Layout) {
-				object.box = layout.box
+			object.on_display = proc(object: ^Object) {
+				object.box = object.parent.?.box
 				draw_shadow(object.box)
 				vgo.fill_box(object.box, global_state.style.rounding, global_state.style.color.fg)
 				if point_in_box(global_state.mouse_pos, object.box) {
@@ -433,10 +429,10 @@ background :: proc(loc := #caller_location) {
 	object := persistent_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
-		object.in_state_mask = OBJECT_STATE_ALL
+		object.state.input_mask = OBJECT_STATE_ALL
 		if object.on_display == nil {
-			object.on_display = proc(object: ^Object, layout: ^Layout) {
-				object.box = layout.box
+			object.on_display = proc(object: ^Object) {
+				object.box = object.parent.?.box
 				vgo.fill_box(
 					object.box,
 					global_state.style.rounding,
@@ -496,8 +492,6 @@ display_object :: proc(object: ^Object) {
 		display_button(&v)
 	case Boolean:
 		display_boolean(&v)
-	case Layout:
-		display_layout(&v)
 	case Label:
 		display_label(&v)
 	case Slider:
@@ -522,18 +516,18 @@ display_object :: proc(object: ^Object) {
 
 	switch v in object.future_placement {
 	case Future_Box_Placement:
-		object.size = linalg.max(object.desired_size, object.size)
-		object.box.lo = placement.origin - placement.offset * object.size
-		object.box.hi = object.box.lo + object.size
+		object.metrics.size = linalg.max(object.metrics.desired_size, object.metrics.size)
+		object.box.lo = v.origin - v.offset * object.metrics.size
+		object.box.hi = object.box.lo + object.metrics.size
 	case Future_Layout_Placement:
 	}
 
-	object.content_box = object.box
-	object.content_box.lo += object.padding.xy
-	object.content_box.hi -= object.padding.zw
+	object.content.box = object.box
+	object.content.box.lo += object.content.padding.xy
+	object.content.box.hi -= object.content.padding.zw
 
-	object.space_left_for_content =
-		axis_normal(object.layout_axis) * (box_size(object.box) - object.desired_size)
+	object.content.space_left =
+		axis_normal(object.content.axis) * (box_size(object.box) - object.metrics.desired_size)
 
 	if object.clip_children {
 		vgo.save_scissor()
@@ -547,9 +541,5 @@ display_object :: proc(object: ^Object) {
 
 	if object.clip_children {
 		vgo.restore_scissor()
-	}
-
-	if object.parent != nil {
-		transfer_object_state_to_parent(object, object.parent)
 	}
 }

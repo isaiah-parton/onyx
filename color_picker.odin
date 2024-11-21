@@ -89,7 +89,7 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 	if begin_object(object) {
 		defer end_object()
 
-		object.desired_size = global_state.style.visual_size * {0.5, 1}
+		object.metrics.desired_size = global_state.style.visual_size * {0.5, 1}
 
 		if object.variant == nil {
 			object.variant = Color_Picker {
@@ -98,7 +98,7 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 		}
 		variant := &object.variant.(Color_Picker)
 
-		if .Changed in variant.last_state {
+		if .Changed in variant.state.previous {
 			value^ = variant.value
 			draw_frames(1)
 		} else {
@@ -117,10 +117,10 @@ display_color_picker :: proc(self: ^Color_Picker) {
 	} else {
 		self.open_time = 0
 	}
-	if .Pressed in (self.state - self.last_state) {
-		self.state += {.Open}
+	if .Pressed in new_state(self.state) {
+		self.state.current += {.Open}
 	}
-	if .Hovered in self.state {
+	if .Hovered in self.state.current {
 		global_state.cursor_type = .Pointing_Hand
 	}
 	if point_in_box(global_state.mouse_pos, self.box) {
@@ -157,8 +157,8 @@ display_color_picker :: proc(self: ^Color_Picker) {
 	}
 
 	PADDING :: 10
-	if .Open in self.state {
-		if .Open not_in self.last_state {
+	if .Open in self.state.current {
+		if .Open not_in self.state.previous {
 			self.hsva = vgo.hsva_from_color(self.value)
 		}
 
@@ -190,11 +190,11 @@ display_color_picker :: proc(self: ^Color_Picker) {
 
 			if object_was_just_changed(last_object().?) {
 				self.value = vgo.color_from_hsva(self.hsva)
-				self.state += {.Changed}
+				self.state.current += {.Changed}
 			}
 
-			if .Focused not_in current_layer().?.state && .Focused not_in self.state {
-				self.state -= {.Open}
+			if .Focused not_in current_layer().?.state && .Focused not_in self.state.current {
+				self.state.current -= {.Open}
 			}
 		}
 	}
@@ -227,14 +227,14 @@ alpha_slider :: proc(
 		variant.axis = axis
 		variant.color = color
 
-		if .Changed in variant.last_state {
+		if .Changed in variant.state.previous {
 			value^ = variant.value
 		}
 		variant.value = value^
 
-		variant.desired_size = global_state.style.visual_size
+		variant.metrics.desired_size = global_state.style.visual_size
 		if variant.axis == .Y {
-			variant.desired_size.xy = variant.desired_size.yx
+			variant.metrics.desired_size.xy = variant.metrics.desired_size.yx
 		}
 	}
 	return id
@@ -247,13 +247,13 @@ display_alpha_slider :: proc(self: ^Alpha_Slider) {
 	i := int(self.axis)
 	j := 1 - i
 
-	if .Pressed in self.state {
+	if .Pressed in self.state.current {
 		self.value = clamp(
 			(global_state.mouse_pos[i] - self.box.lo[i]) / (self.box.hi[i] - self.box.lo[i]),
 			0,
 			1,
 		)
-		self.state += {.Changed}
+		self.state.current += {.Changed}
 	}
 
 	if object_is_visible(self) {
@@ -308,12 +308,12 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) -> Id {
 		}
 		variant := &object.variant.(HSV_Wheel)
 
-		if .Changed in variant.last_state {
+		if .Changed in variant.state.previous {
 			value^ = variant.value
 		}
 		variant.value = value^
 
-		variant.desired_size = 200
+		variant.metrics.desired_size = 200
 	}
 	return id
 }
@@ -345,13 +345,13 @@ display_hsv_wheel :: proc(self: ^HSV_Wheel) {
 		hover_object(self)
 	}
 
-	if .Pressed in (self.state - self.last_state) {
+	if .Pressed in new_state(self.state) {
 		if distance_to_mouse > inner_radius {
-			self.state += {.Active}
+			self.state.current += {.Active}
 		}
 	}
-	if .Pressed in self.state {
-		if .Active in self.state {
+	if .Pressed in self.state.current {
+		if .Active in self.state.current {
 			self.value.x = math.atan2(delta_to_mouse.y, delta_to_mouse.x) / math.RAD_PER_DEG
 			if self.value.x < 0 {
 				self.value.x += 360
@@ -366,9 +366,9 @@ display_hsv_wheel :: proc(self: ^HSV_Wheel) {
 			self.value.z = clamp(1 - v, 0, 1)
 			self.value.y = clamp(u / self.value.z, 0, 1)
 		}
-		self.state += {.Changed}
+		self.state.current += {.Changed}
 	} else {
-		self.state -= {.Active}
+		self.state.current -= {.Active}
 	}
 
 	if object_is_visible(self) {
@@ -398,7 +398,7 @@ display_hsv_wheel :: proc(self: ^HSV_Wheel) {
 			point_b,
 			clamp(1 - self.value.z, 0, 1),
 		)
-		r: f32 = 9 if (self.state >= {.Pressed} && .Active not_in self.state) else 7
+		r: f32 = 9 if (self.state.current >= {.Pressed} && .Active not_in self.state.current) else 7
 		vgo.fill_circle(point, r + 1, paint = vgo.BLACK if self.value.z > 0.5 else vgo.WHITE)
 		vgo.fill_circle(
 			point,

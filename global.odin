@@ -112,6 +112,7 @@ Global_State :: struct {
 	panel_map:                map[Id]^Panel,
 	panel_stack:              Stack(^Panel, MAX_PANELS),
 	panel_snapping:           Panel_Snap_State,
+	placement_options_stack:  Stack(Placement_Options, 64),
 	// Layers are
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
@@ -423,14 +424,12 @@ new_frame :: proc() {
 	glfw.PollEvents()
 
 	global_state.layer_stack.height = 0
-	global_state.layout_stack.height = 0
 	global_state.object_stack.height = 0
 	global_state.panel_stack.height = 0
 
 	reset_panel_snap_state(&global_state.panel_snapping)
 
 	global_state.object_index = 0
-	global_state.layout_array_count = 0
 
 	global_state.active_container = global_state.next_active_container
 	global_state.next_active_container = 0

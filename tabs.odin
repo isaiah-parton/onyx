@@ -24,7 +24,7 @@ tabs :: proc(items: []string, index: ^$T, loc := #caller_location) {
 		}
 		variant := &object.variant.(Tabs)
 		variant.items = items
-		variant.desired_size = global_state.style.visual_size
+		variant.metrics.desired_size = global_state.style.visual_size
 
 		if object_was_changed(object) {
 			index^ = T(variant.index)
@@ -52,12 +52,12 @@ display_tabs :: proc(self: ^Tabs) {
 
 	for item, i in self.items {
 		option_box := cut_box_left(&inner_box, option_size)
-		hovered := (self.state >= {.Hovered}) && point_in_box(global_state.mouse_pos, option_box)
+		hovered := (self.state.current >= {.Hovered}) && point_in_box(global_state.mouse_pos, option_box)
 		if self.index != i {
 			if hovered {
-				if .Clicked in self.state {
+				if .Clicked in self.state.current {
 					self.index = i
-					self.state += {.Changed}
+					self.state.current += {.Changed}
 				}
 				global_state.cursor_type = .Pointing_Hand
 			}

@@ -61,29 +61,32 @@ profiler_end_scope :: proc(scope: Profiler_Scope) {
 }
 
 @(private)
+draw_object_debug_margin :: proc(box: Box, margin: [4]f32) {
+	vgo.set_paint(vgo.fade(vgo.YELLOW, 0.5))
+	if margin.x > 0 do vgo.fill_box(attach_box_left(box, margin.x))
+	if margin.y > 0 do vgo.fill_box(attach_box_top(box, margin.y))
+	if margin.z > 0 do vgo.fill_box(attach_box_right(box, margin.z))
+	if margin.w > 0 do vgo.fill_box(attach_box_bottom(box, margin.w))
+}
+
+@(private)
+draw_object_debug_padding :: proc(box: Box, padding: [4]f32) {
+	box := box
+	vgo.set_paint(vgo.fade(vgo.TURQUOISE, 0.5))
+	if padding.x > 0 do vgo.fill_box(cut_box_left(&box, padding.x))
+	if padding.y > 0 do vgo.fill_box(cut_box_top(&box, padding.y))
+	if padding.z > 0 do vgo.fill_box(cut_box_right(&box, padding.z))
+	if padding.w > 0 do vgo.fill_box(cut_box_bottom(&box, padding.w))
+}
+
+@(private)
 draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
-	color := vgo.GREEN
-	variant := reflect.union_variant_typeid(object.variant)
-	if variant == Layout {
-		color = vgo.BLUE
-	}
-	vgo.stroke_box(object.box, 1, paint = color)
 	if object_is_being_debugged(state, object) {
-		vgo.fill_box(object.box, paint = vgo.fade(color, 0.5))
-		vgo.set_paint(vgo.fade(vgo.YELLOW, 0.5))
-		if object.margin.x > 0 do vgo.fill_box(attach_box_left(object.box, object.margin.x))
-		if object.margin.y > 0 do vgo.fill_box(attach_box_top(object.box, object.margin.y))
-		if object.margin.z > 0 do vgo.fill_box(attach_box_right(object.box, object.margin.z))
-		if object.margin.w > 0 do vgo.fill_box(attach_box_bottom(object.box, object.margin.w))
-		if layout, ok := object.variant.(Layout); ok {
-			box := object.box
-			vgo.set_paint(vgo.fade(vgo.TURQUOISE, 0.5))
-			vgo.fill_box(cut_box_left(&box, layout.padding.x))
-			vgo.fill_box(cut_box_top(&box, layout.padding.y))
-			vgo.fill_box(cut_box_right(&box, layout.padding.z))
-			vgo.fill_box(cut_box_bottom(&box, layout.padding.w))
-		}
+		vgo.fill_box(object.box, paint = vgo.fade(vgo.BLUE, 0.25))
+		draw_object_debug_margin(object.box, object.metrics.margin)
+		draw_object_debug_padding(object.box, object.content.padding)
 	}
+	vgo.stroke_box(object.box, 1, paint = vgo.BLUE)
 }
 
 @(private)
@@ -123,11 +126,9 @@ validate_debug_object_index :: proc(state: Debug_State) -> int {
 
 @(private)
 draw_debug_stuff :: proc(state: ^Debug_State) {
-
 	if state.top_object_index != state.last_top_object_index {
 		state.last_top_object_index = state.top_object_index
 		state.hovered_object_index = state.top_object_index
-		// slice.reverse_sort_by(state.hovered_objects[:], object_is_in_front_of)
 	}
 
 	state.hovered_object_index += int(global_state.mouse_scroll.y)
@@ -199,21 +200,18 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			object.id,
 			object.box.lo,
 			object.box.hi,
-			object.size,
-			object.desired_size,
+			object.metrics.size,
+			object.metrics.desired_size,
 		)
-		if layout, ok := object.variant.(Layout); ok {
-			fmt.sbprintf(
-				&b,
-				"\n axis: %v\n justify: %v\n align: %v\n has_known_box: %v\n deferred: %v\n children: %i",
-				layout.axis,
-				layout.justify,
-				layout.align,
-				layout.has_known_box,
-				layout_is_deferred(&layout),
-				len(layout.children),
-			)
-		}
+		fmt.sbprintf(
+			&b,
+			"\n axis: %v\n justify: %v\n align: %v\n has_known_box: %v\n deferred: %v\n children: %i",
+			object.content.axis,
+			object.content.justify,
+			object.has_known_box,
+			object_defers_children(object),
+			len(object.children),
+		)
 
 		variant_typeid := reflect.union_variant_typeid(object.variant)
 		header_text_layout := vgo.make_text_layout(
@@ -230,7 +228,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		origin := linalg.clamp(mouse_point() + 10, 0, global_state.view - size)
 
 		vgo.fill_box({origin, origin + size}, paint = vgo.fade(vgo.BLACK, 0.75))
-		vgo.fill_box({origin, origin + header_text_layout.size}, paint = vgo.BLUE if variant_typeid == Layout else vgo.GREEN)
+		vgo.fill_box({origin, origin + header_text_layout.size}, paint = vgo.BLUE)
 		vgo.fill_text_layout(header_text_layout, origin, paint = vgo.BLACK)
 		vgo.fill_text_layout(
 			info_text_layout,
