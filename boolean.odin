@@ -39,39 +39,39 @@ boolean :: proc(
 				base = object,
 			}
 		}
-		boolean := &object.variant.(Boolean)
-		boolean.value = state
+		self := &object.variant.(Boolean)
+		self.value = state
 
-		boolean.gadget_size = global_state.style.visual_size.y * 0.8
-		if type == .Switch do boolean.gadget_size *= [2]f32{2, 1}
+		self.gadget_size = global_state.style.visual_size.y * 0.8
+		if type == .Switch do self.gadget_size *= [2]f32{2, 1}
 
-		boolean.type = type
-		boolean.text = text
+		self.type = type
+		self.text = text
 		if len(text) > 0 {
-			boolean.text_layout = vgo.make_text_layout(
+			self.text_layout = vgo.make_text_layout(
 				text,
 				global_state.style.default_text_size,
 				global_state.style.default_font,
 			)
 			if int(text_side) > 1 {
-				object.desired_size.x = max(boolean.gadget_size.x, boolean.text_layout.size.x)
-				object.desired_size.y = boolean.gadget_size.x + boolean.text_layout.size.y
+				self.metrics.desired_size.x = max(self.gadget_size.x, self.text_layout.size.x)
+				self.metrics.desired_size.y = self.gadget_size.x + self.text_layout.size.y
 			} else {
-				object.desired_size.x =
-					boolean.gadget_size.x +
-					boolean.text_layout.size.x +
+				self.metrics.desired_size.x =
+					self.gadget_size.x +
+					self.text_layout.size.x +
 					global_state.style.text_padding.x * 2
-				object.desired_size.y = boolean.gadget_size.y
+				self.metrics.desired_size.y = self.gadget_size.y
 			}
 		}
 	}
 }
 
 display_boolean :: proc(self: ^Boolean) {
-	apply_layout_placement(self)
+	place_object(self)
 	handle_object_click(self)
 
-	if .Hovered in self.state {
+	if .Hovered in self.state.current {
 		set_cursor(.Pointing_Hand)
 	}
 	if point_in_box(global_state.mouse_pos, self.box) {
@@ -112,7 +112,7 @@ display_boolean :: proc(self: ^Boolean) {
 
 		gadget_center := box_center(gadget_box)
 
-		if .Hovered in self.state {
+		if .Hovered in self.state.current {
 			vgo.fill_box(
 				{{gadget_center.x, self.box.lo.y}, self.box.hi},
 				{0, global_state.style.rounding, 0, global_state.style.rounding},
@@ -215,7 +215,7 @@ display_boolean :: proc(self: ^Boolean) {
 		}
 	}
 
-	if .Clicked in self.state {
+	if .Clicked in self.state.current {
 		self.value^ = !self.value^
 	}
 }

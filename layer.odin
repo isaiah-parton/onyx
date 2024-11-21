@@ -22,7 +22,6 @@ Layer_Kind :: enum int {
 	Debug,
 }
 
-
 Layer_Option :: enum {
 	Isolated,
 	Attached,
@@ -36,8 +35,8 @@ Layer :: struct {
 	id: Id,
 	parent:       ^Layer,
 	children: [dynamic]^Layer,
-	state:        Object_State,
-	last_state:   Object_State,
+	state:        Object_Status_Set,
+	last_state:   Object_Status_Set,
 	options:      Layer_Options,
 	dead:         bool,
 	deferred:     bool,

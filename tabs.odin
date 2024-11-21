@@ -35,7 +35,7 @@ tabs :: proc(items: []string, index: ^$T, loc := #caller_location) {
 }
 
 display_tabs :: proc(self: ^Tabs) {
-	apply_layout_placement(self)
+	place_object(self)
 	handle_object_click(self)
 
 	if point_in_box(global_state.mouse_pos, self.box) {

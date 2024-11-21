@@ -105,16 +105,13 @@ Global_State :: struct {
 	form:                     Form,
 	form_active:              bool,
 	// Layout
-	layout_array_count:       int,
-	current_layout:           ^Layout,
-	layout_stack:             Stack(^Layout, MAX_LAYOUTS),
 	active_container:         Id,
 	next_active_container:    Id,
 	// Panels
 	panels:                   [MAX_PANELS]Maybe(Panel),
 	panel_map:                map[Id]^Panel,
 	panel_stack:              Stack(^Panel, MAX_PANELS),
-	panel_snapping: Panel_Snap_State,
+	panel_snapping:           Panel_Snap_State,
 	// Layers are
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
@@ -126,8 +123,8 @@ Global_State :: struct {
 	hovered_layer:            Id,
 	next_hovered_layer:       Id,
 	focused_layer:            Id,
-	clip_stack: Stack(Box, 128),
-	current_object_clip: Box,
+	clip_stack:               Stack(Box, 128),
+	current_object_clip:      Box,
 	// IO
 	cursor_type:              Mouse_Cursor,
 	mouse_button:             Mouse_Button,

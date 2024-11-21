@@ -32,7 +32,14 @@ Button_Result :: struct {
 	hovered: bool,
 }
 
-button :: proc(text: string, style: Button_Style = .Primary, font_size: f32 = global_state.style.default_text_size, loc := #caller_location) -> (result: Button_Result) {
+button :: proc(
+	text: string,
+	style: Button_Style = .Primary,
+	font_size: f32 = global_state.style.default_text_size,
+	loc := #caller_location,
+) -> (
+	result: Button_Result,
+) {
 	object := persistent_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
@@ -42,23 +49,19 @@ button :: proc(text: string, style: Button_Style = .Primary, font_size: f32 = gl
 				object = object,
 			}
 		}
-		button := &object.variant.(Button)
-		button.text_layout = vgo.make_text_layout(
-			text,
-			font_size,
-			global_state.style.default_font,
-		)
-		button.desired_size = button.text_layout.size + global_state.style.text_padding * 2
-		button.style = style
+		self := &object.variant.(Button)
+		self.text_layout = vgo.make_text_layout(text, font_size, global_state.style.default_font)
+		set_object_desired_size(object, self.text_layout.size + global_state.style.text_padding * 2)
+		self.style = style
 
-		result.clicked = object_was_clicked(button, with = .Left)
-		result.hovered = .Hovered in button.last_state
+		result.clicked = object_was_clicked(self, with = .Left)
+		result.hovered = .Hovered in self.state.previous
 	}
 	return
 }
 
 display_button :: proc(self: ^Button) {
-	apply_layout_placement(self)
+	place_object(self)
 	handle_object_click(self)
 	button_behavior(self)
 	if object_is_visible(self) {
@@ -72,7 +75,7 @@ display_button :: proc(self: ^Button) {
 				radius,
 				vgo.fade(
 					self.color.? or_else global_state.style.color.substance,
-					0.5 if .Hovered in self.state else 0.25,
+					0.5 if .Hovered in self.state.current else 0.25,
 				),
 			)
 			vgo.stroke_box(
@@ -87,33 +90,30 @@ display_button :: proc(self: ^Button) {
 			vgo.fill_box(
 				self.box,
 				radius,
-				vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in self.state else bg_color,
+				vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in self.state.current else bg_color,
 			)
 			text_color = global_state.style.color.accent_content
 		case .Primary:
 			vgo.fill_box(
 				self.box,
 				radius,
-				vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in self.state else global_state.style.color.accent,
+				vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in self.state.current else global_state.style.color.accent,
 			)
 			text_color = global_state.style.color.accent_content
 		case .Ghost:
-			if .Hovered in self.state {
+			if .Hovered in self.state.current {
 				vgo.fill_box(
 					self.box,
 					radius,
-					paint = vgo.fade(
-						self.color.? or_else global_state.style.color.substance,
-						0.2,
-					),
+					paint = vgo.fade(self.color.? or_else global_state.style.color.substance, 0.2),
 				)
 			}
 			text_color = global_state.style.color.content
 		}
 
 		if self.press_time > 0 {
-			scale := self.press_time if .Pressed in self.state else f32(1)
-			opacity := f32(1) if .Pressed in self.state else self.press_time
+			scale := self.press_time if .Pressed in self.state.current else f32(1)
+			opacity := f32(1) if .Pressed in self.state.current else self.press_time
 			vgo.push_scissor(vgo.make_box(self.box, radius))
 			vgo.fill_circle(
 				self.click_point,

@@ -73,18 +73,7 @@ axis_normal :: proc(axis: Axis) -> [2]f32 {
 }
 
 maybe_defer_object :: proc(object: ^Object) -> bool {
-	if !object.isolated {
-		switch layout.axis {
-		case .X:
-			layout.desired_size.x += object.desired_size.x
-			layout.desired_size.y = max(layout.desired_size.y, object.desired_size.y)
-		case .Y:
-			layout.desired_size.y += object.desired_size.y
-			layout.desired_size.x = max(layout.desired_size.x, object.desired_size.x)
-		}
-	}
-
-	if object.parent != nil && layout_is_deferred(&object.parent.layout) {
+	if object.parent != nil && object_defers_children(object.parent) {
 		append(&object.parent.children, object)
 		return true
 	}
@@ -99,70 +88,89 @@ move_object :: proc(object: ^Object, delta: [2]f32) {
 	}
 }
 
-apply_object_placement :: proc(object: ^Object) {
+shift_near_edge_of_box :: proc(box: Box, axis: Axis, amount: f32) -> Box {
+	box := box
+	box.lo[int(axis)] += amount
+	return box
+}
+
+apply_near_object_margin :: proc(box: Box, axis: Axis, margin: [4]f32) -> Box {
+	return shift_near_edge_of_box(box, axis, margin[int(axis)])
+}
+
+apply_far_object_margin :: proc(box: Box, axis: Axis, margin: [4]f32) -> Box {
+	return shift_near_edge_of_box(box, axis, margin[2 + int(axis)])
+}
+
+apply_perpendicular_object_margin :: proc(box: Box, axis: Axis, margin: [4]f32) -> Box {
+	box := box
+	i := 1 - int(axis)
+	box.lo[i] += margin[i]
+	box.hi[i] -= margin[2 + i]
+	return box
+}
+
+apply_object_alignment :: proc(box: Box, axis: Axis, align: Align, size: [2]f32) -> Box {
+	box := box
+	i := 1 - int(axis)
+	switch align {
+	case .Near:
+		box.hi[i] = box.lo[i] + size[i]
+	case .Far:
+		box.lo[i] = box.hi[i] - size[i]
+	case .Center:
+		box.lo[i] = (box.lo[i] + box.hi[i]) / 2 - size[i] / 2
+		box.hi[i] = box.lo[i] + size[i]
+	case .Equal_Space:
+	}
+	return box
+}
+
+place_object :: proc(object: ^Object) {
 	assert(object != nil)
 	if object.has_known_box || object.parent == nil do return
 
-	size := linalg.max(object.size, object.desired_size)
-	if object.parent.layout.axis == .X {
-		parent.layout.content_box.lo.x += object.margin.x
-	} else {
-		parent.layout.content_box.lo.y += object.margin.y
-	}
+	content_box := object.parent.content.box
 
-	box: Box
-	box, parent.layout.content_box = split_box(
-		parent.layout.content_box,
-		axis_cut_side(parent.layout.axis),
-		size[int(parent.layout.axis)],
+	object.box, content_box = split_box(
+		apply_near_object_margin(
+			content_box,
+			object.parent.content.axis,
+			object.metrics.margin,
+		),
+		axis_cut_side(object.parent.content.axis),
+		object.metrics.size[int(object.parent.content.axis)],
 	)
 
-	if parent.layout.justify == .Equal_Space {
-		parent.layout.content_box.lo[int(layout.axis)] +=
-			parent.layout.space_left[int(layout.axis)] / f32(len(parent.children) - 1)
+	content_box = apply_far_object_margin(
+		content_box,
+		object.parent.content.axis,
+		object.metrics.margin,
+	)
+
+	object.box = snapped_box(
+		apply_object_alignment(
+			apply_perpendicular_object_margin(
+				object.box,
+				object.parent.content.axis,
+				object.metrics.margin,
+			),
+			object.parent.content.axis,
+			object.parent.content.align,
+			object.metrics.size,
+		),
+	)
+
+	if object.parent.content.justify == .Equal_Space {
+		content_box.lo[int(object.parent.content.axis)] +=
+		object.parent.content.space_left[int(object.parent.content.axis)] / f32(len(object.parent.children) - 1)
+	} else if object.parent.content.justify == .Center {
+		move_object(object, object.parent.content.space_left * 0.5)
+	} else if object.parent.content.justify == .Far {
+		move_object(object, object.parent.content.space_left)
 	}
 
-	if layout.axis == .X {
-		layout.content_box.lo.x += object.margin.z
-		box.lo.y += object.margin.y
-		box.hi.y -= object.margin.w
-		if size.y < box_height(box) {
-			switch layout.align {
-			case .Near:
-				box.hi.y = box.lo.y + size.y
-			case .Far:
-				box.lo.y = box.hi.y - size.y
-			case .Center:
-				box.lo.y = box_center_y(box) - size.y / 2
-				box.hi.y = box.lo.y + size.y
-			case .Equal_Space:
-			}
-		}
-	} else {
-		layout.content_box.lo.y += object.margin.w
-		box.lo.x += object.margin.x
-		box.hi.x -= object.margin.z
-		if size.x < box_width(box) {
-			switch layout.align {
-			case .Near:
-				box.hi.x = box.lo.x + size.x
-			case .Far:
-				box.lo.x = box.hi.x - size.x
-			case .Center:
-				box.lo.x = box_center_x(box) - size.x / 2
-				box.hi.x = box.lo.x + size.x
-			case .Equal_Space:
-			}
-		}
-	}
-
-	object.box = snapped_box(box)
-
-	if layout.justify == .Center {
-		move_object(object, layout.space_left * 0.5)
-	} else if layout.justify == .Far {
-		move_object(object, layout.space_left)
-	}
+	object.parent.content.box = content_box
 }
 
 inverse_axis :: proc(axis: Axis) -> Axis {
@@ -174,7 +182,7 @@ object_defers_children :: proc(object: ^Object) -> bool {
 }
 
 object_is_deferred :: proc(object: ^Object) -> bool {
-	return (!object.has_known_box)
+	return !object.has_known_box
 }
 
 Future_Box_Placement :: struct {

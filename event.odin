@@ -8,7 +8,7 @@ object_was_changed :: proc(object: ^Object) -> bool {
 }
 
 object_was_clicked :: proc(object: ^Object, times: int = 1, with: Mouse_Button = .Left) -> bool {
-	return (.Clicked in object.last_state) && (object.click_count >= times) && (object.click_button == with)
+	return (.Clicked in object.state.previous) && (object.click_count >= times) && (object.click_button == with)
 }
 
 object_was_just_changed :: proc(object: ^Object) -> bool {

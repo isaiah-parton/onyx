@@ -201,7 +201,7 @@ calendar_day :: proc(
 		if object.on_display == nil {
 			object.on_display = proc(object: ^Object) {
 				self := &object.variant.(Calendar_Day)
-				apply_layout_placement(self)
+				place_object(self)
 				if object_is_visible(self) {
 					if self.time._nsec > self.selection[0]._nsec &&
 		   			self.time._nsec <= self.selection[1]._nsec + i64(t.Hour * 24) {

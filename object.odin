@@ -34,9 +34,17 @@ Object_Status :: enum {
 	Dragged,
 }
 
-Object_State :: bit_set[Object_Status;u8]
+Object_Status_Set :: bit_set[Object_Status;u8]
 
-OBJECT_STATE_ALL :: Object_State{.Hovered, .Focused, .Pressed, .Changed, .Clicked, .Open, .Active}
+OBJECT_STATE_ALL :: Object_Status_Set {
+	.Hovered,
+	.Focused,
+	.Pressed,
+	.Changed,
+	.Clicked,
+	.Open,
+	.Active,
+}
 
 Object_Variant :: union {
 	Button,
@@ -66,42 +74,51 @@ Future_Object_Placement :: union {
 }
 
 Object :: struct {
-	id:                     Id,
-	call_index:             int,
-	frames:                 int,
-	layer:                  ^Layer,
-	box:                    Box,
-	future_placement:       Future_Object_Placement,
-	clip_children:          bool,
-	dead:                   bool,
-	is_deferred:            bool,
-	disabled:               bool,
-	isolated:               bool,
-	has_known_box:          bool,
-	flags:                  Object_Flags,
-	last_state:             Object_State,
-	state:                  Object_State,
-	in_state_mask:          Object_State,
-	out_state_mask:         Object_State,
-	click_count:            int,
-	click_time:             time.Time,
-	click_point:            [2]f32,
-	click_button:           Mouse_Button,
-	margin:                 [4]f32,
-	padding:                [4]f32,
-	size:                   [2]f32,
-	desired_size:           [2]f32,
-	layout_axis:            Axis,
-	content_box:            Box,
-	content_justify:        Align,
-	content_align:          Align,
-	space_left_for_content: [2]f32,
-	content_size:           [2]f32,
-	spacing_size:           [2]f32,
-	parent:                 ^Object,
-	children:               [dynamic]^Object,
-	on_display:             proc(_: ^Object),
-	variant:                Object_Variant,
+	id:               Id,
+	call_index:       int,
+	frames:           int,
+	layer:            ^Layer,
+	box:              Box,
+	future_placement: Future_Object_Placement,
+	clip_children:    bool,
+	dead:             bool,
+	is_deferred:      bool,
+	disabled:         bool,
+	isolated:         bool,
+	has_known_box:    bool,
+	flags:            Object_Flags,
+	state:            Object_State,
+	input:            Object_Input,
+	metrics:          Object_Metrics,
+	content:          Object_Content,
+	parent:           ^Object,
+	children:         [dynamic]^Object,
+	on_display:       proc(_: ^Object),
+	variant:          Object_Variant,
+}
+
+Object_State :: struct {
+	current:     Object_Status_Set,
+	previous:    Object_Status_Set,
+	input_mask:  Object_Status_Set,
+	output_mask: Object_Status_Set,
+}
+
+Object_Content :: struct {
+	axis:         Axis,
+	justify:      Align,
+	align:        Align,
+	box:          Box,
+	space_left:   [2]f32,
+	desired_size: [2]f32,
+	padding:      [4]f32,
+	objects:      [dynamic]^Object,
+}
+
+Object_Metrics :: struct {
+	size:         [2]f32,
+	desired_size: [2]f32,
+	margin:       [4]f32,
 }
 
 Object_Input :: struct {
@@ -109,10 +126,6 @@ Object_Input :: struct {
 	click_release_time: time.Time,
 	click_point:        [2]f32,
 	click_mouse_button: Mouse_Button,
-}
-
-Object_Margin :: struct {
-	left, right, top, bottom: f32,
 }
 
 clean_up_objects :: proc() {
@@ -163,8 +176,8 @@ update_object_references :: proc() {
 	}
 }
 
-enable_objects :: proc(enabled: bool = true) {
-	global_state.disable_objects = !enabled
+set_object_desired_size :: proc(object: ^Object, size: [2]f32) {
+	object.metrics.desired_size = size
 }
 
 current_object :: proc() -> Maybe(^Object) {
@@ -234,12 +247,12 @@ object_was_updated_this_frame :: proc(object: ^Object) -> bool {
 
 handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 	if global_state.hovered_object == object.id {
-		object.state += {.Hovered}
+		object.state.current += {.Hovered}
 		pressed_buttons := global_state.mouse_bits - global_state.last_mouse_bits
 		if pressed_buttons != {} {
-			if object.click_button == global_state.mouse_button &&
-			   time.since(object.click_time) <= MAX_CLICK_DELAY {
-				object.click_count = max((object.click_count + 1) % 4, 1)
+			if object.input.click_mouse_button == global_state.mouse_button &&
+			   time.since(object.input.click_time) <= MAX_CLICK_DELAY {
+				object.input.click_count = max((object.click_count + 1) % 4, 1)
 			} else {
 				object.click_count = 1
 			}
@@ -263,14 +276,14 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 	if object.state >= {.Pressed} {
 		released_buttons := global_state.last_mouse_bits - global_state.mouse_bits
 		if object.click_button in released_buttons {
-			object.state += {.Clicked}
-			object.state -= {.Pressed, .Dragged}
+			object.state.current += {.Clicked}
+			object.state.current -= {.Pressed, .Dragged}
 			global_state.dragged_object = 0
 		}
 	} else {
-		if object.click_count > 0 &&
+		if object.input.click_count > 0 &&
 		   linalg.length(global_state.mouse_pos - global_state.last_mouse_pos) > 2 {
-			object.click_count = 0
+			object.input.click_count = 0
 		}
 	}
 }
@@ -281,10 +294,10 @@ object_is_visible :: proc(object: ^Object) -> bool {
 
 update_object_state :: proc(object: ^Object) {
 	object.last_state = object.state
-	object.state -= {.Clicked, .Focused, .Changed}
+	object.state.current -= {.Clicked, .Focused, .Changed}
 
 	if global_state.focused_object == object.id {
-		object.state += {.Focused}
+		object.state.current += {.Focused}
 	}
 }
 
@@ -309,8 +322,8 @@ begin_object :: proc(object: ^Object) -> bool {
 	update_object_state(object)
 	if global_state.disable_objects do object.disabled = true
 
-	if layout, ok := current_layout().?; ok {
-		object.margin = layout.object_margin
+	if object.parent != nil {
+		object.metrics.margin = current_placement().margin
 		// If the user set an explicit size with either `set_width()` or `set_height()` the object's desired size should reflect that
 		// The purpose of these checks is that `set_size_fill()` makes content shrink to accommodate scrollbars
 		if layout.object_size.x == 0 || layout.object_size.x != box_width(layout.content_box) {
@@ -328,47 +341,58 @@ begin_object :: proc(object: ^Object) -> bool {
 
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
-		object.layer.state += object.state
+
+		object.layer.state += object.state.current
+
 		pop_stack(&global_state.object_stack)
 
-		object.desired_size = linalg.max(
-			object.desired_size,
-			object.content_size + object.spacing_size,
+		object.metrics.desired_size = linalg.max(
+			object.metrics.desired_size,
+			occupied_space_of_object_content(object.content),
 		)
 
-		if object.parent != nil && !object.isolated {
-			object.size = linalg.max(
-				object.size,
-				object.desired_size,
-				object.parent.layout.object_size,
-			)
-			transfer_object_metrics_unless_isolated(object, object.parent)
-			display_or_add_object(object)
-		} else {
+		if object.parent != nil {
+			object.metrics.size = solve_object_size(object.metrics)
+			update_object_parent_metrics(object)
+			object.parent.state.current +=
+				object_state_output(object.state) & object.parent.state.input_mask
+		}
+
+		if !maybe_defer_object(object) {
 			display_object(object)
 		}
 	}
 }
 
-transfer_object_metrics_unless_isolated :: proc(object: ^Object) {
-	if object.isolated do return
-	effective_size := object.desired_size + object.margin.xy + object.margin.zw
-	switch layout.axis {
-	case .X:
-		layout.content_size.x += effective_size.x
-		layout.content_size.y = max(layout.content_size.y, effective_size.y)
-	case .Y:
-		layout.content_size.y += effective_size.y
-		layout.content_size.x = max(layout.content_size.x, effective_size.x)
-	}
+occupied_space_of_object_content :: proc(content: Object_Content) -> [2]f32 {
+	return content.desired_size + content.padding.xy + content.padding.zw
 }
 
-transfer_object_state_to_parent :: proc(child: ^Object, parent: ^Object) {
-	state_mask := child.out_state_mask & parent.in_state_mask
-	if .Pressed in child.state && child.id == global_state.dragged_object {
-		state_mask -= {.Pressed}
-	}
-	parent.state += child.state & state_mask
+solve_object_size :: proc(metrics: Object_Metrics) -> [2]f32 {
+	return linalg.max(metrics.size, metrics.desired_size)
+}
+
+occupied_space_of_object :: proc(metrics: Object_Metrics) -> [2]f32 {
+	return metrics.desired_size + metrics.margin.xy + metrics.margin.zw
+}
+
+update_object_parent_metrics :: proc(object: ^Object) {
+	effective_size := occupied_space_of_object(object.metrics)
+
+	assert(object.parent != nil)
+
+	i := int(object.parent.content.axis)
+	j := 1 - i
+
+	object.parent.content.desired_size[i] += effective_size[i]
+	object.parent.content.desired_size[j] += max(
+		object.parent.content.desired_size[j],
+		effective_size[j],
+	)
+}
+
+object_state_output :: proc(state: Object_State) -> Object_Status_Set {
+	return state.current & state.output_mask
 }
 
 hover_object :: proc(object: ^Object) {
@@ -391,7 +415,7 @@ foreground :: proc(loc := #caller_location) {
 	object := persistent_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
-		object.in_state_mask = OBJECT_STATE_ALL
+		object.state.input_mask = OBJECT_STATE_ALL
 		if object.on_display == nil {
 			object.on_display = proc(object: ^Object, layout: ^Layout) {
 				object.box = layout.box
@@ -463,59 +487,62 @@ display_object :: proc(object: ^Object) {
 
 	switch &v in object.variant {
 	case Date_Picker:
-		display_date_picker(&v, layout)
+		display_date_picker(&v)
 	case Container:
-		display_container(&v, layout)
+		display_container(&v)
 	case Input:
-		display_input(&v, layout)
+		display_input(&v)
 	case Button:
-		display_button(&v, layout)
+		display_button(&v)
 	case Boolean:
-		display_boolean(&v, layout)
+		display_boolean(&v)
 	case Layout:
 		display_layout(&v)
 	case Label:
-		display_label(&v, layout)
+		display_label(&v)
 	case Slider:
-		display_slider(&v, layout)
+		display_slider(&v)
 	case HSV_Wheel:
-		display_hsv_wheel(&v, layout)
+		display_hsv_wheel(&v)
 	case Alpha_Slider:
-		display_alpha_slider(&v, layout)
+		display_alpha_slider(&v)
 	case Color_Picker:
-		display_color_picker(&v, layout)
+		display_color_picker(&v)
 	case Tabs:
-		display_tabs(&v, layout)
+		display_tabs(&v)
 	case Calendar, Calendar_Day:
 		for child in object.children {
-			display_object(child, layout)
+			display_object(child)
 		}
 	case nil:
 		if object.on_display != nil {
-			object.on_display(object, layout)
+			object.on_display(object)
 		}
 	}
 
-	if placement, ok := layout.future_placement.?; ok {
-		layout.size = linalg.max(layout.desired_size, layout.size)
-		layout.box.lo = placement.origin - placement.offset * layout.size
-		layout.box.hi = layout.box.lo + layout.size
+	switch v in object.future_placement {
+	case Future_Box_Placement:
+		object.size = linalg.max(object.desired_size, object.size)
+		object.box.lo = placement.origin - placement.offset * object.size
+		object.box.hi = object.box.lo + object.size
+	case Future_Layout_Placement:
 	}
 
-	layout.content_box = layout.box
-	layout.content_box.lo += layout.padding.xy
-	layout.content_box.hi -= layout.padding.zw
+	object.content_box = object.box
+	object.content_box.lo += object.padding.xy
+	object.content_box.hi -= object.padding.zw
 
-	layout.space_left = axis_normal(layout.axis) * (box_size(layout.box) - layout.desired_size)
+	object.space_left_for_content =
+		axis_normal(object.layout_axis) * (box_size(object.box) - object.desired_size)
 
 	if object.clip_children {
 		vgo.save_scissor()
-		vgo.push_scissor(vgo.make_box(layout.box))
-		push_clip(layout.box)
+		vgo.push_scissor(vgo.make_box(object.box))
+		push_clip(object.box)
 	}
 
-	for object in layout.children {
-		display_object(object, layout)
+	for child_object in object.children {
+		display_object(child_object)
 	}
 
 	if object.clip_children {

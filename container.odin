@@ -109,7 +109,7 @@ end_container :: proc() {
 }
 
 display_container :: proc(self: ^Container) {
-	apply_layout_placement(self)
+	place_object(self)
 
 	self.space_needed = linalg.max(layout.content_size + layout.spacing_size, self.space_needed)
 
