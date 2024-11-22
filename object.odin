@@ -63,8 +63,8 @@ Object_Variant :: union {
 }
 
 Child_Placement_Options :: struct {
-	size:   [2]Layout_Size,
-	align:  Align,
+	size:  [2]Layout_Size,
+	align: Align,
 }
 
 Future_Object_Placement :: union {
@@ -84,7 +84,6 @@ Object :: struct {
 	is_deferred:   bool,
 	disabled:      bool,
 	isolated:      bool,
-	has_known_box: bool,
 	flags:         Object_Flags,
 	state:         Object_State,
 	input:         Object_Input,
@@ -317,15 +316,36 @@ begin_object :: proc(object: ^Object) -> bool {
 	object.frames = global_state.frames
 
 	object.layer = current_layer().? or_return
-	object.parent = current_object().? or_else nil
+	object.parent = current_object()
 	update_object_state(object)
 	if global_state.disable_objects do object.disabled = true
 
 	placement_options := current_placement_options()
 	object.metrics.margin = placement_options.margin
-	object.placement = Child_Placement_Options{
-		size = placement_options.size,
+	object.placement = Child_Placement_Options {
+		size  = placement_options.size,
 		align = placement_options.align,
+	}
+
+	if parent, ok := object.parent.?; ok {
+		if object_defers_children(parent) {
+			object.is_deferred = true
+		}
+	}
+
+	switch v in object.placement {
+	case Future_Box_Placement:
+		object.is_deferred = false
+	case vgo.Box:
+		object.is_deferred = false
+	case Child_Placement_Options:
+		if v.size[0] == nil || v.size[1] == nil {
+			object.is_deferred = true
+		}
+	}
+
+	if !object.is_deferred {
+		place_object(object)
 	}
 
 	push_stack(&global_state.object_stack, object) or_return
@@ -346,7 +366,6 @@ end_object :: proc() {
 		)
 
 		if parent, ok := object.parent.?; ok {
-			object.metrics.size = solve_object_size(object.metrics)
 			update_object_parent_metrics(object)
 			parent.state.current += object_state_output(object.state) & parent.state.input_mask
 		}
@@ -361,16 +380,12 @@ space_required_by_object_content :: proc(content: Object_Content) -> [2]f32 {
 	return content.desired_size + content.padding.xy + content.padding.zw
 }
 
-solve_object_size :: proc(metrics: Object_Metrics) -> [2]f32 {
-	return linalg.max(metrics.size, metrics.desired_size)
-}
-
 occupied_space_of_object :: proc(metrics: Object_Metrics) -> [2]f32 {
 	return metrics.desired_size + metrics.margin.xy + metrics.margin.zw
 }
 
 update_object_parent_metrics :: proc(object: ^Object) {
-	effective_size := occupied_space_of_object(object.metrics)
+	effective_size := linalg.max(object.metrics.size, occupied_space_of_object(object.metrics))
 
 	parent := object.parent.?
 
@@ -378,7 +393,7 @@ update_object_parent_metrics :: proc(object: ^Object) {
 	j := 1 - i
 
 	parent.content.desired_size[i] += effective_size[i]
-	parent.content.desired_size[j] += max(parent.content.desired_size[j], effective_size[j])
+	parent.content.desired_size[j] = max(parent.content.desired_size[j], effective_size[j])
 }
 
 object_state_output :: proc(state: Object_State) -> Object_Status_Set {
@@ -483,6 +498,10 @@ display_object :: proc(object: ^Object) {
 		}
 	}
 
+	if object.is_deferred {
+		place_object(object)
+	}
+
 	switch &v in object.variant {
 	case Date_Picker:
 		display_date_picker(&v)
@@ -514,10 +533,6 @@ display_object :: proc(object: ^Object) {
 		if object.on_display != nil {
 			object.on_display(object)
 		}
-	}
-
-	if !object.has_known_box {
-		place_object(object)
 	}
 
 	object.content.space_left =

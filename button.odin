@@ -80,7 +80,7 @@ display_button :: proc(self: ^Button) {
 			)
 			vgo.stroke_box(
 				self.box,
-				2,
+				1,
 				radius,
 				self.color.? or_else global_state.style.color.substance,
 			)

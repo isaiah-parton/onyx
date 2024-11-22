@@ -11,20 +11,20 @@ Panel_Info :: struct {
 }
 
 Panel :: struct {
-	layer:         ^Layer,
-	box:           Box,
-	move_offset:   [2]f32,
-	last_min_size: [2]f32,
-	min_size:      [2]f32,
-	moving:        bool,
-	resizing:      bool,
-	resize_offset: [2]f32,
-	is_snapped:    bool,
+	layer:            ^Layer,
+	box:              Box,
+	move_offset:      [2]f32,
+	last_min_size:    [2]f32,
+	min_size:         [2]f32,
+	moving:           bool,
+	resizing:         bool,
+	resize_offset:    [2]f32,
+	is_snapped:       bool,
 	non_snapped_size: [2]f32,
-	fade:          f32,
-	can_move:      bool,
-	can_resize:    bool,
-	dead:          bool,
+	fade:             f32,
+	can_move:         bool,
+	can_resize:       bool,
+	dead:             bool,
 }
 
 create_panel :: proc(id: Id) -> Maybe(^Panel) {
@@ -79,6 +79,11 @@ begin_panel :: proc(
 		panel.resizing = false
 		panel.box.hi = global_state.mouse_pos + panel.resize_offset
 	}
+	// panel.box.lo = linalg.clamp(
+	// 	panel.box.lo,
+	// 	linalg.min(global_state.view - box_size(panel.box), 0),
+	// 	linalg.max(global_state.view - box_size(panel.box), 0),
+	// )
 	panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + min_size)
 	panel.box = snapped_box(panel.box)
 
@@ -128,11 +133,7 @@ begin_panel :: proc(
 				draw_shadow(panel.box)
 			}
 
-			vgo.fill_box(
-				panel.box,
-				rounding,
-				paint = global_state.style.color.fg,
-			)
+			vgo.fill_box(panel.box, rounding, paint = global_state.style.color.fg)
 		}
 	}
 
@@ -216,8 +217,8 @@ get_next_panel_position :: proc() -> [2]f32 {
 
 Panel_Snap_State :: struct {
 	active_panel: Maybe(^Panel),
-	snaps: [8]Panel_Snap,
-	snap_count: int,
+	snaps:        [8]Panel_Snap,
+	snap_count:   int,
 }
 
 Panel_Snap :: enum {

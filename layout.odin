@@ -153,43 +153,34 @@ place_object :: proc(object: ^Object) -> bool {
 
 place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Options) -> bool {
 	assert(object != nil)
-	if object.has_known_box do return false
 	parent := object.parent.? or_return
 
 	content_box := parent.content.box
 
+	object.metrics.size, object.metrics.desired_size, _ = solve_object_size(
+		placement.size[int(parent.content.axis)],
+		parent,
+		.X,
+	)
+
 	object.box, content_box = split_box(
-		apply_near_object_margin(
-			content_box,
-			parent.content.axis,
-			object.metrics.margin,
-		),
+		apply_near_object_margin(content_box, parent.content.axis, object.metrics.margin),
 		axis_cut_side(parent.content.axis),
 		object.metrics.size[int(parent.content.axis)],
 	)
 
-	content_box = apply_far_object_margin(
-		content_box,
-		parent.content.axis,
-		object.metrics.margin,
-	)
+	content_box = apply_far_object_margin(content_box, parent.content.axis, object.metrics.margin)
 
-	object.box = snapped_box(
-		apply_object_alignment(
-			apply_perpendicular_object_margin(
-				object.box,
-				parent.content.axis,
-				object.metrics.margin,
-			),
-			parent.content.axis,
-			parent.content.align,
-			object.metrics.size,
-		),
+	object.box = apply_object_alignment(
+		apply_perpendicular_object_margin(object.box, parent.content.axis, object.metrics.margin),
+		parent.content.axis,
+		parent.content.align,
+		object.metrics.size,
 	)
 
 	if parent.content.justify == .Equal_Space {
 		content_box.lo[int(parent.content.axis)] +=
-		parent.content.space_left[int(parent.content.axis)] / f32(len(parent.children) - 1)
+			parent.content.space_left[int(parent.content.axis)] / f32(len(parent.children) - 1)
 	} else if parent.content.justify == .Center {
 		move_object(object, parent.content.space_left * 0.5)
 	} else if parent.content.justify == .Far {
@@ -210,12 +201,12 @@ object_defers_children :: proc(object: ^Object) -> bool {
 }
 
 object_is_deferred :: proc(object: ^Object) -> bool {
-	return !object.has_known_box
+	return object.is_deferred
 }
 
 Future_Box_Placement :: struct {
 	origin: [2]f32,
-	align: [2]f32,
+	align:  [2]f32,
 }
 
 Layout_Size :: union {
@@ -238,9 +229,7 @@ begin_row_layout :: proc(
 	padding: [4]f32 = 0,
 ) -> bool {
 	return begin_layout(
-		placement = Child_Placement_Options{
-			size = size,
-		},
+		placement = Child_Placement_Options{size = size},
 		axis = .X,
 		justify = justify,
 		padding = padding,
@@ -253,9 +242,7 @@ begin_column_layout :: proc(
 	padding: [4]f32 = 0,
 ) -> bool {
 	return begin_layout(
-		placement = Child_Placement_Options{
-			size = size,
-		},
+		placement = Child_Placement_Options{size = size},
 		axis = .Y,
 		justify = justify,
 		padding = padding,
@@ -272,43 +259,11 @@ begin_layout :: proc(
 	self := transient_object()
 	self.state.input_mask = OBJECT_STATE_ALL
 	self.content = {
-		axis = axis,
+		axis    = axis,
 		justify = justify,
 		padding = padding,
 	}
-
-	#partial switch v in placement {
-	case Box:
-		self.isolated = true
-		self.has_known_box = true
-		self.box = v
-		self.metrics.size = box_size(v)
-	case Future_Box_Placement:
-		self.isolated = true
-		self.placement = v
-	case Child_Placement_Options:
-		self.metrics.size, self.metrics.desired_size, self.has_known_box = determine_object_size(
-			v.size[1 - int(self.content.axis)],
-			current_object().?,
-			self.content.axis,
-		)
-		if self.has_known_box {
-			if parent, ok := current_object().?; ok {
-				self.box, parent.content.box = split_box(
-					parent.content.box,
-					axis_cut_side(parent.content.axis),
-					self.metrics.size[int(parent.content.axis)],
-				)
-			}
-		}
-	}
-
-	self.content.box = self.box
-	self.content.padding = padding
-	if !object_defers_children(self) {
-		self.content.box.lo += self.content.padding.xy
-		self.content.box.hi -= self.content.padding.zw
-	}
+	self.placement = placement
 
 	begin_object(self) or_return
 	push_placement_options()
@@ -320,27 +275,27 @@ end_layout :: proc() {
 	end_object()
 }
 
-determine_object_size :: proc(
+solve_object_size :: proc(
 	size: Layout_Size,
 	parent: Maybe(^Object),
 	axis: Axis,
 ) -> (
 	actual_size: [2]f32,
 	desired_size: [2]f32,
-	known: bool,
+	unkown: bool,
 ) {
 	available_space: [2]f32
 	i := int(axis)
 	j := 1 - int(axis)
-	known = true
 	if parent, ok := parent.?; ok {
 		available_space = box_size(parent.content.box)
 		j = int(parent.content.axis)
 		i = 1 - j
 		if object_defers_children(parent) {
-			known = false
+			unkown = true
 		}
 	}
+
 	switch size in size {
 	case Percent:
 		actual_size[j] = available_space[j] * f32(size) * 0.01
@@ -357,7 +312,7 @@ determine_object_size :: proc(
 		actual_size[j] = min(available_space[j], size[0], size[1])
 		desired_size[j] = size[0]
 	case nil:
-		known = false
+		unkown = true
 	}
 	actual_size[i] = available_space[i]
 	return
