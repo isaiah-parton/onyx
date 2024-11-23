@@ -22,21 +22,21 @@ label :: proc(
 	font := global_state.style.default_font,
 ) {
 	object := transient_object()
+	if object.variant == nil {
+		object.variant = Label{
+			object = object,
+		}
+	}
+	self := &object.variant.(Label)
+	self.placement = next_user_placement()
+	self.text_layout = vgo.make_text_layout(
+		text,
+		font_size,
+		font,
+	)
+	self.metrics.desired_size = self.text_layout.size
 	if begin_object(object) {
 		defer end_object()
-
-		if object.variant == nil {
-			object.variant = Label{
-				object = object,
-			}
-		}
-		label := &object.variant.(Label)
-		label.text_layout = vgo.make_text_layout(
-			text,
-			font_size,
-			font,
-		)
-		label.metrics.desired_size = label.text_layout.size
 	}
 }
 

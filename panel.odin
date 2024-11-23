@@ -100,13 +100,13 @@ begin_panel :: proc(
 
 	{
 		object := persistent_object(hash("panelbg"))
+		object.placement = panel.box
 		if begin_object(object) {
 			defer end_object()
 
 			if object.variant == nil {
 				object.state.input_mask = OBJECT_STATE_ALL
 			}
-			object.box = panel.box
 
 			handle_object_click(object, sticky = true)
 
@@ -139,7 +139,7 @@ begin_panel :: proc(
 
 	vgo.push_scissor(vgo.make_box(panel.box, rounding))
 	push_clip(panel.box)
-	begin_layout(placement = panel.box, axis = axis, padding = padding) or_return
+	begin_layout(placement = Box(panel.box), axis = axis, padding = padding) or_return
 	return true
 }
 

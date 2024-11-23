@@ -41,27 +41,25 @@ button :: proc(
 	result: Button_Result,
 ) {
 	object := persistent_object(hash(loc))
-	if begin_object(object) {
-		defer end_object()
-
-		if object.variant == nil {
-			object.variant = Button {
-				object = object,
-			}
+	if object.variant == nil {
+		object.variant = Button {
+			object = object,
 		}
-		self := &object.variant.(Button)
-		self.text_layout = vgo.make_text_layout(text, font_size, global_state.style.default_font)
-		set_object_desired_size(object, self.text_layout.size + global_state.style.text_padding * 2)
-		self.style = style
-
+	}
+	self := &object.variant.(Button)
+	self.text_layout = vgo.make_text_layout(text, font_size, global_state.style.default_font)
+	self.style = style
+	self.placement = next_user_placement()
+	set_object_desired_size(object, self.text_layout.size + global_state.style.text_padding * 2)
+	if begin_object(object) {
 		result.clicked = object_was_clicked(self, with = .Left)
 		result.hovered = .Hovered in self.state.previous
+		end_object()
 	}
 	return
 }
 
 display_button :: proc(self: ^Button) {
-
 	handle_object_click(self)
 	button_behavior(self)
 	if object_is_visible(self) {

@@ -86,23 +86,22 @@ Color_Picker :: struct {
 color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_location) -> Id {
 	id := hash(loc)
 	object := persistent_object(id)
+	object.placement = next_user_placement()
+	object.metrics.desired_size = global_state.style.visual_size * {0.5, 1}
+	if object.variant == nil {
+		object.variant = Color_Picker {
+			object = object,
+		}
+	}
 	if begin_object(object) {
 		defer end_object()
 
-		object.metrics.desired_size = global_state.style.visual_size * {0.5, 1}
-
-		if object.variant == nil {
-			object.variant = Color_Picker {
-				object = object,
-			}
-		}
-		variant := &object.variant.(Color_Picker)
-
-		if .Changed in variant.state.previous {
-			value^ = variant.value
+		self := &object.variant.(Color_Picker)
+		if .Changed in self.state.previous {
+			value^ = self.value
 			draw_frames(1)
 		} else {
-			variant.value = value^
+			self.value = value^
 		}
 	}
 	return id

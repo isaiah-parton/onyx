@@ -320,13 +320,6 @@ begin_object :: proc(object: ^Object) -> bool {
 	update_object_state(object)
 	if global_state.disable_objects do object.disabled = true
 
-	placement_options := current_placement_options()
-	object.metrics.margin = placement_options.margin
-	object.placement = Child_Placement_Options {
-		size  = placement_options.size,
-		align = placement_options.align,
-	}
-
 	if parent, ok := object.parent.?; ok {
 		if object_defers_children(parent) {
 			object.is_deferred = true
@@ -345,7 +338,7 @@ begin_object :: proc(object: ^Object) -> bool {
 	}
 
 	if !object.is_deferred {
-		place_object(object)
+		place_object(object) or_return
 	}
 
 	push_stack(&global_state.object_stack, object) or_return
@@ -385,7 +378,7 @@ occupied_space_of_object :: proc(metrics: Object_Metrics) -> [2]f32 {
 }
 
 update_object_parent_metrics :: proc(object: ^Object) {
-	effective_size := linalg.max(object.metrics.size, occupied_space_of_object(object.metrics))
+	effective_size := occupied_space_of_object(object.metrics)
 
 	parent := object.parent.?
 

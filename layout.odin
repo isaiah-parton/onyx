@@ -156,11 +156,10 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 	parent := object.parent.? or_return
 
 	content_box := parent.content.box
-
-	object.metrics.size, object.metrics.desired_size, _ = solve_object_size(
-		placement.size[int(parent.content.axis)],
-		parent,
-		.X,
+	object.metrics.size, object.metrics.desired_size, _ = solve_child_object_size(
+		placement.size,
+		object.metrics.desired_size,
+		box_size(content_box),
 	)
 
 	object.box, content_box = split_box(
@@ -204,6 +203,15 @@ object_is_deferred :: proc(object: ^Object) -> bool {
 	return object.is_deferred
 }
 
+next_user_placement :: proc() -> Object_Placement {
+	placement_options := current_placement_options()
+
+	return Child_Placement_Options{
+		size = placement_options.size,
+		align = placement_options.align,
+	}
+}
+
 Future_Box_Placement :: struct {
 	origin: [2]f32,
 	align:  [2]f32,
@@ -229,7 +237,7 @@ begin_row_layout :: proc(
 	padding: [4]f32 = 0,
 ) -> bool {
 	return begin_layout(
-		placement = Child_Placement_Options{size = size},
+		placement = Child_Placement_Options{size = {Percent(100), size}},
 		axis = .X,
 		justify = justify,
 		padding = padding,
@@ -242,7 +250,7 @@ begin_column_layout :: proc(
 	padding: [4]f32 = 0,
 ) -> bool {
 	return begin_layout(
-		placement = Child_Placement_Options{size = size},
+		placement = Child_Placement_Options{size = {size, Percent(100)}},
 		axis = .Y,
 		justify = justify,
 		padding = padding,
@@ -264,6 +272,7 @@ begin_layout :: proc(
 		padding = padding,
 	}
 	self.placement = placement
+	self.clip_children = clip_contents
 
 	begin_object(self) or_return
 	push_placement_options()
@@ -275,46 +284,39 @@ end_layout :: proc() {
 	end_object()
 }
 
-solve_object_size :: proc(
-	size: Layout_Size,
-	parent: Maybe(^Object),
-	axis: Axis,
-) -> (
-	actual_size: [2]f32,
+solve_child_object_size :: proc(
+	size: [2]Layout_Size,
 	desired_size: [2]f32,
-	unkown: bool,
+	available_space: [2]f32,
+) -> (
+	new_desired_size: [2]f32,
+	actual_size: [2]f32,
+	unknown: bool,
 ) {
-	available_space: [2]f32
-	i := int(axis)
-	j := 1 - int(axis)
-	if parent, ok := parent.?; ok {
-		available_space = box_size(parent.content.box)
-		j = int(parent.content.axis)
-		i = 1 - j
-		if object_defers_children(parent) {
-			unkown = true
+
+	for i in 0..=1 {
+		switch size in size[i] {
+		case Percent:
+			actual_size[i] = available_space[i] * f32(size) * 0.01
+		case Fixed:
+			actual_size[i] = f32(size)
+			new_desired_size[i] = max(desired_size[i], f32(size))
+		case At_Least:
+			actual_size[i] = max(available_space[i], f32(size))
+			new_desired_size[i] = max(desired_size[i], f32(size))
+		case At_Most:
+			actual_size[i] = min(available_space[i], f32(size))
+			new_desired_size[i] = max(desired_size[i], f32(size))
+		case Between:
+			actual_size[i] = min(available_space[i], size[0], size[1])
+			new_desired_size[i] = max(desired_size[i], size[0])
+		case nil:
+			actual_size = desired_size
+			new_desired_size = desired_size
+			unknown = true
 		}
 	}
 
-	switch size in size {
-	case Percent:
-		actual_size[j] = available_space[j] * f32(size) * 0.01
-	case Fixed:
-		actual_size[j] = f32(size)
-		desired_size[j] = f32(size)
-	case At_Least:
-		actual_size[j] = max(available_space[j], f32(size))
-		desired_size[j] = f32(size)
-	case At_Most:
-		actual_size[j] = min(available_space[j], f32(size))
-		desired_size[j] = f32(size)
-	case Between:
-		actual_size[j] = min(available_space[j], size[0], size[1])
-		desired_size[j] = size[0]
-	case nil:
-		unkown = true
-	}
-	actual_size[i] = available_space[i]
 	return
 }
 

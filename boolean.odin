@@ -31,39 +31,38 @@ boolean :: proc(
 	loc := #caller_location,
 ) {
 	object := persistent_object(hash(loc))
+	if object.variant == nil {
+		object.variant = Boolean {
+			base = object,
+		}
+	}
+	self := &object.variant.(Boolean)
+	self.value = state
+	self.gadget_size = global_state.style.visual_size.y * 0.8
+	if type == .Switch do self.gadget_size *= [2]f32{2, 1}
+	self.placement = next_user_placement()
+	self.type = type
+	self.text = text
+	if len(text) > 0 {
+		self.text_layout = vgo.make_text_layout(
+			text,
+			global_state.style.default_text_size,
+			global_state.style.default_font,
+		)
+		if int(text_side) > 1 {
+			self.metrics.desired_size.x = max(self.gadget_size.x, self.text_layout.size.x)
+			self.metrics.desired_size.y = self.gadget_size.x + self.text_layout.size.y
+		} else {
+			self.metrics.desired_size.x =
+				self.gadget_size.x +
+				self.text_layout.size.x +
+				global_state.style.text_padding.x * 2
+			self.metrics.desired_size.y = self.gadget_size.y
+		}
+	}
 	if begin_object(object) {
 		defer end_object()
 
-		if object.variant == nil {
-			object.variant = Boolean {
-				base = object,
-			}
-		}
-		self := &object.variant.(Boolean)
-		self.value = state
-
-		self.gadget_size = global_state.style.visual_size.y * 0.8
-		if type == .Switch do self.gadget_size *= [2]f32{2, 1}
-
-		self.type = type
-		self.text = text
-		if len(text) > 0 {
-			self.text_layout = vgo.make_text_layout(
-				text,
-				global_state.style.default_text_size,
-				global_state.style.default_font,
-			)
-			if int(text_side) > 1 {
-				self.metrics.desired_size.x = max(self.gadget_size.x, self.text_layout.size.x)
-				self.metrics.desired_size.y = self.gadget_size.x + self.text_layout.size.y
-			} else {
-				self.metrics.desired_size.x =
-					self.gadget_size.x +
-					self.text_layout.size.x +
-					global_state.style.text_padding.x * 2
-				self.metrics.desired_size.y = self.gadget_size.y
-			}
-		}
 	}
 }
 

@@ -14,22 +14,21 @@ Tabs :: struct {
 
 tabs :: proc(items: []string, index: ^$T, loc := #caller_location) {
 	object := persistent_object(hash(loc))
+	if object.variant == nil {
+		object.variant = Tabs {
+			object = object,
+		}
+	}
+	self := &object.variant.(Tabs)
+	self.items = items
+	self.placement = next_user_placement()
+	self.metrics.desired_size = global_state.style.visual_size
 	if begin_object(object) {
 		defer end_object()
-
-		if object.variant == nil {
-			object.variant = Tabs {
-				object = object,
-			}
-		}
-		variant := &object.variant.(Tabs)
-		variant.items = items
-		variant.metrics.desired_size = global_state.style.visual_size
-
 		if object_was_changed(object) {
-			index^ = T(variant.index)
+			index^ = T(self.index)
 		} else {
-			variant.index = int(index^)
+			self.index = int(index^)
 		}
 	}
 }

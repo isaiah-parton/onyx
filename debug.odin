@@ -195,11 +195,13 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		}
 		fmt.sbprintf(
 			&b,
-			" index: %v\n id: %v\n box: [%.1f, %.1f]\n size: %.1f\n desired_size: %.1f",
+			" index: %v\n id: %v\n box: [%.1f, %.1f]\n content.box: [%.1f, %.1f]\n size: %.1f\n desired_size: %.1f",
 			object.call_index + 1,
 			object.id,
 			object.box.lo,
 			object.box.hi,
+			object.content.box.lo,
+			object.content.box.hi,
 			object.metrics.size,
 			object.metrics.desired_size,
 		)
