@@ -177,6 +177,7 @@ display_color_picker :: proc(self: ^Color_Picker) {
 					align = {0, 0.5},
 				},
 				padding = 10,
+				isolated = true,
 				clip_contents = true,
 			) {
 				defer end_layout()
@@ -214,27 +215,27 @@ alpha_slider :: proc(
 ) -> Id {
 	id := hash(loc)
 	object := persistent_object(id)
+	if object.variant == nil {
+		object.variant = Alpha_Slider {
+			object = object,
+		}
+	}
+	self := &object.variant.(Alpha_Slider)
+	self.placement = next_user_placement()
+	self.metrics.desired_size = global_state.style.visual_size
+	if self.axis == .Y {
+		self.metrics.desired_size.xy = self.metrics.desired_size.yx
+	}
 	if begin_object(object) {
 		defer end_object()
 
-		if object.variant == nil {
-			object.variant = Alpha_Slider {
-				object = object,
-			}
-		}
-		variant := &object.variant.(Alpha_Slider)
-		variant.axis = axis
-		variant.color = color
+		self.axis = axis
+		self.color = color
 
-		if .Changed in variant.state.previous {
-			value^ = variant.value
+		if .Changed in self.state.previous {
+			value^ = self.value
 		}
-		variant.value = value^
-
-		variant.metrics.desired_size = global_state.style.visual_size
-		if variant.axis == .Y {
-			variant.metrics.desired_size.xy = variant.metrics.desired_size.yx
-		}
+		self.value = value^
 	}
 	return id
 }
@@ -297,22 +298,20 @@ HSV_Wheel :: struct {
 hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) -> Id {
 	id := hash(loc)
 	object := persistent_object(id)
+	if object.variant == nil {
+		object.variant = HSV_Wheel {
+			object = object,
+		}
+	}
+	self := &object.variant.(HSV_Wheel)
+	self.placement = next_user_placement()
+	self.metrics.desired_size = 200
 	if begin_object(object) {
 		defer end_object()
-
-		if object.variant == nil {
-			object.variant = HSV_Wheel {
-				object = object,
-			}
+		if .Changed in self.state.previous {
+			value^ = self.value
 		}
-		variant := &object.variant.(HSV_Wheel)
-
-		if .Changed in variant.state.previous {
-			value^ = variant.value
-		}
-		variant.value = value^
-
-		variant.metrics.desired_size = 200
+		self.value = value^
 	}
 	return id
 }

@@ -52,17 +52,18 @@ raw_input :: proc(
 	loc := #caller_location,
 ) {
 	object := persistent_object(hash(loc))
+	if object.variant == nil {
+		object.variant = Input {
+			object = object,
+		}
+	}
+
+	self := &object.variant.(Input)
+	self.placement = next_user_placement()
+	self.metrics.desired_size = global_state.style.visual_size
 	if begin_object(object) {
 		defer end_object()
 
-		if object.variant == nil {
-			object.variant = Input {
-				object = object,
-			}
-		}
-
-		self := &object.variant.(Input)
-		self.metrics.desired_size = global_state.style.visual_size
 		self.borrowed_string = content
 		self.placeholder = placeholder
 		self.prefix = prefix

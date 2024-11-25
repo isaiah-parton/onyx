@@ -17,25 +17,26 @@ Slider :: struct {
 }
 
 slider :: proc(value: ^$T, lower, upper: T, format: string = "%v", loc := #caller_location) where intrinsics.type_is_numeric(T) {
-	object := persistent_object(hash(loc))
 	if value == nil do return
+	object := persistent_object(hash(loc))
+	if object.variant == nil {
+		object.variant = Slider{
+			object = object,
+		}
+	}
+	self := &object.variant.(Slider)
+	self.placement = next_user_placement()
+	self.metrics.desired_size = global_state.style.visual_size
 	if begin_object(object) {
 		defer end_object()
 
-		if object.variant == nil {
-			object.variant = Slider{
-				object = object,
-			}
-		}
-		slider := &object.variant.(Slider)
-		if new_value, ok := slider.new_value.?; ok {
+		if new_value, ok := self.new_value.?; ok {
 			value^ = T(new_value)
 		}
-		slider.lower = lower
-		slider.upper = upper
-		slider.format = format
-		slider.value = f64(value^)
-		slider.metrics.desired_size = global_state.style.visual_size
+		self.lower = lower
+		self.upper = upper
+		self.format = format
+		self.value = f64(value^)
 	}
 }
 

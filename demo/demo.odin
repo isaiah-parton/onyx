@@ -108,9 +108,10 @@ main :: proc() {
 				if begin_column_layout(size = At_Least(0), padding = 15) {
 					defer end_layout()
 
-					if begin_row_layout(size = Fixed(20)) {
+					if begin_column_layout(size = Fixed(20)) {
 						defer end_layout()
 
+						current_placement_options().align = .Center
 						label("Content alignment")
 					}
 					if begin_row_layout(size = Fixed(30), justify = .Center) {

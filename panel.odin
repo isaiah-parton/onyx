@@ -151,10 +151,10 @@ end_panel :: proc() {
 	panel := current_panel()
 	if panel.can_resize {
 		object := persistent_object(hash("resize"))
+		object.placement = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
 		if begin_object(object) {
 			defer end_object()
 
-			object.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
 			handle_object_click(object, sticky = true)
 			if point_in_box(mouse_point(), object.box) {
 				hover_object(object)

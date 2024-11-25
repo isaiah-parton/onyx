@@ -327,8 +327,10 @@ begin_object :: proc(object: ^Object) -> bool {
 	}
 
 	switch v in object.placement {
+	case nil:
+		object.is_deferred = true
 	case Future_Box_Placement:
-		object.is_deferred = false
+		object.is_deferred = true
 	case vgo.Box:
 		object.is_deferred = false
 	case Child_Placement_Options:
@@ -378,6 +380,9 @@ occupied_space_of_object :: proc(metrics: Object_Metrics) -> [2]f32 {
 }
 
 update_object_parent_metrics :: proc(object: ^Object) {
+	// TODO: Put this somewhere else
+	if object.isolated do return
+
 	effective_size := occupied_space_of_object(object.metrics)
 
 	parent := object.parent.?

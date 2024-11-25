@@ -156,7 +156,7 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 	parent := object.parent.? or_return
 
 	content_box := parent.content.box
-	object.metrics.size, object.metrics.desired_size, _ = solve_child_object_size(
+	object.metrics.size, object.metrics.desired_size = solve_child_object_size(
 		placement.size,
 		object.metrics.desired_size,
 		box_size(content_box),
@@ -196,7 +196,7 @@ inverse_axis :: proc(axis: Axis) -> Axis {
 }
 
 object_defers_children :: proc(object: ^Object) -> bool {
-	return (object.content.justify != .Near) || object_is_deferred(object)
+	return (object.content.justify != .Near) || object.is_deferred
 }
 
 object_is_deferred :: proc(object: ^Object) -> bool {
@@ -263,6 +263,7 @@ begin_layout :: proc(
 	justify: Align = .Near,
 	padding: [4]f32 = {},
 	clip_contents: bool = false,
+	isolated: bool = false,
 ) -> bool {
 	self := transient_object()
 	self.state.input_mask = OBJECT_STATE_ALL
@@ -271,6 +272,7 @@ begin_layout :: proc(
 		justify = justify,
 		padding = padding,
 	}
+	self.isolated = isolated
 	self.placement = placement
 	self.clip_children = clip_contents
 
@@ -289,11 +291,9 @@ solve_child_object_size :: proc(
 	desired_size: [2]f32,
 	available_space: [2]f32,
 ) -> (
-	new_desired_size: [2]f32,
 	actual_size: [2]f32,
-	unknown: bool,
+	new_desired_size: [2]f32,
 ) {
-
 	for i in 0..=1 {
 		switch size in size[i] {
 		case Percent:
@@ -311,12 +311,10 @@ solve_child_object_size :: proc(
 			actual_size[i] = min(available_space[i], size[0], size[1])
 			new_desired_size[i] = max(desired_size[i], size[0])
 		case nil:
-			actual_size = desired_size
-			new_desired_size = desired_size
-			unknown = true
+			actual_size[i] = desired_size[i]
+			new_desired_size[i] = desired_size[i]
 		}
 	}
-
 	return
 }
 
