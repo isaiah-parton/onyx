@@ -116,8 +116,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			if begin_row_layout(size = Fixed(self.row_height)) {
 				defer end_layout()
 
-				set_height_fill()
-				set_width_to_height()
+				set_height(Percent(100))
 				WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
 				for weekday in WEEKDAY_ABBREVIATIONS {
 					label(text = weekday)
@@ -329,8 +328,8 @@ display_date_picker :: proc(self: ^Date_Picker) {
 				defer end_layout()
 
 				foreground()
-				set_width_auto()
-				set_height_auto()
+				set_width(nil)
+				set_height(nil)
 				calendar(date = self.first, until = self.second)
 
 				if (current_layer().?.state & {.Hovered, .Focused} == {}) &&

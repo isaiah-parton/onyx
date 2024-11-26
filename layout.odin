@@ -20,6 +20,8 @@ Fixed :: distinct f32
 At_Least :: distinct f32
 Percent :: distinct f32
 At_Most :: distinct f32
+Percent_Of_Width :: distinct f32
+Percent_Of_Height :: distinct f32
 Between :: distinct [2]f32
 
 Axis :: enum {
@@ -163,17 +165,17 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 	)
 
 	object.box, content_box = split_box(
-		apply_near_object_margin(content_box, parent.content.axis, object.metrics.margin),
+		apply_near_object_margin(content_box, parent.content.axis, placement.margin),
 		axis_cut_side(parent.content.axis),
 		object.metrics.size[int(parent.content.axis)],
 	)
 
-	content_box = apply_far_object_margin(content_box, parent.content.axis, object.metrics.margin)
+	content_box = apply_far_object_margin(content_box, parent.content.axis, placement.margin)
 
 	object.box = apply_object_alignment(
-		apply_perpendicular_object_margin(object.box, parent.content.axis, object.metrics.margin),
+		apply_perpendicular_object_margin(object.box, parent.content.axis, placement.margin),
 		parent.content.axis,
-		parent.content.align,
+		placement.align,
 		object.metrics.size,
 	)
 
@@ -209,6 +211,7 @@ next_user_placement :: proc() -> Object_Placement {
 	return Child_Placement_Options{
 		size = placement_options.size,
 		align = placement_options.align,
+		margin = placement_options.margin,
 	}
 }
 
@@ -223,6 +226,8 @@ Layout_Size :: union {
 	At_Most,
 	Between,
 	Percent,
+	Percent_Of_Width,
+	Percent_Of_Height,
 }
 
 Object_Placement :: union {
@@ -231,13 +236,27 @@ Object_Placement :: union {
 	Child_Placement_Options,
 }
 
+stack_layout_placement :: proc(axis: Axis, size: Layout_Size) -> Child_Placement_Options {
+	placement: Child_Placement_Options
+	placement.size[int(axis)] = size
+	placement.size[1 - int(axis)] = At_Least(0)
+	return placement
+}
+
+current_axis :: proc() -> Axis {
+	if object, ok := current_object().?; ok {
+		return object.content.axis
+	}
+	return .Y
+}
+
 begin_row_layout :: proc(
 	size: Layout_Size = nil,
 	justify: Align = .Near,
 	padding: [4]f32 = 0,
 ) -> bool {
 	return begin_layout(
-		placement = Child_Placement_Options{size = {Percent(100), size}},
+		placement = stack_layout_placement(current_axis(), size),
 		axis = .X,
 		justify = justify,
 		padding = padding,
@@ -250,7 +269,7 @@ begin_column_layout :: proc(
 	padding: [4]f32 = 0,
 ) -> bool {
 	return begin_layout(
-		placement = Child_Placement_Options{size = {size, Percent(100)}},
+		placement = stack_layout_placement(current_axis(), size),
 		axis = .Y,
 		justify = justify,
 		padding = padding,
@@ -298,6 +317,10 @@ solve_child_object_size :: proc(
 		switch size in size[i] {
 		case Percent:
 			actual_size[i] = available_space[i] * f32(size) * 0.01
+		case Percent_Of_Width:
+			actual_size[i] = available_space.x * f32(size) * 0.01
+		case Percent_Of_Height:
+			actual_size[i] = available_space.y * f32(size) * 0.01
 		case Fixed:
 			actual_size[i] = f32(size)
 			new_desired_size[i] = max(desired_size[i], f32(size))
@@ -325,36 +348,12 @@ axis_cut_side :: proc(axis: Axis) -> Side {
 	return .Top
 }
 
-set_width :: proc(width: f32) {
-	current_placement_options().size.x = Fixed(width)
+set_width :: proc(size: Layout_Size) {
+	current_placement_options().size.x = size
 }
 
-set_width_auto :: proc() {
-	current_placement_options().size.x = nil
-}
-
-set_width_fill :: proc() {
-	set_width_percent(100)
-}
-
-set_width_percent :: proc(percent: f32) {
-	current_placement_options().size.x = Percent(percent)
-}
-
-set_height :: proc(height: f32) {
-	current_placement_options().size.y = Fixed(height)
-}
-
-set_height_auto :: proc() {
-	current_placement_options().size.y = nil
-}
-
-set_height_fill :: proc() {
-	set_height_percent(100)
-}
-
-set_height_percent :: proc(percent: f32) {
-	current_placement_options().size.y = Percent(percent)
+set_height :: proc(size: Layout_Size) {
+	current_placement_options().size.y = size
 }
 
 set_margin_sides :: proc(

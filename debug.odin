@@ -83,7 +83,7 @@ draw_object_debug_padding :: proc(box: Box, padding: [4]f32) {
 draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
 	if object_is_being_debugged(state, object) {
 		vgo.fill_box(object.box, paint = vgo.fade(vgo.BLUE, 0.25))
-		draw_object_debug_margin(object.box, object.metrics.margin)
+		// draw_object_debug_margin(object.box, object.metrics.margin)
 		draw_object_debug_padding(object.box, object.content.padding)
 	}
 	vgo.stroke_box(object.box, 1, paint = vgo.BLUE)

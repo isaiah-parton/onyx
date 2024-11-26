@@ -222,16 +222,14 @@ alpha_slider :: proc(
 	}
 	self := &object.variant.(Alpha_Slider)
 	self.placement = next_user_placement()
+	self.axis = axis
 	self.metrics.desired_size = global_state.style.visual_size
 	if self.axis == .Y {
 		self.metrics.desired_size.xy = self.metrics.desired_size.yx
 	}
-	if begin_object(object) {
+	if begin_object(self) {
 		defer end_object()
-
-		self.axis = axis
 		self.color = color
-
 		if .Changed in self.state.previous {
 			value^ = self.value
 		}

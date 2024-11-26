@@ -63,8 +63,9 @@ Object_Variant :: union {
 }
 
 Child_Placement_Options :: struct {
-	size:  [2]Layout_Size,
-	align: Align,
+	size:   [2]Layout_Size,
+	align:  Align,
+	margin: [4]f32,
 }
 
 Future_Object_Placement :: union {
@@ -116,7 +117,6 @@ Object_Content :: struct {
 Object_Metrics :: struct {
 	size:         [2]f32,
 	desired_size: [2]f32,
-	margin:       [4]f32,
 }
 
 Object_Input :: struct {
@@ -375,15 +375,19 @@ space_required_by_object_content :: proc(content: Object_Content) -> [2]f32 {
 	return content.desired_size + content.padding.xy + content.padding.zw
 }
 
-occupied_space_of_object :: proc(metrics: Object_Metrics) -> [2]f32 {
-	return metrics.desired_size + metrics.margin.xy + metrics.margin.zw
+occupied_space_of_object :: proc(object: ^Object) -> [2]f32 {
+	size := object.metrics.desired_size
+	if placement, ok := object.placement.(Child_Placement_Options); ok {
+		size += placement.margin.xy + placement.margin.zw
+	}
+	return size
 }
 
 update_object_parent_metrics :: proc(object: ^Object) {
 	// TODO: Put this somewhere else
 	if object.isolated do return
 
-	effective_size := occupied_space_of_object(object.metrics)
+	effective_size := occupied_space_of_object(object)
 
 	parent := object.parent.?
 

@@ -96,12 +96,16 @@ main :: proc() {
 
 					vgo.fill_box(current_object().?.box, paint = colors().field)
 
-					set_width_fill()
-					set_height_to_width()
+					set_width(Percent(100))
+					set_height(Percent_Of_Width(100))
 					button("\uf578", style = .Ghost, font_size = 20)
 					button("\uf044", style = .Ghost, font_size = 20)
 					if button("\uedca", style = .Ghost, font_size = 20).clicked {
-						libc.system("explorer \"https://github.com/isaiah-parton/onyx\"")
+						when ODIN_OS == .Linux {
+							libc.system("xdg-open \"https://github.com/isaiah-parton/onyx\"")
+						} else when ODIN_OS == .Windows {
+							libc.system("explorer \"https://github.com/isaiah-parton/onyx\"")
+						}
 					}
 				}
 
@@ -114,9 +118,10 @@ main :: proc() {
 						current_placement_options().align = .Center
 						label("Content alignment")
 					}
-					if begin_row_layout(size = Fixed(30), justify = .Center) {
+					if begin_row_layout(size = Fixed(30)) {
 						defer end_layout()
 
+						set_width(Percent(100))
 						tabs(reflect.enum_field_names(Align), &justify)
 					}
 					if begin_row_layout(justify = justify, size = Percent(25), padding = 10) {
