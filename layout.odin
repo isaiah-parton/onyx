@@ -205,14 +205,8 @@ object_is_deferred :: proc(object: ^Object) -> bool {
 	return object.is_deferred
 }
 
-next_user_placement :: proc() -> Object_Placement {
-	placement_options := current_placement_options()
-
-	return Child_Placement_Options{
-		size = placement_options.size,
-		align = placement_options.align,
-		margin = placement_options.margin,
-	}
+next_user_placement :: proc() -> Child_Placement_Options {
+	return current_placement_options()^
 }
 
 Future_Box_Placement :: struct {
@@ -346,44 +340,4 @@ axis_cut_side :: proc(axis: Axis) -> Side {
 		return .Left
 	}
 	return .Top
-}
-
-set_width :: proc(size: Layout_Size) {
-	current_placement_options().size.x = size
-}
-
-set_height :: proc(size: Layout_Size) {
-	current_placement_options().size.y = size
-}
-
-set_margin_sides :: proc(
-	left: Maybe(f32) = nil,
-	right: Maybe(f32) = nil,
-	top: Maybe(f32) = nil,
-	bottom: Maybe(f32) = nil,
-) {
-	options := current_placement_options()
-	if left, ok := left.?; ok do options.margin.x = left
-	if top, ok := top.?; ok do options.margin.y = top
-	if right, ok := right.?; ok do options.margin.z = right
-	if bottom, ok := bottom.?; ok do options.margin.w = bottom
-}
-
-set_margin_all :: proc(amount: f32) {
-	current_placement_options().margin = amount
-}
-
-set_margin :: proc {
-	set_margin_sides,
-	set_margin_all,
-}
-
-set_width_to_height :: proc() {
-	options := current_placement_options()
-	options.size.x = options.size.y
-}
-
-set_height_to_width :: proc() {
-	options := current_placement_options()
-	options.size.y = options.size.x
 }
