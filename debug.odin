@@ -141,7 +141,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		vgo.set_draw_order(1000)
 	}
 
-	DEBUG_TEXT_SIZE :: 16
+	DEBUG_TEXT_SIZE :: 14
 	vgo.set_paint(vgo.WHITE)
 	vgo.set_font(global_state.style.monospace_font)
 
@@ -195,15 +195,16 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		}
 		fmt.sbprintf(
 			&b,
-			" index: %v\n id: %v\n box: [%.1f, %.1f]\n content.box: [%.1f, %.1f]\n size: %.1f\n desired_size: %.1f",
+			" index: %v\n id: %v\n box: [%.1f, %.1f]\n size: %.1f\n desired_size: %.1f\n content.size: %.1f\n content.desired_size: %.1f\n content.side: %v",
 			object.call_index + 1,
 			object.id,
 			object.box.lo,
 			object.box.hi,
-			object.content.box.lo,
-			object.content.box.hi,
 			object.metrics.size,
 			object.metrics.desired_size,
+			object.content.size,
+			object.content.desired_size,
+			object.content.side,
 		)
 		fmt.sbprintf(
 			&b,

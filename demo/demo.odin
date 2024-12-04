@@ -109,53 +109,64 @@ main :: proc() {
 					}
 				}
 
-				if begin_column_layout(size = At_Least(0), padding = 15) {
+				if begin_row_layout(size = At_Least(0), padding = 15, side = Side.Right) {
 					defer end_layout()
 
-					if begin_column_layout(size = Fixed(20)) {
+					if begin_column_layout(size = Fixed(30)) {
 						defer end_layout()
 
-						current_placement_options().align = .Center
-						label("Content alignment")
 					}
-					if begin_row_layout(size = Fixed(30)) {
+
+					if begin_column_layout(size = At_Least(0)) {
 						defer end_layout()
 
-						set_width(Percent(100))
-						tabs(reflect.enum_field_names(Align), &justify)
-					}
-					if begin_row_layout(justify = justify, size = Percent(25), padding = 10) {
-						defer end_layout()
+						if begin_column_layout(size = Fixed(20)) {
+							defer end_layout()
 
-						set_margin(left = 4, right = 4)
-						for style, i in Button_Style {
-							push_id(i)
-								button(fmt.tprint(style), style = style)
-							pop_id()
+							current_placement_options().align = .Center
+							label("Content alignment")
+						}
+						if begin_row_layout(size = Fixed(30)) {
+							defer end_layout()
+
+							set_width(Percent(100))
+							tabs(reflect.enum_field_names(Align), &justify)
+						}
+						if begin_row_layout(justify = justify, size = Percent(25), padding = 10) {
+							defer end_layout()
+
+							set_margin(left = 4, right = 4)
+							for style, i in Button_Style {
+								push_id(i)
+									button(fmt.tprint(style), style = style)
+								pop_id()
+							}
+						}
+						if begin_row_layout(justify = justify, size = Percent(100 / 3), padding = 10) {
+							defer end_layout()
+
+							raw_input(&input_value, placeholder = "sample text")
+						}
+						if begin_row_layout(justify = justify, size = Percent(50), padding = 10) {
+							defer end_layout()
+
+							set_margin_all(4)
+							for type, i in Boolean_Type {
+								push_id(i)
+									boolean(&boolean_value[type], fmt.tprint(type), type = type)
+								pop_id()
+							}
+						}
+						if begin_row_layout(justify = justify, size = Percent(100), padding = 10) {
+							defer end_layout()
+
+							set_margin_all(4)
+							slider(&slider_values, 0, 10)
+							color_picker(&color)
 						}
 					}
-					if begin_row_layout(justify = justify, size = Percent(100 / 3), padding = 10) {
-						defer end_layout()
 
-						raw_input(&input_value, placeholder = "sample text")
-					}
-					if begin_row_layout(justify = justify, size = Percent(50), padding = 10) {
-						defer end_layout()
 
-						set_margin_all(4)
-						for type, i in Boolean_Type {
-							push_id(i)
-								boolean(&boolean_value[type], fmt.tprint(type), type = type)
-							pop_id()
-						}
-					}
-					if begin_row_layout(justify = justify, size = Percent(100), padding = 10) {
-						defer end_layout()
-
-						set_margin_all(4)
-						slider(&slider_values, 0, 10)
-						color_picker(&color)
-					}
 				}
 			}
 			present()

@@ -105,10 +105,12 @@ Object_State :: struct {
 
 Object_Content :: struct {
 	axis:         Axis,
+	side:         Side,
 	justify:      Align,
 	align:        Align,
 	box:          Box,
 	space_left:   [2]f32,
+	size:         [2]f32,
 	desired_size: [2]f32,
 	padding:      [4]f32,
 	objects:      [dynamic]^Object,
@@ -376,6 +378,14 @@ space_required_by_object_content :: proc(content: Object_Content) -> [2]f32 {
 }
 
 occupied_space_of_object :: proc(object: ^Object) -> [2]f32 {
+	size := object.metrics.size
+	if placement, ok := object.placement.(Child_Placement_Options); ok {
+		size += placement.margin.xy + placement.margin.zw
+	}
+	return size
+}
+
+space_required_by_object :: proc(object: ^Object) -> [2]f32 {
 	size := object.metrics.desired_size
 	if placement, ok := object.placement.(Child_Placement_Options); ok {
 		size += placement.margin.xy + placement.margin.zw
@@ -383,10 +393,15 @@ occupied_space_of_object :: proc(object: ^Object) -> [2]f32 {
 	return size
 }
 
+available_space_for_object_content :: proc(object: ^Object) -> [2]f32 {
+	return object.metrics.size - object.content.padding.xy - object.content.padding.zw
+}
+
 update_object_parent_metrics :: proc(object: ^Object) {
 	// TODO: Put this somewhere else
 	if object.isolated do return
 
+	effective_desired_size := space_required_by_object(object)
 	effective_size := occupied_space_of_object(object)
 
 	parent := object.parent.?
@@ -394,8 +409,11 @@ update_object_parent_metrics :: proc(object: ^Object) {
 	i := int(parent.content.axis)
 	j := 1 - i
 
-	parent.content.desired_size[i] += effective_size[i]
-	parent.content.desired_size[j] = max(parent.content.desired_size[j], effective_size[j])
+	parent.content.desired_size[i] += effective_desired_size[i]
+	parent.content.desired_size[j] = max(parent.content.desired_size[j], effective_desired_size[j])
+
+	parent.content.size[i] += effective_size[i]
+	parent.content.size[j] = max(parent.content.size[j], effective_size[j])
 }
 
 object_state_output :: proc(state: Object_State) -> Object_Status_Set {
@@ -538,7 +556,7 @@ display_object :: proc(object: ^Object) {
 	}
 
 	object.content.space_left =
-		axis_normal(object.content.axis) * (box_size(object.box) - object.metrics.desired_size)
+		axis_normal(object.content.axis) * (available_space_for_object_content(object) - object.content.size)
 
 	if object.clip_children {
 		vgo.save_scissor()

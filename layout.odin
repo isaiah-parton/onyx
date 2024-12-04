@@ -1,5 +1,8 @@
 package onyx
-
+// Layout functionality changes
+//
+// Side -> Axis
+// Side + Justify -> Size
 import "../vgo"
 import "base:runtime"
 import "core:fmt"
@@ -166,7 +169,7 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 
 	object.box, content_box = split_box(
 		apply_near_object_margin(content_box, parent.content.axis, placement.margin),
-		axis_cut_side(parent.content.axis),
+		parent.content.side,
 		object.metrics.size[int(parent.content.axis)],
 	)
 
@@ -248,12 +251,14 @@ begin_row_layout :: proc(
 	size: Layout_Size = nil,
 	justify: Align = .Near,
 	padding: [4]f32 = 0,
+	side: Side = .Left,
 ) -> bool {
 	return begin_layout(
 		placement = stack_layout_placement(current_axis(), size),
 		axis = .X,
 		justify = justify,
 		padding = padding,
+		side = side,
 	)
 }
 
@@ -261,12 +266,14 @@ begin_column_layout :: proc(
 	size: Layout_Size = nil,
 	justify: Align = .Near,
 	padding: [4]f32 = 0,
+	side: Side = .Top,
 ) -> bool {
 	return begin_layout(
 		placement = stack_layout_placement(current_axis(), size),
 		axis = .Y,
 		justify = justify,
 		padding = padding,
+		side = side,
 	)
 }
 
@@ -277,11 +284,13 @@ begin_layout :: proc(
 	padding: [4]f32 = {},
 	clip_contents: bool = false,
 	isolated: bool = false,
+	side: Side = .Left,
 ) -> bool {
 	self := transient_object()
 	self.state.input_mask = OBJECT_STATE_ALL
 	self.content = {
-		axis    = axis,
+		axis    = axis_of_side(side),
+		side    = side,
 		justify = justify,
 		padding = padding,
 	}
@@ -307,7 +316,7 @@ solve_child_object_size :: proc(
 	actual_size: [2]f32,
 	new_desired_size: [2]f32,
 ) {
-	for i in 0..=1 {
+	for i in 0 ..= 1 {
 		switch size in size[i] {
 		case Percent:
 			actual_size[i] = available_space[i] * f32(size) * 0.01
@@ -333,6 +342,10 @@ solve_child_object_size :: proc(
 		}
 	}
 	return
+}
+
+axis_of_side :: proc(side: Side) -> Axis {
+	return Axis(int(side) / 2)
 }
 
 axis_cut_side :: proc(axis: Axis) -> Side {
