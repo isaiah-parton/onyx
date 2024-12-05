@@ -168,7 +168,6 @@ display_color_picker :: proc(self: ^Color_Picker) {
 			defer end_layer()
 
 			if begin_layout(
-				axis = .X,
 				placement = Future_Box_Placement {
 					origin = {
 						self.box.hi.x + global_state.style.popup_margin,

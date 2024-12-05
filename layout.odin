@@ -255,7 +255,6 @@ begin_row_layout :: proc(
 ) -> bool {
 	return begin_layout(
 		placement = stack_layout_placement(current_axis(), size),
-		axis = .X,
 		justify = justify,
 		padding = padding,
 		side = side,
@@ -270,7 +269,6 @@ begin_column_layout :: proc(
 ) -> bool {
 	return begin_layout(
 		placement = stack_layout_placement(current_axis(), size),
-		axis = .Y,
 		justify = justify,
 		padding = padding,
 		side = side,
@@ -279,7 +277,6 @@ begin_column_layout :: proc(
 
 begin_layout :: proc(
 	placement: Object_Placement = nil,
-	axis: Axis = .X,
 	justify: Align = .Near,
 	padding: [4]f32 = {},
 	clip_contents: bool = false,

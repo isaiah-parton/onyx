@@ -39,126 +39,125 @@ dates_are_equal :: proc(a, b: Date) -> bool {
 calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_location) {
 	assert(date != nil, loc = loc)
 	object := persistent_object(hash(loc))
+
+	DAYS_PER_WEEK :: 7
+	MONTHS_PER_YEAR :: 12
+	HOURS_PER_DAY :: 24
+
+	if object.variant == nil {
+		object.variant = Calendar {
+			object = object,
+		}
+	}
+	self := &object.variant.(Calendar)
+	self.metrics.size = {280, 0}
+
+	self.row_height = self.metrics.size.x / DAYS_PER_WEEK
+	self.metrics.size.y = self.row_height * 2
+
+	date := date.? or_else todays_date()
+
+	month := int(date.month) + self.month_offset
+	year := int(date.year)
+
+	month_underflow := 1 - min(1, 1 + month)
+	year -= 1 * month_underflow
+	month += MONTHS_PER_YEAR * month_underflow
+
+	year_overflow := max(0, month / MONTHS_PER_YEAR)
+	year += 1 * year_overflow
+	// month -= MONTHS_PER_YEAR * year_overflow
+
+	self.selection_times = {
+		t.datetime_to_time(
+			dt.DateTime{self.selection[0].? or_else Date{}, {}},
+		) or_else t.Time{},
+		t.datetime_to_time(
+			dt.DateTime{self.selection[1].? or_else Date{}, {}},
+		) or_else t.Time{},
+	}
+
+	month_start := t.datetime_to_time(i64(year), i8(month), 1, 0, 0, 0) or_else t.Time{}
+
+	weekday := t.weekday(month_start)
+	calendar_start := month_start._nsec - i64(weekday) * i64(t.Hour * HOURS_PER_DAY)
+
+	self.days = 0
+	if _days, err := dt.last_day_of_month(i64(year), i8(month)); err == nil {
+		self.days = int(_days)
+	}
+
+	self.days = int(
+		(month_start._nsec - calendar_start) / i64(t.Hour * HOURS_PER_DAY) + i64(self.days),
+	)
+	self.days = int(math.ceil(f32(self.days) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
+	weeks := math.ceil(f32(self.days) / DAYS_PER_WEEK)
+	self.metrics.size.y +=
+		weeks * self.row_height + (weeks + 1) * CALENDAR_WEEK_SPACING
+
+	self.content.side = .Top
+	self.content.axis = .Y
+
 	if begin_object(object) {
 		defer end_object()
 
-		if object.variant == nil {
-			object.variant = Calendar {
-				object = object,
-			}
-		}
-
-		DAYS_PER_WEEK :: 7
-		MONTHS_PER_YEAR :: 12
-		HOURS_PER_DAY :: 24
-
-		self := &object.variant.(Calendar)
-		self.metrics.desired_size = 200
-		self.metrics.desired_size.x = 280
-
-		self.row_height = self.metrics.desired_size.x / DAYS_PER_WEEK
-		self.metrics.desired_size.y = self.row_height * 2
-
-		date := date.? or_else todays_date()
-
-		month := int(date.month) + self.month_offset
-		year := int(date.year)
-
-		month_underflow := 1 - min(1, 1 + month)
-		year -= 1 * month_underflow
-		month += MONTHS_PER_YEAR * month_underflow
-
-		year_overflow := max(0, month / MONTHS_PER_YEAR)
-		year += 1 * year_overflow
-		month -= MONTHS_PER_YEAR * year_overflow
-
-		self.selection_times = {
-			t.datetime_to_time(
-				dt.DateTime{self.selection[0].? or_else Date{}, {}},
-			) or_else t.Time{},
-			t.datetime_to_time(
-				dt.DateTime{self.selection[1].? or_else Date{}, {}},
-			) or_else t.Time{},
-		}
-
-		month_start := t.datetime_to_time(i64(year), i8(month), 1, 0, 0, 0) or_else t.Time{}
-
-		weekday := t.weekday(month_start)
-		calendar_start := month_start._nsec - i64(weekday) * i64(t.Hour * HOURS_PER_DAY)
-
-		if _days, err := dt.last_day_of_month(i64(year), i8(month)); err == nil {
-			self.days = int(_days)
-		}
-
-		self.days = int(
-			(month_start._nsec - calendar_start) / i64(t.Hour * HOURS_PER_DAY) + i64(self.days),
-		)
-		self.days = int(math.ceil(f32(self.days) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
-		weeks := math.ceil(f32(self.days) / DAYS_PER_WEEK)
-		self.metrics.desired_size.y +=
-			weeks * self.row_height + (weeks + 1) * CALENDAR_WEEK_SPACING
-
-		if begin_column_layout() {
+		if begin_row_layout(justify = .Equal_Space, size = Fixed(self.row_height)) {
 			defer end_layout()
 
-			if begin_row_layout(justify = .Equal_Space, size = Fixed(self.row_height)) {
-				defer end_layout()
-
-				if button(text = "<", style = .Outlined).clicked {
-					self.month_offset -= 1
-				}
-				if button(text = ">", style = .Outlined).clicked {
-					self.month_offset += 1
-				}
-				label(text = fmt.tprintf("%s %i", t.Month(self.month), self.year))
+			if button(text = "<", style = .Outlined).clicked {
+				self.month_offset -= 1
 			}
-
-			if begin_row_layout(size = Fixed(self.row_height)) {
-				defer end_layout()
-
-				set_height(Percent(100))
-				WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
-				for weekday in WEEKDAY_ABBREVIATIONS {
-					label(text = weekday)
-				}
+			label(text = fmt.tprintf("%s %i", t.Month(month), year))
+			if button(text = ">", style = .Outlined).clicked {
+				self.month_offset += 1
 			}
+		}
 
-			if begin_row_layout(size = Fixed(self.row_height)) {
-				defer end_layout()
+		if begin_row_layout(size = Fixed(self.row_height)) {
+			defer end_layout()
 
-				time: t.Time = self.calendar_start
-				for i in 0 ..< self.days {
-					if (i > 0) && (i % 7 == 0) {
-						end_layout()
-						begin_column_layout(size = Fixed(self.row_height))
-					}
-					year, month, day := t.date(time)
-					date := Date{i64(year), i8(month), i8(day)}
-					time._nsec += i64(t.Hour * 24)
+			set_height(Percent(100))
+			WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
+			for weekday in WEEKDAY_ABBREVIATIONS {
+				label(text = weekday)
+			}
+		}
 
-					today_year, today_month, today_day := t.date(t.now())
+		if begin_row_layout(size = Fixed(self.row_height)) {
+			defer end_layout()
 
-					if .Clicked in self.state.current {
-						if self.allow_range {
-							if self.selection[0] == nil {
-								self.selection[0] = date
+			time: t.Time = self.calendar_start
+			for i in 0 ..< self.days {
+				if (i > 0) && (i % 7 == 0) {
+					end_layout()
+					begin_row_layout(size = Fixed(self.row_height))
+				}
+				year, month, day := t.date(time)
+				date := Date{i64(year), i8(month), i8(day)}
+				time._nsec += i64(t.Hour * 24)
+
+				today_year, today_month, today_day := t.date(t.now())
+
+				if .Clicked in self.state.current {
+					if self.allow_range {
+						if self.selection[0] == nil {
+							self.selection[0] = date
+						} else {
+							if date == self.selection[0] || date == self.selection[1] {
+								self.selection = {nil, nil}
 							} else {
-								if date == self.selection[0] || date == self.selection[1] {
-									self.selection = {nil, nil}
+								if time._nsec <=
+								   (t.datetime_to_time(dt.DateTime{self.selection[0].?, {}}) or_else t.Time{})._nsec {
+									self.selection[0] = date
 								} else {
-									if time._nsec <=
-									   (t.datetime_to_time(dt.DateTime{self.selection[0].?, {}}) or_else t.Time{})._nsec {
-										self.selection[0] = date
-									} else {
-										self.selection[1] = date
-									}
+									self.selection[1] = date
 								}
 							}
-						} else {
-							self.selection[0] = date
 						}
-						self.month_offset = 0
+					} else {
+						self.selection[0] = date
 					}
+					self.month_offset = 0
 				}
 			}
 		}
@@ -314,7 +313,6 @@ display_date_picker :: proc(self: ^Date_Picker) {
 			defer end_layer()
 
 			if begin_layout(
-				axis = .X,
 				placement = Future_Box_Placement {
 					origin = {
 						self.box.hi.x + global_state.style.popup_margin,

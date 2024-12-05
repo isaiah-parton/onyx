@@ -88,6 +88,13 @@ main :: proc() {
 					),
 				)
 			}
+
+			if begin_panel() {
+				defer end_panel()
+
+				calendar(&date)
+			}
+
 			if begin_panel(axis = .X) {
 				defer end_panel()
 
@@ -109,7 +116,7 @@ main :: proc() {
 					}
 				}
 
-				if begin_row_layout(size = At_Least(0), padding = 15, side = Side.Right) {
+				if begin_row_layout(size = At_Least(0), padding = 15, side = .Right) {
 					defer end_layout()
 
 					if begin_column_layout(size = Fixed(30)) {

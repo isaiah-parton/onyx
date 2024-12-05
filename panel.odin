@@ -139,7 +139,7 @@ begin_panel :: proc(
 
 	vgo.push_scissor(vgo.make_box(panel.box, rounding))
 	push_clip(panel.box)
-	begin_layout(placement = Box(panel.box), axis = axis, padding = padding) or_return
+	begin_layout(placement = Box(panel.box), padding = padding) or_return
 	return true
 }
 

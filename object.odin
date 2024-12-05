@@ -341,6 +341,7 @@ begin_object :: proc(object: ^Object) -> bool {
 		}
 	}
 
+	object.content.axis = axis_of_side(object.content.side)
 	if !object.is_deferred {
 		place_object(object) or_return
 	}
@@ -509,6 +510,10 @@ object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {
 }
 
 display_object :: proc(object: ^Object) {
+	if object.is_deferred {
+		place_object(object)
+	}
+
 	when DEBUG {
 		if point_in_box(mouse_point(), object.box) {
 			if object_is_in_front_of(object, top_hovered_object(global_state.debug) or_else nil) {
@@ -516,10 +521,6 @@ display_object :: proc(object: ^Object) {
 			}
 			append(&global_state.debug.hovered_objects, object)
 		}
-	}
-
-	if object.is_deferred {
-		place_object(object)
 	}
 
 	switch &v in object.variant {
