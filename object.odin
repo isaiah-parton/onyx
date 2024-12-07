@@ -224,6 +224,7 @@ make_object_children_array :: proc() -> [dynamic]^Object {
 persistent_object :: proc(id: Id) -> ^Object {
 	object := global_state.object_map[id] or_else new_persistent_object(id)
 	object.children = make_object_children_array()
+	object.metrics.desired_size = 0
 	return object
 }
 
@@ -238,6 +239,7 @@ transient_object :: proc() -> ^Object {
 	object.id = Id(global_state.transient_objects.len)
 	object.children = make_object_children_array()
 	object.state.output_mask = OBJECT_STATE_ALL
+	object.metrics.desired_size = 0
 	return object
 }
 
@@ -341,6 +343,8 @@ begin_object :: proc(object: ^Object) -> bool {
 		}
 	}
 
+	object.content.size = 0
+	object.content.desired_size = 0
 	object.content.axis = axis_of_side(object.content.side)
 	if !object.is_deferred {
 		place_object(object) or_return
@@ -547,9 +551,7 @@ display_object :: proc(object: ^Object) {
 	case Tabs:
 		display_tabs(&v)
 	case Calendar, Calendar_Day:
-		for child in object.children {
-			display_object(child)
-		}
+		break
 	case nil:
 		if object.on_display != nil {
 			object.on_display(object)
@@ -557,7 +559,7 @@ display_object :: proc(object: ^Object) {
 	}
 
 	object.content.space_left =
-		axis_normal(object.content.axis) * (available_space_for_object_content(object) - object.content.size)
+		axis_normal(object.content.axis) * (box_size(object.content.box) - object.content.size)
 
 	if object.clip_children {
 		vgo.save_scissor()

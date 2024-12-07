@@ -50,10 +50,10 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 		}
 	}
 	self := &object.variant.(Calendar)
-	self.metrics.size = {280, 0}
+	self.metrics.desired_size = {280, 0}
 
-	self.row_height = self.metrics.size.x / DAYS_PER_WEEK
-	self.metrics.size.y = self.row_height * 2
+	self.row_height = self.metrics.desired_size.x / DAYS_PER_WEEK
+	self.metrics.desired_size.y = self.row_height * 2
 
 	date := date.? or_else todays_date()
 
@@ -66,7 +66,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 
 	year_overflow := max(0, month / MONTHS_PER_YEAR)
 	year += 1 * year_overflow
-	// month -= MONTHS_PER_YEAR * year_overflow
+	month -= MONTHS_PER_YEAR * year_overflow
 
 	self.selection_times = {
 		t.datetime_to_time(
@@ -92,16 +92,18 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	)
 	self.days = int(math.ceil(f32(self.days) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
 	weeks := math.ceil(f32(self.days) / DAYS_PER_WEEK)
-	self.metrics.size.y +=
+	self.metrics.desired_size.y +=
 		weeks * self.row_height + (weeks + 1) * CALENDAR_WEEK_SPACING
 
 	self.content.side = .Top
-	self.content.axis = .Y
+	self.placement = next_user_placement()
 
-	if begin_object(object) {
+	if begin_object(self) {
+		push_id(self.id)
+		defer pop_id()
 		defer end_object()
 
-		if begin_row_layout(justify = .Equal_Space, size = Fixed(self.row_height)) {
+		if begin_row_layout(size = Fixed(self.row_height), justify = .Near) {
 			defer end_layout()
 
 			if button(text = "<", style = .Outlined).clicked {
@@ -113,7 +115,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			}
 		}
 
-		if begin_row_layout(size = Fixed(self.row_height)) {
+		if begin_row_layout(size = Fixed(self.row_height), justify = .Near) {
 			defer end_layout()
 
 			set_height(Percent(100))
@@ -138,27 +140,27 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 
 				today_year, today_month, today_day := t.date(t.now())
 
-				if .Clicked in self.state.current {
-					if self.allow_range {
-						if self.selection[0] == nil {
-							self.selection[0] = date
-						} else {
-							if date == self.selection[0] || date == self.selection[1] {
-								self.selection = {nil, nil}
-							} else {
-								if time._nsec <=
-								   (t.datetime_to_time(dt.DateTime{self.selection[0].?, {}}) or_else t.Time{})._nsec {
-									self.selection[0] = date
-								} else {
-									self.selection[1] = date
-								}
-							}
-						}
-					} else {
-						self.selection[0] = date
-					}
-					self.month_offset = 0
-				}
+				// if .Clicked in self.state.current {
+				// 	if self.allow_range {
+				// 		if self.selection[0] == nil {
+				// 			self.selection[0] = date
+				// 		} else {
+				// 			if date == self.selection[0] || date == self.selection[1] {
+				// 				self.selection = {nil, nil}
+				// 			} else {
+				// 				if time._nsec <=
+				// 				   (t.datetime_to_time(dt.DateTime{self.selection[0].?, {}}) or_else t.Time{})._nsec {
+				// 					self.selection[0] = date
+				// 				} else {
+				// 					self.selection[1] = date
+				// 				}
+				// 			}
+				// 		}
+				// 	} else {
+				// 		self.selection[0] = date
+				// 	}
+				// 	self.month_offset = 0
+				// }
 			}
 		}
 	}
@@ -192,11 +194,11 @@ calendar_day :: proc(
 			}
 		}
 
-		variant := &object.variant.(Calendar_Day)
-		variant.day = day
-		variant.is_today = is_today
-		variant.is_this_month = is_this_month
-		variant.selection = selection
+		self := &object.variant.(Calendar_Day)
+		self.day = day
+		self.is_today = is_today
+		self.is_this_month = is_this_month
+		self.selection = selection
 
 		if object.on_display == nil {
 			object.on_display = proc(object: ^Object) {

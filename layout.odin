@@ -148,12 +148,16 @@ place_object :: proc(object: ^Object) -> bool {
 		place_object_in_parent(object, v) or_return
 	}
 
-	object.content.box = {
+	object.content.box = solve_object_content_box(object)
+
+	return true
+}
+
+solve_object_content_box :: proc(object: ^Object) -> Box {
+	return Box{
 		object.box.lo + object.content.padding.xy,
 		object.box.hi - object.content.padding.zw,
 	}
-
-	return true
 }
 
 place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Options) -> bool {
