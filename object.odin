@@ -368,6 +368,13 @@ end_object :: proc() {
 		)
 
 		if parent, ok := object.parent.?; ok {
+			if placement, ok := object.placement.(Child_Placement_Options); ok {
+				object.metrics.size, object.metrics.desired_size = solve_child_object_size(
+					placement.size,
+					object.metrics.desired_size,
+					available_space_for_object_content(parent),
+				)
+			}
 			update_object_parent_metrics(object)
 			parent.state.current += object_state_output(object.state) & parent.state.input_mask
 		}
@@ -550,7 +557,9 @@ display_object :: proc(object: ^Object) {
 		display_color_picker(&v)
 	case Tabs:
 		display_tabs(&v)
-	case Calendar, Calendar_Day:
+	case Calendar_Day:
+		display_calendar_day(&v)
+	case Calendar:
 		break
 	case nil:
 		if object.on_display != nil {

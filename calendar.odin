@@ -99,11 +99,15 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	self.placement = next_user_placement()
 
 	if begin_object(self) {
-		push_id(self.id)
-		defer pop_id()
 		defer end_object()
 
-		if begin_row_layout(size = Fixed(self.row_height), justify = .Near) {
+		push_id(self.id)
+		defer pop_id()
+
+		push_placement_options()
+		defer pop_placement_options()
+
+		if begin_row_layout(size = Fixed(self.row_height), justify = .Equal_Space) {
 			defer end_layout()
 
 			if button(text = "<", style = .Outlined).clicked {
@@ -115,7 +119,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			}
 		}
 
-		if begin_row_layout(size = Fixed(self.row_height), justify = .Near) {
+		if begin_row_layout(size = Fixed(self.row_height), justify = .Equal_Space) {
 			defer end_layout()
 
 			set_height(Percent(100))
@@ -125,20 +129,28 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			}
 		}
 
+		set_height(Percent(100))
+		set_width(Percent_Of_Height(100))
+
 		if begin_row_layout(size = Fixed(self.row_height)) {
 			defer end_layout()
 
 			time: t.Time = self.calendar_start
 			for i in 0 ..< self.days {
+				push_id(i + 1)
+				defer pop_id()
+
 				if (i > 0) && (i % 7 == 0) {
 					end_layout()
 					begin_row_layout(size = Fixed(self.row_height))
 				}
-				year, month, day := t.date(time)
-				date := Date{i64(year), i8(month), i8(day)}
+				year, _month, day := t.date(time)
+				date := Date{i64(year), i8(_month), i8(day)}
 				time._nsec += i64(t.Hour * 24)
 
 				today_year, today_month, today_day := t.date(t.now())
+
+				calendar_day(day, today_year == year && today_month == _month && today_day == day, month == int(_month), time, {}, 0)
 
 				// if .Clicked in self.state.current {
 				// 	if self.allow_range {
@@ -185,83 +197,83 @@ calendar_day :: proc(
 	focus_time: f32,
 ) {
 	object := persistent_object(hash(day + 1))
+	if object.variant == nil {
+		object.variant = Calendar_Day {
+			object = object,
+		}
+	}
+
+	self := &object.variant.(Calendar_Day)
+	self.day = day
+	self.is_today = is_today
+	self.is_this_month = is_this_month
+	self.selection = selection
+	self.placement = next_user_placement()
 	if begin_object(object) {
-		defer end_object()
+		end_object()
+	}
+}
 
-		if object.variant == nil {
-			object.variant = Calendar_Day {
-				object = object,
+display_calendar_day :: proc(self: ^Calendar_Day) {
+	if point_in_box(mouse_point(), self.box) {
+		hover_object(self)
+	}
+	handle_object_click(self)
+	if object_is_visible(self) {
+		if self.time._nsec > self.selection[0]._nsec &&
+		   self.time._nsec <= self.selection[1]._nsec + i64(t.Hour * 24) {
+			corners: [4]f32
+			if self.time._nsec == self.selection[0]._nsec + i64(t.Hour * 24) {
+				corners[0] = global_state.style.rounding
+				corners[2] = global_state.style.rounding
+			}
+			if self.time._nsec == self.selection[1]._nsec + i64(t.Hour * 24) {
+				corners[1] = global_state.style.rounding
+				corners[3] = global_state.style.rounding
+			}
+			vgo.fill_box(
+				self.box,
+				corners,
+				vgo.fade(
+					global_state.style.color.substance,
+					1 if self.is_this_month else 0.5,
+				),
+			)
+		} else {
+			if .Hovered in self.state.current {
+				vgo.fill_box(
+					self.box,
+					global_state.style.shape.rounding,
+					paint = global_state.style.color.substance,
+				)
+			} else if self.is_today {
+				vgo.stroke_box(
+					self.box,
+					1,
+					global_state.style.shape.rounding,
+					paint = global_state.style.color.substance,
+				)
 			}
 		}
-
-		self := &object.variant.(Calendar_Day)
-		self.day = day
-		self.is_today = is_today
-		self.is_this_month = is_this_month
-		self.selection = selection
-
-		if object.on_display == nil {
-			object.on_display = proc(object: ^Object) {
-				self := &object.variant.(Calendar_Day)
-
-				if object_is_visible(self) {
-					if self.time._nsec > self.selection[0]._nsec &&
-					   self.time._nsec <= self.selection[1]._nsec + i64(t.Hour * 24) {
-						corners: [4]f32
-						if self.time._nsec == self.selection[0]._nsec + i64(t.Hour * 24) {
-							corners[0] = global_state.style.rounding
-							corners[2] = global_state.style.rounding
-						}
-						if self.time._nsec == self.selection[1]._nsec + i64(t.Hour * 24) {
-							corners[1] = global_state.style.rounding
-							corners[3] = global_state.style.rounding
-						}
-						vgo.fill_box(
-							self.box,
-							corners,
-							vgo.fade(
-								global_state.style.color.substance,
-								1 if self.is_this_month else 0.5,
-							),
-						)
-					} else {
-						if .Hovered in self.state.current {
-							vgo.fill_box(
-								self.box,
-								global_state.style.shape.rounding,
-								paint = global_state.style.color.substance,
-							)
-						} else if self.is_today {
-							vgo.stroke_box(
-								self.box,
-								2,
-								global_state.style.shape.rounding,
-								paint = global_state.style.color.substance,
-							)
-						}
-					}
-					if self.focus_time > 0 {
-						vgo.fill_box(
-							self.box,
-							global_state.style.shape.rounding,
-							vgo.fade(global_state.style.color.content, self.focus_time),
-						)
-					}
-					vgo.fill_text(
-						fmt.tprint(self.day),
-						global_state.style.default_text_size,
-						box_center(self.box),
-						font = global_state.style.default_font,
-						align = 0.5,
-						paint = vgo.mix(
-							self.focus_time,
-							global_state.style.color.content if self.is_this_month else vgo.fade(global_state.style.color.content, 0.5),
-							global_state.style.color.field,
-						),
-					)
-				}
-			}
+		if self.focus_time > 0 {
+			vgo.fill_box(
+				self.box,
+				global_state.style.shape.rounding,
+				vgo.fade(global_state.style.color.content, self.focus_time),
+			)
 		}
+		vgo.fill_text(
+			fmt.tprint(self.day),
+			global_state.style.default_text_size,
+			box_center(self.box),
+			font = global_state.style.default_font,
+			align = 0.5,
+			paint = vgo.mix(
+				self.focus_time,
+				global_state.style.color.content if self.is_this_month else vgo.fade(global_state.style.color.content, 0.5),
+				global_state.style.color.field,
+			),
+		)
 	}
 }
 
