@@ -368,13 +368,6 @@ end_object :: proc() {
 		)
 
 		if parent, ok := object.parent.?; ok {
-			if placement, ok := object.placement.(Child_Placement_Options); ok {
-				object.metrics.size, object.metrics.desired_size = solve_child_object_size(
-					placement.size,
-					object.metrics.desired_size,
-					available_space_for_object_content(parent),
-				)
-			}
 			update_object_parent_metrics(object)
 			parent.state.current += object_state_output(object.state) & parent.state.input_mask
 		}
@@ -567,14 +560,26 @@ display_object :: proc(object: ^Object) {
 		}
 	}
 
-	object.content.space_left =
-		axis_normal(object.content.axis) * (box_size(object.content.box) - object.content.size)
+	object.content.space_left = box_size(object.content.box)
 
 	if object.clip_children {
 		vgo.save_scissor()
 		vgo.push_scissor(vgo.make_box(object.box))
 		push_clip(object.box)
 	}
+
+	for child_object in object.children {
+		if placement, ok := child_object.placement.(Child_Placement_Options); ok {
+			child_object.metrics.size, child_object.metrics.desired_size = solve_child_object_size(
+				placement.size,
+				child_object.metrics.desired_size,
+				box_size(object.content.box),
+			)
+			object.content.space_left -= occupied_space_of_object(child_object)
+		}
+	}
+
+	object.content.space_left *= axis_normal(object.content.axis)
 
 	for child_object in object.children {
 		display_object(child_object)

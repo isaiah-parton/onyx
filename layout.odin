@@ -166,6 +166,12 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 
 	content_box := parent.content.box
 
+	object.metrics.size, object.metrics.desired_size = solve_child_object_size(
+		placement.size,
+		object.metrics.desired_size,
+		box_size(content_box),
+	)
+
 	object.box, content_box = split_box(
 		apply_near_object_margin(content_box, parent.content.axis, placement.margin),
 		parent.content.side,

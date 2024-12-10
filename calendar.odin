@@ -144,6 +144,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 					end_layout()
 					begin_row_layout(size = Fixed(self.row_height))
 				}
+
 				year, _month, day := t.date(time)
 				date := Date{i64(year), i8(_month), i8(day)}
 				time._nsec += i64(t.Hour * 24)
