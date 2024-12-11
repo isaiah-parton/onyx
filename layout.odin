@@ -1,8 +1,5 @@
 package onyx
-// Layout functionality changes
-//
-// Side -> Axis
-// Side + Justify -> Size
+
 import "../vgo"
 import "base:runtime"
 import "core:fmt"
@@ -22,20 +19,17 @@ Layout_Metrics :: struct {
 Fixed :: distinct f32
 At_Least :: distinct f32
 Percent :: distinct f32
+Percent_Of_Remaining :: distinct f32
 At_Most :: distinct f32
 Percent_Of_Width :: distinct f32
+Percent_Of_Remaining_Width :: distinct f32
 Percent_Of_Height :: distinct f32
+Percent_Of_Remaining_Height :: distinct f32
 Between :: distinct [2]f32
 
 Axis :: enum {
 	X,
 	Y,
-}
-
-Object_Size_Method :: enum {
-	Maximum,
-	Minimum,
-	Fixed,
 }
 
 Layout_Info :: struct {
@@ -54,23 +48,10 @@ Align :: enum {
 	Equal_Space,
 }
 
-H_Align :: enum {
-	Left,
-	Center,
-	Right,
-}
-
-V_Align :: enum {
-	Top,
-	Center,
-	Bottom,
-}
-
 Object_Layout_Options :: struct {
 	size:   [2]Layout_Size,
 	margin: [4]f32,
 	align:  Align,
-	method: Object_Size_Method,
 }
 
 axis_normal :: proc(axis: Axis) -> [2]f32 {
@@ -154,7 +135,7 @@ place_object :: proc(object: ^Object) -> bool {
 }
 
 solve_object_content_box :: proc(object: ^Object) -> Box {
-	return Box{
+	return Box {
 		object.box.lo + object.content.padding.xy,
 		object.box.hi - object.content.padding.zw,
 	}
@@ -169,7 +150,9 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 	object.metrics.size, object.metrics.desired_size = solve_child_object_size(
 		placement.size,
 		object.metrics.desired_size,
-		box_size(content_box),
+		available_space_for_object_content(parent),
+		// FIXME: `parent.metrics.size` is not necessarily valid at this point
+		total_space_for_object_content(parent),
 	)
 
 	object.box, content_box = split_box(
@@ -228,8 +211,11 @@ Layout_Size :: union {
 	At_Most,
 	Between,
 	Percent,
+	Percent_Of_Remaining,
 	Percent_Of_Width,
 	Percent_Of_Height,
+	Percent_Of_Remaining_Width,
+	Percent_Of_Remaining_Height,
 }
 
 Object_Placement :: union {
@@ -242,6 +228,7 @@ stack_layout_placement :: proc(axis: Axis, size: Layout_Size) -> Child_Placement
 	placement: Child_Placement_Options
 	placement.size[int(axis)] = size
 	placement.size[1 - int(axis)] = At_Least(0)
+	placement.margin = current_placement_options().margin
 	return placement
 }
 
@@ -314,17 +301,24 @@ solve_child_object_size :: proc(
 	size: [2]Layout_Size,
 	desired_size: [2]f32,
 	available_space: [2]f32,
+	total_space: [2]f32,
 ) -> (
 	actual_size: [2]f32,
 	new_desired_size: [2]f32,
 ) {
 	for i in 0 ..= 1 {
 		switch size in size[i] {
-		case Percent:
+		case Percent_Of_Remaining:
 			actual_size[i] = available_space[i] * f32(size) * 0.01
+		case Percent:
+			actual_size[i] = total_space[i] * f32(size) * 0.01
 		case Percent_Of_Width:
+			actual_size[i] = total_space.x * f32(size) * 0.01
+		case Percent_Of_Remaining_Width:
 			actual_size[i] = available_space.x * f32(size) * 0.01
 		case Percent_Of_Height:
+			actual_size[i] = total_space.y * f32(size) * 0.01
+		case Percent_Of_Remaining_Height:
 			actual_size[i] = available_space.y * f32(size) * 0.01
 		case Fixed:
 			actual_size[i] = f32(size)

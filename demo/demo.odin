@@ -139,7 +139,7 @@ main :: proc() {
 							set_width(Percent(100))
 							tabs(reflect.enum_field_names(Align), &justify)
 						}
-						if begin_row_layout(justify = justify, size = Percent(25), padding = 10) {
+						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(25), padding = 10) {
 							defer end_layout()
 
 							set_margin(left = 4, right = 4)
@@ -149,12 +149,12 @@ main :: proc() {
 								pop_id()
 							}
 						}
-						if begin_row_layout(justify = justify, size = Percent(100 / 3), padding = 10) {
+						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(100 / 3), padding = 10) {
 							defer end_layout()
 
 							raw_input(&input_value, placeholder = "sample text")
 						}
-						if begin_row_layout(justify = justify, size = Percent(50), padding = 10) {
+						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(50), padding = 10) {
 							defer end_layout()
 
 							set_margin_all(4)
@@ -164,7 +164,7 @@ main :: proc() {
 								pop_id()
 							}
 						}
-						if begin_row_layout(justify = justify, size = Percent(100), padding = 10) {
+						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(100), padding = 10) {
 							defer end_layout()
 
 							set_margin_all(4)
