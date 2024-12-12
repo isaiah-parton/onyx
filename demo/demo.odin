@@ -76,6 +76,7 @@ main :: proc() {
 		{
 			using onyx
 			new_frame()
+
 			{
 				box := view_box()
 				vgo.fill_box(

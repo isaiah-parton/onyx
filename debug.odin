@@ -158,6 +158,9 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 				}
 			}
 		}
+		if total > time.Millisecond * 100 {
+			fmt.println(__prof.d)
+		}
 		fmt.sbprintf(&b, "\nTotal: %.3fms", time.duration_milliseconds(total))
 		fmt.sbprintf(&b, "\nShapes: %i", len(vgo.renderer().shapes.data))
 		fmt.sbprintf(&b, "\nPaints: %i", len(vgo.renderer().paints.data))

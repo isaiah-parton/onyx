@@ -115,11 +115,13 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 
 			set_align(.Center)
 
-			if button(text = "<", style = .Outlined).clicked {
+			set_margin(left = 10)
+			if button(text = "<<", style = .Ghost).clicked {
 				self.month_offset -= 1
 			}
 			label(text = fmt.tprintf("%s %i", t.Month(month), year))
-			if button(text = ">", style = .Outlined).clicked {
+			set_margin(right = 10)
+			if button(text = ">>", style = .Ghost).clicked {
 				self.month_offset += 1
 			}
 		}
@@ -133,7 +135,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			set_height(Percent(100))
 			WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
 			for weekday in WEEKDAY_ABBREVIATIONS {
-				label(text = weekday)
+				label(text = weekday, align = 0.5, color = vgo.fade(colors().content, 0.5))
 			}
 		}
 

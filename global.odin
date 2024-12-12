@@ -311,6 +311,13 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		},
 	)
 
+	// &{
+	// 	nextInChain = &wgpu.InstanceExtras{
+	// 		sType = .InstanceExtras,
+	// 		backends = {.DX12, .GL, .Vulkan},
+	// 	},
+	// }
+
 	global_state.instance = wgpu.CreateInstance()
 	global_state.surface = glfwglue.GetSurface(global_state.instance, window)
 
