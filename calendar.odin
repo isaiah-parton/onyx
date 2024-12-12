@@ -60,11 +60,11 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	month := int(date.month) + self.month_offset
 	year := int(date.year)
 
-	month_underflow := 1 - min(1, 1 + month)
+	month_underflow := 1 - min(1, month)
 	year -= 1 * month_underflow
 	month += MONTHS_PER_YEAR * month_underflow
 
-	year_overflow := max(0, month / MONTHS_PER_YEAR)
+	year_overflow := max(0, (month - 1) / MONTHS_PER_YEAR)
 	year += 1 * year_overflow
 	month -= MONTHS_PER_YEAR * year_overflow
 
@@ -147,14 +147,18 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			set_margin(bottom = 0)
 
 			time: t.Time = self.calendar_start
-			for i in 0 ..< self.days {
-				push_id(i + 1)
-				defer pop_id()
 
+			push_id("days")
+			defer pop_id()
+
+			for i in 0 ..< self.days {
 				if (i > 0) && (i % 7 == 0) {
 					end_layout()
 					begin_row_layout(size = Percent_Of_Width(14.28))
 				}
+
+				push_id(hash(i + 1))
+				defer pop_id()
 
 				year, _month, day := t.date(time)
 				date := Date{i64(year), i8(_month), i8(day)}
@@ -205,8 +209,9 @@ calendar_day :: proc(
 	time: t.Time,
 	selection: [2]t.Time,
 	focus_time: f32,
+	loc := #caller_location,
 ) -> Button_Result {
-	object := persistent_object(hash(day + 1))
+	object := persistent_object(hash(loc))
 	if object.variant == nil {
 		object.variant = Calendar_Day {
 			object = object,
