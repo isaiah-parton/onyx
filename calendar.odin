@@ -14,17 +14,8 @@ CALENDAR_WEEK_SPACING :: 4
 
 Calendar :: struct {
 	using object:    ^Object,
-	selection:       [2]Maybe(Date),
 	month_offset:    int,
-	allow_range:     bool,
-	calendar_start:  t.Time,
-	month_start:     t.Time,
-	row_height:      f32,
 	focus_time:      f32,
-	days:            int,
-	year:            int,
-	month:           int,
-	selection_times: [2]t.Time,
 }
 
 todays_date :: proc() -> Date {
@@ -36,13 +27,20 @@ dates_are_equal :: proc(a, b: Date) -> bool {
 	return a.year == b.year && a.month == b.month && a.day == b.day
 }
 
+DAYS_PER_WEEK :: 7
+MONTHS_PER_YEAR :: 12
+HOURS_PER_DAY :: 24
+
+resolve_month_overflow :: proc(month, year: int) -> (int, int) {
+	modifier := month - 1
+	modifier -= 11 * int(month < 1)
+	modifier /= MONTHS_PER_YEAR
+	return month - MONTHS_PER_YEAR * modifier, year + modifier
+}
+
 calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_location) {
 	assert(date != nil, loc = loc)
 	object := persistent_object(hash(loc))
-
-	DAYS_PER_WEEK :: 7
-	MONTHS_PER_YEAR :: 12
-	HOURS_PER_DAY :: 24
 
 	if object.variant == nil {
 		object.variant = Calendar {
@@ -51,30 +49,22 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	}
 	self := &object.variant.(Calendar)
 	self.metrics.desired_size = {280, 0}
+	row_height := self.metrics.desired_size.x / DAYS_PER_WEEK
+	self.metrics.desired_size.y = row_height * 2
 
-	self.row_height = self.metrics.desired_size.x / DAYS_PER_WEEK
-	self.metrics.desired_size.y = self.row_height * 2
+	viewed_date := date.? or_else todays_date()
 
-	date := date.? or_else todays_date()
+	from_date := date^
+	to_date := until^ if until != nil else Maybe(Date)(nil)
 
-	month := int(date.month) + self.month_offset
-	year := int(date.year)
+	month := int(viewed_date.month) + self.month_offset
+	year := int(viewed_date.year)
 
-	month_underflow := 1 - min(1, 1 + month)
-	year -= 1 * month_underflow
-	month += MONTHS_PER_YEAR * month_underflow
+	month, year = resolve_month_overflow(month, year)
 
-	year_overflow := max(0, month / MONTHS_PER_YEAR)
-	year += 1 * year_overflow
-	month -= MONTHS_PER_YEAR * year_overflow
-
-	self.selection_times = {
-		t.datetime_to_time(
-			dt.DateTime{self.selection[0].? or_else Date{}, {}},
-		) or_else t.Time{},
-		t.datetime_to_time(
-			dt.DateTime{self.selection[1].? or_else Date{}, {}},
-		) or_else t.Time{},
+	selection_times := [2]t.Time{
+		t.datetime_to_time(dt.DateTime{from_date.? or_else Date{}, {}}) or_else t.Time{},
+		t.datetime_to_time(dt.DateTime{to_date.? or_else (from_date.? or_else Date{}), {}}) or_else t.Time{},
 	}
 
 	month_start := t.datetime_to_time(i64(year), i8(month), 1, 0, 0, 0) or_else t.Time{}
@@ -82,21 +72,22 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	weekday := t.weekday(month_start)
 	calendar_start := month_start._nsec - i64(weekday) * i64(t.Hour * HOURS_PER_DAY)
 
-	self.days = 0
-	if _days, err := dt.last_day_of_month(i64(year), i8(month)); err == nil {
-		self.days = int(_days)
+	day_count := 0
+	if days_in_month, err := dt.last_day_of_month(i64(year), i8(month)); err == nil {
+		day_count = int(days_in_month)
 	}
 
-	self.days = int(
-		(month_start._nsec - calendar_start) / i64(t.Hour * HOURS_PER_DAY) + i64(self.days),
+	day_count = int(
+		(month_start._nsec - calendar_start) / i64(t.Hour * HOURS_PER_DAY) + i64(day_count),
 	)
-	self.days = int(math.ceil(f32(self.days) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
-	weeks := math.ceil(f32(self.days) / DAYS_PER_WEEK)
-	self.metrics.desired_size.y += weeks * self.row_height + (weeks + 1) * CALENDAR_WEEK_SPACING
-
+	day_count = int(math.ceil(f32(day_count) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
+	weeks := math.ceil(f32(day_count) / DAYS_PER_WEEK)
+	self.metrics.desired_size.y += weeks * row_height + (weeks + 1) * CALENDAR_WEEK_SPACING
 	self.content.side = .Top
-	self.content.padding = 10 if key_down(.G) else 0
+	self.content.padding = 10
 	self.placement = next_user_placement()
+	self.focus_time = animate(self.focus_time, 0.2, date^ != nil)
+	allow_range := until != nil
 
 	if begin_object(self) {
 		defer end_object()
@@ -146,8 +137,8 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 
 			set_margin(bottom = 0)
 
-			time: t.Time = self.calendar_start
-			for i in 0 ..< self.days {
+			time: t.Time = {calendar_start}
+			for i in 0 ..< day_count {
 				push_id(i + 1)
 				defer pop_id()
 
@@ -157,31 +148,35 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 				}
 
 				year, _month, day := t.date(time)
-				date := Date{i64(year), i8(_month), i8(day)}
+				cell_date := Date{i64(year), i8(_month), i8(day)}
 				time._nsec += i64(t.Hour * 24)
 
 				today_year, today_month, today_day := t.date(t.now())
 
-				if calendar_day(day, today_year == year && today_month == _month && today_day == day, month == int(_month), time, {}, 0).clicked {
-					if self.allow_range {
-						if self.selection[0] == nil {
-							self.selection[0] = date
+				if calendar_day(day, today_year == year && today_month == _month && today_day == day, month == int(_month), time, selection_times, self.focus_time).clicked {
+					if allow_range {
+						if from_date == nil {
+							from_date = cell_date
 						} else {
-							if date == self.selection[0] || date == self.selection[1] {
-								self.selection = {nil, nil}
+							if cell_date == from_date || cell_date == to_date {
+								from_date, to_date = nil, nil
 							} else {
 								if time._nsec <=
-								   (t.datetime_to_time(dt.DateTime{self.selection[0].?, {}}) or_else t.Time{})._nsec {
-									self.selection[0] = date
+								   (t.datetime_to_time(dt.DateTime{from_date.?, {}}) or_else t.Time{})._nsec {
+									from_date = cell_date
 								} else {
-									self.selection[1] = date
+									to_date = cell_date
 								}
 							}
 						}
 					} else {
-						self.selection[0] = date
+						from_date = cell_date if from_date == nil else nil
 					}
 					self.month_offset = 0
+					date^ = from_date
+					if until != nil {
+						until^ = to_date
+					}
 				}
 			}
 		}
@@ -205,8 +200,11 @@ calendar_day :: proc(
 	time: t.Time,
 	selection: [2]t.Time,
 	focus_time: f32,
-) -> Button_Result {
-	object := persistent_object(hash(day + 1))
+	loc := #caller_location,
+) -> (
+	result: Button_Result,
+) {
+	object := persistent_object(hash(loc))
 	if object.variant == nil {
 		object.variant = Calendar_Day {
 			object = object,
@@ -220,12 +218,14 @@ calendar_day :: proc(
 	self.selection = selection
 	self.placement = next_user_placement()
 	if begin_object(object) {
-		end_object()
+		defer end_object()
+
+		result = {
+			clicked = .Clicked in self.state.previous,
+			hovered = .Hovered in self.state.previous,
+		}
 	}
-	return {
-		clicked = .Clicked in self.state.current,
-		hovered = .Hovered in self.state.current,
-	}
+	return
 }
 
 display_calendar_day :: proc(self: ^Calendar_Day) {
@@ -233,25 +233,29 @@ display_calendar_day :: proc(self: ^Calendar_Day) {
 		hover_object(self)
 	}
 	handle_object_click(self)
+	if .Hovered in self.state.current {
+		set_cursor(.Pointing_Hand)
+	}
+	is_within_range := self.time._nsec > self.selection[0]._nsec &&
+	   self.time._nsec <= self.selection[1]._nsec + i64(t.Hour * 24)
+	is_first_day := self.selection[0]._nsec >= self.time._nsec && self.selection[0]._nsec <= self.time._nsec + i64(t.Hour * 24)
+	is_last_day := self.selection[1]._nsec >= self.time._nsec && self.selection[1]._nsec <= self.time._nsec + i64(t.Hour * 24)
+	self.focus_time = animate(self.focus_time, 0.2, is_first_day || is_last_day)
 	if object_is_visible(self) {
-		if self.time._nsec > self.selection[0]._nsec &&
-		   self.time._nsec <= self.selection[1]._nsec + i64(t.Hour * 24) {
+		if is_within_range {
 			corners: [4]f32
-			if self.time._nsec == self.selection[0]._nsec + i64(t.Hour * 24) {
+			if is_first_day {
 				corners[0] = global_state.style.rounding
 				corners[2] = global_state.style.rounding
 			}
-			if self.time._nsec == self.selection[1]._nsec + i64(t.Hour * 24) {
+			if is_last_day {
 				corners[1] = global_state.style.rounding
 				corners[3] = global_state.style.rounding
 			}
 			vgo.fill_box(
 				self.box,
 				corners,
-				vgo.fade(
-					global_state.style.color.substance,
-					1 if self.is_this_month else 0.5,
-				),
+				vgo.fade(global_state.style.color.substance, 1 if self.is_this_month else 0.5),
 			)
 		} else {
 			if .Hovered in self.state.current {

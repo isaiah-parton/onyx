@@ -90,7 +90,7 @@ main :: proc() {
 				)
 			}
 
-			if begin_panel() {
+			if begin_panel(can_resize = false) {
 				defer end_panel()
 
 				calendar(&date)

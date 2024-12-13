@@ -43,6 +43,7 @@ begin_panel :: proc(
 	size: Maybe([2]f32) = nil,
 	axis: Axis = .Y,
 	padding: f32 = 0,
+	can_resize: bool = true,
 	loc := #caller_location,
 ) -> bool {
 	MIN_SIZE :: [2]f32{100, 100}
@@ -59,7 +60,7 @@ begin_panel :: proc(
 		panel.box = {position, position + size}
 
 		panel.can_move = true
-		panel.can_resize = true
+		panel.can_resize = can_resize
 	}
 
 	push_stack(&global_state.panel_stack, panel)
@@ -84,7 +85,11 @@ begin_panel :: proc(
 	// 	linalg.min(global_state.view - box_size(panel.box), 0),
 	// 	linalg.max(global_state.view - box_size(panel.box), 0),
 	// )
-	panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + min_size)
+	if panel.can_resize {
+		panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + min_size)
+	} else {
+		panel.box.hi = panel.box.lo + min_size
+	}
 	panel.box = snapped_box(panel.box)
 
 	if panel.last_min_size != panel.min_size {
