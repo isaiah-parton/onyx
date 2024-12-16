@@ -55,6 +55,11 @@ begin_container :: proc(
 		object.state.input_mask = OBJECT_STATE_ALL
 	}
 	push_id(object.id)
+
+	object.isolated = true
+	object.placement = next_user_placement()
+	object.clip_children = true
+
 	begin_object(object) or_return
 
 	self := object.variant.(Container)
@@ -95,15 +100,22 @@ begin_container :: proc(
 	layout_box := Box{layout_origin, layout_origin + linalg.max(layout_size, box_size(self.box))}
 
 	// begin_layout(placement = layout_box) or_return
+	push_placement_options({})
+
+	vgo.fill_box(self.box, paint = colors().field)
 
 	return true
 }
 
 end_container :: proc() {
+	pop_placement_options()
 	// end_layout()
 
 	self := current_object().?.variant.(Container)
-	self.space_needed = linalg.max(space_required_by_object_content(self.content), self.space_needed)
+	self.space_needed = linalg.max(
+		space_required_by_object_content(self.content),
+		self.space_needed,
+	)
 
 	end_object()
 	pop_id()
@@ -177,9 +189,9 @@ display_container :: proc(self: ^Container) {
 		if display_scroll_x {
 			box.hi.y -= self.scroll_time.x * global_state.style.shape.scrollbar_thickness
 		}
-		// if scrollbar({make_visible = (is_active || abs(delta_scroll.y) > 0.01), vertical = true, box = box, pos = &container.scroll.y, travel = content_size.y - box_height(object.box), handle_size = box_height(box) * box_height(object.box) / content_size.y}).changed {
-		// 	container.target_scroll.y = container.scroll.y
-		// }
+		if scrollbar(make_visible = (self.is_active || abs(delta_scroll.y) > 0.01), vertical = true, box = box, pos = &self.scroll.y, travel = content_size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / content_size.y) {
+			self.target_scroll.y = self.scroll.y
+		}
 	}
 	if display_scroll_x {
 		box := get_box_cut_bottom(
@@ -189,10 +201,8 @@ display_container :: proc(self: ^Container) {
 		if display_scroll_y {
 			box.hi.x -= self.scroll_time.y * global_state.style.shape.scrollbar_thickness
 		}
-		// if scrollbar({make_visible = (is_active || abs(delta_scroll.x) > 0.01), box = box, pos = &container.scroll.x, travel = content_size.x - box_width(object.box), handle_size = box_width(box) * box_width(object.box) / content_size.x}).changed {
-		// 	container.target_scroll.x = container.scroll.x
-		// }
+		if scrollbar(make_visible = (self.is_active || abs(delta_scroll.x) > 0.01), box = box, pos = &self.scroll.x, travel = content_size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / content_size.x) {
+			self.target_scroll.x = self.scroll.x
+		}
 	}
-	vgo.fill_box(self.box, paint = colors().field)
-
 }

@@ -60,6 +60,7 @@ Object_Variant :: union {
 	Date_Picker,
 	Calendar,
 	Calendar_Day,
+	Scrollbar,
 }
 
 Child_Placement_Options :: struct {
@@ -350,6 +351,12 @@ begin_object :: proc(object: ^Object) -> bool {
 		place_object(object) or_return
 	}
 
+	if object.clip_children {
+		vgo.save_scissor()
+		vgo.push_scissor(vgo.make_box(object.box))
+		push_clip(object.box)
+	}
+
 	push_stack(&global_state.object_stack, object) or_return
 
 	return true
@@ -359,6 +366,11 @@ end_object :: proc() {
 	if object, ok := current_object().?; ok {
 
 		object.layer.state += object.state.current
+
+		if object.clip_children {
+			pop_clip()
+			vgo.restore_scissor()
+		}
 
 		pop_stack(&global_state.object_stack)
 
@@ -554,6 +566,8 @@ display_object :: proc(object: ^Object) {
 		display_color_picker(&v)
 	case Tabs:
 		display_tabs(&v)
+	case Scrollbar:
+		display_scrollbar(&v)
 	case Calendar_Day:
 		display_calendar_day(&v)
 	case Calendar:

@@ -94,15 +94,16 @@ main :: proc() {
 				)
 			}
 
-			if begin_panel(can_resize = false) {
+			if begin_panel(padding = 10) {
 				defer end_panel()
 
-				set_margin_all(10)
+				set_width(At_Least(0))
+				set_height(At_Least(0))
+
 				if begin_container() {
 					defer end_container()
 
-
-				calendar(&date, &until)
+					calendar(&date, &until)
 				}
 			}
 
