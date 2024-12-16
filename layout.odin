@@ -129,6 +129,8 @@ place_object :: proc(object: ^Object) -> bool {
 		place_object_in_parent(object, v) or_return
 	}
 
+	object.box = snapped_box(object.box)
+
 	object.content.box = solve_object_content_box(object)
 
 	return true
@@ -288,7 +290,7 @@ begin_layout :: proc(
 	self.clip_children = clip_contents
 
 	begin_object(self) or_return
-	push_placement_options()
+	push_current_placement_options()
 	return true
 }
 

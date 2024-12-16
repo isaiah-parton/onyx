@@ -18,8 +18,8 @@ Profiler_Scope :: enum {
 }
 
 Profiler :: struct {
-	t: [Profiler_Scope]time.Time,
-	d: [Profiler_Scope]time.Duration,
+	t:  [Profiler_Scope]time.Time,
+	d:  [Profiler_Scope]time.Duration,
 }
 
 Debug_State :: struct {
@@ -36,7 +36,7 @@ destroy_debug_state :: proc(state: ^Debug_State) {
 	delete(state.hovered_objects)
 }
 
-@(private = "file")
+@(private)
 __prof: Profiler
 
 @(deferred_in = __profiler_scope)
@@ -83,7 +83,9 @@ draw_object_debug_padding :: proc(box: Box, padding: [4]f32) {
 draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
 	if object_is_being_debugged(state, object) {
 		vgo.fill_box(object.box, paint = vgo.fade(vgo.BLUE, 0.25))
-		// draw_object_debug_margin(object.box, object.metrics.margin)
+		if placement, ok := object.placement.(Child_Placement_Options); ok {
+			draw_object_debug_margin(object.box, placement.margin)
+		}
 		draw_object_debug_padding(object.box, object.content.padding)
 	}
 	vgo.stroke_box(object.box, 1, paint = vgo.BLUE)
@@ -154,19 +156,24 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			fmt.sbprintf(&b, "\n%v: %.3fms", scope, time.duration_milliseconds(__prof.d[scope]))
 			if scope == .Render {
 				for timer in vgo.Debug_Timer {
-					fmt.sbprintf(&b, "\n  %v: %.3fms", timer, time.duration_milliseconds(vgo.renderer().timers[timer]))
+					fmt.sbprintf(
+						&b,
+						"\n  %v: %.3fms",
+						timer,
+						time.duration_milliseconds(vgo.renderer().timers[timer]),
+					)
 				}
 			}
-		}
-		if total > time.Millisecond * 100 {
-			fmt.println(__prof.d)
 		}
 		fmt.sbprintf(&b, "\nTotal: %.3fms", time.duration_milliseconds(total))
 		fmt.sbprintf(&b, "\nShapes: %i", len(vgo.renderer().shapes.data))
 		fmt.sbprintf(&b, "\nPaints: %i", len(vgo.renderer().paints.data))
 		fmt.sbprintf(&b, "\nMatrices: %i", len(vgo.renderer().xforms.data))
 		fmt.sbprintf(&b, "\nControl Vertices: %i", len(vgo.renderer().cvs.data))
-		fmt.sbprintf(&b, "\nLayer: %i", global_state.last_hovered_layer)
+		fmt.sbprintf(&b, "\nDraw calls: %i", vgo.draw_call_count())
+		fmt.sbprintf(&b, "\nLayers: %i", len(global_state.layers))
+		fmt.sbprintf(&b, "\nObjects: %i", len(global_state.objects) + global_state.transient_objects.len)
+		fmt.sbprintf(&b, "\nPanels: %i", len(global_state.panel_map))
 		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, {})
 	}
 
@@ -180,14 +187,10 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			font = global_state.style.monospace_font,
 		)
 		origin := [2]f32{0, global_state.view.y}
-		vgo.fill_text_layout(
-			text_layout,
-			origin + 2,
-			align = {0, 1},
-			paint = vgo.BLACK,
-		)
+		vgo.fill_text_layout(text_layout, origin + 2, align = {0, 1}, paint = vgo.BLACK)
 		vgo.fill_text_layout(text_layout, origin, align = {0, 1})
 	}
+
 	if object, ok := currently_debugged_object(state^); ok {
 		b := strings.builder_make(context.temp_allocator)
 		if !state.wireframe {

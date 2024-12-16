@@ -83,6 +83,7 @@ Global_State :: struct {
 	last_frame_time:          time.Time,
 	start_time:               time.Time,
 	last_second:              time.Time,
+	frame_duration:           time.Duration,
 	frames_so_far:            int,
 	frames_this_second:       int,
 	// Hashing
@@ -221,7 +222,6 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	global_state.focused = true
 	global_state.view = {f32(width), f32(height)}
 	global_state.last_frame_time = time.now()
-	draw_frames(1)
 	global_state.start_time = time.now()
 
 	global_state.cursors[.Normal] = glfw.CreateStandardCursor(glfw.ARROW_CURSOR)
@@ -314,7 +314,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	// &{
 	// 	nextInChain = &wgpu.InstanceExtras{
 	// 		sType = .InstanceExtras,
-	// 		backends = {.DX12, .GL, .Vulkan},
+	// 		backends = {.Vulkan},
 	// 	},
 	// }
 
@@ -394,6 +394,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	}
 
 	global_state.ready = true
+	draw_frames(1)
 
 	return true
 }
@@ -412,12 +413,9 @@ new_frame :: proc() {
 
 	profiler_scope(.New_Frame)
 
-	free_all(context.temp_allocator)
-
 	now := time.now()
-	global_state.delta_time = f32(
-		time.duration_seconds(time.diff(global_state.last_frame_time, now)),
-	)
+	global_state.frame_duration = time.diff(global_state.last_frame_time, now)
+	global_state.delta_time = f32(time.duration_seconds(global_state.frame_duration))
 	global_state.last_frame_time = now
 	global_state.frames += 1
 	global_state.frames_so_far += 1

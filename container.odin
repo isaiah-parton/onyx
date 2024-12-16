@@ -54,7 +54,7 @@ begin_container :: proc(
 		}
 		object.state.input_mask = OBJECT_STATE_ALL
 	}
-
+	push_id(object.id)
 	begin_object(object) or_return
 
 	self := object.variant.(Container)
@@ -94,22 +94,22 @@ begin_container :: proc(
 	layout_origin := self.box.lo - linalg.max(linalg.floor(self.scroll), 0)
 	layout_box := Box{layout_origin, layout_origin + linalg.max(layout_size, box_size(self.box))}
 
-	begin_layout(placement = layout_box) or_return
+	// begin_layout(placement = layout_box) or_return
 
 	return true
 }
 
 end_container :: proc() {
-	end_layout()
+	// end_layout()
+
+	self := current_object().?.variant.(Container)
+	self.space_needed = linalg.max(space_required_by_object_content(self.content), self.space_needed)
+
 	end_object()
 	pop_id()
 }
 
 display_container :: proc(self: ^Container) {
-
-
-	self.space_needed = linalg.max(space_required_by_object_content(self.content), self.space_needed)
-
 	if self.is_active {
 		if self.enable_zoom &&
 		   (.Pressed not_in self.state.current) &&
@@ -169,7 +169,6 @@ display_container :: proc(self: ^Container) {
 	display_scroll_y := self.scroll_time.y > 0.0
 	// Scrollbars
 	inner_box := shrink_box(self.box, 4)
-	push_id(self.id)
 	if display_scroll_y {
 		box := get_box_cut_right(
 			inner_box,
@@ -194,10 +193,6 @@ display_container :: proc(self: ^Container) {
 		// 	container.target_scroll.x = container.scroll.x
 		// }
 	}
-	vgo.push_scissor(vgo.make_box(self.box, global_state.style.rounding))
 	vgo.fill_box(self.box, paint = colors().field)
-	for child in self.children {
-		display_object(child)
-	}
-	vgo.pop_scissor()
+
 }

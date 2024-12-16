@@ -65,6 +65,8 @@ begin_panel :: proc(
 
 	push_stack(&global_state.panel_stack, panel)
 
+	push_current_placement_options()
+
 	if panel.moving == true {
 		mouse_point := mouse_point()
 		panel.moving = false
@@ -200,6 +202,7 @@ end_panel :: proc() {
 	pop_id()
 	vgo.pop_scissor()
 	end_layer()
+	pop_placement_options()
 	pop_stack(&global_state.panel_stack)
 }
 

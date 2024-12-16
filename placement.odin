@@ -6,8 +6,12 @@ current_placement_options :: proc() -> ^Placement_Options {
 	return &global_state.placement_options_stack.items[max(0, global_state.placement_options_stack.height - 1)]
 }
 
-push_placement_options :: proc() {
-	push_stack(&global_state.placement_options_stack, current_placement_options()^)
+push_current_placement_options :: proc() {
+	push_placement_options(current_placement_options()^)
+}
+
+push_placement_options :: proc(options: Placement_Options) {
+	push_stack(&global_state.placement_options_stack, options)
 }
 
 pop_placement_options :: proc() {

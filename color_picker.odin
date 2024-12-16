@@ -276,7 +276,15 @@ display_alpha_slider :: proc(self: ^Alpha_Slider) {
 				),
 			)
 			vgo.fill_box(
-				{{box.lo.x, pos - 1}, {box.hi.x, pos + 1}},
+				{{box.lo.x - 1, pos - 1}, {box.lo.x, pos + 2}},
+				paint = global_state.style.color.content,
+			)
+			vgo.fill_box(
+				{{box.hi.x, pos - 1}, {box.hi.x + 1, pos + 2}},
+				paint = global_state.style.color.content,
+			)
+			vgo.fill_box(
+				{{box.lo.x, pos}, {box.hi.x, pos + 1}},
 				paint = global_state.style.color.content,
 			)
 		}

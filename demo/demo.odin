@@ -67,6 +67,7 @@ main :: proc() {
 	color: vgo.Color = vgo.GOLD
 	enum_value: runtime.Odin_OS_Type
 	date: Maybe(onyx.Date)
+	until: Maybe(onyx.Date)
 	boolean_value: [onyx.Boolean_Type]bool
 
 	for {
@@ -75,6 +76,9 @@ main :: proc() {
 		}
 		{
 			using onyx
+
+			free_all(context.temp_allocator)
+
 			new_frame()
 
 			{
@@ -93,7 +97,13 @@ main :: proc() {
 			if begin_panel(can_resize = false) {
 				defer end_panel()
 
-				calendar(&date)
+				set_margin_all(10)
+				if begin_container() {
+					defer end_container()
+
+
+				calendar(&date, &until)
+				}
 			}
 
 			if begin_panel(axis = .X) {
@@ -150,7 +160,7 @@ main :: proc() {
 								pop_id()
 							}
 						}
-						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(100 / 3), padding = 10) {
+						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(33.33), padding = 10) {
 							defer end_layout()
 
 							raw_input(&input_value, placeholder = "sample text")
@@ -173,8 +183,6 @@ main :: proc() {
 							color_picker(&color)
 						}
 					}
-
-
 				}
 			}
 			present()
