@@ -20,6 +20,7 @@ Button :: struct {
 	text:         string,
 	is_loading:   bool,
 	press_time:   f32,
+	rounding: [4]f32,
 	style:        Button_Style,
 	font_index:   Maybe(int),
 	font_size:    Maybe(f32),
@@ -35,6 +36,7 @@ Button_Result :: struct {
 button :: proc(
 	text: string,
 	style: Button_Style = .Primary,
+	rounding: [4]f32 = global_state.style.rounding,
 	font_size: f32 = global_state.style.default_text_size,
 	loc := #caller_location,
 ) -> (
@@ -49,6 +51,7 @@ button :: proc(
 	self := &object.variant.(Button)
 	self.text_layout = vgo.make_text_layout(text, font_size, global_state.style.default_font)
 	self.style = style
+	self.rounding = rounding
 	self.placement = next_user_placement()
 	set_object_desired_size(object, self.text_layout.size + global_state.style.text_padding * 2)
 	if begin_object(object) {
@@ -64,22 +67,21 @@ display_button :: proc(self: ^Button) {
 	button_behavior(self)
 	if object_is_visible(self) {
 		text_color: vgo.Color
-		radius: [4]f32 = global_state.style.rounding
 
 		switch self.style {
 		case .Outlined:
 			vgo.fill_box(
 				self.box,
-				radius,
+				self.rounding,
 				vgo.fade(
 					self.color.? or_else global_state.style.color.substance,
-					0.5 if .Hovered in self.state.current else 0.25,
+					0.25 if .Hovered in self.state.current else 0.0,
 				),
 			)
 			vgo.stroke_box(
 				self.box,
 				1,
-				radius,
+				self.rounding,
 				self.color.? or_else global_state.style.color.substance,
 			)
 			text_color = global_state.style.color.content
@@ -87,14 +89,14 @@ display_button :: proc(self: ^Button) {
 			bg_color := self.color.? or_else global_state.style.color.substance
 			vgo.fill_box(
 				self.box,
-				radius,
+				self.rounding,
 				vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in self.state.current else bg_color,
 			)
 			text_color = global_state.style.color.accent_content
 		case .Primary:
 			vgo.fill_box(
 				self.box,
-				radius,
+				self.rounding,
 				vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in self.state.current else global_state.style.color.accent,
 			)
 			text_color = global_state.style.color.accent_content
@@ -102,7 +104,7 @@ display_button :: proc(self: ^Button) {
 			if .Hovered in self.state.current {
 				vgo.fill_box(
 					self.box,
-					radius,
+					self.rounding,
 					paint = vgo.fade(self.color.? or_else global_state.style.color.substance, 0.2),
 				)
 			}
@@ -112,7 +114,7 @@ display_button :: proc(self: ^Button) {
 		if self.press_time > 0 {
 			scale := self.press_time if .Pressed in self.state.current else f32(1)
 			opacity := f32(1) if .Pressed in self.state.current else self.press_time
-			vgo.push_scissor(vgo.make_box(self.box, radius))
+			vgo.push_scissor(vgo.make_box(self.box, self.rounding))
 			vgo.fill_circle(
 				self.input.click_point,
 				linalg.length(self.box.hi - self.box.lo) * scale,

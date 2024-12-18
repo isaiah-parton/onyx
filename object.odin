@@ -608,6 +608,10 @@ display_object :: proc(object: ^Object) {
 		pop_clip()
 		vgo.restore_scissor()
 	}
+
+	if parent, ok := object.parent.?; ok {
+		parent.state.current += object_state_output(object.state) & parent.state.input_mask
+	}
 }
 
 content_justify_causes_deference :: proc(justify: Align) -> bool {

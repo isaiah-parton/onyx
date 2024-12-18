@@ -12,10 +12,35 @@ import dt "core:time/datetime"
 Date :: dt.Date
 CALENDAR_WEEK_SPACING :: 4
 
+Calendar_Page :: struct {
+	year:  i64,
+	month: i8,
+}
+
 Calendar :: struct {
-	using object:    ^Object,
-	month_offset:    int,
-	focus_time:      f32,
+	using object: ^Object,
+	page:         Maybe(Calendar_Page),
+	focus_time:   f32,
+}
+
+move_calendar_page :: proc(page: Calendar_Page, months: i8) -> Calendar_Page {
+	page := page
+	page.month += months
+	modifier := page.month - 1
+	modifier -= 11 * i8(page.month < 1)
+	modifier /= MONTHS_PER_YEAR
+	return {
+		month = page.month - MONTHS_PER_YEAR * modifier,
+		year = page.year + i64(modifier),
+	}
+}
+
+todays_calendar_page :: proc() -> Calendar_Page {
+	date := todays_date()
+	return {
+		month = date.month,
+		year = date.year,
+	}
 }
 
 todays_date :: proc() -> Date {
@@ -31,13 +56,6 @@ DAYS_PER_WEEK :: 7
 MONTHS_PER_YEAR :: 12
 HOURS_PER_DAY :: 24
 
-resolve_month_overflow :: proc(month, year: int) -> (int, int) {
-	modifier := month - 1
-	modifier -= 11 * int(month < 1)
-	modifier /= MONTHS_PER_YEAR
-	return month - MONTHS_PER_YEAR * modifier, year + modifier
-}
-
 calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_location) {
 	assert(date != nil, loc = loc)
 	object := persistent_object(hash(loc))
@@ -52,28 +70,28 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	row_height := self.metrics.desired_size.x / DAYS_PER_WEEK
 	self.metrics.desired_size.y = row_height * 2
 
-	view_date := date.? or_else todays_date()
+	page := self.page.? or_else todays_calendar_page()
+	if self.page == nil {
+		self.page = page
+	}
 
 	from_date := date^
 	to_date := until^ if until != nil else Maybe(Date)(nil)
 
-	view_month := int(view_date.month) + self.month_offset
-	view_year := int(view_date.year)
-
-	view_month, view_year = resolve_month_overflow(view_month, view_year)
-
-	selection_times := [2]t.Time{
+	selection_times := [2]t.Time {
 		t.datetime_to_time(dt.DateTime{from_date.? or_else Date{}, {}}) or_else t.Time{},
-		t.datetime_to_time(dt.DateTime{to_date.? or_else (from_date.? or_else Date{}), {}}) or_else t.Time{},
+		t.datetime_to_time(
+			dt.DateTime{to_date.? or_else (from_date.? or_else Date{}), {}},
+		) or_else t.Time{},
 	}
 
-	month_start := t.datetime_to_time(i64(view_year), i8(view_month), 1, 0, 0, 0) or_else t.Time{}
+	month_start := t.datetime_to_time(page.year, page.month, 1, 0, 0, 0) or_else t.Time{}
 
 	weekday := t.weekday(month_start)
 	calendar_start := month_start._nsec - i64(weekday) * i64(t.Hour * HOURS_PER_DAY)
 
 	day_count := 0
-	if days_in_month, err := dt.last_day_of_month(i64(view_year), i8(view_month)); err == nil {
+	if days_in_month, err := dt.last_day_of_month(page.year, page.month); err == nil {
 		day_count = int(days_in_month)
 	}
 
@@ -108,12 +126,14 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 
 			set_margin(left = 10)
 			if button(text = "<<", style = .Ghost).clicked {
-				self.month_offset -= 1
+				self.page = move_calendar_page(page, -1)
 			}
-			label(text = fmt.tprintf("%i %s %i", self.month_offset, t.Month(view_month), view_year))
+			label(
+				text = fmt.tprintf("%s %i", t.Month(page.month), page.year),
+			)
 			set_margin(right = 10)
 			if button(text = ">>", style = .Ghost).clicked {
-				self.month_offset += 1
+				self.page = move_calendar_page(page, 1)
 			}
 		}
 
@@ -151,7 +171,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 				cell_date := Date{i64(year), i8(month), i8(day)}
 				cell_year, cell_month, cell_day := t.date(t.now())
 
-				if calendar_day(day, cell_year == year && cell_month == month && cell_day == day, view_month == int(month), time, selection_times, self.focus_time).clicked {
+				if calendar_day(day, cell_year == year && cell_month == month && cell_day == day, page.month == i8(month), time, selection_times, self.focus_time).clicked {
 					if allow_range {
 						if from_date == nil {
 							from_date = cell_date
@@ -173,12 +193,6 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 						} else {
 							from_date = cell_date
 						}
-					}
-					// TODO: Fix month offset
-					if from_date == nil {
-						self.month_offset = view_month - int(todays_date().month)
-					} else if to_date == nil {
-						self.month_offset = 0
 					}
 					date^ = from_date
 					if until != nil {
@@ -246,8 +260,8 @@ display_calendar_day :: proc(self: ^Calendar_Day) {
 	if .Hovered in self.state.current {
 		set_cursor(.Pointing_Hand)
 	}
-	is_within_range := self.time._nsec >= self.selection[0]._nsec &&
-	   self.time._nsec <= self.selection[1]._nsec
+	is_within_range :=
+		self.time._nsec >= self.selection[0]._nsec && self.time._nsec <= self.selection[1]._nsec
 	is_first_day := self.selection[0]._nsec == self.time._nsec
 	is_last_day := self.selection[1]._nsec == self.time._nsec
 	self.focus_time = animate(self.focus_time, 0.2, is_first_day || is_last_day)

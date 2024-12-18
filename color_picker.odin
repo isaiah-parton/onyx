@@ -127,7 +127,7 @@ display_color_picker :: proc(self: ^Color_Picker) {
 	}
 
 	if object_is_visible(self) {
-		shadow_opacity := f32(1) //max(object.hover_time, object.open_time)
+		shadow_opacity := self.open_time
 		if shadow_opacity > 0 {
 			vgo.box_shadow(
 				self.box,
@@ -264,7 +264,7 @@ display_alpha_slider :: proc(self: ^Alpha_Slider) {
 		)
 		self.color.a = 255
 		time := clamp(self.value, 0, 1)
-		pos := box.lo[i] + (box.hi[i] - box.lo[i]) * time
+		pos := box.lo[i] + (box.hi[i] - box.lo[i] - 4) * time
 		if self.axis == .Y {
 			vgo.fill_box(
 				box,
@@ -275,16 +275,9 @@ display_alpha_slider :: proc(self: ^Alpha_Slider) {
 					self.color,
 				),
 			)
-			vgo.fill_box(
-				{{box.lo.x - 1, pos - 1}, {box.lo.x, pos + 2}},
-				paint = global_state.style.color.content,
-			)
-			vgo.fill_box(
-				{{box.hi.x, pos - 1}, {box.hi.x + 1, pos + 2}},
-				paint = global_state.style.color.content,
-			)
-			vgo.fill_box(
-				{{box.lo.x, pos}, {box.hi.x, pos + 1}},
+			vgo.stroke_box(
+				{{box.lo.x, pos}, {box.hi.x, pos + 4}},
+				1,
 				paint = global_state.style.color.content,
 			)
 		}

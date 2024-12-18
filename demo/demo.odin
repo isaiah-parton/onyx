@@ -117,9 +117,9 @@ main :: proc() {
 
 					set_width(Percent(100))
 					set_height(Percent_Of_Width(100))
-					button("\uf578", style = .Ghost, font_size = 20)
-					button("\uf044", style = .Ghost, font_size = 20)
-					if button("\uedca", style = .Ghost, font_size = 20).clicked {
+					button("\uf578", style = .Ghost, font_size = 20, rounding = 0)
+					button("\uf044", style = .Ghost, font_size = 20, rounding = 0)
+					if button("\uedca", style = .Ghost, font_size = 20, rounding = 0).clicked {
 						when ODIN_OS == .Linux {
 							libc.system("xdg-open \"https://github.com/isaiah-parton/onyx\"")
 						} else when ODIN_OS == .Windows {
