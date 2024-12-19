@@ -7,11 +7,11 @@ import "core:math/linalg"
 import "core:slice"
 
 
-
 Many_2_One_Widget :: struct {
-	using object: ^Object,
-	index:        int,
-	items:        []string,
+	using object:  ^Object,
+	index:         int,
+	items:         []string,
+	label_layouts: []vgo.Text_Layout,
 }
 
 Tabs :: Many_2_One_Widget
@@ -26,7 +26,15 @@ tabs :: proc(items: []string, index: ^$T, loc := #caller_location) {
 	self := &object.variant.(Tabs)
 	self.items = items
 	self.placement = next_user_placement()
-	self.metrics.desired_size = global_state.style.visual_size
+	self.metrics.desired_size.y = global_state.style.visual_size.y
+	self.label_layouts = make([]vgo.Text_Layout, len(items), allocator = context.temp_allocator)
+	for item, i in items {
+		self.label_layouts[i] = vgo.make_text_layout(
+			item,
+			global_state.style.default_text_size,
+			global_state.style.default_font,
+		)
+	}
 	if begin_object(object) {
 		defer end_object()
 		if object_was_changed(object) {
@@ -47,15 +55,12 @@ display_tabs :: proc(self: ^Tabs) {
 
 	is_visible := object_is_visible(self)
 	inner_box := shrink_box(self.box, 1)
-	if is_visible {
-		vgo.fill_box(self.box, global_state.style.rounding, global_state.style.color.field)
-	}
-	option_rounding := global_state.style.rounding * ((box_height(self.box) - 4) / box_height(self.box))
 	option_size := (inner_box.hi.x - inner_box.lo.x) / f32(len(self.items))
 
 	for item, i in self.items {
-		option_box := cut_box_left(&inner_box, option_size)
-		hovered := (self.state.current >= {.Hovered}) && point_in_box(global_state.mouse_pos, option_box)
+		option_box := cut_box_left(&inner_box, self.label_layouts[i].size.x)
+		hovered :=
+			(self.state.current >= {.Hovered}) && point_in_box(global_state.mouse_pos, option_box)
 		if self.index != i {
 			if hovered {
 				if .Clicked in self.state.current {
@@ -67,19 +72,20 @@ display_tabs :: proc(self: ^Tabs) {
 		}
 		if is_visible {
 			vgo.fill_box(
-				shrink_box(option_box, 1),
-				option_rounding,
+				{
+					{option_box.lo.x, option_box.hi.y - 3},
+					{option_box.hi.x, option_box.hi.y},
+				},
+				1.5,
 				paint = vgo.fade(
-					global_state.style.color.fg,
+					global_state.style.color.content,
 					f32(int(hovered || self.index == i)),
 				),
 			)
-			vgo.fill_text(
-				item,
-				global_state.style.default_text_size,
-				box_center(option_box),
-				font = global_state.style.default_font,
-				align = 0.5,
+			vgo.fill_text_layout(
+				self.label_layouts[i],
+				{box_center_x(option_box), option_box.lo.y},
+				align = {0.5, 0},
 				paint = vgo.fade(global_state.style.color.content, 1 if self.index == i else 0.5),
 			)
 		}
@@ -122,12 +128,14 @@ display_option_slider :: proc(self: ^Option_Slider) {
 	if is_visible {
 		vgo.fill_box(self.box, global_state.style.rounding, global_state.style.color.field)
 	}
-	option_rounding := global_state.style.rounding * ((box_height(self.box) - 4) / box_height(self.box))
+	option_rounding :=
+		global_state.style.rounding * ((box_height(self.box) - 4) / box_height(self.box))
 	option_size := (inner_box.hi.x - inner_box.lo.x) / f32(len(self.items))
 
 	for item, i in self.items {
 		option_box := cut_box_left(&inner_box, option_size)
-		hovered := (self.state.current >= {.Hovered}) && point_in_box(global_state.mouse_pos, option_box)
+		hovered :=
+			(self.state.current >= {.Hovered}) && point_in_box(global_state.mouse_pos, option_box)
 		if self.index != i {
 			if hovered {
 				if .Clicked in self.state.current {

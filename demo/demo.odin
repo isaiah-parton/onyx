@@ -152,7 +152,7 @@ main :: proc() {
 							defer end_layout()
 
 							set_width(Percent(100))
-							option_slider(reflect.enum_field_names(Align), &justify)
+							tabs(reflect.enum_field_names(Align), &justify)
 						}
 						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(25), padding = 10) {
 							defer end_layout()
