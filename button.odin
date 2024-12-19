@@ -25,6 +25,7 @@ Button :: struct {
 	font_index:   Maybe(int),
 	font_size:    Maybe(f32),
 	color:        Maybe(vgo.Color),
+	waves: small_array.Small_Array(10, Wave_Effect),
 	text_layout:  vgo.Text_Layout,
 }
 
@@ -111,16 +112,27 @@ display_button :: proc(self: ^Button) {
 			text_color = global_state.style.color.content
 		}
 
-		if self.press_time > 0 {
-			scale := self.press_time if .Pressed in self.state.current else f32(1)
-			opacity := f32(1) if .Pressed in self.state.current else self.press_time
-			vgo.push_scissor(vgo.make_box(self.box, self.rounding))
+		if .Pressed in new_state(self.state) {
+			small_array.append(&self.waves, Wave_Effect{point = mouse_point()})
+		}
+
+		draw_frames(min(1, self.waves.len) + 1)
+
+		vgo.push_scissor(vgo.make_box(self.box, self.rounding))
+	 	for &wave, i in self.waves.data[:self.waves.len] {
 			vgo.fill_circle(
-				self.input.click_point,
-				linalg.length(self.box.hi - self.box.lo) * scale,
-				paint = vgo.fade(vgo.WHITE, opacity * 0.2),
+				wave.point,
+				linalg.length(self.box.hi - self.box.lo) * min(wave.time, 0.75) * 1.33,
+				paint = vgo.fade(vgo.WHITE, (1 - max(0, wave.time - 0.75) * 4) * 0.2),
 			)
-			vgo.pop_scissor()
+			if !(wave.time >= 0.75 && .Pressed in self.state.current) {
+				wave.time += 2.5 * global_state.delta_time
+			}
+		}
+		vgo.pop_scissor()
+
+		for self.waves.len > 0 && self.waves.data[0].time > 1 {
+			small_array.pop_front(&self.waves)
 		}
 
 		if !self.is_loading {

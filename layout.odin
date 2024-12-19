@@ -157,24 +157,25 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 		total_space_for_object_content(parent),
 	)
 
+	parent_content_axis := axis_of_side(parent.content.side)
 	object.box, content_box = split_box(
-		apply_near_object_margin(content_box, parent.content.axis, placement.margin),
+		apply_near_object_margin(content_box, parent_content_axis, placement.margin),
 		parent.content.side,
-		object.metrics.size[int(parent.content.axis)],
+		object.metrics.size[int(parent_content_axis)],
 	)
 
-	content_box = apply_far_object_margin(content_box, parent.content.axis, placement.margin)
+	content_box = apply_far_object_margin(content_box, parent_content_axis, placement.margin)
 
 	object.box = apply_object_alignment(
-		apply_perpendicular_object_margin(object.box, parent.content.axis, placement.margin),
-		parent.content.axis,
+		apply_perpendicular_object_margin(object.box, parent_content_axis, placement.margin),
+		parent_content_axis,
 		placement.align,
 		object.metrics.size,
 	)
 
 	if parent.content.justify == .Equal_Space {
-		content_box.lo[int(parent.content.axis)] +=
-			parent.content.space_left[int(parent.content.axis)] / f32(len(parent.children) - 1)
+		content_box.lo[int(parent_content_axis)] +=
+		parent.content.space_left[int(parent_content_axis)] / f32(len(parent.children) - 1)
 	} else if parent.content.justify == .Center {
 		move_object(object, parent.content.space_left * 0.5)
 	} else if parent.content.justify == .Far {
@@ -236,7 +237,7 @@ stack_layout_placement :: proc(axis: Axis, size: Layout_Size) -> Child_Placement
 
 current_axis :: proc() -> Axis {
 	if object, ok := current_object().?; ok {
-		return object.content.axis
+		return axis_of_side(object.content.side)
 	}
 	return .Y
 }
@@ -280,7 +281,6 @@ begin_layout :: proc(
 	self := make_transient_object()
 	self.state.input_mask = OBJECT_STATE_ALL
 	self.content = {
-		axis    = axis_of_side(side),
 		side    = side,
 		justify = justify,
 		padding = padding,

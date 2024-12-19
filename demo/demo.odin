@@ -18,6 +18,7 @@ import "core:strconv"
 import "core:strings"
 import "core:sys/windows"
 import "core:time"
+import "core:thread"
 import "core:c/libc"
 import "vendor:glfw"
 import "vendor:wgpu"
@@ -120,21 +121,23 @@ main :: proc() {
 					button("\uf578", style = .Ghost, font_size = 20, rounding = 0)
 					button("\uf044", style = .Ghost, font_size = 20, rounding = 0)
 					if button("\uedca", style = .Ghost, font_size = 20, rounding = 0).clicked {
-						when ODIN_OS == .Linux {
-							libc.system("xdg-open \"https://github.com/isaiah-parton/onyx\"")
-						} else when ODIN_OS == .Windows {
-							libc.system("explorer \"https://github.com/isaiah-parton/onyx\"")
-						}
+						thread.run(proc() {
+							when ODIN_OS == .Linux {
+								libc.system("xdg-open \"https://github.com/isaiah-parton/onyx\"")
+							} else when ODIN_OS == .Windows {
+								libc.system("explorer \"https://github.com/isaiah-parton/onyx\"")
+							}
+						})
 					}
 				}
 
 				if begin_row_layout(size = At_Least(0), padding = 15, side = .Right) {
 					defer end_layout()
 
-					if begin_column_layout(size = Fixed(30)) {
-						defer end_layout()
+					// if begin_column_layout(size = Fixed(30)) {
+					// 	defer end_layout()
 
-					}
+					// }
 
 					if begin_column_layout(size = At_Least(0)) {
 						defer end_layout()
@@ -149,7 +152,7 @@ main :: proc() {
 							defer end_layout()
 
 							set_width(Percent(100))
-							tabs(reflect.enum_field_names(Align), &justify)
+							option_slider(reflect.enum_field_names(Align), &justify)
 						}
 						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(25), padding = 10) {
 							defer end_layout()

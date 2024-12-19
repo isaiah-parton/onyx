@@ -60,6 +60,11 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 	stack.height = 0
 }
 
+Wave_Effect :: struct {
+	point: [2]f32,
+	time: f32,
+}
+
 @(private)
 global_state: Global_State
 
@@ -88,6 +93,7 @@ Global_State :: struct {
 	frames_this_second:       int,
 	// Hashing
 	id_stack:                 Stack(Id, MAX_IDS),
+	wave_effects: [dynamic]Wave_Effect,
 	// Objects
 	transient_objects:        small_array.Small_Array(512, Object),
 	objects:                  [dynamic]^Object,
@@ -445,6 +451,10 @@ new_frame :: proc() {
 	update_layer_references()
 	clean_up_objects()
 	update_object_references()
+
+	for len(global_state.wave_effects) > 0 && global_state.wave_effects[0].time > 1.0 {
+		pop(&global_state.wave_effects)
+	}
 
 	if key_pressed(.Escape) {
 		global_state.focused_object = 0

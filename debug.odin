@@ -217,8 +217,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		)
 		fmt.sbprintf(
 			&b,
-			"\n axis: %v\n justify: %v\n deferred: %v\n children: %i",
-			object.content.axis,
+			"\n justify: %v\n deferred: %v\n children: %i",
 			object.content.justify,
 			object.is_deferred,
 			len(object.children),

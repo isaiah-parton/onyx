@@ -107,7 +107,6 @@ Object_State :: struct {
 }
 
 Object_Content :: struct {
-	axis:         Axis,
 	side:         Side,
 	justify:      Align,
 	align:        Align,
@@ -353,7 +352,6 @@ begin_object :: proc(object: ^Object) -> bool {
 
 	object.content.size = 0
 	object.content.desired_size = 0
-	object.content.axis = axis_of_side(object.content.side)
 	if !object.is_deferred {
 		place_object(object) or_return
 	}
@@ -442,7 +440,7 @@ update_object_parent_metrics :: proc(object: ^Object) {
 
 	parent := object.parent.?
 
-	i := int(parent.content.axis)
+	i := int(axis_of_side(parent.content.side))
 	j := 1 - i
 
 	parent.content.desired_size[i] += effective_desired_size[i]
@@ -615,7 +613,7 @@ display_object :: proc(object: ^Object) {
 				object.content.space_left -= occupied_space_of_object(child_object)
 			}
 		}
-		object.content.space_left *= axis_normal(object.content.axis)
+		object.content.space_left *= axis_normal(axis_of_side(object.content.side))
 	}
 
 	for child_object in object.children {
