@@ -39,7 +39,7 @@ boolean :: proc(
 	self := &object.variant.(Boolean)
 	self.value = state
 	self.gadget_size = global_state.style.visual_size.y * 0.8
-	if type == .Switch do self.gadget_size *= [2]f32{2, 1}
+	if type == .Switch do self.gadget_size *= [2]f32{1.75, 1}
 	self.placement = next_user_placement()
 	self.type = type
 	self.text = text

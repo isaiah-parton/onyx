@@ -52,7 +52,7 @@ default_style_shape :: proc() -> Style_Shape {
 		header_text_size = 32,
 		default_text_size = 14,
 		tab_text_size = 18,
-		content_text_size = 16,
+		content_text_size = 14,
 		rounding = 4,
 		menu_padding = 2,
 		popup_margin = 7,

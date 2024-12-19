@@ -19,6 +19,7 @@ MAX_CLICK_DELAY :: time.Millisecond * 450
 Object_Flag :: enum {
 	Is_Input,
 	Persistent,
+	Hover_Through,
 }
 
 Object_Flags :: bit_set[Object_Flag;u8]
@@ -75,26 +76,27 @@ Future_Object_Placement :: union {
 }
 
 Object :: struct {
-	id:            Id,
-	call_index:    int,
-	frames:        int,
-	layer:         ^Layer,
-	box:           Box,
-	placement:     Object_Placement,
-	clip_children: bool,
-	dead:          bool,
-	is_deferred:   bool,
-	disabled:      bool,
-	isolated:      bool,
-	flags:         Object_Flags,
-	state:         Object_State,
-	input:         Object_Input,
-	metrics:       Object_Metrics,
-	content:       Object_Content,
-	parent:        Maybe(^Object),
-	children:      [dynamic]^Object,
-	on_display:    proc(_: ^Object),
-	variant:       Object_Variant,
+	id:              Id,
+	call_index:      int,
+	frames:          int,
+	layer:           ^Layer,
+	box:             Box,
+	placement:       Object_Placement,
+	clip_children:   bool,
+	dead:            bool,
+	is_deferred:     bool,
+	disabled:        bool,
+	isolated:        bool,
+	will_be_hovered: bool,
+	flags:           Object_Flags,
+	state:           Object_State,
+	input:           Object_Input,
+	metrics:         Object_Metrics,
+	content:         Object_Content,
+	parent:          Maybe(^Object),
+	children:        [dynamic]^Object,
+	on_display:      proc(_: ^Object),
+	variant:         Object_Variant,
 }
 
 Object_State :: struct {
@@ -110,6 +112,7 @@ Object_Content :: struct {
 	justify:      Align,
 	align:        Align,
 	box:          Box,
+	offset:       [2]f32,
 	space_left:   [2]f32,
 	size:         [2]f32,
 	desired_size: [2]f32,
@@ -229,7 +232,7 @@ persistent_object :: proc(id: Id) -> ^Object {
 	return object
 }
 
-transient_object :: proc() -> ^Object {
+make_transient_object :: proc() -> ^Object {
 	small_array.append(&global_state.transient_objects, Object{})
 	object :=
 		small_array.get_ptr_safe(
@@ -297,18 +300,22 @@ object_is_visible :: proc(object: ^Object) -> bool {
 
 update_object_state :: proc(object: ^Object) {
 	object.state.previous = object.state.current
-	object.state.current -= {.Clicked, .Focused, .Changed}
+	object.state.current -= {.Clicked, .Focused, .Changed, .Hovered}
 
 	if global_state.focused_object == object.id {
 		object.state.current += {.Focused}
 	}
 }
 
+assign_next_object_index :: proc(object: ^Object) {
+	object.call_index = global_state.object_index
+	global_state.object_index += 1
+}
+
 begin_object :: proc(object: ^Object) -> bool {
 	assert(object != nil)
 
-	object.call_index = global_state.object_index
-	global_state.object_index += 1
+	assign_next_object_index(object)
 
 	object.dead = false
 
@@ -365,14 +372,12 @@ begin_object :: proc(object: ^Object) -> bool {
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
 
-		object.layer.state += object.state.current
+		transfer_object_state_to_its_layer(object)
 
 		if object.clip_children {
 			pop_clip()
 			vgo.restore_scissor()
 		}
-
-		pop_stack(&global_state.object_stack)
 
 		object.metrics.desired_size = linalg.max(
 			object.metrics.desired_size,
@@ -384,14 +389,24 @@ end_object :: proc() {
 			parent.state.current += object_state_output(object.state) & parent.state.input_mask
 		}
 
+		pop_stack(&global_state.object_stack)
+
 		if !maybe_defer_object(object) {
 			display_object(object)
 		}
 	}
 }
 
+transfer_object_state_to_its_layer :: proc(object: ^Object) {
+	object.layer.state += object.state.current
+}
+
 space_required_by_object_content :: proc(content: Object_Content) -> [2]f32 {
 	return content.desired_size + content.padding.xy + content.padding.zw
+}
+
+space_used_by_object_content :: proc(content: Object_Content) -> [2]f32 {
+	return content.size + content.padding.xy + content.padding.zw
 }
 
 occupied_space_of_object :: proc(object: ^Object) -> [2]f32 {
@@ -449,16 +464,18 @@ lost_state :: proc(state: Object_State) -> Object_Status_Set {
 	return state.previous - state.current
 }
 
-hover_object :: proc(object: ^Object) {
+hover_object :: proc(object: ^Object, transparent: bool = false) {
 	when DEBUG {
 		if global_state.debug.enabled do return
 	}
 	if object.disabled do return
 	if object.layer.index < global_state.hovered_layer_index do return
 	if !point_in_box(global_state.mouse_pos, current_clip()) do return
-	global_state.next_hovered_object = object.id
-	global_state.next_hovered_layer = object.layer.id
-	global_state.hovered_layer_index = object.layer.index
+	if !transparent {
+		global_state.next_hovered_object = object.id
+		global_state.next_hovered_layer = object.layer.id
+		global_state.hovered_layer_index = object.layer.index
+	}
 }
 
 focus_object :: proc(object: ^Object) {
@@ -588,12 +605,13 @@ display_object :: proc(object: ^Object) {
 		object.content.space_left = box_size(object.content.box)
 		for child_object in object.children {
 			if placement, ok := child_object.placement.(Child_Placement_Options); ok {
-				child_object.metrics.size, child_object.metrics.desired_size = solve_child_object_size(
-					placement.size,
-					child_object.metrics.desired_size,
-					available_space_for_object_content(object),
-					total_space_for_object_content(object),
-				)
+				child_object.metrics.size, child_object.metrics.desired_size =
+					solve_child_object_size(
+						placement.size,
+						child_object.metrics.desired_size,
+						available_space_for_object_content(object),
+						total_space_for_object_content(object),
+					)
 				object.content.space_left -= occupied_space_of_object(child_object)
 			}
 		}
@@ -616,4 +634,8 @@ display_object :: proc(object: ^Object) {
 
 content_justify_causes_deference :: proc(justify: Align) -> bool {
 	return int(justify) > 0
+}
+
+add_object_state_for_next_frame :: proc(object: ^Object, state: Object_Status_Set) {
+	object.state.current += state
 }

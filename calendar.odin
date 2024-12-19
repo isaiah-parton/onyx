@@ -11,6 +11,9 @@ import dt "core:time/datetime"
 
 Date :: dt.Date
 CALENDAR_WEEK_SPACING :: 4
+DAYS_PER_WEEK :: 7
+MONTHS_PER_YEAR :: 12
+HOURS_PER_DAY :: 24
 
 Calendar_Page :: struct {
 	year:  i64,
@@ -29,18 +32,12 @@ move_calendar_page :: proc(page: Calendar_Page, months: i8) -> Calendar_Page {
 	modifier := page.month - 1
 	modifier -= 11 * i8(page.month < 1)
 	modifier /= MONTHS_PER_YEAR
-	return {
-		month = page.month - MONTHS_PER_YEAR * modifier,
-		year = page.year + i64(modifier),
-	}
+	return {month = page.month - MONTHS_PER_YEAR * modifier, year = page.year + i64(modifier)}
 }
 
 todays_calendar_page :: proc() -> Calendar_Page {
 	date := todays_date()
-	return {
-		month = date.month,
-		year = date.year,
-	}
+	return {month = date.month, year = date.year}
 }
 
 todays_date :: proc() -> Date {
@@ -52,10 +49,6 @@ dates_are_equal :: proc(a, b: Date) -> bool {
 	return a.year == b.year && a.month == b.month && a.day == b.day
 }
 
-DAYS_PER_WEEK :: 7
-MONTHS_PER_YEAR :: 12
-HOURS_PER_DAY :: 24
-
 calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_location) {
 	assert(date != nil, loc = loc)
 	object := persistent_object(hash(loc))
@@ -64,6 +57,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 		object.variant = Calendar {
 			object = object,
 		}
+		object.state.input_mask = OBJECT_STATE_ALL
 	}
 	self := &object.variant.(Calendar)
 	self.metrics.desired_size = {280, 0}
@@ -90,17 +84,18 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	weekday := t.weekday(month_start)
 	calendar_start := month_start._nsec - i64(weekday) * i64(t.Hour * HOURS_PER_DAY)
 
-	day_count := 0
+	how_many_days := 0
 	if days_in_month, err := dt.last_day_of_month(page.year, page.month); err == nil {
-		day_count = int(days_in_month)
+		how_many_days = int(days_in_month)
 	}
 
-	day_count = int(
-		(month_start._nsec - calendar_start) / i64(t.Hour * HOURS_PER_DAY) + i64(day_count),
+	how_many_days = int(
+		(month_start._nsec - calendar_start) / i64(t.Hour * HOURS_PER_DAY) + i64(how_many_days),
 	)
-	day_count = int(math.ceil(f32(day_count) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
-	weeks := math.ceil(f32(day_count) / DAYS_PER_WEEK)
-	self.metrics.desired_size.y += weeks * row_height + (weeks + 1) * CALENDAR_WEEK_SPACING
+	how_many_days = int(math.ceil(f32(how_many_days) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
+	how_many_weeks := math.ceil(f32(how_many_days) / DAYS_PER_WEEK)
+	self.metrics.desired_size.y +=
+		how_many_weeks * row_height + (how_many_weeks + 1) * CALENDAR_WEEK_SPACING
 	self.content.side = .Top
 	self.content.padding = 10
 	self.placement = next_user_placement()
@@ -128,9 +123,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			if button(text = "<<", style = .Ghost).clicked {
 				self.page = move_calendar_page(page, -1)
 			}
-			label(
-				text = fmt.tprintf("%s %i", t.Month(page.month), page.year),
-			)
+			label(text = fmt.tprintf("%s %i", t.Month(page.month), page.year))
 			set_margin(right = 10)
 			if button(text = ">>", style = .Ghost).clicked {
 				self.page = move_calendar_page(page, 1)
@@ -158,7 +151,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			set_margin(bottom = 0)
 
 			time: t.Time = {calendar_start}
-			for i in 0 ..< day_count {
+			for i in 0 ..< how_many_days {
 				push_id(int(time._nsec))
 				defer pop_id()
 
@@ -276,11 +269,20 @@ display_calendar_day :: proc(self: ^Calendar_Day) {
 				corners[1] = global_state.style.rounding
 				corners[3] = global_state.style.rounding
 			}
-			vgo.fill_box(
-				self.box,
-				corners,
-				vgo.fade(global_state.style.color.substance, 1 if self.is_this_month else 0.5),
-			)
+			if self.is_today {
+				vgo.add_linked_shapes(
+					vgo.make_box(shrink_box(self.box, 1), global_state.style.rounding),
+					vgo.make_box(self.box),
+					mode = .Xor,
+					paint = colors().substance,
+				)
+			} else {
+				vgo.fill_box(
+					self.box,
+					corners,
+					vgo.fade(global_state.style.color.substance, 1 if self.is_this_month else 0.5),
+				)
+			}
 		} else {
 			if .Hovered in self.state.current {
 				vgo.fill_box(

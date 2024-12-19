@@ -386,6 +386,7 @@ display_input :: proc(self: ^Input) {
 			2 * self.active_time,
 			global_state.style.rounding,
 			paint = vgo.fade(colors.accent, self.active_time),
+			outline = .Outer_Stroke,
 		)
 	}
 

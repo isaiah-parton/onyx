@@ -51,24 +51,19 @@ begin_container :: proc(
 			object   = object,
 			min_zoom = 0.1,
 			max_zoom = 1.0,
+			zoom = 1,
 		}
 		object.state.input_mask = OBJECT_STATE_ALL
 	}
-	push_id(object.id)
+	self := &object.variant.(Container)
 
-	object.isolated = true
-	object.placement = next_user_placement()
-	object.clip_children = true
+	push_id(self.id)
 
-	begin_object(object) or_return
+	self.isolated = true
+	self.placement = next_user_placement()
+	self.clip_children = true
 
-	self := object.variant.(Container)
-
-	is_active := .Hovered in new_state(self.state)
-
-	if point_in_box(global_state.mouse_pos, self.box) {
-		hover_object(self)
-	}
+	begin_object(self) or_return
 
 	self.space = space.? or_else linalg.max(box_size(self.box), self.space_needed)
 	self.space_needed = 0
@@ -81,7 +76,7 @@ begin_container :: proc(
 		self.target_zoom = 1
 	}
 
-	if is_active {
+	if self.is_active {
 		if .Pressed in self.state.current {
 			if .Pressed not_in self.state.previous {
 				self.pan_offset = global_state.mouse_pos - (self.box.lo - self.scroll)
@@ -96,10 +91,8 @@ begin_container :: proc(
 		}
 	}
 
-	layout_origin := self.box.lo - linalg.max(linalg.floor(self.scroll), 0)
-	layout_box := Box{layout_origin, layout_origin + linalg.max(layout_size, box_size(self.box))}
+	self.content.offset = -linalg.max(linalg.floor(self.scroll), 0)
 
-	// begin_layout(placement = layout_box) or_return
 	push_placement_options({})
 
 	vgo.fill_box(self.box, paint = colors().field)
@@ -109,31 +102,29 @@ begin_container :: proc(
 
 end_container :: proc() {
 	pop_placement_options()
-	// end_layout()
 
-	self := current_object().?.variant.(Container)
-	self.space_needed = linalg.max(
-		space_required_by_object_content(self.content),
-		self.space_needed,
-	)
+	self := &current_object().?.variant.(Container)
+	self.space_needed = linalg.max(space_used_by_object_content(self.content), self.space_needed)
 
 	end_object()
 	pop_id()
 }
 
 display_container :: proc(self: ^Container) {
-	if self.is_active {
+	if point_in_box(mouse_point(), self.box) {
+		hover_object(self, transparent = true)
+	}
+
+	if .Hovered in self.state.current {
 		if self.enable_zoom &&
 		   (.Pressed not_in self.state.current) &&
 		   (key_down(.Left_Control) || key_down(.Right_Control)) {
-			// Determine old and new zoom levels
 			old_zoom := self.target_zoom
 			new_zoom := clamp(
 				(math.round(old_zoom / 0.1) * 0.1) + global_state.mouse_scroll.y * 0.1,
 				1,
 				self.max_zoom,
 			)
-			// Change needed?
 			if new_zoom != old_zoom {
 				zoom_container_anchored(self, new_zoom, global_state.mouse_pos)
 			}
@@ -148,39 +139,38 @@ display_container :: proc(self: ^Container) {
 			self.target_scroll -= delta_scroll * 100
 		}
 	}
-	// Update zoom
 	if false {
 		self.target_zoom = clamp(self.target_zoom, self.min_zoom, self.max_zoom)
 		delta_zoom := self.target_zoom - self.zoom
-		// Hint next frame to be drawn if delta sufficient
 		if abs(delta_zoom) > 0.001 {
 			draw_frames(1)
 		}
 		self.zoom += delta_zoom * 15 * global_state.delta_time
 	}
-	// Update scroll
+
 	content_size := self.space * self.zoom
 	target_content_size := self.space * self.target_zoom
 	view_size := box_size(self.box)
-	// Clamp target scroll
+
 	self.target_scroll = linalg.clamp(self.target_scroll, 0, target_content_size - view_size)
 	delta_scroll := (self.target_scroll - self.scroll) * global_state.delta_time * 15
 	self.scroll += delta_scroll
-	// Hint next frame to be drawn if delta sufficient
+
 	if abs(delta_scroll.x) > 0.01 || abs(delta_scroll.y) > 0.01 {
 		draw_frames(1)
 	}
-	// Enable/disable scrollbars
+
 	enable_scroll_x := math.floor(content_size.x) > box_width(self.box) && !self.hide_scrollbars
 	enable_scroll_y := math.floor(content_size.y) > box_height(self.box) && !self.hide_scrollbars
-	// Animate scrollbars
+
 	self.scroll_time.x = animate(self.scroll_time.x, 0.2, enable_scroll_x)
 	self.scroll_time.y = animate(self.scroll_time.y, 0.2, enable_scroll_y)
-	// Enable/disable them for real this time
+
 	display_scroll_x := self.scroll_time.x > 0.0
 	display_scroll_y := self.scroll_time.y > 0.0
-	// Scrollbars
+
 	inner_box := shrink_box(self.box, 4)
+
 	if display_scroll_y {
 		box := get_box_cut_right(
 			inner_box,
@@ -189,10 +179,18 @@ display_container :: proc(self: ^Container) {
 		if display_scroll_x {
 			box.hi.y -= self.scroll_time.x * global_state.style.shape.scrollbar_thickness
 		}
-		if scrollbar(make_visible = (self.is_active || abs(delta_scroll.y) > 0.01), vertical = true, box = box, pos = &self.scroll.y, travel = content_size.y - box_height(self.box), handle_size = box_height(box) * box_height(self.box) / content_size.y) {
+		if scrollbar(
+			// make_visible = (self.is_active || abs(delta_scroll.y) > 0.01),
+			vertical = true,
+			box = box,
+			pos = &self.scroll.y,
+			travel = content_size.y - box_height(self.box),
+			handle_size = box_height(box) * box_height(self.box) / content_size.y,
+		) {
 			self.target_scroll.y = self.scroll.y
 		}
 	}
+
 	if display_scroll_x {
 		box := get_box_cut_bottom(
 			inner_box,
@@ -201,7 +199,13 @@ display_container :: proc(self: ^Container) {
 		if display_scroll_y {
 			box.hi.x -= self.scroll_time.y * global_state.style.shape.scrollbar_thickness
 		}
-		if scrollbar(make_visible = (self.is_active || abs(delta_scroll.x) > 0.01), box = box, pos = &self.scroll.x, travel = content_size.x - box_width(self.box), handle_size = box_width(box) * box_width(self.box) / content_size.x) {
+		if scrollbar(
+			// make_visible = (self.is_active || abs(delta_scroll.x) > 0.01),
+			box = box,
+			pos = &self.scroll.x,
+			travel = content_size.x - box_width(self.box),
+			handle_size = box_width(box) * box_width(self.box) / content_size.x,
+		) {
 			self.target_scroll.x = self.scroll.x
 		}
 	}

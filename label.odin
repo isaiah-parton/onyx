@@ -24,7 +24,7 @@ label :: proc(
 	align: [2]f32 = 0,
 	color: vgo.Color = colors().content,
 ) {
-	object := transient_object()
+	object := make_transient_object()
 	if object.variant == nil {
 		object.variant = Label{
 			object = object,

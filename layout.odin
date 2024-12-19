@@ -138,8 +138,8 @@ place_object :: proc(object: ^Object) -> bool {
 
 solve_object_content_box :: proc(object: ^Object) -> Box {
 	return Box {
-		object.box.lo + object.content.padding.xy,
-		object.box.hi - object.content.padding.zw,
+		object.box.lo + object.content.padding.xy + object.content.offset,
+		object.box.hi - object.content.padding.zw + object.content.offset,
 	}
 }
 
@@ -277,7 +277,7 @@ begin_layout :: proc(
 	isolated: bool = false,
 	side: Side = .Left,
 ) -> bool {
-	self := transient_object()
+	self := make_transient_object()
 	self.state.input_mask = OBJECT_STATE_ALL
 	self.content = {
 		axis    = axis_of_side(side),
