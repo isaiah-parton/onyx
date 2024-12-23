@@ -76,7 +76,7 @@ display_slider :: proc(self: ^Slider) {
 		vgo.fill_box(
 			{box.lo, {knob_center.x, box.hi.y}},
 			radius,
-			vgo.mix(0.333, colors.accent, vgo.BLACK),
+			vgo.mix(1.0 / 3.0, colors.accent, vgo.BLACK),
 		)
 		vgo.fill_circle(knob_center, knob_radius, colors.accent)
 	}

@@ -21,7 +21,8 @@ Toggle_Widget :: struct {
 Tab :: struct {
 	using __toggle_widget: Toggle_Widget,
 	text_layout:           vgo.Text_Layout,
-	bar_opacity:           f32,
+	active_time:           f32,
+	hover_time:            f32,
 }
 
 Tabs :: Many_2_One_Widget
@@ -58,26 +59,34 @@ display_tab :: proc(self: ^Tab) {
 		set_cursor(.Pointing_Hand)
 	}
 
-	self.bar_opacity +=
-		(max(f32(i32(.Hovered in self.object.state.current)) * 0.5, f32(i32(self.state))) -
-			self.bar_opacity) *
-		15 *
-		global_state.delta_time
+	self.hover_time = animate(self.hover_time, 0.1, .Hovered in self.object.state.current)
+	self.active_time = animate(self.active_time, 0.15, self.state)
 
 	if object_is_visible(self.object) {
 		center_x := box_center_x(self.object.box)
+		box := get_box_cut_bottom(
+			self.object.box,
+			box_height(self.object.box) * math.lerp(f32(0.85), f32(1.0), self.active_time),
+		)
 		vgo.fill_box(
+			box,
 			{
-				{self.object.box.lo.x, self.object.box.hi.y - 2},
-				{self.object.box.hi.x, self.object.box.hi.y},
+				global_state.style.rounding * self.active_time,
+				global_state.style.rounding * self.active_time,
+				0,
+				0,
 			},
-			paint = vgo.fade(global_state.style.color.content, self.bar_opacity),
+			paint = vgo.mix(
+				math.lerp(f32(0.25), f32(1.0), max(self.hover_time * 0.5, self.active_time)),
+				global_state.style.color.bg[0],
+				global_state.style.color.fg
+			),
 		)
 		vgo.fill_text_layout(
 			self.text_layout,
-			box_center(self.object.box) + {0, -2},
+			box_center(box),
 			align = 0.5,
-			paint = global_state.style.color.content,
+			paint = global_state.style.color.accent_content,
 		)
 	}
 }

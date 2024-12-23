@@ -115,13 +115,12 @@ main :: proc() {
 				if begin_column_layout(size = Fixed(36)) {
 					defer end_layout()
 
-					vgo.fill_box(current_object().?.box, paint = colors().field)
-
 					set_width(Percent(100))
 					set_height(Percent_Of_Width(100))
-					button("\uf578", style = .Ghost, font_size = 20, rounding = 0)
-					button("\uf044", style = .Ghost, font_size = 20, rounding = 0)
-					if button("\uedca", style = .Ghost, font_size = 20, rounding = 0).clicked {
+					set_margin(bottom = 1)
+					button("\uf578", accent = .Subtle, font_size = 20, rounding = 0)
+					button("\uf044", accent = .Subtle, font_size = 20, rounding = 0)
+					if button("\uedca", accent = .Subtle, font_size = 20, rounding = 0).clicked {
 						thread.run(proc() {
 							when ODIN_OS == .Linux {
 								libc.system("xdg-open \"https://github.com/isaiah-parton/onyx\"")
@@ -131,6 +130,7 @@ main :: proc() {
 						})
 					}
 				}
+
 
 				if begin_column_layout(size = At_Least(0), padding = 20) {
 					defer end_layout()
@@ -144,8 +144,7 @@ main :: proc() {
 					if begin_row_layout(size = Fixed(30)) {
 						defer end_layout()
 
-						// set_width(Percent(100))
-						// tabs(reflect.enum_field_names(Align), &justify)
+						set_align(.Far)
 						for member, i in Align {
 							push_id(i)
 							if tab(fmt.tprint(member), justify == member) {
@@ -154,22 +153,24 @@ main :: proc() {
 							pop_id()
 						}
 					}
+
 					if begin_row_layout(justify = justify, size = Percent_Of_Remaining(25), padding = 10) {
 						defer end_layout()
 
 						set_margin(left = 1)
-						for style, i in Button_Style {
+						BUTTON_LABELS := [?]string{"Improvise", "Adapt", "Overcome", "Bubblegum"}
+						for i in 0..<len(buttons_active) {
 							rounding: [4]f32 = 0
 							if i == 0 {
 								rounding.x = 5
 								rounding.z = 5
 							}
-							if i == len(Button_Style) - 1 {
+							if i == len(buttons_active) - 1 {
 								rounding.y = 5
 								rounding.w = 5
 							}
 							push_id(i)
-								if button(fmt.tprint(style), style = style, rounding = rounding, active = buttons_active[i]).clicked {
+								if button(BUTTON_LABELS[i], rounding = rounding, is_loading = true, active = buttons_active[i]).clicked {
 									buttons_active[i] = !buttons_active[i]
 								}
 							pop_id()

@@ -383,10 +383,9 @@ display_input :: proc(self: ^Input) {
 
 		vgo.stroke_box(
 			self.box,
-			2 * self.active_time,
+			1,
 			global_state.style.rounding,
 			paint = vgo.fade(colors.accent, self.active_time),
-			outline = .Outer_Stroke,
 		)
 	}
 

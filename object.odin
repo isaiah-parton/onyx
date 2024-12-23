@@ -47,7 +47,14 @@ OBJECT_STATE_ALL :: Object_Status_Set {
 	.Active,
 }
 
+Dummy :: struct {
+	using object: ^Object,
+	rounding: [4]f32,
+	color: vgo.Color,
+}
+
 Object_Variant :: union {
+	Dummy,
 	Button,
 	Boolean,
 	Container,
@@ -481,6 +488,20 @@ focus_object :: proc(object: ^Object) {
 	global_state.focused_object = object.id
 }
 
+dummy :: proc(rounding: [4]f32 = 0, color: vgo.Color) {
+	object := make_transient_object()
+	if begin_object(object) {
+		defer end_object()
+		object.placement = object.parent.?.content.box
+		object.state.input_mask = OBJECT_STATE_ALL
+		object.variant = Dummy{
+			object = object,
+			rounding = rounding,
+			color = color,
+		}
+	}
+}
+
 foreground :: proc(loc := #caller_location) {
 	object := persistent_object(hash(loc))
 	if begin_object(object) {
@@ -490,7 +511,7 @@ foreground :: proc(loc := #caller_location) {
 			object.on_display = proc(object: ^Object) {
 				object.box = object.parent.?.box
 				draw_shadow(object.box)
-				vgo.fill_box(object.box, global_state.style.rounding, global_state.style.color.fg)
+				vgo.fill_box(object.box, paint = global_state.style.color.fg)
 				if point_in_box(global_state.mouse_pos, object.box) {
 					hover_object(object)
 				}
@@ -507,11 +528,7 @@ background :: proc(loc := #caller_location) {
 		if object.on_display == nil {
 			object.on_display = proc(object: ^Object) {
 				object.box = object.parent.?.box
-				vgo.fill_box(
-					object.box,
-					global_state.style.rounding,
-					global_state.style.color.field,
-				)
+				vgo.fill_box(object.box, paint = global_state.style.color.field)
 				if point_in_box(global_state.mouse_pos, object.box) {
 					hover_object(object)
 				}
@@ -560,6 +577,8 @@ display_object :: proc(object: ^Object) {
 	}
 
 	switch &v in object.variant {
+	case Dummy:
+		vgo.fill_box(v.box, v.rounding, paint = v.color)
 	case Date_Picker:
 		display_date_picker(&v)
 	case Container:

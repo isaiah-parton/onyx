@@ -120,12 +120,12 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			set_align(.Center)
 
 			set_margin(left = 10)
-			if button(text = "<<", style = .Ghost).clicked {
+			if button(text = "<<", accent = .Subtle).clicked {
 				self.page = move_calendar_page(page, -1)
 			}
 			label(text = fmt.tprintf("%s %i", t.Month(page.month), page.year))
 			set_margin(right = 10)
-			if button(text = ">>", style = .Ghost).clicked {
+			if button(text = ">>", accent = .Subtle).clicked {
 				self.page = move_calendar_page(page, 1)
 			}
 		}
@@ -269,20 +269,11 @@ display_calendar_day :: proc(self: ^Calendar_Day) {
 				corners[1] = global_state.style.rounding
 				corners[3] = global_state.style.rounding
 			}
-			if self.is_today {
-				vgo.add_linked_shapes(
-					vgo.make_box(shrink_box(self.box, 1), global_state.style.rounding),
-					vgo.make_box(self.box),
-					mode = .Xor,
-					paint = colors().substance,
-				)
-			} else {
-				vgo.fill_box(
-					self.box,
-					corners,
-					vgo.fade(global_state.style.color.substance, 1 if self.is_this_month else 0.5),
-				)
-			}
+			vgo.fill_box(
+				self.box,
+				corners,
+				vgo.fade(global_state.style.color.substance, 1 if self.is_this_month else 0.5),
+			)
 		} else {
 			if .Hovered in self.state.current {
 				vgo.fill_box(
