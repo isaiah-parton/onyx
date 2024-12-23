@@ -1,5 +1,5 @@
 # Onyx
-**The vision**: Beautiful immediate-mode gui with advanced layouts that runs as fast as your monitor.
+This is a bit of a different take on immediate mode ui, while the ui is constructed and events are handled the same way as say dear imgui, some parts of the interface aren't rendered until all of their contents have been processed.  This allows for objects of unknown sizes, and centering stuff.  This is very much in the experimental stage, and while I want to keep this advanced functionality, the usage could change drastically.
 
 ![image](preview.png)
 
