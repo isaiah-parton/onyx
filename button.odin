@@ -8,6 +8,32 @@ import "core:math/ease"
 import "core:math/linalg"
 import "core:time"
 
+Wave_Effects :: small_array.Small_Array(4, Wave_Effect)
+
+draw_and_update_wave_effects :: proc(object: ^Object, array: ^Wave_Effects) {
+	if .Pressed in new_state(object.state) {
+		small_array.append(array, Wave_Effect{point = mouse_point()})
+	}
+
+	for &wave, i in array.data[:array.len] {
+		vgo.fill_circle(
+			wave.point,
+			linalg.length(object.box.hi - object.box.lo) * min(wave.time, 0.75) * 1.33,
+			paint = vgo.fade(vgo.WHITE, (1 - max(0, wave.time - 0.75) * 4) * 0.2),
+		)
+
+		if !(wave.time >= 0.75 && .Pressed in object.state.current && i == array.len - 1) {
+			wave.time += 2.5 * global_state.delta_time
+		}
+	}
+
+	draw_frames((array.len & 1) + 1)
+
+	for array.len > 0 && array.data[0].time > 1 {
+		small_array.pop_front(array)
+	}
+}
+
 Button_Style :: enum {
 	Primary,
 	Secondary,
@@ -19,13 +45,14 @@ Button :: struct {
 	using object: ^Object,
 	text:         string,
 	is_loading:   bool,
+	active: bool,
 	press_time:   f32,
-	rounding: [4]f32,
-	style:        Button_Style,
+	hover_time: f32,
+	rounding: 		[4]f32,
 	font_index:   Maybe(int),
 	font_size:    Maybe(f32),
 	color:        Maybe(vgo.Color),
-	waves: small_array.Small_Array(10, Wave_Effect),
+	waves: 				Wave_Effects,
 	text_layout:  vgo.Text_Layout,
 }
 
@@ -39,6 +66,7 @@ button :: proc(
 	style: Button_Style = .Primary,
 	rounding: [4]f32 = global_state.style.rounding,
 	font_size: f32 = global_state.style.default_text_size,
+	active: bool = false,
 	loc := #caller_location,
 ) -> (
 	result: Button_Result,
@@ -51,8 +79,8 @@ button :: proc(
 	}
 	self := &object.variant.(Button)
 	self.text_layout = vgo.make_text_layout(text, font_size, global_state.style.default_font)
-	self.style = style
 	self.rounding = rounding
+	self.active = active
 	self.placement = next_user_placement()
 	set_object_desired_size(object, self.text_layout.size + global_state.style.text_padding * 2)
 	if begin_object(object) {
@@ -67,85 +95,30 @@ display_button :: proc(self: ^Button) {
 	handle_object_click(self)
 	button_behavior(self)
 	if object_is_visible(self) {
-		text_color: vgo.Color
+		bg_color := self.color.? or_else global_state.style.color.substance
+		bg_color = vgo.blend(bg_color, global_state.style.color.accent, self.press_time)
 
-		switch self.style {
-		case .Outlined:
-			vgo.fill_box(
-				self.box,
-				self.rounding,
-				vgo.fade(
-					self.color.? or_else global_state.style.color.substance,
-					0.25 if .Hovered in self.state.current else 0.0,
-				),
-			)
-			vgo.stroke_box(
-				self.box,
-				1,
-				self.rounding,
-				self.color.? or_else global_state.style.color.substance,
-			)
-			text_color = global_state.style.color.content
-		case .Secondary:
-			bg_color := self.color.? or_else global_state.style.color.substance
-			vgo.fill_box(
-				self.box,
-				self.rounding,
-				vgo.mix(0.15, bg_color, vgo.WHITE) if .Hovered in self.state.current else bg_color,
-			)
-			text_color = global_state.style.color.accent_content
-		case .Primary:
-			vgo.fill_box(
-				self.box,
-				self.rounding,
-				vgo.mix(0.15, global_state.style.color.accent, vgo.WHITE) if .Hovered in self.state.current else global_state.style.color.accent,
-			)
-			text_color = global_state.style.color.accent_content
-		case .Ghost:
-			if .Hovered in self.state.current {
-				vgo.fill_box(
-					self.box,
-					self.rounding,
-					paint = vgo.fade(self.color.? or_else global_state.style.color.substance, 0.2),
-				)
-			}
-			text_color = global_state.style.color.content
-		}
-
-		if .Pressed in new_state(self.state) {
-			small_array.append(&self.waves, Wave_Effect{point = mouse_point()})
-		}
-
-		draw_frames(min(1, self.waves.len) + 1)
+		vgo.fill_box(
+			self.box,
+			self.rounding,
+			vgo.mix(0.2 * self.hover_time, bg_color, vgo.WHITE),
+		)
 
 		vgo.push_scissor(vgo.make_box(self.box, self.rounding))
-	 	for &wave, i in self.waves.data[:self.waves.len] {
-			vgo.fill_circle(
-				wave.point,
-				linalg.length(self.box.hi - self.box.lo) * min(wave.time, 0.75) * 1.33,
-				paint = vgo.fade(vgo.WHITE, (1 - max(0, wave.time - 0.75) * 4) * 0.2),
-			)
-			if !(wave.time >= 0.75 && .Pressed in self.state.current) {
-				wave.time += 2.5 * global_state.delta_time
-			}
-		}
+ 		draw_and_update_wave_effects(self, &self.waves)
 		vgo.pop_scissor()
-
-		for self.waves.len > 0 && self.waves.data[0].time > 1 {
-			small_array.pop_front(&self.waves)
-		}
 
 		if !self.is_loading {
 			vgo.fill_text_layout(
 				self.text_layout,
 				box_center(self.box),
 				align = 0.5,
-				paint = text_color,
+				paint = global_state.style.color.accent_content,
 			)
 		}
 
 		if self.is_loading {
-			vgo.spinner(box_center(self.box), box_height(self.box) * 0.3, text_color)
+			vgo.spinner(box_center(self.box), box_height(self.box) * 0.3, global_state.style.color.accent_content)
 		}
 	}
 }

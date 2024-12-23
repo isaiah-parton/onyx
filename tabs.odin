@@ -6,7 +6,6 @@ import "core:math"
 import "core:math/linalg"
 import "core:slice"
 
-
 Many_2_One_Widget :: struct {
 	using object:  ^Object,
 	index:         int,
@@ -14,7 +13,74 @@ Many_2_One_Widget :: struct {
 	label_layouts: []vgo.Text_Layout,
 }
 
+Toggle_Widget :: struct {
+	object: ^Object,
+	state:  bool,
+}
+
+Tab :: struct {
+	using __toggle_widget: Toggle_Widget,
+	text_layout:           vgo.Text_Layout,
+	bar_opacity:           f32,
+}
+
 Tabs :: Many_2_One_Widget
+
+tab :: proc(text: string, state: bool, loc := #caller_location) -> (clicked: bool) {
+	object := persistent_object(hash(loc))
+	if object.variant == nil {
+		object.variant = Tab {
+			object = object,
+		}
+	}
+	self := &object.variant.(Tab)
+	self.state = state
+	self.text_layout = vgo.make_text_layout(
+		text,
+		global_state.style.default_text_size,
+		global_state.style.default_font,
+	)
+	self.object.metrics.desired_size = self.text_layout.size + {20, 10}
+	self.object.placement = next_user_placement()
+	if begin_object(self.object) {
+		clicked = .Clicked in self.object.state.previous
+		end_object()
+	}
+	return
+}
+
+display_tab :: proc(self: ^Tab) {
+	handle_object_click(self.object)
+	if point_in_box(global_state.mouse_pos, self.object.box) {
+		hover_object(self.object)
+	}
+	if .Hovered in self.object.state.current {
+		set_cursor(.Pointing_Hand)
+	}
+
+	self.bar_opacity +=
+		(max(f32(i32(.Hovered in self.object.state.current)) * 0.5, f32(i32(self.state))) -
+			self.bar_opacity) *
+		15 *
+		global_state.delta_time
+
+	if object_is_visible(self.object) {
+		center_x := box_center_x(self.object.box)
+		vgo.fill_box(
+			{
+				{self.object.box.lo.x, self.object.box.hi.y - 2},
+				{self.object.box.hi.x, self.object.box.hi.y},
+			},
+			paint = vgo.fade(global_state.style.color.content, self.bar_opacity),
+		)
+		vgo.fill_text_layout(
+			self.text_layout,
+			box_center(self.object.box) + {0, -2},
+			align = 0.5,
+			paint = global_state.style.color.content,
+		)
+	}
+}
 
 tabs :: proc(items: []string, index: ^$T, loc := #caller_location) {
 	object := persistent_object(hash(loc))
@@ -72,10 +138,7 @@ display_tabs :: proc(self: ^Tabs) {
 		}
 		if is_visible {
 			vgo.fill_box(
-				{
-					{option_box.lo.x, option_box.hi.y - 3},
-					{option_box.hi.x, option_box.hi.y},
-				},
+				{{option_box.lo.x, option_box.hi.y - 3}, {option_box.hi.x, option_box.hi.y}},
 				1.5,
 				paint = vgo.fade(
 					global_state.style.color.content,

@@ -9,17 +9,11 @@ Color_Scheme :: struct {
 }
 
 Style :: struct {
-	// Used as a fallback in case a glyph is not found
 	icon_font:      vgo.Font,
-	// For code editor
 	monospace_font: vgo.Font,
-	// Might want a fancy serif font for headers
 	header_font:    Maybe(vgo.Font),
-	// Default font for everything
 	default_font:   vgo.Font,
-	// Color scheme should be separate
 	color:          Color_Scheme,
-	// Dunno why this is its own struct
 	using shape:    Style_Shape,
 }
 

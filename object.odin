@@ -52,6 +52,7 @@ Object_Variant :: union {
 	Boolean,
 	Container,
 	Label,
+	Tab,
 	Tabs,
 	Input,
 	HSV_Wheel,
@@ -581,6 +582,8 @@ display_object :: proc(object: ^Object) {
 		display_color_picker(&v)
 	case Tabs:
 		display_tabs(&v)
+	case Tab:
+		display_tab(&v)
 	case Scrollbar:
 		display_scrollbar(&v)
 	case Calendar_Day:

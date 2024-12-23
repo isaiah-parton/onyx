@@ -59,6 +59,7 @@ main :: proc() {
 	onyx.start(window)
 	defer onyx.shutdown()
 
+	buttons_active: [4]bool
 	justify: onyx.Align
 	checkbox_value: bool
 	toggle_value: bool
@@ -131,61 +132,70 @@ main :: proc() {
 					}
 				}
 
-				if begin_row_layout(size = At_Least(0), padding = 15, side = .Right) {
+				if begin_column_layout(size = At_Least(0), padding = 20) {
 					defer end_layout()
 
-					// if begin_column_layout(size = Fixed(30)) {
-					// 	defer end_layout()
-
-					// }
-
-					if begin_column_layout(size = At_Least(0)) {
+					if begin_column_layout(size = Fixed(20)) {
 						defer end_layout()
 
-						if begin_column_layout(size = Fixed(20)) {
-							defer end_layout()
+						current_placement_options().align = .Center
+						label("Content alignment")
+					}
+					if begin_row_layout(size = Fixed(30)) {
+						defer end_layout()
 
-							current_placement_options().align = .Center
-							label("Content alignment")
-						}
-						if begin_row_layout(size = Fixed(30)) {
-							defer end_layout()
-
-							set_width(Percent(100))
-							tabs(reflect.enum_field_names(Align), &justify)
-						}
-						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(25), padding = 10) {
-							defer end_layout()
-
-							set_margin(left = 4, right = 4)
-							for style, i in Button_Style {
-								push_id(i)
-									button(fmt.tprint(style), style = style)
-								pop_id()
+						// set_width(Percent(100))
+						// tabs(reflect.enum_field_names(Align), &justify)
+						for member, i in Align {
+							push_id(i)
+							if tab(fmt.tprint(member), justify == member) {
+								justify = member
 							}
+							pop_id()
 						}
-						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(33.33), padding = 10) {
-							defer end_layout()
+					}
+					if begin_row_layout(justify = justify, size = Percent_Of_Remaining(25), padding = 10) {
+						defer end_layout()
 
-							raw_input(&input_value, placeholder = "sample text")
-						}
-						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(50), padding = 10) {
-							defer end_layout()
-
-							set_margin_all(4)
-							for type, i in Boolean_Type {
-								push_id(i)
-									boolean(&boolean_value[type], fmt.tprint(type), type = type)
-								pop_id()
+						set_margin(left = 1)
+						for style, i in Button_Style {
+							rounding: [4]f32 = 0
+							if i == 0 {
+								rounding.x = 5
+								rounding.z = 5
 							}
+							if i == len(Button_Style) - 1 {
+								rounding.y = 5
+								rounding.w = 5
+							}
+							push_id(i)
+								if button(fmt.tprint(style), style = style, rounding = rounding, active = buttons_active[i]).clicked {
+									buttons_active[i] = !buttons_active[i]
+								}
+							pop_id()
 						}
-						if begin_row_layout(justify = justify, size = Percent_Of_Remaining(100), padding = 10) {
-							defer end_layout()
+					}
+					if begin_row_layout(justify = justify, size = Percent_Of_Remaining(33.33), padding = 10) {
+						defer end_layout()
 
-							set_margin_all(4)
-							slider(&slider_values, 0, 10)
-							color_picker(&color)
+						raw_input(&input_value, placeholder = "sample text")
+					}
+					if begin_row_layout(justify = justify, size = Percent_Of_Remaining(50), padding = 10) {
+						defer end_layout()
+
+						set_margin_all(4)
+						for type, i in Boolean_Type {
+							push_id(i)
+								boolean(&boolean_value[type], fmt.tprint(type), type = type)
+							pop_id()
 						}
+					}
+					if begin_row_layout(justify = justify, size = Percent_Of_Remaining(100), padding = 10) {
+						defer end_layout()
+
+						set_margin_all(4)
+						slider(&slider_values, 0, 10)
+						color_picker(&color)
 					}
 				}
 			}
