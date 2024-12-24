@@ -62,8 +62,8 @@ display_scrollbar :: proc(self: ^Scrollbar) {
 	handle_travel_distance := (self.box.hi[i] - self.box.lo[i]) - self.handle_size
 
 	handle_box: Box
-	handle_box.lo[i] = self.box.lo[i] + handle_travel_distance * handle_time
-	handle_box.hi[i] = handle_box.lo[i] + self.handle_size
+	handle_box.lo[i] = self.box.lo[i] + max(0, handle_travel_distance * handle_time)
+	handle_box.hi[i] = min(handle_box.lo[i] + self.handle_size, self.box.hi[i])
 	handle_box.lo[j] = self.box.lo[j]
 	handle_box.hi[j] = self.box.hi[j]
 

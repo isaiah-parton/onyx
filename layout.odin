@@ -118,7 +118,7 @@ place_object :: proc(object: ^Object) -> bool {
 	switch v in object.placement {
 	case nil:
 		parent := object.parent.? or_return
-		object.box = parent.box
+		object.box = parent.content.box
 	case Box:
 		object.box = v
 	case Future_Box_Placement:

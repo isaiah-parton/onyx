@@ -38,6 +38,15 @@ Style_Shape :: struct {
 	table_row_height:    f32,
 }
 
+rounded_corners :: proc(corners: Corners) -> [4]f32 {
+	return {
+		global_state.style.rounding * f32(i32(.Top_Left in corners)),
+		global_state.style.rounding * f32(i32(.Top_Right in corners)),
+		global_state.style.rounding * f32(i32(.Bottom_Left in corners)),
+		global_state.style.rounding * f32(i32(.Bottom_Right in corners)),
+	}
+}
+
 default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
 		tooltip_padding = 3,

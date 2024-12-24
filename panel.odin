@@ -137,7 +137,14 @@ begin_panel :: proc(
 			}
 
 			if !panel.is_snapped {
-				draw_shadow(panel.box)
+				if vgo.disable_scissor() {
+					vgo.box_shadow(
+						move_box(panel.box, 3),
+						global_state.style.rounding,
+						6,
+						vgo.fade(global_state.style.color.shadow, 1.0 - (0.1 * panel.fade)),
+					)
+				}
 			}
 
 			vgo.fill_box(panel.box, rounding, paint = global_state.style.color.fg)
@@ -189,11 +196,11 @@ end_panel :: proc() {
 	}
 
 	if panel.fade > 0 {
-		vgo.fill_box(panel.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.15))
+		vgo.fill_box(panel.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.05))
 	}
 	panel.fade = animate(
 		panel.fade,
-		0.15,
+		0.25,
 		panel.layer.index < global_state.last_highest_layer_index,
 	)
 

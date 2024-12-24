@@ -120,6 +120,7 @@ Global_State :: struct {
 	panel_stack:              Stack(^Panel, MAX_PANELS),
 	panel_snapping:           Panel_Snap_State,
 	placement_options_stack:  Stack(Placement_Options, 64),
+	object_options_stack: Stack(Object_Options, 64),
 	// Layers are
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
@@ -437,6 +438,9 @@ new_frame :: proc() {
 	global_state.layer_stack.height = 0
 	global_state.object_stack.height = 0
 	global_state.panel_stack.height = 0
+	global_state.object_options_stack.height = 0
+
+	push_options({rounded_corners = global_state.style.rounding})
 
 	reset_panel_snap_state(&global_state.panel_snapping)
 
@@ -534,6 +538,27 @@ shutdown :: proc() {
 	destroy_debug_state(&global_state.debug)
 
 	vgo.shutdown()
+}
+
+push_options :: proc(options: Object_Options) {
+	push_stack(&global_state.object_options_stack, options)
+}
+
+push_current_options :: proc() {
+	push_options(current_options()^)
+}
+
+current_options :: proc() -> ^Object_Options {
+	return &global_state.object_options_stack.items[global_state.object_options_stack.height - 1]
+}
+
+pop_options :: proc() {
+	pop_stack(&global_state.object_options_stack)
+}
+
+set_rounded_corners :: proc(corners: Corners) {
+	options := current_options()
+	options.rounded_corners = rounded_corners(corners)
 }
 
 user_focus_just_changed :: proc() -> bool {

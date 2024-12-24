@@ -34,6 +34,7 @@ Input :: struct {
 	anchor:          int,
 	active_time:     f32,
 	offset:          [2]f32,
+	rounding: [4]f32,
 }
 
 destroy_input :: proc(input: ^Input) {
@@ -95,7 +96,7 @@ display_input :: proc(self: ^Input) {
 	state := self.state
 
 	if is_visible {
-		vgo.fill_box(box, global_state.style.rounding, colors.field)
+		vgo.fill_box(box, radius = self.rounding, paint = colors.field)
 	}
 
 	text_origin := input_text_origin_from(box, self.is_multiline)
@@ -384,7 +385,7 @@ display_input :: proc(self: ^Input) {
 		vgo.stroke_box(
 			self.box,
 			1,
-			global_state.style.rounding,
+			radius = self.rounding,
 			paint = vgo.fade(colors.accent, self.active_time),
 		)
 	}
