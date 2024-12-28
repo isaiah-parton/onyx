@@ -99,10 +99,26 @@ main :: proc() {
 				defer end_layer()
 
 				if begin_layout(placement = view_box(), padding = 50) {
+					push_current_placement_options()
+					defer pop_placement_options()
 					defer end_layout()
 
 					foreground()
-					calendar(&date, &until)
+					set_width(Fixed(400))
+					set_height(Fixed(200))
+					if begin_container() {
+						defer end_container()
+
+						if begin_column_layout() {
+							defer end_layout()
+
+							for i in 0..<100 {
+								push_id(i)
+									button(fmt.tprintf("Button #%i", i + 1))
+								pop_id()
+							}
+						}
+					}
 				}
 			}
 
@@ -160,11 +176,21 @@ main :: proc() {
 						size = Percent_Of_Remaining(25),
 						padding = 10,
 					) {
+						push_current_options()
+
+						defer pop_options()
 						defer end_layout()
 
 						set_margin(left = 1)
 						BUTTON_LABELS := [?]string{"Improvise", "Adapt", "Overcome", "Bubblegum"}
 						for i in 0 ..< len(buttons_active) {
+							if i == 0 {
+								set_rounded_corners({.Bottom_Left, .Top_Left})
+							} else if i == len(buttons_active) - 1 {
+								set_rounded_corners({.Bottom_Right, .Top_Right})
+							} else {
+								set_rounded_corners({})
+							}
 							push_id(i)
 							if button(BUTTON_LABELS[i], active = buttons_active[i]).clicked {
 								buttons_active[i] = !buttons_active[i]
@@ -177,13 +203,18 @@ main :: proc() {
 						size = Percent_Of_Remaining(33.33),
 						padding = 10,
 					) {
+						push_current_options()
+
+						defer pop_options()
 						defer end_layout()
 
 						set_margin(left = 1)
+						set_rounded_corners({.Bottom_Left, .Top_Left})
 						raw_input(
 							&input_value,
 							placeholder = "sample text",
 						)
+						set_rounded_corners({.Bottom_Right, .Top_Right})
 						button("search")
 					}
 					if begin_row_layout(

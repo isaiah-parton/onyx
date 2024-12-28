@@ -23,7 +23,7 @@ barycentric :: proc(point, a, b, c: [2]f32) -> (u, v: f32) {
 	return
 }
 
-line_closest_point :: proc(a, b, p: [2]f32) -> [2]f32 {
+nearest_point_on_line :: proc(a, b, p: [2]f32) -> [2]f32 {
 	ap := p - a
 	ab_dir := b - a
 	dot := ap.x * ab_dir.x + ap.y * ab_dir.y
@@ -33,10 +33,10 @@ line_closest_point :: proc(a, b, p: [2]f32) -> [2]f32 {
 	return a + ab_dir * dot / ab_len_sqr
 }
 
-triangle_closest_point :: proc(a, b, c, p: [2]f32) -> [2]f32 {
-	proj_ab := line_closest_point(a, b, p)
-	proj_bc := line_closest_point(b, c, p)
-	proj_ca := line_closest_point(c, a, p)
+nearest_point_in_triangle :: proc(a, b, c, p: [2]f32) -> [2]f32 {
+	proj_ab := nearest_point_on_line(a, b, p)
+	proj_bc := nearest_point_on_line(b, c, p)
+	proj_ca := nearest_point_on_line(c, a, p)
 	dist2_ab := linalg.length2(p - proj_ab)
 	dist2_bc := linalg.length2(p - proj_bc)
 	dist2_ca := linalg.length2(p - proj_ca)
@@ -356,7 +356,7 @@ display_hsv_wheel :: proc(self: ^HSV_Wheel) {
 			point := global_state.mouse_pos
 			point_a, point_b, point_c := make_a_triangle(center, angle, inner_radius)
 			if !triangle_contains_point(point_a, point_b, point_c, point) {
-				point = triangle_closest_point(point_a, point_b, point_c, point)
+				point = nearest_point_in_triangle(point_a, point_b, point_c, point)
 			}
 			u, v, w := triangle_barycentric(point_a, point_b, point_c, point)
 			self.value.z = clamp(1 - v, 0, 1)

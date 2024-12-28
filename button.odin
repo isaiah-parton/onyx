@@ -132,7 +132,6 @@ display_button :: proc(self: ^Button) {
 				paint = vgo.fade(base_color, (self.hover_time + f32(i32(self.active))) * 0.25),
 			)
 			text_color = colors().accent_content
-		// text_color = vgo.mix(f32(i32(self.active)), colors().accent_content, colors().content)
 		}
 
 		vgo.push_scissor(vgo.make_box(self.box, self.options.rounded_corners))

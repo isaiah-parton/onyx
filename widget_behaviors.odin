@@ -12,16 +12,13 @@ button_behavior :: proc(self: ^Button) {
 	self.press_time = animate(
 	self.press_time,
 		0.2,
-		(.Pressed in self.state.current) || self.active,
+		self.active,
 	)
 	self.hover_time = animate(
 	self.hover_time,
 		0.1,
 		.Hovered in self.state.current,
 	)
-	if .Pressed in lost_state(self.state) {
-		self.press_time = 1
-	}
 	if .Hovered in self.state.current {
 		set_cursor(.Pointing_Hand)
 	}
