@@ -109,15 +109,19 @@ main :: proc() {
 					if begin_container() {
 						defer end_container()
 
-						if begin_column_layout() {
-							defer end_layout()
+						set_align(.Near)
+
+						// if begin_column_layout() {
+							// defer end_layout()
 
 							for i in 0..<100 {
 								push_id(i)
 									button(fmt.tprintf("Button #%i", i + 1))
 								pop_id()
 							}
-						}
+
+						// }
+						// fmt.println(last_object().?.metrics)
 					}
 				}
 			}

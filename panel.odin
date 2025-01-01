@@ -5,11 +5,6 @@ import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
-Panel_Info :: struct {
-	title:          string,
-	position, size: Maybe([2]f32),
-}
-
 Panel :: struct {
 	layer:            ^Layer,
 	box:              Box,

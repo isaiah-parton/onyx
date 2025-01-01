@@ -72,6 +72,7 @@ move_object :: proc(object: ^Object, delta: [2]f32) {
 	for child in object.children {
 		move_object(child, delta)
 	}
+	object.local_position += delta
 }
 
 shift_near_edge_of_box :: proc(box: Box, axis: Axis, amount: f32) -> Box {
@@ -80,12 +81,16 @@ shift_near_edge_of_box :: proc(box: Box, axis: Axis, amount: f32) -> Box {
 	return box
 }
 
-apply_near_object_margin :: proc(box: Box, axis: Axis, margin: [4]f32) -> Box {
-	return shift_near_edge_of_box(box, axis, margin[int(axis)])
+apply_near_object_margin :: proc(position: [2]f32, axis: Axis, margin: [4]f32) -> [2]f32 {
+	position := position
+	position[int(axis)] += margin[int(axis)]
+	return position
 }
 
-apply_far_object_margin :: proc(box: Box, axis: Axis, margin: [4]f32) -> Box {
-	return shift_near_edge_of_box(box, axis, margin[2 + int(axis)])
+apply_far_object_margin :: proc(position: [2]f32, axis: Axis, margin: [4]f32) -> [2]f32 {
+	position := position
+	position[int(axis)] += margin[2 + int(axis)]
+	return position
 }
 
 apply_perpendicular_object_margin :: proc(box: Box, axis: Axis, margin: [4]f32) -> Box {
@@ -118,7 +123,7 @@ place_object :: proc(object: ^Object) -> bool {
 	switch v in object.placement {
 	case nil:
 		parent := object.parent.? or_return
-		object.box = parent.content.box
+		object.box = parent.box
 	case Box:
 		object.box = v
 	case Future_Box_Placement:
@@ -129,9 +134,7 @@ place_object :: proc(object: ^Object) -> bool {
 		place_object_in_parent(object, v) or_return
 	}
 
-	object.box = snapped_box(object.box)
-
-	object.content.box = solve_object_content_box(object)
+	object.content.next_position = object.content.offset
 
 	return true
 }
@@ -147,7 +150,7 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 	assert(object != nil)
 	parent := object.parent.? or_return
 
-	content_box := parent.content.box
+	next_position := parent.content.next_position
 
 	object.metrics.size, object.metrics.desired_size = solve_child_object_size(
 		placement.size,
@@ -158,13 +161,10 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 	)
 
 	parent_content_axis := axis_of_side(parent.content.side)
-	object.box, content_box = split_box(
-		apply_near_object_margin(content_box, parent_content_axis, placement.margin),
-		parent.content.side,
-		object.metrics.size[int(parent_content_axis)],
-	)
-
-	content_box = apply_far_object_margin(content_box, parent_content_axis, placement.margin)
+	next_position = apply_near_object_margin(next_position, parent_content_axis, placement.margin)
+	object.local_position = next_position
+	next_position[int(parent_content_axis)] += object.metrics.size[int(parent_content_axis)]
+	next_position = apply_far_object_margin(next_position, parent_content_axis, placement.margin)
 
 	object.box = apply_object_alignment(
 		apply_perpendicular_object_margin(object.box, parent_content_axis, placement.margin),
@@ -174,15 +174,15 @@ place_object_in_parent :: proc(object: ^Object, placement: Child_Placement_Optio
 	)
 
 	if parent.content.justify == .Equal_Space {
-		content_box.lo[int(parent_content_axis)] +=
+		next_position[int(parent_content_axis)] +=
 		parent.content.space_left[int(parent_content_axis)] / f32(len(parent.children) - 1)
 	} else if parent.content.justify == .Center {
-		move_object(object, parent.content.space_left * 0.5)
+		object.local_position += parent.content.space_left * 0.5
 	} else if parent.content.justify == .Far {
-		move_object(object, parent.content.space_left)
+		object.local_position += parent.content.space_left
 	}
 
-	parent.content.box = content_box
+	parent.content.next_position = next_position
 
 	return true
 }

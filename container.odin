@@ -28,8 +28,8 @@ Container :: struct {
 }
 
 zoom_container_anchored :: proc(self: ^Container, new_zoom: f32, anchor: [2]f32) {
-	content_top_left := self.content.box.lo
-	content_size := box_size(self.content.box)
+	content_top_left := self.box.lo
+	content_size := self.content.size
 	view_top_left := self.box.lo
 	view_size := box_size(self.box)
 	view_coordinates := (anchor - view_top_left) / view_size
@@ -42,6 +42,7 @@ zoom_container_anchored :: proc(self: ^Container, new_zoom: f32, anchor: [2]f32)
 
 begin_container :: proc(
 	space: Maybe([2]f32) = nil,
+	side: Side = .Top,
 	can_zoom: bool = false,
 	loc := #caller_location,
 ) -> bool {
@@ -62,6 +63,7 @@ begin_container :: proc(
 	self.isolated = true
 	self.placement = next_user_placement()
 	self.clip_children = true
+	self.content.side = side
 
 	begin_object(self) or_return
 

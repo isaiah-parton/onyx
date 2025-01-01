@@ -48,9 +48,9 @@ OBJECT_STATE_ALL :: Object_Status_Set {
 }
 
 Object_Options :: struct {
-	rounded_corners: [4]f32,
+	rounded_corners:  [4]f32,
 	background_color: vgo.Color,
-	disabled: bool,
+	disabled:         bool,
 }
 
 Object_Variant :: union {
@@ -87,15 +87,18 @@ Object :: struct {
 	call_index:      int,
 	frames:          int,
 	layer:           ^Layer,
+	local_position:  [2]f32,
 	box:             Box,
 	placement:       Object_Placement,
 	clip_children:   bool,
 	dead:            bool,
+	// TODO: Expand to `defers_child_placement` and `size_is_unknown`
 	is_deferred:     bool,
+	//
 	disabled:        bool,
 	isolated:        bool,
 	will_be_hovered: bool,
-	options: 				Object_Options,
+	options:         Object_Options,
 	flags:           Object_Flags,
 	state:           Object_State,
 	input:           Object_Input,
@@ -115,16 +118,16 @@ Object_State :: struct {
 }
 
 Object_Content :: struct {
-	side:         Side,
-	justify:      Align,
-	align:        Align,
-	box:          Box,
-	offset:       [2]f32,
-	space_left:   [2]f32,
-	size:         [2]f32,
-	desired_size: [2]f32,
-	padding:      [4]f32,
-	objects:      [dynamic]^Object,
+	side:          Side,
+	justify:       Align,
+	align:         Align,
+	next_position: [2]f32,
+	offset:        [2]f32,
+	space_left:    [2]f32,
+	size:          [2]f32,
+	desired_size:  [2]f32,
+	padding:       [4]f32,
+	objects:       [dynamic]^Object,
 }
 
 Object_Metrics :: struct {
@@ -437,7 +440,7 @@ total_space_for_object_content :: proc(object: ^Object) -> [2]f32 {
 }
 
 available_space_for_object_content :: proc(object: ^Object) -> [2]f32 {
-	return box_size(object.content.box)
+	return object.content.space_left
 }
 
 update_object_parent_metrics :: proc(object: ^Object) {
@@ -552,6 +555,13 @@ display_object :: proc(object: ^Object) {
 		place_object(object)
 	}
 
+	if _, ok := object.placement.(Child_Placement_Options); ok {
+		if parent, ok := object.parent.?; ok {
+			object.local_position += parent.local_position
+		}
+		object.box = Box{object.local_position, object.local_position + object.metrics.size}
+	}
+
 	when DEBUG {
 		if point_in_box(mouse_point(), object.box) {
 			if object_is_in_front_of(object, top_hovered_object(global_state.debug) or_else nil) {
@@ -609,7 +619,7 @@ display_object :: proc(object: ^Object) {
 	}
 
 	if content_justify_causes_deference(object.content.justify) {
-		object.content.space_left = box_size(object.content.box)
+		object.content.space_left = box_size(object.box) - object.content.padding.xy - object.content.padding.zw
 		for child_object in object.children {
 			if placement, ok := child_object.placement.(Child_Placement_Options); ok {
 				child_object.metrics.size, child_object.metrics.desired_size =
