@@ -13,18 +13,11 @@ Boolean_Type :: enum {
 }
 
 Boolean :: struct {
-	using base:      ^Object,
-	value:           ^bool,
-	type:            Boolean_Type,
 	animation_timer: f32,
-	side:            Side,
-	text:            string,
-	text_layout:     vgo.Text_Layout,
-	gadget_size:     [2]f32,
 }
 
 boolean :: proc(
-	state: ^bool,
+	value: ^bool,
 	text: string = "",
 	text_side: Side = .Left,
 	type: Boolean_Type = .Checkbox,
@@ -32,189 +25,192 @@ boolean :: proc(
 ) {
 	object := persistent_object(hash(loc))
 	if object.variant == nil {
-		object.variant = Boolean {
-			base = object,
-		}
+		object.variant = Boolean{}
 	}
-	self := &object.variant.(Boolean)
-	self.value = state
-	self.gadget_size = global_state.style.visual_size.y * 0.8
-	if type == .Switch do self.gadget_size *= [2]f32{1.75, 1}
-	self.placement = next_user_placement()
-	self.type = type
-	self.text = text
+	extras := &object.variant.(Boolean)
+
+	gadget_size: [2]f32
+
+	switch type {
+	case .Checkbox:
+		gadget_size = global_state.style.visual_size.y * 0.8
+	case .Radio:
+		gadget_size = global_state.style.visual_size.y * 0.8
+	case .Switch:
+		gadget_size = [2]f32{1.75, 1} * global_state.style.visual_size.y * 0.8
+	}
+
+	text_layout: vgo.Text_Layout
 	if len(text) > 0 {
-		self.text_layout = vgo.make_text_layout(
+		text_layout = vgo.make_text_layout(
 			text,
 			global_state.style.default_text_size,
 			global_state.style.default_font,
 		)
 		if int(text_side) > 1 {
-			self.metrics.desired_size.x = max(self.gadget_size.x, self.text_layout.size.x)
-			self.metrics.desired_size.y = self.gadget_size.x + self.text_layout.size.y
+			object.size.x = max(gadget_size.x, text_layout.size.x)
+			object.size.y = gadget_size.x + text_layout.size.y
 		} else {
-			self.metrics.desired_size.x =
-				self.gadget_size.x +
-				self.text_layout.size.x +
+			object.size.x =
+				gadget_size.x +
+				text_layout.size.x +
 				global_state.style.text_padding.x * 2
-			self.metrics.desired_size.y = self.gadget_size.y
+			object.size.y = gadget_size.y
 		}
 	}
+
 	if begin_object(object) {
 		defer end_object()
 
-	}
-}
+		object.box = next_box(object.size, true)
 
-display_boolean :: proc(self: ^Boolean) {
-
-	handle_object_click(self)
-
-	if .Hovered in self.state.current {
-		set_cursor(.Pointing_Hand)
-	}
-	if point_in_box(global_state.mouse_pos, self.box) {
-		hover_object(self)
-	}
-	self.animation_timer = animate(self.animation_timer, 0.2, self.value^)
-
-	if object_is_visible(self) {
-		gadget_box: Box
-
-		if len(self.text) > 0 {
-			switch self.side {
-			case .Left:
-				gadget_box = {self.box.lo, self.gadget_size}
-			case .Right:
-				gadget_box = {
-					{self.box.hi.x - self.gadget_size.x, self.box.lo.y},
-					self.gadget_size,
-				}
-			case .Top:
-				gadget_box = {
-					{
-						box_center_x(self.box) - self.gadget_size.x / 2,
-						self.box.hi.y - self.gadget_size.y,
-					},
-					self.gadget_size,
-				}
-			case .Bottom:
-				gadget_box = {
-					{box_center_x(self.box) - self.gadget_size.x / 2, self.box.lo.y},
-					self.gadget_size,
-				}
-			}
-			gadget_box.hi += gadget_box.lo
-		} else {
-			gadget_box = self.box
+		handle_object_click(object)
+		if .Hovered in object.state.current {
+			set_cursor(.Pointing_Hand)
 		}
-
-		gadget_center := box_center(gadget_box)
-
-		if .Hovered in self.state.current {
-			vgo.fill_box(
-				{{gadget_center.x, self.box.lo.y}, self.box.hi},
-				{0, global_state.style.rounding, 0, global_state.style.rounding},
-				vgo.fade(colors().substance, 0.2),
-			)
+		if point_in_box(global_state.mouse_pos, object.box) {
+			hover_object(object)
 		}
+		extras.animation_timer = animate(extras.animation_timer, 0.2, value^)
 
-		opacity: f32 = 0.5 if self.disabled else 1
+		if object_is_visible(object) {
+			gadget_box: Box
 
-		state_time := ease.quadratic_in_out(self.animation_timer)
-
-		switch self.type {
-		case .Checkbox:
-			if state_time < 1 {
-				vgo.fill_box(gadget_box, global_state.style.rounding, colors().field)
-			}
-			if state_time > 0 && state_time < 1 {
-				vgo.push_scissor(vgo.make_box(self.box, global_state.style.rounding))
-			}
-			vgo.fill_box(
-				gadget_box,
-				global_state.style.rounding,
-				vgo.fade(colors().accent, state_time),
-			)
-			if state_time > 0 {
-				gadget_center += {
-					0,
-					box_height(gadget_box) *
-					((1 - state_time) if self.value^ else -(1 - state_time)),
+			if len(text) > 0 {
+				switch text_side {
+				case .Left:
+					gadget_box = {object.box.lo, gadget_size}
+				case .Right:
+					gadget_box = {
+						{object.box.hi.x - gadget_size.x, object.box.lo.y},
+						gadget_size,
+					}
+				case .Top:
+					gadget_box = {
+						{
+							box_center_x(object.box) - gadget_size.x / 2,
+							object.box.hi.y - gadget_size.y,
+						},
+						gadget_size,
+					}
+				case .Bottom:
+					gadget_box = {
+						{box_center_x(object.box) - gadget_size.x / 2, object.box.lo.y},
+						gadget_size,
+					}
 				}
-				vgo.check(gadget_center, self.gadget_size.y / 4, colors().field)
+				gadget_box.hi += gadget_box.lo
+			} else {
+				gadget_box = object.box
 			}
-			if state_time > 0 && state_time < 1 {
-				vgo.pop_scissor()
-			}
-		case .Radio:
+
 			gadget_center := box_center(gadget_box)
-			radius := self.gadget_size.y / 2
-			vgo.fill_circle(
-				gadget_center,
-				radius,
-				vgo.mix(state_time, colors().field, colors().accent),
-			)
-			if state_time > 0 {
-				vgo.fill_circle(
-					gadget_center,
-					(radius - 5) * state_time,
-					vgo.fade(colors().field, state_time),
+
+			if .Hovered in object.state.current {
+				vgo.fill_box(
+					{{gadget_center.x, object.box.lo.y}, object.box.hi},
+					{0, global_state.style.rounding, 0, global_state.style.rounding},
+					vgo.fade(colors().substance, 0.2),
 				)
 			}
-		case .Switch:
-			inner_box := shrink_box(gadget_box, 2)
-			outer_radius := box_height(gadget_box) / 2
-			inner_radius := box_height(inner_box) / 2
-			lever_center: [2]f32 = {
-				inner_box.lo.x +
-				inner_radius +
-				(box_width(inner_box) - box_height(inner_box)) * state_time,
-				box_center_y(inner_box),
-			}
-			if state_time < 1 {
-				vgo.fill_box(gadget_box, paint = colors().field, radius = outer_radius)
-			}
-			vgo.fill_box(
-				{gadget_box.lo, lever_center + outer_radius},
-				radius = outer_radius,
-				paint = vgo.fade(colors().accent, state_time),
-			)
-			vgo.fill_circle(
-				lever_center,
-				inner_radius,
-				vgo.mix(state_time, colors().fg, colors().field),
-			)
-		}
-		// Paint text
-		text_pos: [2]f32
-		if len(self.text) > 0 {
-			switch self.side {
-			case .Left:
-				text_pos = {
-					gadget_box.hi.x + global_state.style.text_padding.x,
-					box_center_y(self.box),
-				}
-			case .Right:
-				text_pos = {
-					gadget_box.lo.x - global_state.style.text_padding.x,
-					box_center_y(self.box),
-				}
-			case .Top:
-				text_pos = self.box.lo
-			case .Bottom:
-				text_pos = {self.box.lo.x, self.box.hi.y}
-			}
-			vgo.fill_text_layout(
-				self.text_layout,
-				text_pos,
-				align = {0, 0.5},
-				paint = vgo.fade(colors().content, opacity),
-			)
-		}
-	}
 
-	if .Clicked in self.state.current {
-		self.value^ = !self.value^
+			opacity: f32 = 0.5 if object.disabled else 1
+
+			state_time := ease.quadratic_in_out(extras.animation_timer)
+
+			switch type {
+			case .Checkbox:
+				if state_time < 1 {
+					vgo.fill_box(gadget_box, global_state.style.rounding, colors().field)
+				}
+				if state_time > 0 && state_time < 1 {
+					vgo.push_scissor(vgo.make_box(object.box, global_state.style.rounding))
+				}
+				vgo.fill_box(
+					gadget_box,
+					global_state.style.rounding,
+					vgo.fade(colors().accent, state_time),
+				)
+				if state_time > 0 {
+					gadget_center += {
+						0,
+						box_height(gadget_box) *
+						((1 - state_time) if value^ else -(1 - state_time)),
+					}
+					vgo.check(gadget_center, gadget_size.y / 4, colors().field)
+				}
+				if state_time > 0 && state_time < 1 {
+					vgo.pop_scissor()
+				}
+			case .Radio:
+				gadget_center := box_center(gadget_box)
+				radius := gadget_size.y / 2
+				vgo.fill_circle(
+					gadget_center,
+					radius,
+					vgo.mix(state_time, colors().field, colors().accent),
+				)
+				if state_time > 0 {
+					vgo.fill_circle(
+						gadget_center,
+						(radius - 5) * state_time,
+						vgo.fade(colors().field, state_time),
+					)
+				}
+			case .Switch:
+				inner_box := shrink_box(gadget_box, 2)
+				outer_radius := box_height(gadget_box) / 2
+				inner_radius := box_height(inner_box) / 2
+				lever_center: [2]f32 = {
+					inner_box.lo.x +
+					inner_radius +
+					(box_width(inner_box) - box_height(inner_box)) * state_time,
+					box_center_y(inner_box),
+				}
+				if state_time < 1 {
+					vgo.fill_box(gadget_box, paint = colors().field, radius = outer_radius)
+				}
+				vgo.fill_box(
+					{gadget_box.lo, lever_center + outer_radius},
+					radius = outer_radius,
+					paint = vgo.fade(colors().accent, state_time),
+				)
+				vgo.fill_circle(
+					lever_center,
+					inner_radius,
+					vgo.mix(state_time, colors().fg, colors().field),
+				)
+			}
+
+			text_pos: [2]f32
+			if len(text) > 0 {
+				switch text_side {
+				case .Left:
+					text_pos = {
+						gadget_box.hi.x + global_state.style.text_padding.x,
+						box_center_y(object.box),
+					}
+				case .Right:
+					text_pos = {
+						gadget_box.lo.x - global_state.style.text_padding.x,
+						box_center_y(object.box),
+					}
+				case .Top:
+					text_pos = object.box.lo
+				case .Bottom:
+					text_pos = {object.box.lo.x, object.box.hi.y}
+				}
+				vgo.fill_text_layout(
+					text_layout,
+					text_pos,
+					align = {0, 0.5},
+					paint = vgo.fade(colors().content, opacity),
+				)
+			}
+		}
+
+		if .Clicked in object.state.current {
+			value^ = !value^
+		}
 	}
 }

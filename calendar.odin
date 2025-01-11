@@ -59,14 +59,15 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 		}
 		object.state.input_mask = OBJECT_STATE_ALL
 	}
-	self := &object.variant.(Calendar)
-	self.metrics.desired_size = {280, 0}
-	row_height := self.metrics.desired_size.x / DAYS_PER_WEEK
-	self.metrics.desired_size.y = row_height * 2
+	extras := &object.variant.(Calendar)
 
-	page := self.page.? or_else todays_calendar_page()
-	if self.page == nil {
-		self.page = page
+	object.size = {280, 0}
+	row_height := object.size.x / DAYS_PER_WEEK
+	object.size.y = row_height * 2
+
+	page := extras.page.? or_else todays_calendar_page()
+	if extras.page == nil {
+		extras.page = page
 	}
 
 	from_date := date^
@@ -94,61 +95,45 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	)
 	how_many_days = int(math.ceil(f32(how_many_days) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
 	how_many_weeks := math.ceil(f32(how_many_days) / DAYS_PER_WEEK)
-	self.metrics.desired_size.y +=
+	object.size.y +=
 		how_many_weeks * row_height + (how_many_weeks + 1) * CALENDAR_WEEK_SPACING
-	self.content.side = .Top
-	self.content.padding = 10
-	self.placement = next_user_placement()
-	self.focus_time = animate(self.focus_time, 0.2, date^ != nil)
+	extras.focus_time = animate(extras.focus_time, 0.2, date^ != nil)
 	allow_range := until != nil
 
-	if begin_object(self) {
+	if begin_object(object) {
 		defer end_object()
 
-		push_id(self.id)
+		push_id(object.id)
 		defer pop_id()
 
-		push_placement_options({})
-		defer pop_placement_options()
-
-		set_margin(bottom = 4)
-
-		if begin_row_layout(size = Percent_Of_Width(14.28), justify = .Equal_Space) {
+		if begin_layout(side = .Left) {
 			defer end_layout()
-			set_margin(bottom = 0)
 
-			set_align(.Center)
-
-			set_margin(left = 10)
 			if button(text = "<<", accent = .Subtle).clicked {
-				self.page = move_calendar_page(page, -1)
+				extras.page = move_calendar_page(page, -1)
 			}
 			label(text = fmt.tprintf("%s %i", t.Month(page.month), page.year))
-			set_margin(right = 10)
 			if button(text = ">>", accent = .Subtle).clicked {
-				self.page = move_calendar_page(page, 1)
+				extras.page = move_calendar_page(page, 1)
 			}
 		}
 
-		set_width(Percent(14.28))
+		set_height(remaining_space().y * 0.1428)
 
-		if begin_row_layout(size = Percent_Of_Width(14.28), justify = .Equal_Space) {
+		if begin_layout(side = .Left) {
 			defer end_layout()
-			set_margin(bottom = 0)
 
-			set_height(Percent(100))
+			set_width(remaining_space().x)
 			WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
 			for weekday in WEEKDAY_ABBREVIATIONS {
 				label(text = weekday, align = 0.5, color = vgo.fade(colors().content, 0.5))
 			}
 		}
 
-		set_height(Percent(100))
+		set_height(remaining_space().y)
 
-		if begin_row_layout(size = Percent_Of_Width(14.28)) {
+		if begin_layout(side = .Left) {
 			defer end_layout()
-
-			set_margin(bottom = 0)
 
 			time: t.Time = {calendar_start}
 			for i in 0 ..< how_many_days {
@@ -157,14 +142,14 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 
 				if (i > 0) && (i % 7 == 0) {
 					end_layout()
-					begin_row_layout(size = Percent_Of_Width(14.28))
+					begin_layout(side = .Left)
 				}
 
 				year, month, day := t.date(time)
 				cell_date := Date{i64(year), i8(month), i8(day)}
 				cell_year, cell_month, cell_day := t.date(t.now())
 
-				if calendar_day(day, cell_year == year && cell_month == month && cell_day == day, page.month == i8(month), time, selection_times, self.focus_time).clicked {
+				if calendar_day(day, cell_year == year && cell_month == month && cell_day == day, page.month == i8(month), time, selection_times, extras.focus_time).clicked {
 					if allow_range {
 						if from_date == nil {
 							from_date = cell_date
@@ -233,7 +218,6 @@ calendar_day :: proc(
 	self.is_this_month = is_this_month
 	self.time = time
 	self.selection = selection
-	self.placement = next_user_placement()
 	if begin_object(object) {
 		defer end_object()
 
@@ -354,40 +338,4 @@ parse_date :: proc(s: string) -> (date: Date, ok: bool) {
 	if err != nil do return
 	ok = true
 	return
-}
-
-display_date_picker :: proc(self: ^Date_Picker) {
-	if .Open in self.state.previous {
-		if begin_layer(options = {.Attached}, kind = .Background) {
-			defer end_layer()
-
-			if begin_layout(
-				placement = Future_Box_Placement {
-					origin = {
-						self.box.hi.x + global_state.style.popup_margin,
-						box_center_y(self.box),
-					},
-					align = {0, 0.5},
-				},
-				padding = 10,
-				clip_contents = true,
-			) {
-				defer end_layout()
-
-				foreground()
-				set_width(nil)
-				set_height(nil)
-				calendar(date = self.first, until = self.second)
-
-				if (current_layer().?.state & {.Hovered, .Focused} == {}) &&
-				   (.Focused not_in self.state.current) {
-					self.state.current -= {.Open}
-				}
-			}
-		}
-	} else {
-		if .Pressed in new_state(self.state) {
-			self.state.current += {.Open}
-		}
-	}
 }

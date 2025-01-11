@@ -109,26 +109,30 @@ box_center :: proc(a: Box) -> [2]f32 {
 }
 
 cut_box_left :: proc(box: ^Box, a: f32) -> (res: Box) {
-	res = {box.lo, {box.lo.x + a, box.hi.y}}
-	box.lo.x += a
+	left := min(box.lo.x + a, box.hi.x)
+	res = {box.lo, {left, box.hi.y}}
+	box.lo.x = left
 	return
 }
 
 cut_box_top :: proc(box: ^Box, a: f32) -> (res: Box) {
-	res = {box.lo, {box.hi.x, box.lo.y + a}}
-	box.lo.y += a
+	top := min(box.lo.y + a, box.hi.y)
+	res = {box.lo, {box.hi.x, top}}
+	box.lo.y = top
 	return
 }
 
 cut_box_right :: proc(box: ^Box, a: f32) -> (res: Box) {
-	res = {{box.hi.x - a, box.lo.y}, box.hi}
-	box.hi.x -= a
+	right := max(box.lo.x, box.hi.x - a)
+	res = {{right, box.lo.y}, box.hi}
+	box.hi.x = right
 	return
 }
 
 cut_box_bottom :: proc(box: ^Box, a: f32) -> (res: Box) {
-	res = {{box.lo.x, box.hi.y - a}, box.hi}
-	box.hi.y -= a
+	bottom := max(box.lo.y, box.hi.y - a)
+	res = {{box.lo.x, bottom}, box.hi}
+	box.hi.y = bottom
 	return
 }
 

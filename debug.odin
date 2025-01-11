@@ -83,10 +83,6 @@ draw_object_debug_padding :: proc(box: Box, padding: [4]f32) {
 draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
 	if object_is_being_debugged(state, object) {
 		vgo.fill_box(object.box, paint = vgo.fade(vgo.BLUE, 0.25))
-		if placement, ok := object.placement.(Child_Placement_Options); ok {
-			draw_object_debug_margin(object.box, placement.margin)
-		}
-		draw_object_debug_padding(object.box, object.content.padding)
 	}
 	vgo.stroke_box(object.box, 1, paint = vgo.BLUE)
 }
@@ -195,9 +191,6 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		b := strings.builder_make(context.temp_allocator)
 		if !state.wireframe {
 			draw_object_debug_box(state^, object)
-			for child in object.children {
-				draw_object_debug_box(state^, child)
-			}
 		}
 		fmt.sbprintf(
 			&b,
@@ -206,19 +199,6 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			object.id,
 			object.box.lo,
 			object.box.hi,
-			object.metrics.size,
-			object.metrics.desired_size,
-			object.content.size,
-			object.content.desired_size,
-			object.content.side,
-			object.content.padding,
-		)
-		fmt.sbprintf(
-			&b,
-			"\n justify: %v\n deferred: %v\n children: %i",
-			object.content.justify,
-			object.is_deferred,
-			len(object.children),
 		)
 
 		variant_typeid := reflect.union_variant_typeid(object.variant)

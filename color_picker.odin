@@ -86,8 +86,7 @@ Color_Picker :: struct {
 color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_location) -> Id {
 	id := hash(loc)
 	object := persistent_object(id)
-	object.placement = next_user_placement()
-	object.metrics.desired_size = global_state.style.visual_size * {0.5, 1}
+	object.size = global_state.style.visual_size * {0.5, 1}
 	if object.variant == nil {
 		object.variant = Color_Picker {
 			object = object,
@@ -96,114 +95,98 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 	if begin_object(object) {
 		defer end_object()
 
-		self := &object.variant.(Color_Picker)
-		if .Changed in self.state.previous {
-			value^ = self.value
+		object := &object.variant.(Color_Picker)
+		if .Changed in object.state.previous {
+			value^ = object.value
 			draw_frames(1)
 		} else {
-			self.value = value^
+			object.value = value^
 		}
 	}
 	return id
 }
 
-display_color_picker :: proc(self: ^Color_Picker) {
+display_color_picker :: proc(object: ^Color_Picker) {
 
-	handle_object_click(self)
+	handle_object_click(object)
 
-	if .Open in self.state.current {
-		self.open_time = animate(self.open_time, 0.3, true)
+	if .Open in object.state.current {
+	object.open_time = animate(object.open_time, 0.3, true)
 	} else {
-		self.open_time = 0
+		object.open_time = 0
 	}
-	if .Pressed in new_state(self.state) {
-		self.state.current += {.Open}
+	if .Pressed in new_state(object.state) {
+		object.state.current += {.Open}
 	}
-	if .Hovered in self.state.current {
+	if .Hovered in object.state.current {
 		global_state.cursor_type = .Pointing_Hand
 	}
-	if point_in_box(global_state.mouse_pos, self.box) {
-		hover_object(self)
+	if point_in_box(global_state.mouse_pos, object.box) {
+		hover_object(object)
 	}
 
-	if object_is_visible(self) {
-		shadow_opacity := self.open_time
+	if object_is_visible(object) {
+		shadow_opacity := object.open_time
 		if shadow_opacity > 0 {
 			vgo.box_shadow(
-				self.box,
+				object.box,
 				global_state.style.rounding,
 				6,
 				vgo.fade(global_state.style.color.shadow, shadow_opacity),
 			)
 		}
 
-		checker_box := shrink_box(self.box, 1)
+		checker_box := shrink_box(object.box, 1)
 		vgo.push_scissor(vgo.make_box(checker_box, box_height(checker_box) / 2))
 		draw_checkerboard_pattern(
-			self.box,
-			box_height(self.box) / 2,
-			vgo.blend(global_state.style.color.checker_bg[0], self.value, vgo.WHITE),
-			vgo.blend(global_state.style.color.checker_bg[1], self.value, vgo.WHITE),
+			object.box,
+			box_height(object.box) / 2,
+			vgo.blend(global_state.style.color.checker_bg[0], object.value, vgo.WHITE),
+			vgo.blend(global_state.style.color.checker_bg[1], object.value, vgo.WHITE),
 		)
 		vgo.fill_text(
-			fmt.tprintf("#%6x", vgo.hex_from_color(self.value)),
+			fmt.tprintf("#%6x", vgo.hex_from_color(object.value)),
 			global_state.style.default_text_size,
-			box_center(self.box),
+			box_center(object.box),
 			align = 0.5,
-			paint = vgo.BLACK if max(vgo.luminance_of(self.value), 1 - f32(self.value.a) / 255) > 0.45 else vgo.WHITE,
+			paint = vgo.BLACK if max(vgo.luminance_of(object.value), 1 - f32(object.value.a) / 255) > 0.45 else vgo.WHITE,
 		)
 		vgo.pop_scissor()
 	}
 
 	PADDING :: 10
-	if .Open in self.state.current {
-		if .Open not_in self.state.previous {
-			self.hsva = vgo.hsva_from_color(self.value)
+	if .Open in object.state.current {
+		if .Open not_in object.state.previous {
+		object.hsva = vgo.hsva_from_color(object.value)
 		}
 
-		push_id(self.id)
+		push_id(object.id)
 		defer pop_id()
 
 		if begin_layer(options = {.Attached}, kind = .Background) {
 			defer end_layer()
 
-			if begin_layout(
-				placement = Future_Box_Placement {
-					origin = {
-						self.box.hi.x + global_state.style.popup_margin,
-						box_center_y(self.box),
-					},
-					align = {0, 0.5},
-				},
-				padding = 10,
-				isolated = true,
-				clip_contents = true,
-			) {
+			if begin_layout(side = .Left) {
 				defer end_layout()
 
+				shrink(10)
+
 				foreground()
-				alpha_slider(&self.hsva.w)
-				set_margin(left = 10)
-				hsv_wheel((^[3]f32)(&self.hsva))
+				alpha_slider(&object.hsva.w)
+				space(10)
+				hsv_wheel((^[3]f32)(&object.hsva))
 			}
 
 			if object_was_just_changed(last_object().?) {
-				self.value = vgo.color_from_hsva(self.hsva)
-				self.state.current += {.Changed}
+				object.value = vgo.color_from_hsva(object.hsva)
+				object.state.current += {.Changed}
 			}
 
-			if .Focused not_in current_layer().?.state && .Focused not_in self.state.current {
-				self.state.current -= {.Open}
+			if .Focused not_in current_layer().?.state && .Focused not_in object.state.current {
+				object.state.current -= {.Open}
 			}
 		}
 	}
-}
-
-Alpha_Slider :: struct {
-	using object: ^Object,
-	value:        f32,
-	axis:         Axis,
-	color:        vgo.Color,
 }
 
 alpha_slider :: proc(
@@ -211,107 +194,158 @@ alpha_slider :: proc(
 	color: vgo.Color = vgo.BLACK,
 	axis: Axis = .Y,
 	loc := #caller_location,
-) -> Id {
-	id := hash(loc)
-	object := persistent_object(id)
-	if object.variant == nil {
-		object.variant = Alpha_Slider {
-			object = object,
-		}
+) {
+	if value == nil {
+		return
 	}
-	self := &object.variant.(Alpha_Slider)
-	self.placement = next_user_placement()
-	self.axis = axis
-	self.metrics.desired_size = global_state.style.visual_size
-	if self.axis == .Y {
-		self.metrics.desired_size.xy = self.metrics.desired_size.yx
+	color := color
+	object := persistent_object(hash(loc))
+	object.size = global_state.style.visual_size
+	if axis == .Y {
+		object.size.xy = object.size.yx
 	}
-	if begin_object(self) {
-		defer end_object()
-		self.color = color
-		if .Changed in self.state.previous {
-			value^ = self.value
-		}
-		self.value = value^
-	}
-	return id
-}
-
-display_alpha_slider :: proc(self: ^Alpha_Slider) {
-
-	handle_object_click(self, true)
-
-	i := int(self.axis)
-	j := 1 - i
-
-	if .Pressed in self.state.current {
-		self.value = clamp(
-			(global_state.mouse_pos[i] - self.box.lo[i]) / (self.box.hi[i] - self.box.lo[i]),
-			0,
-			1,
-		)
-		self.state.current += {.Changed}
-	}
-
-	if object_is_visible(self) {
-		R :: 4
-		box := self.box
-		draw_checkerboard_pattern(
-			box,
-			(box.hi[j] - box.lo[j]) / 2,
-			global_state.style.color.checker_bg[0],
-			global_state.style.color.checker_bg[1],
-		)
-		self.color.a = 255
-		time := clamp(self.value, 0, 1)
-		pos := box.lo[i] + (box.hi[i] - box.lo[i] - 4) * time
-		if self.axis == .Y {
-			vgo.fill_box(
-				box,
-				paint = vgo.make_linear_gradient(
-					box.lo,
-					{box.lo.x, box.hi.y},
-					vgo.fade(self.color, 0.0),
-					self.color,
-				),
-			)
-			vgo.stroke_box(
-				{{box.lo.x, pos}, {box.hi.x, pos + 4}},
-				1,
-				paint = global_state.style.color.content,
-			)
-		}
-	}
-
-	if point_in_box(global_state.mouse_pos, self.box) {
-		hover_object(self)
-	}
-}
-
-HSV_Wheel :: struct {
-	using object: ^Object,
-	value:        [3]f32,
-}
-
-hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) -> Id {
-	id := hash(loc)
-	object := persistent_object(id)
-	if object.variant == nil {
-		object.variant = HSV_Wheel {
-			object = object,
-		}
-	}
-	self := &object.variant.(HSV_Wheel)
-	self.placement = next_user_placement()
-	self.metrics.desired_size = 200
 	if begin_object(object) {
 		defer end_object()
-		if .Changed in self.state.previous {
-			value^ = self.value
+
+		handle_object_click(object, true)
+
+		i := int(axis)
+		j := 1 - i
+
+		if .Pressed in object.state.current {
+			value^ = clamp(
+				(global_state.mouse_pos[i] - object.box.lo[i]) / (object.box.hi[i] - object.box.lo[i]),
+				0,
+				1,
+			)
+			object.state.current += {.Changed}
 		}
-		self.value = value^
+
+		if object_is_visible(object) {
+			R :: 4
+			box := object.box
+			draw_checkerboard_pattern(
+				box,
+				(box.hi[j] - box.lo[j]) / 2,
+				global_state.style.color.checker_bg[0],
+				global_state.style.color.checker_bg[1],
+			)
+			color.a = 255
+			time := clamp(value^, 0, 1)
+			pos := box.lo[i] + (box.hi[i] - box.lo[i] - 4) * time
+			if axis == .Y {
+				vgo.fill_box(
+					box,
+					paint = vgo.make_linear_gradient(
+						box.lo,
+						{box.lo.x, box.hi.y},
+						vgo.fade(color, 0.0),
+						color,
+					),
+				)
+				vgo.stroke_box(
+					{{box.lo.x, pos}, {box.hi.x, pos + 4}},
+					1,
+					paint = global_state.style.color.content,
+				)
+			}
+		}
+
+		if point_in_box(global_state.mouse_pos, object.box) {
+			hover_object(object)
+		}
 	}
-	return id
+	return
+}
+
+hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
+	if value == nil {
+		return
+	}
+	object := persistent_object(hash(loc))
+	object.size = 200
+	if begin_object(object) {
+		defer end_object()
+
+		handle_object_click(object, sticky = true)
+
+		size := min(box_width(object.box), box_height(object.box))
+		outer_radius := size / 2
+		inner_radius := outer_radius * 0.75
+
+		center := box_center(object.box)
+		angle := value.x * math.RAD_PER_DEG
+
+		delta_to_mouse := global_state.mouse_pos - center
+		distance_to_mouse := linalg.length(delta_to_mouse)
+
+		if distance_to_mouse <= outer_radius {
+			hover_object(object)
+		}
+
+		if .Pressed in new_state(object.state) {
+			if distance_to_mouse > inner_radius {
+				object.state.current += {.Active}
+			}
+		}
+		if .Pressed in object.state.current {
+			if .Active in object.state.current {
+				value.x = math.atan2(delta_to_mouse.y, delta_to_mouse.x) / math.RAD_PER_DEG
+				if value.x < 0 {
+					value.x += 360
+				}
+			} else {
+				point := global_state.mouse_pos
+				point_a, point_b, point_c := make_a_triangle(center, angle, inner_radius)
+				if !triangle_contains_point(point_a, point_b, point_c, point) {
+					point = nearest_point_in_triangle(point_a, point_b, point_c, point)
+				}
+				u, v, w := triangle_barycentric(point_a, point_b, point_c, point)
+				value.z = clamp(1 - v, 0, 1)
+				value.y = clamp(u / value.z, 0, 1)
+			}
+			object.state.current += {.Changed}
+		} else {
+			object.state.current -= {.Active}
+		}
+
+		if object_is_visible(object) {
+			vgo.stroke_circle(
+				center,
+				outer_radius,
+				width = (outer_radius - inner_radius),
+				paint = vgo.make_wheel_gradient(center),
+			)
+
+			point_a, point_b, point_c := make_a_triangle(
+				center,
+				value.x * math.RAD_PER_DEG,
+				inner_radius,
+			)
+
+			vgo.fill_polygon(
+				{point_a, point_b, point_c},
+				paint = vgo.make_tri_gradient(
+					{point_a, point_b, point_c},
+					{vgo.color_from_hsva({value.x, 1, 1, 1}), vgo.BLACK, vgo.WHITE},
+				),
+			)
+
+			point := linalg.lerp(
+				linalg.lerp(point_c, point_a, clamp(value.y, 0, 1)),
+				point_b,
+				clamp(1 - value.z, 0, 1),
+			)
+			r: f32 = 9 if (object.state.current >= {.Pressed} && .Active not_in object.state.current) else 7
+			vgo.fill_circle(point, r + 1, paint = vgo.BLACK if value.z > 0.5 else vgo.WHITE)
+			vgo.fill_circle(
+				point,
+				r,
+				paint = vgo.color_from_hsva({value.x, value.y, value.z, 1}),
+			)
+		}
+	}
+	return
 }
 
 TRIANGLE_STEP :: math.TAU / 3
@@ -321,85 +355,4 @@ make_a_triangle :: proc(center: [2]f32, angle: f32, radius: f32) -> (a, b, c: [2
 	b = center + {math.cos(angle - TRIANGLE_STEP), math.sin(angle - TRIANGLE_STEP)} * radius
 	c = center + {math.cos(angle + TRIANGLE_STEP), math.sin(angle + TRIANGLE_STEP)} * radius
 	return
-}
-
-display_hsv_wheel :: proc(self: ^HSV_Wheel) {
-
-	handle_object_click(self, sticky = true)
-
-	size := min(box_width(self.box), box_height(self.box))
-	outer_radius := size / 2
-	inner_radius := outer_radius * 0.75
-
-	center := box_center(self.box)
-	angle := self.value.x * math.RAD_PER_DEG
-
-	delta_to_mouse := global_state.mouse_pos - center
-	distance_to_mouse := linalg.length(delta_to_mouse)
-
-	if distance_to_mouse <= outer_radius {
-		hover_object(self)
-	}
-
-	if .Pressed in new_state(self.state) {
-		if distance_to_mouse > inner_radius {
-			self.state.current += {.Active}
-		}
-	}
-	if .Pressed in self.state.current {
-		if .Active in self.state.current {
-			self.value.x = math.atan2(delta_to_mouse.y, delta_to_mouse.x) / math.RAD_PER_DEG
-			if self.value.x < 0 {
-				self.value.x += 360
-			}
-		} else {
-			point := global_state.mouse_pos
-			point_a, point_b, point_c := make_a_triangle(center, angle, inner_radius)
-			if !triangle_contains_point(point_a, point_b, point_c, point) {
-				point = nearest_point_in_triangle(point_a, point_b, point_c, point)
-			}
-			u, v, w := triangle_barycentric(point_a, point_b, point_c, point)
-			self.value.z = clamp(1 - v, 0, 1)
-			self.value.y = clamp(u / self.value.z, 0, 1)
-		}
-		self.state.current += {.Changed}
-	} else {
-		self.state.current -= {.Active}
-	}
-
-	if object_is_visible(self) {
-		vgo.stroke_circle(
-			center,
-			outer_radius,
-			width = (outer_radius - inner_radius),
-			paint = vgo.make_wheel_gradient(center),
-		)
-
-		point_a, point_b, point_c := make_a_triangle(
-			center,
-			self.value.x * math.RAD_PER_DEG,
-			inner_radius,
-		)
-
-		vgo.fill_polygon(
-			{point_a, point_b, point_c},
-			paint = vgo.make_tri_gradient(
-				{point_a, point_b, point_c},
-				{vgo.color_from_hsva({self.value.x, 1, 1, 1}), vgo.BLACK, vgo.WHITE},
-			),
-		)
-
-		point := linalg.lerp(
-			linalg.lerp(point_c, point_a, clamp(self.value.y, 0, 1)),
-			point_b,
-			clamp(1 - self.value.z, 0, 1),
-		)
-		r: f32 = 9 if (self.state.current >= {.Pressed} && .Active not_in self.state.current) else 7
-		vgo.fill_circle(point, r + 1, paint = vgo.BLACK if self.value.z > 0.5 else vgo.WHITE)
-		vgo.fill_circle(
-			point,
-			r,
-			paint = vgo.color_from_hsva({self.value.x, self.value.y, self.value.z, 1}),
-		)
-	}
 }

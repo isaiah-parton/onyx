@@ -8,24 +8,24 @@ set_cursor :: proc(type: Mouse_Cursor) {
 	global_state.cursor_type = type
 }
 
-button_behavior :: proc(self: ^Button) {
-	self.press_time = animate(
-	self.press_time,
-		0.2,
-		self.active,
-	)
-	self.hover_time = animate(
-	self.hover_time,
-		0.1,
-		.Hovered in self.state.current,
-	)
-	if .Hovered in self.state.current {
-		set_cursor(.Pointing_Hand)
-	}
-	if point_in_box(global_state.mouse_pos, self.box) {
-		hover_object(self)
-	}
-}
+// button_behavior :: proc(self: ^Button) {
+// 	self.press_time = animate(
+// 		self.press_time,
+// 		0.2,
+// 		self.active,
+// 	)
+// 	self.hover_time = animate(
+// 		self.hover_time,
+// 		0.1,
+// 		.Hovered in self.state.current,
+// 	)
+// 	if .Hovered in self.state.current {
+// 		set_cursor(.Pointing_Hand)
+// 	}
+// 	if point_in_box(global_state.mouse_pos, self.box) {
+// 		hover_object(self)
+// 	}
+// }
 
 horizontal_slider_behavior :: proc(object: ^Object) {
 	// object.hover_time = animate(object.hover_time, 0.1, .Hovered in object.state)

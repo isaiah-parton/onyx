@@ -4,19 +4,6 @@ import "../vgo"
 import "core:fmt"
 import "core:math/linalg"
 
-Label :: struct {
-	using object: ^Object,
-	text_layout:  vgo.Text_Layout,
-	align: [2]f32,
-	color: vgo.Color,
-}
-
-display_label :: proc(self: ^Label) {
-	if object_is_visible(self) {
-		vgo.fill_text_layout(self.text_layout, linalg.lerp(self.box.lo, self.box.hi, self.align), paint = self.color, align = self.align)
-	}
-}
-
 label :: proc(
 	text: string,
 	font_size := global_state.style.default_text_size,
@@ -25,23 +12,18 @@ label :: proc(
 	color: vgo.Color = colors().content,
 ) {
 	object := make_transient_object()
-	if object.variant == nil {
-		object.variant = Label{
-			object = object,
-		}
-	}
-	self := &object.variant.(Label)
-	self.placement = next_user_placement()
-	self.text_layout = vgo.make_text_layout(
+	text_layout := vgo.make_text_layout(
 		text,
 		font_size,
 		font,
 	)
-	self.color = color
-	self.align = align
-	self.metrics.desired_size = self.text_layout.size
+	object.size = text_layout.size
+	object.box = next_box(object.size)
 	if begin_object(object) {
-		defer end_object()
+		if object_is_visible(object) {
+			vgo.fill_text_layout(text_layout, linalg.lerp(object.box.lo, object.box.hi, align), paint = color, align = align)
+		}
+		end_object()
 	}
 }
 

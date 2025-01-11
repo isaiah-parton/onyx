@@ -62,7 +62,7 @@ clear_stack :: proc(stack: ^Stack($T, $N)) {
 
 Wave_Effect :: struct {
 	point: [2]f32,
-	time: f32,
+	time:  f32,
 }
 
 @(private)
@@ -75,15 +75,12 @@ Global_State :: struct {
 	debug:                    Debug_State,
 	view:                     [2]f32,
 	desired_fps:              int,
-	// Graphis
 	instance:                 wgpu.Instance,
 	device:                   wgpu.Device,
 	adapter:                  wgpu.Adapter,
 	surface:                  wgpu.Surface,
 	surface_config:           wgpu.SurfaceConfiguration,
-	// Disable frame rate limit
 	disable_frame_skip:       bool,
-	// Timings
 	delta_time:               f32,
 	last_frame_time:          time.Time,
 	start_time:               time.Time,
@@ -91,10 +88,8 @@ Global_State :: struct {
 	frame_duration:           time.Duration,
 	frames_so_far:            int,
 	frames_this_second:       int,
-	// Hashing
 	id_stack:                 Stack(Id, MAX_IDS),
-	wave_effects: [dynamic]Wave_Effect,
-	// Objects
+	wave_effects:             [dynamic]Wave_Effect,
 	transient_objects:        small_array.Small_Array(512, Object),
 	objects:                  [dynamic]^Object,
 	object_map:               map[Id]^Object,
@@ -108,20 +103,16 @@ Global_State :: struct {
 	dragged_object:           Id,
 	disable_objects:          bool,
 	drag_offset:              [2]f32,
-	// Form
 	form:                     Form,
 	form_active:              bool,
-	// Layout
 	active_container:         Id,
 	next_active_container:    Id,
-	// Panels
 	panels:                   [MAX_PANELS]Maybe(Panel),
 	panel_map:                map[Id]^Panel,
 	panel_stack:              Stack(^Panel, MAX_PANELS),
 	panel_snapping:           Panel_Snap_State,
-	placement_options_stack:  Stack(Placement_Options, 64),
-	object_options_stack: Stack(Object_Options, 64),
-	// Layers are
+	layout_stack:             Stack(Layout, MAX_LAYOUTS),
+	next_box:                 Maybe(Box),
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
 	layer_stack:              Stack(^Layer, MAX_LAYERS),
@@ -134,7 +125,6 @@ Global_State :: struct {
 	focused_layer:            Id,
 	clip_stack:               Stack(Box, 128),
 	current_object_clip:      Box,
-	// IO
 	cursor_type:              Mouse_Cursor,
 	mouse_button:             Mouse_Button,
 	last_mouse_pos:           [2]f32,
@@ -148,13 +138,9 @@ Global_State :: struct {
 	runes:                    [dynamic]rune,
 	visible:                  bool,
 	focused:                  bool,
-	// Style
 	style:                    Style,
-	// Source boxes of user images on the texture atlas
 	user_images:              [100]Maybe(Box),
-	// Scratch text editor
 	text_editor:              tedit.Editor,
-	// Drawing
 	frames_to_draw:           int,
 	frames:                   int,
 	drawn_frames:             int,
@@ -438,9 +424,6 @@ new_frame :: proc() {
 	global_state.layer_stack.height = 0
 	global_state.object_stack.height = 0
 	global_state.panel_stack.height = 0
-	global_state.object_options_stack.height = 0
-
-	push_options({rounded_corners = global_state.style.rounding})
 
 	reset_panel_snap_state(&global_state.panel_snapping)
 
@@ -540,25 +523,13 @@ shutdown :: proc() {
 	vgo.shutdown()
 }
 
-push_options :: proc(options: Object_Options) {
-	push_stack(&global_state.object_options_stack, options)
-}
 
-push_current_options :: proc() {
-	push_options(current_options()^)
-}
 
-current_options :: proc() -> ^Object_Options {
-	return &global_state.object_options_stack.items[global_state.object_options_stack.height - 1]
-}
 
-pop_options :: proc() {
-	pop_stack(&global_state.object_options_stack)
-}
+
 
 set_rounded_corners :: proc(corners: Corners) {
-	options := current_options()
-	options.rounded_corners = rounded_corners(corners)
+	current_layout().?.next_corner_radius = rounded_corners(corners)
 }
 
 user_focus_just_changed :: proc() -> bool {

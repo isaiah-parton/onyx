@@ -42,31 +42,14 @@ Button_Accent :: enum {
 }
 
 Button :: struct {
-	using object: ^Object,
-	text:         string,
-	is_loading:   bool,
-	active:       bool,
-	press_time:   f32,
-	hover_time:   f32,
-	accent:       Button_Accent,
-	font_index:   Maybe(int),
-	font_size:    Maybe(f32),
-	waves:        Wave_Effects,
-	text_layout:  vgo.Text_Layout,
+	waves:      Wave_Effects,
+	hover_time: f32,
+	press_time: f32,
 }
 
 Button_Result :: struct {
 	clicked: bool,
 	hovered: bool,
-}
-
-add_object_variant :: proc(v: $T) -> ^Object where intrinsics.type_is_subtype_of(T, ^Object) {
-	object := make_transient_object()
-	if object.variant == nil {
-		object.variant = T {
-			object = object,
-		}
-	}
 }
 
 button :: proc(
@@ -75,86 +58,106 @@ button :: proc(
 	font_size: f32 = global_state.style.default_text_size,
 	active: bool = false,
 	is_loading: bool = false,
+	text_align: f32 = 0,
 	loc := #caller_location,
 ) -> (
 	result: Button_Result,
 ) {
 	object := persistent_object(hash(loc))
+
 	if object.variant == nil {
-		object.variant = Button {
-			object = object,
-		}
+		object.variant = Button{}
 	}
-	self := &object.variant.(Button)
-	self.text_layout = vgo.make_text_layout(text, font_size, global_state.style.default_font)
-	self.active = active
-	self.is_loading = is_loading
-	self.accent = accent
-	self.placement = next_user_placement()
-	set_object_desired_size(object, self.text_layout.size + global_state.style.text_padding * 2)
+
+	extras := &object.variant.(Button)
+
+	text_layout := vgo.make_text_layout(text, font_size, global_state.style.default_font)
+
+	object.size = text_layout.size + global_state.style.text_padding * 2
+
 	if begin_object(object) {
-		result.clicked = object_was_clicked(self, with = .Left)
-		result.hovered = .Hovered in self.state.previous
+
+		object.box = next_box(object.size)
+
+		handle_object_click(object)
+
+		extras.press_time = animate(extras.press_time, 0.2, active)
+
+		extras.hover_time = animate(extras.hover_time, 0.1, .Hovered in object.state.current)
+
+		if .Hovered in object.state.current {
+			set_cursor(.Pointing_Hand)
+		}
+
+		if point_in_box(global_state.mouse_pos, object.box) {
+			hover_object(object)
+		}
+
+		if object_is_visible(object) {
+			base_color := global_state.style.color.substance
+			base_color = vgo.blend(base_color, global_state.style.color.accent, extras.press_time)
+			text_color: vgo.Color
+			rounding := current_layout().?.next_corner_radius
+
+			switch accent {
+			case .Normal:
+				vgo.fill_box(
+					object.box,
+					rounding,
+					vgo.mix(0.2 * extras.hover_time, base_color, vgo.WHITE),
+				)
+				text_color = colors().accent_content
+			case .Outlined:
+				color := vgo.mix(0.2 * extras.hover_time, base_color, vgo.WHITE)
+				vgo.stroke_box(object.box, 1, rounding, paint = color)
+				vgo.fill_box(
+					object.box,
+					rounding,
+					paint = vgo.fade(color, math.lerp(f32(0.25), f32(0.5), extras.press_time)),
+				)
+				text_color = colors().accent_content
+			case .Subtle:
+				vgo.fill_box(
+					object.box,
+					rounding,
+					paint = vgo.fade(base_color, (extras.hover_time + f32(i32(active))) * 0.25),
+				)
+				text_color = colors().accent_content
+			}
+
+			vgo.push_scissor(vgo.make_box(object.box, rounding))
+			draw_and_update_wave_effects(object, &extras.waves)
+			vgo.pop_scissor()
+
+			if is_loading {
+				vgo.spinner(
+					box_center(object.box),
+					box_height(object.box) * 0.3,
+					global_state.style.color.accent_content,
+				)
+			} else {
+				vgo.fill_text_layout(
+					text_layout,
+					{
+						math.lerp(
+							object.box.lo.x + global_state.style.text_padding.x,
+							object.box.hi.y - global_state.style.text_padding.x,
+							text_align,
+						),
+						box_center_y(object.box),
+					},
+					align = {text_align, 0.5},
+					paint = text_color,
+				)
+			}
+		}
+
+		result.clicked = object_was_clicked(object, with = .Left)
+		result.hovered = .Hovered in object.state.previous
+
 		end_object()
 	}
 	return
-}
-
-display_button :: proc(self: ^Button) {
-	handle_object_click(self)
-	button_behavior(self)
-	if object_is_visible(self) {
-		base_color := global_state.style.color.substance
-		base_color = vgo.blend(base_color, global_state.style.color.accent, self.press_time)
-		text_color: vgo.Color
-
-		switch self.accent {
-		case .Normal:
-			vgo.fill_box(
-				self.box,
-				self.options.rounded_corners,
-				vgo.mix(0.2 * self.hover_time, base_color, vgo.WHITE),
-			)
-			text_color = colors().accent_content
-		case .Outlined:
-			color := vgo.mix(0.2 * self.hover_time, base_color, vgo.WHITE)
-			vgo.stroke_box(self.box, 1, self.options.rounded_corners, paint = color)
-			vgo.fill_box(
-				self.box,
-				self.options.rounded_corners,
-				paint = vgo.fade(color, math.lerp(f32(0.25), f32(0.5), self.press_time)),
-			)
-			text_color = colors().accent_content
-		case .Subtle:
-			vgo.fill_box(
-				self.box,
-				self.options.rounded_corners,
-				paint = vgo.fade(base_color, (self.hover_time + f32(i32(self.active))) * 0.25),
-			)
-			text_color = colors().accent_content
-		}
-
-		vgo.push_scissor(vgo.make_box(self.box, self.options.rounded_corners))
-		draw_and_update_wave_effects(self, &self.waves)
-		vgo.pop_scissor()
-
-		if !self.is_loading {
-			vgo.fill_text_layout(
-				self.text_layout,
-				box_center(self.box),
-				align = 0.5,
-				paint = text_color,
-			)
-		}
-
-		if self.is_loading {
-			vgo.spinner(
-				box_center(self.box),
-				box_height(self.box) * 0.3,
-				global_state.style.color.accent_content,
-			)
-		}
-	}
 }
 
 /*
@@ -168,7 +171,7 @@ Image_Button :: struct {
 init_image_button :: proc(using info: ^Image_Button, loc := #caller_location) -> bool {
 	if info == nil do return false
 	if id == 0 do id = hash(loc)
-	self = get_object(id)
+	object = get_object(id)
 	return true
 }
 

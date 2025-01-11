@@ -11,12 +11,12 @@ Panel :: struct {
 	move_offset:      [2]f32,
 	last_min_size:    [2]f32,
 	min_size:         [2]f32,
-	moving:           bool,
-	resizing:         bool,
 	resize_offset:    [2]f32,
-	is_snapped:       bool,
 	non_snapped_size: [2]f32,
 	fade:             f32,
+	moving:           bool,
+	resizing:         bool,
+	is_snapped:       bool,
 	can_move:         bool,
 	can_resize:       bool,
 	dead:             bool,
@@ -60,7 +60,6 @@ begin_panel :: proc(
 
 	push_stack(&global_state.panel_stack, panel)
 
-	push_current_placement_options()
 
 	if panel.moving == true {
 		mouse_point := mouse_point()
@@ -102,7 +101,7 @@ begin_panel :: proc(
 
 	{
 		object := persistent_object(hash("panelbg"))
-		object.placement = panel.box
+		object.box = panel.box
 		if begin_object(object) {
 			defer end_object()
 
@@ -148,19 +147,21 @@ begin_panel :: proc(
 
 	vgo.push_scissor(vgo.make_box(panel.box, rounding))
 	push_clip(panel.box)
-	begin_layout(placement = Box(panel.box), padding = padding) or_return
+
+	set_next_box(panel.box)
+	begin_layout(side = .Top) or_return
 	return true
 }
 
 end_panel :: proc() {
-	layout_object := current_object().?
+	layout := current_layout().?
 	end_layout()
 	pop_clip()
 
 	panel := current_panel()
 	if panel.can_resize {
 		object := persistent_object(hash("resize"))
-		object.placement = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
+		object.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
 		if begin_object(object) {
 			defer end_object()
 
@@ -199,12 +200,11 @@ end_panel :: proc() {
 		panel.layer.index < global_state.last_highest_layer_index,
 	)
 
-	panel.min_size += layout_object.metrics.desired_size
+	panel.min_size += layout.content_size
 
 	pop_id()
 	vgo.pop_scissor()
 	end_layer()
-	pop_placement_options()
 	pop_stack(&global_state.panel_stack)
 }
 

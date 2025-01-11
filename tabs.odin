@@ -41,8 +41,7 @@ tab :: proc(text: string, state: bool, loc := #caller_location) -> (clicked: boo
 		global_state.style.default_text_size,
 		global_state.style.default_font,
 	)
-	self.object.metrics.desired_size = self.text_layout.size + {20, 10}
-	self.object.placement = next_user_placement()
+	object.size = self.text_layout.size + {20, 10}
 	if begin_object(self.object) {
 		clicked = .Clicked in self.object.state.previous
 		end_object()

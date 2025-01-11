@@ -69,7 +69,7 @@ main :: proc() {
 	enum_value: runtime.Odin_OS_Type
 	date: Maybe(onyx.Date)
 	until: Maybe(onyx.Date)
-	boolean_value: [onyx.Boolean_Type]bool
+	boolean_value: bool
 
 	for {
 		if glfw.WindowShouldClose(window) {
@@ -95,159 +95,100 @@ main :: proc() {
 				)
 			}
 
+			set_next_box(view_box())
+
 			if begin_layer(kind = .Background) {
-				defer end_layer()
 
-				if begin_layout(placement = view_box(), padding = 50) {
-					push_current_placement_options()
-					defer pop_placement_options()
-					defer end_layout()
+				if begin_layout(side = .Top) {
 
-					foreground()
-					set_width(Fixed(400))
-					set_height(Fixed(200))
-					if begin_container() {
-						defer end_container()
+					shrink(100)
 
-						set_align(.Near)
+					vgo.fill_box(current_layout().?.box, 10, colors().fg)
 
-						// if begin_column_layout() {
-							// defer end_layout()
+					shrink(25)
 
-							for i in 0..<100 {
-								push_id(i)
-									button(fmt.tprintf("Button #%i", i + 1))
-								pop_id()
-							}
+					set_height(0)
 
-						// }
-						// fmt.println(last_object().?.metrics)
+					label("Row layout")
+
+					space(10)
+
+					set_width(remaining_space().x)
+					set_height(24)
+					if begin_layout(side = .Left) {
+
+						set_width(0)
+						button("Add")
+						space(10)
+						set_rounded_corners({.Top_Left, .Bottom_Left})
+						button("Select All", accent = .Outlined)
+						space(1)
+						set_rounded_corners({})
+						button("Invert Selection", accent = .Outlined)
+						space(1)
+						set_rounded_corners({.Top_Right, .Bottom_Right})
+						button("Filter", accent = .Outlined)
+
+						end_layout()
 					}
-				}
-			}
 
-			if begin_panel(axis = .X) {
-				defer end_panel()
+					space(20)
+					set_width(200)
 
-				if begin_column_layout(size = Fixed(36)) {
-					push_current_options()
+					set_rounded_corners({.Top_Left, .Top_Right})
+					button("Appearance")
 
-					defer pop_options()
-					defer end_layout()
+					space(1)
 
-					set_width(Percent(100))
-					set_height(Percent_Of_Width(100))
-					set_margin(bottom = 1)
 					set_rounded_corners({})
-					button("\uf578", accent = .Subtle, font_size = 20)
-					button("\uf044", accent = .Subtle, font_size = 20)
-					if button("\uedca", accent = .Subtle, font_size = 20).clicked {
-						thread.run(proc() {
-							when ODIN_OS == .Linux {
-								libc.system("xdg-open \"https://github.com/isaiah-parton/onyx\"")
-							} else when ODIN_OS == .Windows {
-								libc.system("explorer \"https://github.com/isaiah-parton/onyx\"")
-							}
-						})
+					button("Notifications")
+
+					space(1)
+
+					button("API")
+
+					space(1)
+
+					set_rounded_corners({.Bottom_Left, .Bottom_Right})
+					button("Engine")
+
+					space(20)
+
+					for type, i in Boolean_Type {
+						push_id(i)
+							boolean(&boolean_value, fmt.tprint(type), type = type)
+							space(10)
+						pop_id()
 					}
+
+					space(10)
+
+					set_width(200)
+					set_rounded_corners(ALL_CORNERS)
+					raw_input(&input_value)
+
+					space(10)
+
+					set_height(100)
+					if begin_container() {
+
+						set_height(30)
+						set_rounded_corners({})
+						for i in 1..=12 {
+							push_id(i)
+								button(fmt.tprintf("Button #%i", i))
+							pop_id()
+						}
+
+						end_container()
+					}
+
+					end_layout()
 				}
 
-
-				if begin_column_layout(size = At_Least(0), padding = 20) {
-					defer end_layout()
-
-					if begin_column_layout(size = Fixed(30)) {
-						defer end_layout()
-
-						current_placement_options().align = .Center
-						label("Content alignment")
-					}
-					if begin_row_layout(size = Fixed(30)) {
-						defer end_layout()
-
-						set_align(.Far)
-						for member, i in Align {
-							push_id(i)
-							if tab(fmt.tprint(member), justify == member) {
-								justify = member
-							}
-							pop_id()
-						}
-					}
-
-					if begin_row_layout(
-						justify = justify,
-						size = Percent_Of_Remaining(25),
-						padding = 10,
-					) {
-						push_current_options()
-
-						defer pop_options()
-						defer end_layout()
-
-						set_margin(left = 1)
-						BUTTON_LABELS := [?]string{"Improvise", "Adapt", "Overcome", "Bubblegum"}
-						for i in 0 ..< len(buttons_active) {
-							if i == 0 {
-								set_rounded_corners({.Bottom_Left, .Top_Left})
-							} else if i == len(buttons_active) - 1 {
-								set_rounded_corners({.Bottom_Right, .Top_Right})
-							} else {
-								set_rounded_corners({})
-							}
-							push_id(i)
-							if button(BUTTON_LABELS[i], active = buttons_active[i]).clicked {
-								buttons_active[i] = !buttons_active[i]
-							}
-							pop_id()
-						}
-					}
-					if begin_row_layout(
-						justify = justify,
-						size = Percent_Of_Remaining(33.33),
-						padding = 10,
-					) {
-						push_current_options()
-
-						defer pop_options()
-						defer end_layout()
-
-						set_margin(left = 1)
-						set_rounded_corners({.Bottom_Left, .Top_Left})
-						raw_input(
-							&input_value,
-							placeholder = "sample text",
-						)
-						set_rounded_corners({.Bottom_Right, .Top_Right})
-						button("search")
-					}
-					if begin_row_layout(
-						justify = justify,
-						size = Percent_Of_Remaining(50),
-						padding = 10,
-					) {
-						defer end_layout()
-
-						set_margin_all(4)
-						for type, i in Boolean_Type {
-							push_id(i)
-							boolean(&boolean_value[type], fmt.tprint(type), type = type)
-							pop_id()
-						}
-					}
-					if begin_row_layout(
-						justify = justify,
-						size = Percent_Of_Remaining(100),
-						padding = 10,
-					) {
-						defer end_layout()
-
-						set_margin_all(4)
-						slider(&slider_values, 0, 10)
-						color_picker(&color)
-					}
-				}
+				end_layer()
 			}
+
 			present()
 		}
 	}

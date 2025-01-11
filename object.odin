@@ -57,56 +57,30 @@ Object_Variant :: union {
 	Button,
 	Boolean,
 	Container,
-	Label,
 	Tab,
 	Tabs,
 	Input,
-	HSV_Wheel,
-	Slider,
-	Alpha_Slider,
 	Color_Picker,
 	Date_Picker,
 	Calendar,
 	Calendar_Day,
-	Scrollbar,
-}
-
-Child_Placement_Options :: struct {
-	size:   [2]Layout_Size,
-	align:  Align,
-	margin: [4]f32,
-}
-
-Future_Object_Placement :: union {
-	Child_Placement_Options,
-	Future_Box_Placement,
 }
 
 Object :: struct {
 	id:              Id,
 	call_index:      int,
 	frames:          int,
+	size:            [2]f32,
 	layer:           ^Layer,
 	local_position:  [2]f32,
 	box:             Box,
-	placement:       Object_Placement,
-	clip_children:   bool,
 	dead:            bool,
-	// TODO: Expand to `defers_child_placement` and `size_is_unknown`
-	is_deferred:     bool,
-	//
 	disabled:        bool,
 	isolated:        bool,
 	will_be_hovered: bool,
-	options:         Object_Options,
 	flags:           Object_Flags,
 	state:           Object_State,
 	input:           Object_Input,
-	metrics:         Object_Metrics,
-	content:         Object_Content,
-	parent:          Maybe(^Object),
-	children:        [dynamic]^Object,
-	on_display:      proc(_: ^Object),
 	variant:         Object_Variant,
 }
 
@@ -190,10 +164,6 @@ update_object_references :: proc() {
 	}
 }
 
-set_object_desired_size :: proc(object: ^Object, size: [2]f32) {
-	object.metrics.desired_size = size
-}
-
 current_object :: proc() -> Maybe(^Object) {
 	if global_state.object_stack.height > 0 {
 		return global_state.object_stack.items[global_state.object_stack.height - 1]
@@ -222,13 +192,7 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 }
 
 destroy_object :: proc(object: ^Object) {
-	delete(object.children)
-	#partial switch &v in object.variant {
-	case Input:
-		destroy_input(&v)
-	case:
-		break
-	}
+
 }
 
 make_object_children_array :: proc() -> [dynamic]^Object {
@@ -237,8 +201,6 @@ make_object_children_array :: proc() -> [dynamic]^Object {
 
 persistent_object :: proc(id: Id) -> ^Object {
 	object := global_state.object_map[id] or_else new_persistent_object(id)
-	object.children = make_object_children_array()
-	object.metrics.desired_size = 0
 	return object
 }
 
@@ -251,9 +213,8 @@ make_transient_object :: proc() -> ^Object {
 		) or_else nil
 	assert(object != nil)
 	object.id = Id(global_state.transient_objects.len)
-	object.children = make_object_children_array()
 	object.state.output_mask = OBJECT_STATE_ALL
-	object.metrics.desired_size = 0
+
 	return object
 }
 
@@ -337,42 +298,9 @@ begin_object :: proc(object: ^Object) -> bool {
 	}
 	object.frames = global_state.frames
 
-	object.options = current_options()^
 	object.layer = current_layer().? or_return
-	object.parent = current_object()
 	update_object_state(object)
 	if global_state.disable_objects do object.disabled = true
-
-	if parent, ok := object.parent.?; ok {
-		if object_defers_children(parent) {
-			object.is_deferred = true
-		}
-	}
-
-	switch v in object.placement {
-	case nil:
-		object.is_deferred = true
-	case Future_Box_Placement:
-		object.is_deferred = true
-	case vgo.Box:
-		object.is_deferred = false
-	case Child_Placement_Options:
-		if v.size[0] == nil || v.size[1] == nil {
-			object.is_deferred = true
-		}
-	}
-
-	object.content.size = 0
-	object.content.desired_size = 0
-	if !object.is_deferred {
-		place_object(object) or_return
-	}
-
-	if object.clip_children {
-		vgo.save_scissor()
-		vgo.push_scissor(vgo.make_box(object.box))
-		push_clip(object.box)
-	}
 
 	push_stack(&global_state.object_stack, object) or_return
 
@@ -381,85 +309,16 @@ begin_object :: proc(object: ^Object) -> bool {
 
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
-
 		transfer_object_state_to_its_layer(object)
-
-		if object.clip_children {
-			pop_clip()
-			vgo.restore_scissor()
-		}
-
-		object.metrics.desired_size = linalg.max(
-			object.metrics.desired_size,
-			space_required_by_object_content(object.content),
-		)
-
-		if parent, ok := object.parent.?; ok {
-			update_object_parent_metrics(object)
+		if parent, ok := current_object().?; ok {
 			parent.state.current += object_state_output(object.state) & parent.state.input_mask
 		}
-
 		pop_stack(&global_state.object_stack)
-
-		if !maybe_defer_object(object) {
-			display_object(object)
-		}
 	}
 }
 
 transfer_object_state_to_its_layer :: proc(object: ^Object) {
 	object.layer.state += object.state.current
-}
-
-space_required_by_object_content :: proc(content: Object_Content) -> [2]f32 {
-	return content.desired_size + content.padding.xy + content.padding.zw
-}
-
-space_used_by_object_content :: proc(content: Object_Content) -> [2]f32 {
-	return content.size + content.padding.xy + content.padding.zw
-}
-
-occupied_space_of_object :: proc(object: ^Object) -> [2]f32 {
-	size := object.metrics.size
-	if placement, ok := object.placement.(Child_Placement_Options); ok {
-		size += placement.margin.xy + placement.margin.zw
-	}
-	return size
-}
-
-space_required_by_object :: proc(object: ^Object) -> [2]f32 {
-	size := object.metrics.desired_size
-	if placement, ok := object.placement.(Child_Placement_Options); ok {
-		size += placement.margin.xy + placement.margin.zw
-	}
-	return size
-}
-
-total_space_for_object_content :: proc(object: ^Object) -> [2]f32 {
-	return object.metrics.size - object.content.padding.xy - object.content.padding.zw
-}
-
-available_space_for_object_content :: proc(object: ^Object) -> [2]f32 {
-	return object.content.space_left
-}
-
-update_object_parent_metrics :: proc(object: ^Object) {
-	// TODO: Put this somewhere else
-	if object.isolated do return
-
-	effective_desired_size := space_required_by_object(object)
-	effective_size := occupied_space_of_object(object)
-
-	parent := object.parent.?
-
-	i := int(axis_of_side(parent.content.side))
-	j := 1 - i
-
-	parent.content.desired_size[i] += effective_desired_size[i]
-	parent.content.desired_size[j] = max(parent.content.desired_size[j], effective_desired_size[j])
-
-	parent.content.size[i] += effective_size[i]
-	parent.content.size[j] = max(parent.content.size[j], effective_size[j])
 }
 
 object_state_output :: proc(state: Object_State) -> Object_Status_Set {
@@ -497,14 +356,10 @@ foreground :: proc(loc := #caller_location) {
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
-		if object.on_display == nil {
-			object.on_display = proc(object: ^Object) {
-				draw_shadow(object.box)
-				vgo.fill_box(object.box, paint = global_state.style.color.fg)
-				if point_in_box(global_state.mouse_pos, object.box) {
-					hover_object(object)
-				}
-			}
+		draw_shadow(object.box)
+		vgo.fill_box(object.box, paint = global_state.style.color.fg)
+		if point_in_box(global_state.mouse_pos, object.box) {
+			hover_object(object)
 		}
 	}
 }
@@ -514,13 +369,9 @@ background :: proc(loc := #caller_location) {
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
-		if object.on_display == nil {
-			object.on_display = proc(object: ^Object) {
-				vgo.fill_box(object.box, paint = global_state.style.color.field)
-				if point_in_box(global_state.mouse_pos, object.box) {
-					hover_object(object)
-				}
-			}
+		vgo.fill_box(object.box, paint = global_state.style.color.field)
+		if point_in_box(global_state.mouse_pos, object.box) {
+			hover_object(object)
 		}
 	}
 }
@@ -545,108 +396,14 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 	draw_frames(1)
 }
 
+divider :: proc() {
+	layout := current_layout().?
+	vgo.fill_box(cut_box(&layout.box, layout.next_cut_side, 1), paint = colors().substance)
+}
+
 object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {
 	if (object == nil) || (other == nil) do return true
 	return (object.call_index > other.call_index) && (object.layer.index >= other.layer.index)
-}
-
-display_object :: proc(object: ^Object) {
-	if object.is_deferred {
-		place_object(object)
-	}
-
-	if _, ok := object.placement.(Child_Placement_Options); ok {
-		if parent, ok := object.parent.?; ok {
-			object.local_position += parent.local_position
-		}
-		object.box = Box{object.local_position, object.local_position + object.metrics.size}
-	}
-
-	when DEBUG {
-		if point_in_box(mouse_point(), object.box) {
-			if object_is_in_front_of(object, top_hovered_object(global_state.debug) or_else nil) {
-				global_state.debug.top_object_index = len(global_state.debug.hovered_objects)
-			}
-			append(&global_state.debug.hovered_objects, object)
-		}
-	}
-
-	if object.options.background_color != {} {
-		vgo.fill_box(object.box, object.options.rounded_corners, object.options.background_color)
-	}
-
-	switch &v in object.variant {
-	case Date_Picker:
-		display_date_picker(&v)
-	case Container:
-		display_container(&v)
-	case Input:
-		display_input(&v)
-	case Button:
-		display_button(&v)
-	case Boolean:
-		display_boolean(&v)
-	case Label:
-		display_label(&v)
-	case Slider:
-		display_slider(&v)
-	case HSV_Wheel:
-		display_hsv_wheel(&v)
-	case Alpha_Slider:
-		display_alpha_slider(&v)
-	case Color_Picker:
-		display_color_picker(&v)
-	case Tabs:
-		display_tabs(&v)
-	case Tab:
-		display_tab(&v)
-	case Scrollbar:
-		display_scrollbar(&v)
-	case Calendar_Day:
-		display_calendar_day(&v)
-	case Calendar:
-		break
-	case nil:
-		if object.on_display != nil {
-			object.on_display(object)
-		}
-	}
-
-	if object.clip_children {
-		vgo.save_scissor()
-		vgo.push_scissor(vgo.make_box(object.box))
-		push_clip(object.box)
-	}
-
-	if content_justify_causes_deference(object.content.justify) {
-		object.content.space_left = box_size(object.box) - object.content.padding.xy - object.content.padding.zw
-		for child_object in object.children {
-			if placement, ok := child_object.placement.(Child_Placement_Options); ok {
-				child_object.metrics.size, child_object.metrics.desired_size =
-					solve_child_object_size(
-						placement.size,
-						child_object.metrics.desired_size,
-						available_space_for_object_content(object),
-						total_space_for_object_content(object),
-					)
-				object.content.space_left -= occupied_space_of_object(child_object)
-			}
-		}
-		object.content.space_left *= axis_normal(axis_of_side(object.content.side))
-	}
-
-	for child_object in object.children {
-		display_object(child_object)
-	}
-
-	if object.clip_children {
-		pop_clip()
-		vgo.restore_scissor()
-	}
-
-	if parent, ok := object.parent.?; ok {
-		parent.state.current += object_state_output(object.state) & parent.state.input_mask
-	}
 }
 
 content_justify_causes_deference :: proc(justify: Align) -> bool {
