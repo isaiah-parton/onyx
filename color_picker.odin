@@ -141,8 +141,8 @@ display_color_picker :: proc(object: ^Color_Picker) {
 		draw_checkerboard_pattern(
 			object.box,
 			box_height(object.box) / 2,
-			vgo.blend(global_state.style.color.checker_bg[0], object.value, vgo.WHITE),
-			vgo.blend(global_state.style.color.checker_bg[1], object.value, vgo.WHITE),
+			vgo.blend(global_state.style.color.checkers[0], object.value, vgo.WHITE),
+			vgo.blend(global_state.style.color.checkers[1], object.value, vgo.WHITE),
 		)
 		vgo.fill_text(
 			fmt.tprintf("#%6x", vgo.hex_from_color(object.value)),
@@ -227,8 +227,8 @@ alpha_slider :: proc(
 			draw_checkerboard_pattern(
 				box,
 				(box.hi[j] - box.lo[j]) / 2,
-				global_state.style.color.checker_bg[0],
-				global_state.style.color.checker_bg[1],
+				global_state.style.color.checkers[0],
+				global_state.style.color.checkers[1],
 			)
 			color.a = 255
 			time := clamp(value^, 0, 1)

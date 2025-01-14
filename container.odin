@@ -51,6 +51,7 @@ begin_container :: proc(
 			min_zoom = 0.1,
 			max_zoom = 1.0,
 			zoom = 1,
+			target_zoom = 1,
 		}
 		object.state.input_mask = OBJECT_STATE_ALL
 	}
@@ -90,13 +91,19 @@ begin_container :: proc(
 		}
 	}
 
+	if point_in_box(mouse_point(), self.box) {
+		hover_object(object)
+	}
+	handle_object_click(self, true)
 
-	vgo.fill_box(self.box, paint = colors().field)
-
-	vgo.push_scissor(vgo.make_box(self.box))
+	radius := current_options().radius
+	vgo.fill_box(self.box, radius, paint = colors().field)
+	vgo.push_scissor(vgo.make_box(self.box, radius))
 	push_clip(self.box)
 
-	set_next_box(self.box)
+	layout_box := self.box
+	layout_box.hi -= self.scroll_time.yx * (global_state.style.scrollbar_thickness + 4)
+	set_next_box(move_box(layout_box, -self.scroll))
 	begin_layout(side = .Top, does_grow = true) or_return
 
 	return true
@@ -106,16 +113,12 @@ end_container :: proc() {
 	layout := current_layout().?
 	object := current_object().?
 	extras := &object.variant.(Container)
-	extras.space_needed = linalg.max(layout.content_size, extras.space_needed)
+	extras.space = linalg.max(layout.content_size, extras.space_needed)
 
 	end_layout()
 
 	pop_clip()
 	vgo.pop_scissor()
-
-	if point_in_box(mouse_point(), object.box) {
-		hover_object(object, transparent = true)
-	}
 
 	if .Hovered in object.state.current {
 		if extras.enable_zoom &&
@@ -154,7 +157,7 @@ end_container :: proc() {
 	target_content_size := extras.space * extras.target_zoom
 	view_size := box_size(object.box)
 
-	extras.target_scroll = linalg.clamp(extras.target_scroll, 0, target_content_size - view_size)
+	extras.target_scroll = linalg.max(linalg.min(extras.target_scroll, target_content_size - view_size), 0)
 	delta_scroll := (extras.target_scroll - extras.scroll) * global_state.delta_time * 15
 	extras.scroll += delta_scroll
 
@@ -182,12 +185,11 @@ end_container :: proc() {
 			box.hi.y -= extras.scroll_time.x * global_state.style.shape.scrollbar_thickness
 		}
 		if scrollbar(
-			// make_visible = (self.is_active || abs(delta_scroll.y) > 0.01),
 			vertical = true,
 			box = box,
 			pos = &extras.scroll.y,
 			travel = content_size.y - box_height(object.box),
-			handle_size = box_height(box) * box_height(object.box) / content_size.y,
+			handle_size = max(box_height(box) * box_height(object.box) / content_size.y, global_state.style.scrollbar_thickness * 2),
 		) {
 			extras.target_scroll.y = extras.scroll.y
 		}
@@ -202,11 +204,10 @@ end_container :: proc() {
 			box.hi.x -= extras.scroll_time.y * global_state.style.shape.scrollbar_thickness
 		}
 		if scrollbar(
-			// make_visible = (extras.is_active || abs(delta_scroll.x) > 0.01),
 			box = box,
 			pos = &extras.scroll.x,
 			travel = content_size.x - box_width(object.box),
-			handle_size = box_width(box) * box_width(object.box) / content_size.x,
+			handle_size = max(box_width(box) * box_width(object.box) / content_size.x, global_state.style.scrollbar_thickness * 2),
 		) {
 			extras.target_scroll.x = extras.scroll.x
 		}

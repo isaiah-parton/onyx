@@ -19,6 +19,8 @@ scrollbar :: proc(
 	if begin_object(object) {
 		defer end_object()
 
+		object.box = box
+
 		handle_object_click(object, sticky = true)
 
 		if point_in_box(mouse_point(), object.box) {
@@ -43,7 +45,7 @@ scrollbar :: proc(
 			vgo.fill_box(
 				handle_box,
 				rounding,
-				paint = colors().substance if .Hovered in object.state.current else colors().fg,
+				paint = colors().substance if .Hovered in object.state.current else colors().foreground,
 			)
 		}
 

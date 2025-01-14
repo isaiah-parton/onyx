@@ -112,6 +112,7 @@ Global_State :: struct {
 	panel_stack:              Stack(^Panel, MAX_PANELS),
 	panel_snapping:           Panel_Snap_State,
 	layout_stack:             Stack(Layout, MAX_LAYOUTS),
+	options_stack:             Stack(Options, MAX_LAYOUTS),
 	next_box:                 Maybe(Box),
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
@@ -529,7 +530,7 @@ shutdown :: proc() {
 
 
 set_rounded_corners :: proc(corners: Corners) {
-	current_layout().?.next_corner_radius = rounded_corners(corners)
+	current_options().radius = rounded_corners(corners)
 }
 
 user_focus_just_changed :: proc() -> bool {

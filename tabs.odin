@@ -77,8 +77,8 @@ display_tab :: proc(self: ^Tab) {
 			},
 			paint = vgo.mix(
 				math.lerp(f32(0.25), f32(1.0), max(self.hover_time * 0.5, self.active_time)),
-				global_state.style.color.bg[0],
-				global_state.style.color.fg
+				global_state.style.color.background,
+				global_state.style.color.foreground
 			),
 		)
 		vgo.fill_text_layout(
@@ -221,7 +221,7 @@ display_option_slider :: proc(self: ^Option_Slider) {
 				shrink_box(option_box, 1),
 				option_rounding,
 				paint = vgo.fade(
-					global_state.style.color.fg,
+					global_state.style.color.foreground,
 					f32(int(hovered || self.index == i)),
 				),
 			)

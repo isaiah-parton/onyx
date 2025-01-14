@@ -4,8 +4,8 @@ import "../vgo"
 
 Color_Scheme :: struct {
 	substance, hover, accent, accent_content, content, shadow: vgo.Color,
-	field, fg: vgo.Color,
-	bg, checker_bg: [2]vgo.Color,
+	field, foreground, background: vgo.Color,
+	checkers: [2]vgo.Color,
 }
 
 Style :: struct {
@@ -79,19 +79,16 @@ light_color_scheme :: proc() -> Color_Scheme {
 
 dark_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
-		bg = {
-			{26, 29, 36, 255},
-			{37, 41, 52, 255},
-		},
-		checker_bg = {
+		checkers = {
 			{210, 210, 210, 255},
 			{160, 160, 160, 255},
 		},
-		fg = {50, 53, 68, 255},
-		field = {33, 35, 48, 255},
-		substance = {105, 109, 125, 255},
-		accent = {59, 130, 246, 255},
-		accent_content = {0, 0, 0, 255},
+		background = {10, 10, 10, 255},
+		foreground = {45, 45, 45, 255},
+		field = {10, 10, 10, 255},
+		substance = {100, 100, 100, 255},
+		accent = {216, 176, 66 , 255},
+		accent_content = {10, 10, 10, 255},
 		content = {255, 255, 255, 255},
 		shadow = {0, 0, 0, 25},
 		hover = {120, 125, 140, 95}

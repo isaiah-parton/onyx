@@ -82,7 +82,7 @@ begin_tooltip :: proc(
 		}
 	}
 
-	bg_color := global_state.style.color.bg[0]
+	bg_color := global_state.style.color.background
 
 	draw_shadow(box)
 	begin_layer(kind = .Topmost, loc = loc)

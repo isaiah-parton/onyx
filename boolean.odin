@@ -178,7 +178,7 @@ boolean :: proc(
 				vgo.fill_circle(
 					lever_center,
 					inner_radius,
-					vgo.mix(state_time, colors().fg, colors().field),
+					vgo.mix(state_time, colors().foreground, colors().field),
 				)
 			}
 

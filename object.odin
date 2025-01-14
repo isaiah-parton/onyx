@@ -266,7 +266,10 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 }
 
 object_is_visible :: proc(object: ^Object) -> bool {
-	return global_state.visible && get_clip(current_clip(), object.box) != .Full
+	return(
+		global_state.visible &&
+			get_clip(current_clip(), object.box) != .Full &&
+			(object.box.lo.x < object.box.hi.x || object.box.lo.y < object.box.hi.y))
 }
 
 update_object_state :: proc(object: ^Object) {
@@ -310,10 +313,10 @@ begin_object :: proc(object: ^Object) -> bool {
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
 		transfer_object_state_to_its_layer(object)
+		pop_stack(&global_state.object_stack)
 		if parent, ok := current_object().?; ok {
 			parent.state.current += object_state_output(object.state) & parent.state.input_mask
 		}
-		pop_stack(&global_state.object_stack)
 	}
 }
 
@@ -333,18 +336,16 @@ lost_state :: proc(state: Object_State) -> Object_Status_Set {
 	return state.previous - state.current
 }
 
-hover_object :: proc(object: ^Object, transparent: bool = false) {
+hover_object :: proc(object: ^Object) {
 	when DEBUG {
 		if global_state.debug.enabled do return
 	}
 	if object.disabled do return
 	if object.layer.index < global_state.hovered_layer_index do return
 	if !point_in_box(global_state.mouse_pos, current_clip()) do return
-	if !transparent {
-		global_state.next_hovered_object = object.id
-		global_state.next_hovered_layer = object.layer.id
-		global_state.hovered_layer_index = object.layer.index
-	}
+	global_state.next_hovered_object = object.id
+	global_state.next_hovered_layer = object.layer.id
+	global_state.hovered_layer_index = object.layer.index
 }
 
 focus_object :: proc(object: ^Object) {
@@ -357,7 +358,7 @@ foreground :: proc(loc := #caller_location) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
 		draw_shadow(object.box)
-		vgo.fill_box(object.box, paint = global_state.style.color.fg)
+		vgo.fill_box(object.box, paint = global_state.style.color.foreground)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
 		}
@@ -398,7 +399,7 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 
 divider :: proc() {
 	layout := current_layout().?
-	vgo.fill_box(cut_box(&layout.box, layout.next_cut_side, 1), paint = colors().substance)
+	vgo.fill_box(cut_box(&layout.box, current_options().side, 1), paint = colors().substance)
 }
 
 object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {

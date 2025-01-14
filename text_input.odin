@@ -66,7 +66,7 @@ raw_input :: proc(
 		colors := colors()
 		state := object.state
 
-		rounding := current_layout().?.next_corner_radius
+		rounding := current_options().radius
 
 		if is_visible {
 			vgo.fill_box(box, radius = rounding, paint = colors.field)

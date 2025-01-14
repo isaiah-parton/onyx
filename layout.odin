@@ -6,15 +6,35 @@ import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 
+Options :: struct {
+	padding: [4]f32,
+	side: Side,
+	size: [2]f32,
+	align: Align,
+	radius: [4]f32,
+}
+
+current_options :: proc() -> ^Options {
+	return &global_state.options_stack.items[max(global_state.options_stack.height - 1, 0)]
+}
+
+push_current_options :: proc() {
+	push_stack(&global_state.options_stack, current_options()^)
+}
+
+push_options :: proc(options: Options = {}) {
+	push_stack(&global_state.options_stack, options)
+}
+
+pop_options :: proc() {
+	pop_stack(&global_state.options_stack)
+}
+
 Layout :: struct {
 	box:                Box,
 	bounds:             Box,
 	does_grow:          bool,
-	next_cut_side:      Side,
-	next_cut_size:      [2]f32,
-	next_box_align:     Align,
 	content_size:       [2]f32,
-	next_corner_radius: [4]f32,
 }
 
 Axis :: enum {
@@ -56,31 +76,62 @@ next_user_defined_box :: proc() -> (box: Box, ok: bool) {
 }
 
 next_box_from_current_layout :: proc(size: [2]f32, fixed: bool) -> Box {
-	return next_box_from_layout(current_layout().?, size, fixed)
+	return next_box_from_layout(current_layout().?, current_options(), size, fixed)
 }
 
-next_box_from_layout :: proc(layout: ^Layout, size: [2]f32, fixed: bool) -> Box {
-	i := int(layout.next_cut_side) / 2
+solve_layout_content_size :: proc(total: [2]f32, side: Side, size: [2]f32) -> [2]f32 {
+	if int(side) > 1 {
+		return {max(total.x, size.x), total.y + size.y}
+	}
+	return {total.x + size.x, max(total.y, size.y)}
+}
+
+grow_side_of_box :: proc(box: Box, side: Side, size: [2]f32) -> Box {
+	box := box
+	switch side {
+	case .Top:
+		box.hi.y = max(box.hi.y, box.lo.y + size.y)
+	case .Bottom:
+		box.lo.y = min(box.lo.y, box.hi.y - size.y)
+	case .Left:
+		box.hi.x = max(box.hi.x, box.lo.x + size.x)
+	case .Right:
+		box.lo.x = min(box.lo.x, box.hi.x - size.x)
+	}
+	return box
+}
+
+next_box_from_layout :: proc(layout: ^Layout, options: ^Options, size: [2]f32, fixed: bool) -> Box {
+	i := int(options.side) / 2
 	j := 1 - i
 
 	size := size
 	if !fixed {
-		size = linalg.max(size, layout.next_cut_size)
+		size = linalg.max(size, options.size)
 	}
+
+	if !layout.does_grow {
+		size = linalg.min(size, box_size(layout.box))
+	}
+
+	layout.content_size = solve_layout_content_size(
+		layout.content_size,
+		options.side,
+		size,
+	)
 
 	if layout.does_grow {
-		switch layout.next_cut_side {
-		case .Top:
-			layout.box.hi.y = max(layout.box.hi.y, layout.box.lo.y + size[i])
-		case .Bottom:
-		case .Left:
-		case .Right:
-		}
+		layout.box = grow_side_of_box(layout.box, options.side, size)
 	}
 
-	box := cut_box(&layout.box, layout.next_cut_side, size[i])
+	box := cut_box(&layout.box, options.side, size[i])
 
-	switch layout.next_box_align {
+	box.lo += options.padding.xy
+	box.hi -= options.padding.zw
+
+	size -= (options.padding.xy + options.padding.zw)
+
+	switch options.align {
 	case .Near:
 		box.hi[j] = box.lo[j] + size[j]
 	case .Center:
@@ -98,58 +149,13 @@ axis_normal :: proc(axis: Axis) -> [2]f32 {
 	return {f32(1 - i32(axis)), f32(i32(axis))}
 }
 
-shift_near_edge_of_box :: proc(box: Box, axis: Axis, amount: f32) -> Box {
-	box := box
-	box.lo[int(axis)] += amount
-	return box
-}
-
-apply_near_object_margin :: proc(position: [2]f32, axis: Axis, margin: [4]f32) -> [2]f32 {
-	position := position
-	position[int(axis)] += margin[int(axis)]
-	return position
-}
-
-apply_far_object_margin :: proc(position: [2]f32, axis: Axis, margin: [4]f32) -> [2]f32 {
-	position := position
-	position[int(axis)] += margin[2 + int(axis)]
-	return position
-}
-
-apply_perpendicular_object_margin :: proc(box: Box, axis: Axis, margin: [4]f32) -> Box {
-	box := box
-	i := 1 - int(axis)
-	box.lo[i] += margin[i]
-	box.hi[i] -= margin[2 + i]
-	return box
-}
-
-apply_object_alignment :: proc(box: Box, axis: Axis, align: Align, size: [2]f32) -> Box {
-	box := box
-	i := 1 - int(axis)
-
-	switch align {
-	case .Near:
-		box.hi[i] = box.lo[i] + size[i]
-	case .Far:
-		box.lo[i] = box.hi[i] - size[i]
-	case .Center:
-		box.lo[i] = (box.lo[i] + box.hi[i]) / 2 - size[i] / 2
-		box.hi[i] = box.lo[i] + size[i]
-	}
-
-	return box
-}
-
 inverse_axis :: proc(axis: Axis) -> Axis {
 	return Axis(1 - int(axis))
 }
 
 current_axis :: proc() -> Axis {
-	if layout, ok := current_layout().?; ok {
-		return axis_of_side(layout.next_cut_side)
-	}
-	return .Y
+	return axis_of_side(current_options().side)
+
 }
 
 begin_layout :: proc(side: Side, size: [2]f32 = {}, does_grow: bool = false) -> bool {
@@ -158,18 +164,16 @@ begin_layout :: proc(side: Side, size: [2]f32 = {}, does_grow: bool = false) -> 
 		does_grow          = does_grow,
 		box                = box,
 		bounds             = box,
-		next_cut_side      = side,
-		next_corner_radius = global_state.style.rounding,
 	}
-	if parent_layout, ok := current_layout().?; ok {
-		layout.next_cut_size = parent_layout.next_cut_size
-		layout.next_corner_radius = parent_layout.next_corner_radius
-	}
+	options := current_options()^
+	options.side = side
+	push_options(options)
 	return push_layout(layout)
 }
 
 end_layout :: proc() {
 	pop_layout()
+	pop_options()
 }
 
 axis_of_side :: proc(side: Side) -> Axis {
@@ -191,11 +195,11 @@ shrink :: proc(amount: [4]f32) {
 
 space :: proc(amount: f32) {
 	layout := current_layout().?
-	cut_box(&layout.box, layout.next_cut_side, amount)
+	cut_box(&layout.box, current_options().side, amount)
 }
 
 set_size :: proc(size: f32) {
-	current_layout().?.next_cut_size = size
+	current_options().size = size
 }
 
 set_next_box :: proc(box: Box) {
@@ -203,11 +207,15 @@ set_next_box :: proc(box: Box) {
 }
 
 set_width :: proc(width: f32) {
-	current_layout().?.next_cut_size.x = width
+	current_options().size.x = width
 }
 
 set_height :: proc(height: f32) {
-	current_layout().?.next_cut_size.y = height
+	current_options().size.y = height
+}
+
+set_padding :: proc(padding: [4]f32) {
+	current_options().padding = padding
 }
 
 remaining_space :: proc() -> [2]f32 {

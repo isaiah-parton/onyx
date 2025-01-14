@@ -141,7 +141,7 @@ begin_panel :: proc(
 				}
 			}
 
-			vgo.fill_box(panel.box, rounding, paint = global_state.style.color.fg)
+			vgo.fill_box(panel.box, rounding, paint = global_state.style.color.foreground)
 		}
 	}
 

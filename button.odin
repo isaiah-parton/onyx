@@ -97,7 +97,7 @@ button :: proc(
 			base_color := global_state.style.color.substance
 			base_color = vgo.blend(base_color, global_state.style.color.accent, extras.press_time)
 			text_color: vgo.Color
-			rounding := current_layout().?.next_corner_radius
+			rounding := current_options().radius
 
 			switch accent {
 			case .Normal:
@@ -115,14 +115,14 @@ button :: proc(
 					rounding,
 					paint = vgo.fade(color, math.lerp(f32(0.25), f32(0.5), extras.press_time)),
 				)
-				text_color = colors().accent_content
+				text_color = colors().content
 			case .Subtle:
 				vgo.fill_box(
 					object.box,
 					rounding,
 					paint = vgo.fade(base_color, (extras.hover_time + f32(i32(active))) * 0.25),
 				)
-				text_color = colors().accent_content
+				text_color = colors().content
 			}
 
 			vgo.push_scissor(vgo.make_box(object.box, rounding))

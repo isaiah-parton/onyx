@@ -25,6 +25,14 @@ import "vendor:wgpu"
 
 FILLER_TEXT :: `1. In the beginning was the Word, and the Word was with God, and the Word was God.  2. The same was in the beginning with God.  3. All things were made by him; and without him was not any thing made that was made.  4. In him was life; and the life was the light of men.  5. And the light shineth in darkness; and the darkness comprehended it not.`
 
+Section :: enum {
+	Appearance,
+	Editor,
+	Network,
+	API,
+	Engine,
+}
+
 main :: proc() {
 
 	when ODIN_DEBUG {
@@ -70,6 +78,7 @@ main :: proc() {
 	date: Maybe(onyx.Date)
 	until: Maybe(onyx.Date)
 	boolean_value: bool
+	current_section: Section
 
 	for {
 		if glfw.WindowShouldClose(window) {
@@ -86,12 +95,7 @@ main :: proc() {
 				box := view_box()
 				vgo.fill_box(
 					box,
-					paint = vgo.make_linear_gradient(
-						box.lo,
-						box.hi,
-						colors().bg[0],
-						colors().bg[1],
-					),
+					paint = colors().background,
 				)
 			}
 
@@ -99,89 +103,110 @@ main :: proc() {
 
 			if begin_layer(kind = .Background) {
 
-				if begin_layout(side = .Top) {
+				if begin_layout(side = .Left) {
 
 					shrink(100)
 
-					vgo.fill_box(current_layout().?.box, 10, colors().fg)
+					vgo.fill_box(current_layout().?.box, 10, colors().foreground)
 
 					shrink(25)
 
-					set_height(0)
+					set_height(remaining_space().y)
+					set_width(200)
+					if begin_layout(.Top) {
+						set_height(26)
 
-					label("Row layout")
-
-					space(10)
-
-					set_width(remaining_space().x)
-					set_height(24)
-					if begin_layout(side = .Left) {
-
-						set_width(0)
-						button("Add")
-						space(10)
-						set_rounded_corners({.Top_Left, .Bottom_Left})
-						button("Select All", accent = .Outlined)
-						space(1)
-						set_rounded_corners({})
-						button("Invert Selection", accent = .Outlined)
-						space(1)
-						set_rounded_corners({.Top_Right, .Bottom_Right})
-						button("Filter", accent = .Outlined)
+						for section, i in Section {
+							if i == 0 {
+								set_rounded_corners({.Top_Left, .Top_Right})
+							} else if i == len(Section) - 1 {
+								set_rounded_corners({.Bottom_Left, .Bottom_Right})
+							} else {
+								set_rounded_corners({})
+							}
+							push_id(i)
+								if button(fmt.tprint(section), active = current_section == section).clicked {
+									current_section = section
+								}
+								space(1)
+							pop_id()
+						}
 
 						end_layout()
 					}
 
 					space(20)
-					set_width(200)
 
-					set_rounded_corners({.Top_Left, .Top_Right})
-					button("Appearance")
+					set_width(remaining_space().x)
+					if begin_layout(.Top) {
+						vgo.fill_box(current_layout().?.box, 10, paint = vgo.fade(colors().background, 0.5))
 
-					space(1)
+						shrink(20)
+						set_height(0)
+						label("Row layout")
 
-					set_rounded_corners({})
-					button("Notifications")
+						space(10)
 
-					space(1)
+						set_width(remaining_space().x)
+						set_height(24)
+						if begin_layout(side = .Left) {
 
-					button("API")
-
-					space(1)
-
-					set_rounded_corners({.Bottom_Left, .Bottom_Right})
-					button("Engine")
-
-					space(20)
-
-					for type, i in Boolean_Type {
-						push_id(i)
-							boolean(&boolean_value, fmt.tprint(type), type = type)
+							set_width(0)
+							set_rounded_corners(ALL_CORNERS)
+							button("Add")
 							space(10)
-						pop_id()
-					}
+							set_rounded_corners({.Top_Left, .Bottom_Left})
+							button("Select All", accent = .Outlined)
+							space(1)
+							set_rounded_corners({})
+							button("Invert Selection", accent = .Outlined)
+							space(1)
+							set_rounded_corners({.Top_Right, .Bottom_Right})
+							button("Filter", accent = .Outlined)
 
-					space(10)
+							end_layout()
+						}
 
-					set_width(200)
-					set_rounded_corners(ALL_CORNERS)
-					raw_input(&input_value)
+						space(20)
 
-					space(10)
-
-					set_height(100)
-					if begin_container() {
-
-						set_height(30)
-						set_rounded_corners({})
-						for i in 1..=12 {
+						for type, i in Boolean_Type {
 							push_id(i)
-								button(fmt.tprintf("Button #%i", i))
+								boolean(&boolean_value, fmt.tprint(type), type = type)
+								space(10)
 							pop_id()
 						}
 
-						end_container()
+						space(10)
+
+						set_rounded_corners(ALL_CORNERS)
+						set_width(0)
+						set_height(0)
+						label("Text Input")
+						space(4)
+						set_width(200)
+						set_height(30)
+						raw_input(&input_value, placeholder = "placeholder")
+
+						space(20)
+
+						set_height(remaining_space().y)
+						if begin_container() {
+							set_width(remaining_space().x)
+							set_height(34)
+							set_rounded_corners(ALL_CORNERS)
+							set_padding(4)
+							for i in 1..=100 {
+								push_id(i)
+									button(fmt.tprintf("Button #%i", i), accent = .Subtle)
+								pop_id()
+							}
+
+							end_container()
+						}
+
+						end_layout()
 					}
+
 
 					end_layout()
 				}
