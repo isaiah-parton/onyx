@@ -64,6 +64,7 @@ Object_Variant :: union {
 	Date_Picker,
 	Calendar,
 	Calendar_Day,
+	Graph,
 }
 
 Object :: struct {
@@ -82,6 +83,7 @@ Object :: struct {
 	state:           Object_State,
 	input:           Object_Input,
 	variant:         Object_Variant,
+	hover_time: f32,
 }
 
 Object_State :: struct {

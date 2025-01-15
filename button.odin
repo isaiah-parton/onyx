@@ -28,7 +28,7 @@ draw_and_update_wave_effects :: proc(object: ^Object, array: ^Wave_Effects) {
 		}
 	}
 
-	draw_frames((array.len & 1) + 1)
+	draw_frames(min(array.len, 1) * 2)
 
 	for array.len > 0 && array.data[0].time > 1 {
 		small_array.pop_front(array)

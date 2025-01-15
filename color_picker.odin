@@ -77,113 +77,98 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: vg
 }
 
 Color_Picker :: struct {
-	using object: ^Object,
-	hsva:         [4]f32,
-	value:        vgo.Color,
 	open_time:    f32,
+	hsva: [4]f32,
 }
 
-color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_location) -> Id {
-	id := hash(loc)
-	object := persistent_object(id)
+color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_location) {
+	if value == nil {
+		return
+	}
+	object := persistent_object(hash(loc))
 	object.size = global_state.style.visual_size * {0.5, 1}
 	if object.variant == nil {
-		object.variant = Color_Picker {
-			object = object,
-		}
+		object.variant = Color_Picker{}
 	}
+	object.box = next_box(object.size)
+	object.state.input_mask = OBJECT_STATE_ALL
 	if begin_object(object) {
 		defer end_object()
 
-		object := &object.variant.(Color_Picker)
-		if .Changed in object.state.previous {
-			value^ = object.value
-			draw_frames(1)
+		extras := &object.variant.(Color_Picker)
+		handle_object_click(object)
+
+		if .Open in object.state.current {
+		extras.open_time = animate(extras.open_time, 0.3, true)
 		} else {
-			object.value = value^
+			extras.open_time = 0
 		}
-	}
-	return id
-}
+		if .Pressed in new_state(object.state) {
+			object.state.current += {.Open}
+		}
+		if .Hovered in object.state.current {
+			global_state.cursor_type = .Pointing_Hand
+		}
+		if point_in_box(global_state.mouse_pos, object.box) {
+			hover_object(object)
+		}
 
-display_color_picker :: proc(object: ^Color_Picker) {
-
-	handle_object_click(object)
-
-	if .Open in object.state.current {
-	object.open_time = animate(object.open_time, 0.3, true)
-	} else {
-		object.open_time = 0
-	}
-	if .Pressed in new_state(object.state) {
-		object.state.current += {.Open}
-	}
-	if .Hovered in object.state.current {
-		global_state.cursor_type = .Pointing_Hand
-	}
-	if point_in_box(global_state.mouse_pos, object.box) {
-		hover_object(object)
-	}
-
-	if object_is_visible(object) {
-		shadow_opacity := object.open_time
-		if shadow_opacity > 0 {
-			vgo.box_shadow(
+		if object_is_visible(object) {
+			checker_box := object.box
+			vgo.push_scissor(vgo.make_box(checker_box, current_options().radius))
+			draw_checkerboard_pattern(
 				object.box,
-				global_state.style.rounding,
-				6,
-				vgo.fade(global_state.style.color.shadow, shadow_opacity),
+				box_height(object.box) / 2,
+				vgo.blend(global_state.style.color.checkers[0], value^, vgo.WHITE),
+				vgo.blend(global_state.style.color.checkers[1], value^, vgo.WHITE),
 			)
+			vgo.fill_text(
+				fmt.tprintf("#%6x", vgo.hex_from_color(value^)),
+				global_state.style.default_text_size,
+				box_center(object.box),
+				font = global_state.style.monospace_font,
+				align = 0.5,
+				paint = vgo.BLACK if max(vgo.luminance_of(value^), 1 - f32(value.a) / 255) > 0.45 else vgo.WHITE,
+			)
+			vgo.pop_scissor()
 		}
 
-		checker_box := shrink_box(object.box, 1)
-		vgo.push_scissor(vgo.make_box(checker_box, box_height(checker_box) / 2))
-		draw_checkerboard_pattern(
-			object.box,
-			box_height(object.box) / 2,
-			vgo.blend(global_state.style.color.checkers[0], object.value, vgo.WHITE),
-			vgo.blend(global_state.style.color.checkers[1], object.value, vgo.WHITE),
-		)
-		vgo.fill_text(
-			fmt.tprintf("#%6x", vgo.hex_from_color(object.value)),
-			global_state.style.default_text_size,
-			box_center(object.box),
-			align = 0.5,
-			paint = vgo.BLACK if max(vgo.luminance_of(object.value), 1 - f32(object.value.a) / 255) > 0.45 else vgo.WHITE,
-		)
-		vgo.pop_scissor()
-	}
-
-	PADDING :: 10
-	if .Open in object.state.current {
-		if .Open not_in object.state.previous {
-		object.hsva = vgo.hsva_from_color(object.value)
-		}
-
-		push_id(object.id)
-		defer pop_id()
-
-		if begin_layer(options = {.Attached}, kind = .Background) {
-			defer end_layer()
-
-			if begin_layout(side = .Left) {
-				defer end_layout()
-
-				shrink(10)
-
-				foreground()
-				alpha_slider(&object.hsva.w)
-				space(10)
-				hsv_wheel((^[3]f32)(&object.hsva))
+		PADDING :: 10
+		if .Open in object.state.current {
+			if .Open not_in object.state.previous {
+				extras.hsva = vgo.hsva_from_color(value^)
 			}
 
-			if object_was_just_changed(last_object().?) {
-				object.value = vgo.color_from_hsva(object.hsva)
-				object.state.current += {.Changed}
-			}
+			push_id(object.id)
+			defer pop_id()
 
-			if .Focused not_in current_layer().?.state && .Focused not_in object.state.current {
-				object.state.current -= {.Open}
+			if begin_layer(options = {.Attached}, kind = .Background) {
+				defer end_layer()
+
+				baseline := box_center_y(object.box)
+				set_next_box({{object.box.hi.x, baseline - 100}, {object.box.hi.x + 200, baseline + 100}})
+				if begin_layout(side = .Left) {
+					defer end_layout()
+
+					vgo.fill_box(current_layout().?.box, global_state.style.rounding, paint = colors().field)
+					vgo.stroke_box(current_layout().?.box, 1, global_state.style.rounding, paint = colors().substance)
+
+					shrink(10)
+
+					foreground()
+					alpha_slider(&extras.hsva.w)
+					space(10)
+					hsv_wheel((^[3]f32)(&extras.hsva))
+				}
+
+				if object_was_just_changed(object) {
+					value^ = vgo.color_from_hsva(extras.hsva)
+					object.state.current += {.Changed}
+				}
+
+				if .Focused not_in current_layer().?.state && .Focused not_in object.state.current {
+					object.state.current -= {.Open}
+				}
 			}
 		}
 	}
@@ -204,6 +189,7 @@ alpha_slider :: proc(
 	if axis == .Y {
 		object.size.xy = object.size.yx
 	}
+	object.box = next_box(object.size)
 	if begin_object(object) {
 		defer end_object()
 
@@ -264,6 +250,7 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 	}
 	object := persistent_object(hash(loc))
 	object.size = 200
+	object.box = next_box(object.size)
 	if begin_object(object) {
 		defer end_object()
 

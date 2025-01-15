@@ -198,7 +198,7 @@ space :: proc(amount: f32) {
 	cut_box(&layout.box, current_options().side, amount)
 }
 
-set_size :: proc(size: f32) {
+set_size :: proc(size: [2]f32) {
 	current_options().size = size
 }
 
@@ -221,4 +221,8 @@ set_padding :: proc(padding: [4]f32) {
 remaining_space :: proc() -> [2]f32 {
 	layout := current_layout().?
 	return layout.box.hi - layout.box.lo
+}
+
+set_side :: proc(side: Side) {
+	current_options().side = side
 }

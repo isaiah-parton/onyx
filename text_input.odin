@@ -48,7 +48,11 @@ raw_input :: proc(
 	}
 	object := persistent_object(hash(loc))
 	if object.variant == nil {
-		object.variant = Input{}
+		input := Input{
+			builder = strings.builder_make()
+		}
+		strings.write_string(&input.builder, content^)
+		object.variant = input
 	}
 
 	extras := &object.variant.(Input)
