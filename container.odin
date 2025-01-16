@@ -65,6 +65,11 @@ begin_container :: proc(
 
 	self.box = next_box({})
 
+	if point_in_box(mouse_point(), self.box) {
+		hover_object(object)
+	}
+	handle_object_click(self, true)
+
 	self.space = space.? or_else linalg.max(box_size(self.box), self.space_needed)
 	self.space_needed = 0
 
@@ -76,29 +81,7 @@ begin_container :: proc(
 		self.target_zoom = 1
 	}
 
-	if self.is_active {
-		if .Pressed in self.state.current {
-			if .Pressed not_in self.state.previous {
-				self.pan_offset = global_state.mouse_pos - (self.box.lo - self.scroll)
-			}
-			new_scroll := linalg.clamp(
-				self.box.lo - (global_state.mouse_pos - self.pan_offset),
-				0,
-				layout_size - box_size(self.box),
-			)
-			self.scroll = new_scroll
-			self.target_scroll = new_scroll
-		}
-	}
-
-	if point_in_box(mouse_point(), self.box) {
-		hover_object(object)
-	}
-	handle_object_click(self, true)
-
-	radius := current_options().radius
-	vgo.fill_box(self.box, radius, paint = colors().field)
-	vgo.push_scissor(vgo.make_box(self.box, radius))
+	vgo.push_scissor(vgo.make_box(self.box, current_options().radius))
 	push_clip(self.box)
 
 	layout_box := self.box
@@ -113,7 +96,7 @@ end_container :: proc() {
 	layout := current_layout().?
 	object := current_object().?
 	extras := &object.variant.(Container)
-	extras.space = linalg.max(layout.content_size, extras.space_needed)
+	extras.space_needed = linalg.max(layout.content_size, extras.space_needed)
 
 	end_layout()
 
@@ -153,8 +136,8 @@ end_container :: proc() {
 		extras.zoom += delta_zoom * 15 * global_state.delta_time
 	}
 
-	content_size := extras.space * extras.zoom
-	target_content_size := extras.space * extras.target_zoom
+	content_size := extras.space_needed * extras.zoom
+	target_content_size := extras.space_needed * extras.target_zoom
 	view_size := box_size(object.box)
 
 	extras.target_scroll = linalg.max(linalg.min(extras.target_scroll, target_content_size - view_size), 0)

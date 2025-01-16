@@ -240,17 +240,8 @@ point_aligned_in_box :: proc(box: Box, align_h: Alignment, align_v: Alignment) -
 	return point
 }
 
-shrink_box_single :: proc(a: Box, amount: f32) -> Box {
+shrink_box :: proc(a: Box, amount: [2]f32) -> Box {
 	return {a.lo + amount, a.hi - amount}
-}
-
-shrink_box_double :: proc(a: Box, amount: [2]f32) -> Box {
-	return {a.lo + amount, a.hi - amount}
-}
-
-shrink_box :: proc {
-	shrink_box_single,
-	shrink_box_double,
 }
 
 expand_box :: proc(a: Box, amount: f32) -> Box {

@@ -57,8 +57,6 @@ Object_Variant :: union {
 	Button,
 	Boolean,
 	Container,
-	Tab,
-	Tabs,
 	Input,
 	Color_Picker,
 	Date_Picker,
@@ -276,7 +274,7 @@ object_is_visible :: proc(object: ^Object) -> bool {
 
 update_object_state :: proc(object: ^Object) {
 	object.state.previous = object.state.current
-	object.state.current -= {.Clicked, .Focused, .Changed, .Hovered}
+	object.state.current -= {.Dragged, .Clicked, .Focused, .Changed, .Hovered}
 
 	if global_state.focused_object == object.id {
 		object.state.current += {.Focused}
@@ -339,9 +337,6 @@ lost_state :: proc(state: Object_State) -> Object_Status_Set {
 }
 
 hover_object :: proc(object: ^Object) {
-	when DEBUG {
-		if global_state.debug.enabled do return
-	}
 	if object.disabled do return
 	if object.layer.index < global_state.hovered_layer_index do return
 	if !point_in_box(global_state.mouse_pos, current_clip()) do return

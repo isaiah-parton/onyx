@@ -16,10 +16,10 @@ object_was_just_changed :: proc(object: ^Object) -> bool {
 }
 
 object_is_dragged :: proc(object: ^Object, beyond: f32 = 1, with: Mouse_Button = .Left) -> bool {
-	if .Pressed in object.state.current && .Dragged not_in object.state.current {
+	if .Pressed in object.state.current && .Dragged not_in object.state.previous {
 		if linalg.length(mouse_point() - object.input.click_point) > beyond {
 			object.state.current += {.Dragged}
 		}
 	}
-	return (.Dragged in object.state.current) && (object.input.click_mouse_button == with)
+	return (.Dragged in object.state.previous) && (object.input.click_mouse_button == with)
 }

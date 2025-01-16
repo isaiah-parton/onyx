@@ -26,130 +26,136 @@ import "vendor:wgpu"
 FILLER_TEXT :: `1. In the beginning was the Word, and the Word was with God, and the Word was God.  2. The same was in the beginning with God.  3. All things were made by him; and without him was not any thing made that was made.  4. In him was life; and the life was the light of men.  5. And the light shineth in darkness; and the darkness comprehended it not.`
 
 Section :: enum {
-	Basic,
-	Graphs,
+	Button,
+	Boolean,
+	Multiple_Choice,
+	Analog,
+	Text,
+	Graph,
 }
 
 State :: struct {
-	buttons_active: [4]bool,
-	justify: onyx.Align,
-	checkbox_value: bool,
-	toggle_value: bool,
-	radio_value: bool,
-	input_value: string,
-	slider_values: f64,
-	color: vgo.Color,
-	enum_value: runtime.Odin_OS_Type,
-	date: Maybe(onyx.Date),
-	until: Maybe(onyx.Date),
-	boolean_value: bool,
-	current_section: Section,
-	displayed_graph_data: [20]f32,
-	graph_data: [20]f32,
-	graph_low: f32,
-	graph_high: f32,
-	graph_color: vgo.Color,
+	button_section: Button_Section_State,
+	boolean_section: Boolean_Section_State,
+	graph_section: Graph_Section_State,
+	text_section: Text_Section_State,
+	current_section:      Section,
 }
 
-section_basic :: proc(state: ^State) {
+Boolean_Section_State :: struct {
+	types: [onyx.Boolean_Type]bool,
+}
+
+boolean_section :: proc(state: ^Boolean_Section_State) {
 	using onyx
+	for type, i in Boolean_Type {
+		push_id(i)
+		boolean(&state.types[type], fmt.tprint(type), type = type)
+		pop_id()
+		space(10)
+	}
+}
 
-	set_height(0)
-	label("Row layout")
+Button_Section_State :: struct {
 
-	space(10)
+}
 
+button_section :: proc(state: ^Button_Section_State) {
+	using onyx
 	set_width(remaining_space().x)
 	set_height(24)
 	if begin_layout(side = .Left) {
-
 		set_width(0)
-		set_rounded_corners(ALL_CORNERS)
-		button("Add")
-		space(10)
-		set_rounded_corners({.Top_Left, .Bottom_Left})
-		button("Select All", accent = .Outlined)
-		space(1)
-		set_rounded_corners({})
-		button("Invert Selection", accent = .Outlined)
-		space(1)
-		set_rounded_corners({.Top_Right, .Bottom_Right})
-		button("Filter", accent = .Outlined)
-
-		end_layout()
-	}
-
-	space(20)
-
-	for type, i in Boolean_Type {
-		push_id(i)
-			boolean(&state.boolean_value, fmt.tprint(type), type = type)
-			space(10)
-		pop_id()
-	}
-
-	space(10)
-
-	set_rounded_corners(ALL_CORNERS)
-	set_width(0)
-	set_height(0)
-	label("Text Input")
-	space(4)
-	set_width(200)
-	set_height(30)
-	raw_input(&state.input_value, placeholder = "placeholder")
-
-	space(20)
-
-	set_height(remaining_space().y)
-	if begin_container() {
-		set_width(remaining_space().x)
-		set_height(34)
-		set_rounded_corners(ALL_CORNERS)
-		set_padding(4)
-		for i in 1..=100 {
+		for accent, i in Button_Accent {
 			push_id(i)
-				button(fmt.tprintf("Button #%i", i), accent = .Subtle)
+				button(fmt.tprint(accent), accent = accent)
 			pop_id()
+			space(10)
 		}
-
-		end_container()
+		end_layout()
 	}
 }
 
-section_graphs :: proc(state: ^State) {
+Text_Section_State :: struct {
+	text: string,
+	multiline_text: string,
+}
+
+text_section :: proc(state: ^Text_Section_State) {
+	using onyx
+	set_width(200)
+	set_height(30)
+	raw_input(&state.text, placeholder = "placeholder")
+	space(10)
+	set_height(100)
+	raw_input(&state.multiline_text, placeholder = "placeholder", is_multiline = true)
+}
+
+Graph_Section_State :: struct {
+	displayed_data: [20]f32,
+	displayed_low:  f32,
+	displayed_high: f32,
+	data:           [20]f32,
+	low:            f32,
+	high:           f32,
+	color:          vgo.Color,
+	show_points:    bool,
+	style:          onyx.Line_Graph_Fill_Style,
+}
+
+graph_section :: proc(state: ^Graph_Section_State) {
 	using onyx
 	set_side(.Bottom)
 	set_height(26)
 	if begin_layout(.Left) {
+		set_align(.Center)
 		set_width(0)
 		if button("Randomize").clicked {
 			randomize_graphs(state)
 		}
 		space(10)
-		color_picker(&state.graph_color)
+		color_picker(&state.color)
+		space(10)
+		boolean(&state.show_points, "Show Points")
+		space(10)
+		option_slider(reflect.enum_field_names(Line_Graph_Fill_Style), &state.style)
 		end_layout()
 	}
 	space(10)
 	set_size(remaining_space())
-	if begin_graph(30, state.graph_low - 10, state.graph_high + 10) {
-		curve_graph(state.displayed_graph_data[:], state.graph_color, "USD $%.2f")
+	if begin_graph(30, state.displayed_low - 10, state.displayed_high + 10) {
+		curve_graph(
+			state.displayed_data[:],
+			state.color,
+			show_points = state.show_points,
+			fill_style = state.style,
+		)
 
 		end_graph()
 	}
 
-	for i in 0..<len(state.graph_data) {
-		state.displayed_graph_data[i] += (state.graph_data[i] - state.displayed_graph_data[i]) * 10 * vgo.frame_time()
+	for i in 0 ..< len(state.data) {
+		difference := (state.data[i] - state.displayed_data[i])
+		state.displayed_data[i] += difference * 10 * vgo.frame_time()
+		if abs(difference) > 0.01 {
+			draw_frames(2)
+		}
 	}
+	state.displayed_low +=
+		(state.low - state.displayed_low) * 10 * vgo.frame_time()
+	state.displayed_high +=
+		(state.high - state.displayed_high) * 10 * vgo.frame_time()
 }
 
-randomize_graphs :: proc(state: ^State) {
+randomize_graphs :: proc(state: ^Graph_Section_State) {
 	modifier: f32 = rand.float32_range(-1, 1)
-	for i in 0..<len(state.graph_data) {
+	state.low = 0
+	state.high = 0
+	for i in 0 ..< len(state.data) {
 		value := f32(i) * modifier + rand.float32_range(-2, 2)
-		state.graph_data[i] = value
-		state.graph_low = min(state.graph_low, value)
-		state.graph_high = max(state.graph_high, value)
+		state.data[i] = value
+		state.low = min(state.low, value)
+		state.high = max(state.high, value)
 	}
 }
 
@@ -189,8 +195,8 @@ main :: proc() {
 	state: State
 
 	rand.reset(rand.uint64())
-	state.graph_color = vgo.GREEN
-	randomize_graphs(&state)
+	state.graph_section.color = vgo.GREEN
+	randomize_graphs(&state.graph_section)
 
 	for {
 		if glfw.WindowShouldClose(window) {
@@ -205,10 +211,7 @@ main :: proc() {
 
 			{
 				box := view_box()
-				vgo.fill_box(
-					box,
-					paint = colors().background,
-				)
+				vgo.fill_box(box, paint = colors().background)
 			}
 
 			set_next_box(view_box())
@@ -221,7 +224,9 @@ main :: proc() {
 
 					vgo.fill_box(current_layout().?.box, 10, colors().foreground)
 
-					shrink(25)
+					shrink(30)
+
+					set_rounded_corners(ALL_CORNERS)
 
 					set_height(remaining_space().y)
 					set_width(200)
@@ -229,18 +234,13 @@ main :: proc() {
 						set_height(26)
 
 						for section, i in Section {
-							if i == 0 {
-								set_rounded_corners({.Top_Left, .Top_Right})
-							} else if i == len(Section) - 1 {
-								set_rounded_corners({.Bottom_Left, .Bottom_Right})
-							} else {
-								set_rounded_corners({})
-							}
+							set_rounded_corners(vstack_corners(i, len(Section)))
 							push_id(i)
-								if button(fmt.tprint(section), active = state.current_section == section).clicked {
-									state.current_section = section
-								}
-								space(1)
+							text, _ := strings.replace_all(fmt.tprint(section), "_", " ", allocator = context.temp_allocator)
+							if button(text, active = state.current_section == section).clicked {
+								state.current_section = section
+							}
+							space(1)
 							pop_id()
 						}
 
@@ -251,13 +251,18 @@ main :: proc() {
 
 					set_width(remaining_space().x)
 					if begin_layout(.Top) {
+						vgo.fill_box(current_layout().?.box, rounded_corners(ALL_CORNERS), paint = colors().background)
+						shrink(10)
 
-						shrink(20)
-						switch state.current_section {
-						case .Basic:
-							section_basic(&state)
-						case .Graphs:
-							section_graphs(&state)
+						#partial switch state.current_section {
+						case .Button:
+							button_section(&state.button_section)
+						case .Boolean:
+							boolean_section(&state.boolean_section)
+						case .Text:
+							text_section(&state.text_section)
+						case .Graph:
+							graph_section(&state.graph_section)
 						}
 
 						end_layout()

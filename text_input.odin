@@ -76,12 +76,18 @@ raw_input :: proc(
 			vgo.fill_box(box, radius = rounding, paint = colors.field)
 		}
 
-		text_origin := input_text_origin_from(box, is_multiline)
+		font := (global_state.style.monospace_font if (is_monospace) else global_state.style.default_font)
+		text_origin: [2]f32
+		if is_multiline {
+			text_origin = box.lo + global_state.style.text_padding
+		} else {
+			text_origin = {box.lo.x + global_state.style.text_padding.x, box_center_y(box) - font.line_height * text_size * 0.5}
+		}
+		text_origin -= extras.offset
 		submitted := !(!key_down(.Left_Control) && is_multiline) && key_pressed(.Enter)
 		editor := &extras.editor
 		content_layout: vgo.Text_Layout
 
-		font := (global_state.style.monospace_font if (is_monospace) else global_state.style.default_font)
 		vgo.set_font(font)
 
 		prefix_layout: vgo.Text_Layout
@@ -95,7 +101,7 @@ raw_input :: proc(
 				content_text,
 				text_size,
 				selection = editor.selection,
-				local_mouse = mouse_point() - (text_origin - extras.offset),
+				local_mouse = mouse_point() - text_origin,
 			)
 		}
 		//
@@ -115,7 +121,7 @@ raw_input :: proc(
 			}
 		} else {
 			if .Pressed in new_state(object.state) {
-			object.state.current += {.Active}
+				object.state.current += {.Active}
 			}
 		}
 		if key_pressed(.Escape) {
@@ -254,7 +260,7 @@ raw_input :: proc(
 				glyph_pos + {-1, -2},
 				glyph_pos + {1, content_layout.font.line_height + 2},
 			}
-			inner_box := shrink_box(object.box, 4)
+			inner_box := object.box
 			extras.offset.x += max(0, cursor_box.hi.x - inner_box.hi.x)
 			if box_width(inner_box) > box_width(cursor_box) {
 				extras.offset.x -= max(0, inner_box.lo.x - cursor_box.lo.x)
@@ -288,7 +294,6 @@ raw_input :: proc(
 					placeholder,
 					text_size,
 					text_origin,
-					align = {0, f32(i32(!is_multiline)) * 0.5},
 					paint = vgo.fade(colors.content, 0.5),
 				)
 			}
@@ -312,11 +317,10 @@ raw_input :: proc(
 							vgo.fill_box(
 								{
 									text_origin +
-									content_layout.glyphs[range[0]].offset +
-									{0, line_height * -0.5},
+									content_layout.glyphs[range[0]].offset,
 									text_origin +
 									content_layout.glyphs[range[1]].offset +
-									{0, line_height * 0.5},
+									{0, line_height},
 								},
 								paint = vgo.fade(colors.accent, 0.5),
 							)
@@ -327,16 +331,15 @@ raw_input :: proc(
 			vgo.fill_text_layout(
 				content_layout,
 				text_origin,
-				{0, f32(i32(!is_multiline)) * 0.5},
-				colors.content,
+				paint = colors.content,
 			)
 			if .Active in object.state.previous && len(content_layout.glyphs) > 0 {
 				cursor_origin :=
 					text_origin + content_layout.glyphs[content_layout.glyph_selection[0]].offset
 				vgo.fill_box(
 					{
-						{cursor_origin.x - 1, cursor_origin.y - line_height / 2},
-						{cursor_origin.x + 1, cursor_origin.y + line_height / 2},
+						{cursor_origin.x - 1, cursor_origin.y},
+						{cursor_origin.x + 1, cursor_origin.y + line_height},
 					},
 					paint = colors.accent,
 				)
@@ -374,11 +377,4 @@ raw_input :: proc(
 		end_object()
 	}
 	return
-}
-
-input_text_origin_from :: proc(box: Box, multiline: bool = false) -> [2]f32 {
-	if multiline {
-		return box.lo + global_state.style.text_padding
-	}
-	return {box.lo.x + global_state.style.text_padding.x, box_center_y(box)}
 }

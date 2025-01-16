@@ -135,7 +135,7 @@ next_box_from_layout :: proc(layout: ^Layout, options: ^Options, size: [2]f32, f
 	case .Near:
 		box.hi[j] = box.lo[j] + size[j]
 	case .Center:
-		baseline := box.hi[j] - box.lo[j]
+		baseline := (box.hi[j] + box.lo[j]) / 2
 		box.lo[j] = baseline - size[j] / 2
 		box.hi[j] = baseline + size[j] / 2
 	case .Far:
@@ -225,4 +225,8 @@ remaining_space :: proc() -> [2]f32 {
 
 set_side :: proc(side: Side) {
 	current_options().side = side
+}
+
+set_align :: proc(align: Align) {
+	current_options().align = align
 }

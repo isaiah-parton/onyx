@@ -83,9 +83,9 @@ dark_color_scheme :: proc() -> Color_Scheme {
 			{210, 210, 210, 255},
 			{160, 160, 160, 255},
 		},
-		background = {10, 10, 10, 255},
+		background = {35, 35, 35, 255},
 		foreground = {45, 45, 45, 255},
-		field = {10, 10, 10, 255},
+		field = {35, 10, 10, 255},
 		substance = {100, 100, 100, 255},
 		accent = {216, 176, 66 , 255},
 		accent_content = {10, 10, 10, 255},
@@ -93,6 +93,46 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		shadow = {0, 0, 0, 25},
 		hover = {120, 125, 140, 95}
 	}
+}
+
+hstack_corner_radius :: proc(index, count: int) -> [4]f32 {
+	if index == 0 {
+		return {1, 0, 1, 0}
+	}
+	if index == count - 1 {
+		return {0, 1, 0, 1}
+	}
+	return 0
+}
+
+vstack_corner_radius :: proc(index, count: int) -> [4]f32 {
+	if index == 0 {
+		return {1, 1, 0, 0}
+	}
+	if index == count - 1 {
+		return {0, 0, 1, 1}
+	}
+	return 0
+}
+
+hstack_corners :: proc(index, count: int) -> Corners {
+	if index == 0 {
+		return {.Top_Left, .Bottom_Left}
+	}
+	if index == count - 1 {
+		return {.Top_Right, .Bottom_Right}
+	}
+	return {}
+}
+
+vstack_corners :: proc(index, count: int) -> Corners {
+	if index == 0 {
+		return {.Top_Left, .Top_Right}
+	}
+	if index == count - 1 {
+		return {.Bottom_Left, .Bottom_Right}
+	}
+	return {}
 }
 
 set_style_rounding :: proc(amount: f32) {

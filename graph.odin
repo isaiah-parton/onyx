@@ -8,7 +8,7 @@ import "core:math/ease"
 import "core:math/linalg"
 
 Graph :: struct {
-	low: f32,
+	low:  f32,
 	high: f32,
 }
 
@@ -17,8 +17,8 @@ begin_graph :: proc(grid_size: [2]f32, low, high: f32, loc := #caller_location) 
 	begin_object(object) or_return
 
 	object.box = next_box({})
-	object.variant = Graph{
-		low = low,
+	object.variant = Graph {
+		low  = low,
 		high = high,
 	}
 
@@ -28,12 +28,22 @@ begin_graph :: proc(grid_size: [2]f32, low, high: f32, loc := #caller_location) 
 	vgo.fill_box(object.box, paint = colors().field)
 	if grid_size.y > 1 {
 		for y: f32 = object.box.lo.y; y < object.box.hi.y; y += grid_size.y {
-			vgo.line({object.box.lo.x, math.floor(y) + 0.5}, {object.box.hi.x, math.floor(y) + 0.5}, 1, colors().foreground)
+			vgo.line(
+				{object.box.lo.x, math.floor(y) + 0.5},
+				{object.box.hi.x, math.floor(y) + 0.5},
+				1,
+				colors().foreground,
+			)
 		}
 	}
 	if grid_size.x > 1 {
 		for x: f32 = object.box.lo.x; x < object.box.hi.x; x += grid_size.x {
-			vgo.line({math.floor(x) + 0.5, object.box.lo.y}, {math.floor(x) + 0.5, object.box.hi.y}, 1, colors().foreground)
+			vgo.line(
+				{math.floor(x) + 0.5, object.box.lo.y},
+				{math.floor(x) + 0.5, object.box.hi.y},
+				1,
+				colors().foreground,
+			)
 		}
 	}
 
@@ -46,7 +56,19 @@ end_graph :: proc() {
 	end_object()
 }
 
-curve_graph :: proc(data: []f32, color: vgo.Color, format: string = "%v") -> bool {
+Line_Graph_Fill_Style :: enum {
+	None,
+	Solid,
+	Gradient,
+}
+
+curve_graph :: proc(
+	data: []f32,
+	color: vgo.Color,
+	format: string = "%v",
+	show_points: bool = false,
+	fill_style: Line_Graph_Fill_Style = .Gradient,
+) -> bool {
 	object := current_object().?
 
 	graph := &object.variant.(Graph)
@@ -70,17 +92,30 @@ curve_graph :: proc(data: []f32, color: vgo.Color, format: string = "%v") -> boo
 					inner_box.lo.x +
 					(f32(i) / f32(len(data) - 1)) * (inner_box.hi.x - inner_box.lo.x),
 					inner_box.hi.y +
-					(f32(value - graph.low) / f32(graph.high - graph.low)) * (inner_box.lo.y - inner_box.hi.y),
+					(f32(value - graph.low) / f32(graph.high - graph.low)) *
+						(inner_box.lo.y - inner_box.hi.y),
 				},
 			)
 		}
 
-		paint := vgo.make_linear_gradient(
-			inner_box.lo,
-			{inner_box.lo.x, inner_box.hi.y},
-			vgo.fade(color, 1.0),
-			vgo.fade(color, 0.0),
-		)
+		fill_paint: vgo.Paint_Index
+		switch fill_style {
+		case .None:
+		case .Solid:
+			fill_paint = vgo.add_paint(
+				{kind = .Solid_Color, col0 = vgo.normalize_color(vgo.fade(color, 0.25))},
+			)
+		case .Gradient:
+			fill_paint = vgo.add_paint(
+				vgo.make_linear_gradient(
+					inner_box.lo,
+					{inner_box.lo.x, inner_box.hi.y},
+					vgo.fade(color, 0.75),
+					vgo.fade(color, 0.0),
+				),
+			)
+		}
+		stroke_paint := vgo.paint_index_from_option(color)
 
 		for i in 0 ..< len(points) {
 			p0 := points[max(i - 1, 0)]
@@ -96,34 +131,36 @@ curve_graph :: proc(data: []f32, color: vgo.Color, format: string = "%v") -> boo
 			ab := linalg.lerp(a, b, 0.5)
 			cd := linalg.lerp(c, d, 0.5)
 			mp := linalg.lerp(ab, cd, 0.5)
-			shape0 := vgo.Shape{
-				kind = .Signed_Bezier,
+			shape0 := vgo.Shape {
+				kind     = .Signed_Bezier,
 				quad_min = {a.x, inner_box.lo.y},
 				quad_max = {mp.x, inner_box.hi.y},
-				radius = 1,
-				cv0 = a,
-				cv1 = ab,
-				cv2 = mp,
-				paint = vgo.paint_index_from_option(paint),
+				radius   = 1,
+				cv0      = a,
+				cv1      = ab,
+				cv2      = mp,
+				paint    = fill_paint,
 			}
-			shape1 := vgo.Shape{
-				kind = .Signed_Bezier,
+			shape1 := vgo.Shape {
+				kind     = .Signed_Bezier,
 				quad_min = {mp.x, inner_box.lo.y},
 				quad_max = {d.x, inner_box.hi.y},
-				radius = -1,
-				cv0 = d,
-				cv1 = cd,
-				cv2 = mp,
-				paint = vgo.paint_index_from_option(paint),
+				radius   = -1,
+				cv0      = d,
+				cv1      = cd,
+				cv2      = mp,
+				paint    = fill_paint,
 			}
-			vgo.add_shape(shape0)
-			vgo.add_shape(shape1)
+			if fill_style != .None {
+				vgo.add_shape(shape0)
+				vgo.add_shape(shape1)
+			}
 			shape0.outline = .Stroke
 			shape1.outline = .Stroke
 			shape0.width = 1
 			shape1.width = 1
-			shape0.paint = vgo.paint_index_from_option(color)
-			shape1.paint = vgo.paint_index_from_option(color)
+			shape0.paint = stroke_paint
+			shape1.paint = stroke_paint
 			vgo.add_shape(shape0)
 			vgo.add_shape(shape1)
 			// vgo.stroke_cubic_bezier(p1, c1, c2, p2, 2, paint = color)
@@ -135,25 +172,19 @@ curve_graph :: proc(data: []f32, color: vgo.Color, format: string = "%v") -> boo
 			vgo.fill_box({{p, inner_box.lo.y}, {p + 1, inner_box.hi.y}}, paint = colors().content)
 		}
 
-		// lp: [2]f32
-		// for value, i in data {
-		// 	point_time: f32 = f32(i) / f32(len(data) - 1)
-		// 	p: [2]f32 = {
-		// 		inner_box.lo.x + point_time * (inner_box.hi.x - inner_box.lo.x),
-		// 		inner_box.hi.y +
-		// 		(f32(value - low) / f32(high - low)) *
-		// 			(inner_box.lo.y - inner_box.hi.y),
-		// 	}
-		// 	dot_time := f32(0)//variant.dot_times[e]
-		// 	dot_time = animate(dot_time, 0.15, hn == i && .Hovered in object.state.current)
-		// 	vgo.fill_circle(p, 4.5, color)
-		// 	if dot_time > 0 {
-		// 		vgo.fill_circle(p, 8 * dot_time, color)
-		// 		vgo.fill_circle(p, 6 * dot_time, colors().foreground)
-		// 	}
-		// 	// variant.dot_times[e] = dot_time
-		// 	lp = p
-		// }
+		if show_points {
+			for point, i in points {
+				point_time: f32 = f32(i) / f32(len(data) - 1)
+				dot_time := f32(0) //variant.dot_times[e]
+				dot_time = animate(dot_time, 0.15, hn == i && .Hovered in object.state.current)
+				vgo.fill_circle(point, 3, color)
+				if dot_time > 0 {
+					vgo.fill_circle(point, 8 * dot_time, color)
+					vgo.fill_circle(point, 6 * dot_time, colors().foreground)
+				}
+				// variant.dot_times[e] = dot_time
+			}
+		}
 	}
 
 	return true

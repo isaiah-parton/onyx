@@ -77,8 +77,8 @@ draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: vg
 }
 
 Color_Picker :: struct {
-	open_time:    f32,
-	hsva: [4]f32,
+	open_time: f32,
+	hsva:      [4]f32,
 }
 
 color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_location) {
@@ -86,7 +86,12 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 		return
 	}
 	object := persistent_object(hash(loc))
-	object.size = global_state.style.visual_size * {0.5, 1}
+	text_layout := vgo.make_text_layout(
+		fmt.tprintf("#%6x", vgo.hex_from_color(value^)),
+		global_state.style.default_text_size,
+		global_state.style.monospace_font,
+	)
+	object.size = text_layout.size + global_state.style.text_padding * 2
 	if object.variant == nil {
 		object.variant = Color_Picker{}
 	}
@@ -99,7 +104,7 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 		handle_object_click(object)
 
 		if .Open in object.state.current {
-		extras.open_time = animate(extras.open_time, 0.3, true)
+			extras.open_time = animate(extras.open_time, 0.3, true)
 		} else {
 			extras.open_time = 0
 		}
@@ -122,11 +127,9 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 				vgo.blend(global_state.style.color.checkers[0], value^, vgo.WHITE),
 				vgo.blend(global_state.style.color.checkers[1], value^, vgo.WHITE),
 			)
-			vgo.fill_text(
-				fmt.tprintf("#%6x", vgo.hex_from_color(value^)),
-				global_state.style.default_text_size,
+			vgo.fill_text_layout(
+				text_layout,
 				box_center(object.box),
-				font = global_state.style.monospace_font,
 				align = 0.5,
 				paint = vgo.BLACK if max(vgo.luminance_of(value^), 1 - f32(value.a) / 255) > 0.45 else vgo.WHITE,
 			)
@@ -146,12 +149,23 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 				defer end_layer()
 
 				baseline := box_center_y(object.box)
-				set_next_box({{object.box.hi.x, baseline - 100}, {object.box.hi.x + 200, baseline + 100}})
+				set_next_box(
+					{{object.box.hi.x, baseline - 100}, {object.box.hi.x + 200, baseline + 100}},
+				)
 				if begin_layout(side = .Left) {
 					defer end_layout()
 
-					vgo.fill_box(current_layout().?.box, global_state.style.rounding, paint = colors().field)
-					vgo.stroke_box(current_layout().?.box, 1, global_state.style.rounding, paint = colors().substance)
+					vgo.fill_box(
+						current_layout().?.box,
+						global_state.style.rounding,
+						paint = colors().field,
+					)
+					vgo.stroke_box(
+						current_layout().?.box,
+						1,
+						global_state.style.rounding,
+						paint = colors().substance,
+					)
 
 					shrink(10)
 
@@ -166,7 +180,8 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 					object.state.current += {.Changed}
 				}
 
-				if .Focused not_in current_layer().?.state && .Focused not_in object.state.current {
+				if .Focused not_in current_layer().?.state &&
+				   .Focused not_in object.state.current {
 					object.state.current -= {.Open}
 				}
 			}
@@ -200,7 +215,8 @@ alpha_slider :: proc(
 
 		if .Pressed in object.state.current {
 			value^ = clamp(
-				(global_state.mouse_pos[i] - object.box.lo[i]) / (object.box.hi[i] - object.box.lo[i]),
+				(global_state.mouse_pos[i] - object.box.lo[i]) /
+				(object.box.hi[i] - object.box.lo[i]),
 				0,
 				1,
 			)
@@ -323,13 +339,10 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 				point_b,
 				clamp(1 - value.z, 0, 1),
 			)
-			r: f32 = 9 if (object.state.current >= {.Pressed} && .Active not_in object.state.current) else 7
+			r: f32 =
+				9 if (object.state.current >= {.Pressed} && .Active not_in object.state.current) else 7
 			vgo.fill_circle(point, r + 1, paint = vgo.BLACK if value.z > 0.5 else vgo.WHITE)
-			vgo.fill_circle(
-				point,
-				r,
-				paint = vgo.color_from_hsva({value.x, value.y, value.z, 1}),
-			)
+			vgo.fill_circle(point, r, paint = vgo.color_from_hsva({value.x, value.y, value.z, 1}))
 		}
 	}
 	return
