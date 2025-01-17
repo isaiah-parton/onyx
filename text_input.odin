@@ -21,11 +21,11 @@ Input_Decal :: enum {
 }
 
 Input :: struct {
-	editor:          tedit.Editor,
-	builder:         strings.Builder,
-	anchor:          int,
-	active_time:     f32,
-	offset:          [2]f32,
+	editor:      tedit.Editor,
+	builder:     strings.Builder,
+	anchor:      int,
+	active_time: f32,
+	offset:      [2]f32,
 }
 
 destroy_input :: proc(input: ^Input) {
@@ -48,8 +48,8 @@ raw_input :: proc(
 	}
 	object := persistent_object(hash(loc))
 	if object.variant == nil {
-		input := Input{
-			builder = strings.builder_make()
+		input := Input {
+			builder = strings.builder_make(),
 		}
 		strings.write_string(&input.builder, content^)
 		object.variant = input
@@ -66,24 +66,28 @@ raw_input :: proc(
 
 		box := object.box
 		text_size := global_state.style.content_text_size
-		content_text := strings.to_string(extras.builder) if .Active in object.state.current else content^
-		colors := colors()
+		content_text :=
+			strings.to_string(extras.builder) if .Active in object.state.current else content^
+		colors := style().color
 		state := object.state
 
 		rounding := current_options().radius
 
 		if is_visible {
-			vgo.fill_box(box, radius = rounding, paint = colors.field)
+			vgo.fill_box(box, radius = rounding, paint = style().color.field)
 		}
 
-		font := (global_state.style.monospace_font if (is_monospace) else global_state.style.default_font)
+		font :=
+			(global_state.style.monospace_font if (is_monospace) else global_state.style.default_font)
 		text_origin: [2]f32
 		if is_multiline {
-			text_origin = box.lo + global_state.style.text_padding
+			text_origin = box.lo + global_state.style.text_padding + {0, 2}
 		} else {
-			text_origin = {box.lo.x + global_state.style.text_padding.x, box_center_y(box) - font.line_height * text_size * 0.5}
+			text_origin = {
+				box.lo.x + global_state.style.text_padding.x,
+				box_center_y(box) - font.line_height * text_size * 0.5,
+			}
 		}
-		text_origin -= extras.offset
 		submitted := !(!key_down(.Left_Control) && is_multiline) && key_pressed(.Enter)
 		editor := &extras.editor
 		content_layout: vgo.Text_Layout
@@ -101,7 +105,7 @@ raw_input :: proc(
 				content_text,
 				text_size,
 				selection = editor.selection,
-				local_mouse = mouse_point() - text_origin,
+				local_mouse = mouse_point() - (text_origin - extras.offset),
 			)
 		}
 		//
@@ -257,10 +261,10 @@ raw_input :: proc(
 			glyph := content_layout.glyphs[content_layout.glyph_selection[0]]
 			glyph_pos := (text_origin - extras.offset) + glyph.offset
 			cursor_box := Box {
-				glyph_pos + {-1, -2},
-				glyph_pos + {1, content_layout.font.line_height + 2},
+				glyph_pos + {0, -2},
+				glyph_pos + {0, content_layout.font.line_height + 2},
 			}
-			inner_box := object.box
+			inner_box := shrink_box(object.box, global_state.style.text_padding)
 			extras.offset.x += max(0, cursor_box.hi.x - inner_box.hi.x)
 			if box_width(inner_box) > box_width(cursor_box) {
 				extras.offset.x -= max(0, inner_box.lo.x - cursor_box.lo.x)
@@ -294,14 +298,14 @@ raw_input :: proc(
 					placeholder,
 					text_size,
 					text_origin,
-					paint = vgo.fade(colors.content, 0.5),
+					paint = vgo.fade(style().color.content, 0.5),
 				)
 			}
 			if len(prefix) > 0 {
 				vgo.fill_text_layout(
 					prefix_layout,
 					text_origin + {-prefix_layout.size.x, 0},
-					paint = vgo.fade(colors.content, 0.5),
+					paint = vgo.fade(style().color.content, 0.5),
 				)
 			}
 			line_height := font.line_height * text_size
@@ -316,32 +320,27 @@ raw_input :: proc(
 							range = {min(range[0], range[1]), max(range[0], range[1])}
 							vgo.fill_box(
 								{
-									text_origin +
-									content_layout.glyphs[range[0]].offset,
+									text_origin + content_layout.glyphs[range[0]].offset,
 									text_origin +
 									content_layout.glyphs[range[1]].offset +
 									{0, line_height},
 								},
-								paint = vgo.fade(colors.accent, 0.5),
+								paint = vgo.fade(style().color.accent, 0.5),
 							)
 						}
 					}
 				}
 			}
-			vgo.fill_text_layout(
-				content_layout,
-				text_origin,
-				paint = colors.content,
-			)
+			vgo.fill_text_layout(content_layout, text_origin, paint = style().color.content)
 			if .Active in object.state.previous && len(content_layout.glyphs) > 0 {
 				cursor_origin :=
 					text_origin + content_layout.glyphs[content_layout.glyph_selection[0]].offset
 				vgo.fill_box(
 					{
-						{cursor_origin.x - 1, cursor_origin.y},
-						{cursor_origin.x + 1, cursor_origin.y + line_height},
+						{cursor_origin.x - 1, cursor_origin.y - 2},
+						{cursor_origin.x + 1, cursor_origin.y + line_height + 2},
 					},
-					paint = colors.accent,
+					paint = style().color.accent,
 				)
 			}
 			vgo.pop_scissor()
@@ -355,7 +354,7 @@ raw_input :: proc(
 				case .Check:
 					vgo.check(center, 7, vgo.GREEN)
 				case .Spinner:
-					vgo.spinner(center, 7, colors.content)
+					vgo.spinner(center, 7, style().color.content)
 					draw_frames(1)
 				}
 			}
@@ -364,7 +363,7 @@ raw_input :: proc(
 				object.box,
 				2,
 				radius = rounding,
-				paint = vgo.fade(colors.accent, extras.active_time),
+				paint = vgo.fade(style().color.accent, extras.active_time),
 				// outline = .Outer_Stroke,
 			)
 		}

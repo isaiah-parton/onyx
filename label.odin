@@ -9,21 +9,16 @@ label :: proc(
 	font_size := global_state.style.default_text_size,
 	font := global_state.style.default_font,
 	align: [2]f32 = 0,
-	color: vgo.Color = colors().content,
+	color: vgo.Color = style().color.content,
 ) {
-	object := make_transient_object()
 	text_layout := vgo.make_text_layout(
 		text,
 		font_size,
 		font,
 	)
-	object.size = text_layout.size
-	object.box = next_box(object.size)
-	if begin_object(object) {
-		if object_is_visible(object) {
-			vgo.fill_text_layout(text_layout, linalg.lerp(object.box.lo, object.box.hi, align), paint = color, align = align)
-		}
-		end_object()
+	box := next_box(text_layout.size)
+	if get_clip(current_clip(), box) != .Full {
+		vgo.fill_text_layout(text_layout, linalg.lerp(box.lo, box.hi, align), paint = color, align = align)
 	}
 }
 

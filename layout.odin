@@ -155,7 +155,16 @@ inverse_axis :: proc(axis: Axis) -> Axis {
 
 current_axis :: proc() -> Axis {
 	return axis_of_side(current_options().side)
+}
 
+current_box :: proc() -> Box {
+	if object, ok := current_object().?; ok {
+		return object.box
+	}
+	if layout, ok := current_layout().?; ok {
+		return layout.box
+	}
+	return view_box()
 }
 
 begin_layout :: proc(side: Side, size: [2]f32 = {}, does_grow: bool = false) -> bool {

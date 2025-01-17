@@ -10,42 +10,59 @@ import "core:math/linalg"
 Graph :: struct {
 	low:  f32,
 	high: f32,
+	offset: [2]f32,
 }
 
-begin_graph :: proc(grid_size: [2]f32, low, high: f32, loc := #caller_location) -> bool {
+begin_graph :: proc(grid_step: [2]f32, low, high: f32, offset: [2]f32 = {}, loc := #caller_location) -> bool {
 	object := persistent_object(hash(loc))
 	begin_object(object) or_return
 
 	object.box = next_box({})
-	object.variant = Graph {
-		low  = low,
-		high = high,
-	}
+
+	range := high - low
 
 	push_clip(object.box)
 	vgo.push_scissor(vgo.make_box(object.box, global_state.style.rounding))
 
-	vgo.fill_box(object.box, paint = colors().field)
-	if grid_size.y > 1 {
-		for y: f32 = object.box.lo.y; y < object.box.hi.y; y += grid_size.y {
+	vgo.fill_box(object.box, paint = style().color.field)
+	grid_offset := [2]f32{0, (low / range) * box_height(object.box)}
+	grid_size := box_size(object.box)
+	grid_origin := [2]f32{object.box.lo.x, object.box.hi.y}
+	grid_pseudo_origin := grid_origin + linalg.mod(grid_offset, grid_step)
+
+	object.variant = Graph {
+		low  = low,
+		high = high,
+		offset = grid_offset,
+	}
+
+	if grid_step.y > 1 {
+		for y: f32 = grid_pseudo_origin.y; y < grid_pseudo_origin.y + grid_size.y; y += grid_step.y {
 			vgo.line(
 				{object.box.lo.x, math.floor(y) + 0.5},
 				{object.box.hi.x, math.floor(y) + 0.5},
 				1,
-				colors().foreground,
+				style().color.foreground,
 			)
 		}
 	}
-	if grid_size.x > 1 {
-		for x: f32 = object.box.lo.x; x < object.box.hi.x; x += grid_size.x {
+	if grid_step.x > 1 {
+		for x: f32 = grid_pseudo_origin.x; x < grid_pseudo_origin.x + grid_size.x; x += grid_step.x {
 			vgo.line(
 				{math.floor(x) + 0.5, object.box.lo.y},
 				{math.floor(x) + 0.5, object.box.hi.y},
 				1,
-				colors().foreground,
+				style().color.foreground,
 			)
 		}
 	}
+	baseline := grid_origin.y + grid_offset.y
+	vgo.line(
+		{object.box.lo.x, math.floor(baseline) + 0.5},
+		{object.box.hi.x, math.floor(baseline) + 0.5},
+		1,
+		style().color.substance,
+	)
 
 	return true
 }
@@ -56,33 +73,37 @@ end_graph :: proc() {
 	end_object()
 }
 
-Line_Graph_Fill_Style :: enum {
+Line_Chart_Fill_Style :: enum {
 	None,
 	Solid,
 	Gradient,
 }
 
-curve_graph :: proc(
+curve_line_chart :: proc(
 	data: []f32,
 	color: vgo.Color,
-	format: string = "%v",
+	format: string = "%.2f",
 	show_points: bool = false,
-	fill_style: Line_Graph_Fill_Style = .Gradient,
+	fill_style: Line_Chart_Fill_Style = .Gradient,
 ) -> bool {
 	object := current_object().?
 
 	graph := &object.variant.(Graph)
 	inner_box := object.box
 
+	if point_in_box(mouse_point(), object.box) {
+		hover_object(object)
+	}
+	handle_object_click(object)
+
 	if object_is_visible(object) {
-		spacing: f32 = (inner_box.hi.x - inner_box.lo.x) / f32(len(data) - 1)
-		hn := int(math.round((global_state.mouse_pos.x - inner_box.lo.x) / spacing))
-		// tooltip_idx = clamp(hn, 0, len(data) - 1)
-		// tooltip_pos = [2]f32 {
-		// 	inner_box.lo.x +
-		// 	math.round((global_state.mouse_pos.x - inner_box.lo.x) / spacing) * spacing,
-		// 	global_state.mouse_pos.y,
-		// }
+		point_spacing: f32 = (inner_box.hi.x - inner_box.lo.x) / f32(len(data) - 1)
+		active_point_index: int = -1
+		if .Hovered in object.state.current {
+			active_point_index = int(
+				math.round((global_state.mouse_pos.x - inner_box.lo.x) / point_spacing),
+			)
+		}
 
 		points := make([dynamic][2]f32, allocator = context.temp_allocator)
 		for value, i in data {
@@ -98,7 +119,8 @@ curve_graph :: proc(
 			)
 		}
 
-		fill_paint: vgo.Paint_Index
+		baseline := inner_box.hi.y + graph.offset.y
+		fill_paint, alt_fill_paint: vgo.Paint_Index
 		switch fill_style {
 		case .None:
 		case .Solid:
@@ -109,8 +131,8 @@ curve_graph :: proc(
 			fill_paint = vgo.add_paint(
 				vgo.make_linear_gradient(
 					inner_box.lo,
-					{inner_box.lo.x, inner_box.hi.y},
-					vgo.fade(color, 0.75),
+					{inner_box.lo.x, baseline},
+					vgo.fade(color, 0.5),
 					vgo.fade(color, 0.0),
 				),
 			)
@@ -133,8 +155,8 @@ curve_graph :: proc(
 			mp := linalg.lerp(ab, cd, 0.5)
 			shape0 := vgo.Shape {
 				kind     = .Signed_Bezier,
-				quad_min = {a.x, inner_box.lo.y},
-				quad_max = {mp.x, inner_box.hi.y},
+				quad_min = {a.x, min(a.y, ab.y, mp.y) - 1},
+				quad_max = {mp.x, baseline},
 				radius   = 1,
 				cv0      = a,
 				cv1      = ab,
@@ -143,8 +165,8 @@ curve_graph :: proc(
 			}
 			shape1 := vgo.Shape {
 				kind     = .Signed_Bezier,
-				quad_min = {mp.x, inner_box.lo.y},
-				quad_max = {d.x, inner_box.hi.y},
+				quad_min = {mp.x, min(d.y, cd.y, mp.y) - 1},
+				quad_max = {d.x, baseline},
 				radius   = -1,
 				cv0      = d,
 				cv1      = cd,
@@ -161,33 +183,53 @@ curve_graph :: proc(
 			shape1.width = 1
 			shape0.paint = stroke_paint
 			shape1.paint = stroke_paint
+			shape0.quad_max.y = inner_box.hi.y
+			shape1.quad_max.y = inner_box.hi.y
 			vgo.add_shape(shape0)
 			vgo.add_shape(shape1)
-			// vgo.stroke_cubic_bezier(p1, c1, c2, p2, 2, paint = color)
 		}
 
-		if .Hovered in object.state.current && hn >= 0 && hn < len(data) {
-			p :=
-				inner_box.lo.x + (f32(hn) / f32(len(data) - 1)) * (inner_box.hi.x - inner_box.lo.x)
-			vgo.fill_box({{p, inner_box.lo.y}, {p + 1, inner_box.hi.y}}, paint = colors().content)
-		}
-
-		if show_points {
-			for point, i in points {
-				point_time: f32 = f32(i) / f32(len(data) - 1)
-				dot_time := f32(0) //variant.dot_times[e]
-				dot_time = animate(dot_time, 0.15, hn == i && .Hovered in object.state.current)
+		for point, i in points {
+			point_time: f32 = f32(i) / f32(len(data) - 1)
+			if show_points {
 				vgo.fill_circle(point, 3, color)
-				if dot_time > 0 {
-					vgo.fill_circle(point, 8 * dot_time, color)
-					vgo.fill_circle(point, 6 * dot_time, colors().foreground)
-				}
-				// variant.dot_times[e] = dot_time
+			}
+			if active_point_index == i {
+				vgo.fill_circle(point, 6, color)
+				vgo.fill_circle(point, 5, style().color.field)
+
+				tooltip_text_layout := vgo.make_text_layout(
+					fmt.tprintf(format, data[i]),
+					global_state.style.default_text_size * 0.75,
+					global_state.style.default_font,
+				)
+				tooltip_size := tooltip_text_layout.size + global_state.style.text_padding * 2
+				tooltip_size.x += tooltip_text_layout.size.y
+				tooltip_margin :: 10
+				tooltip_box := make_tooltip_box(point + {0, -tooltip_margin}, tooltip_size, {0.5, 1}, object.box)
+				previous_draw_order := vgo.get_draw_order()
+				vgo.set_draw_order(99)
+				vgo.disable_scissor()
+				vgo.fill_box(tooltip_box, 4, style().color.field)
+				vgo.stroke_box(tooltip_box, 1, 4, style().color.substance)
+				vgo.fill_circle(tooltip_box.lo + box_height(tooltip_box) / 2, 3, paint = color)
+				vgo.fill_text_layout(
+					tooltip_text_layout,
+					{tooltip_box.hi.x - global_state.style.text_padding.x, box_center_y(tooltip_box)},
+					align = {1, 0.5},
+					paint = style().color.content,
+				)
+				vgo.enable_scissor()
+				vgo.set_draw_order(previous_draw_order)
 			}
 		}
 	}
 
 	return true
+}
+
+bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
+
 }
 
 /*
@@ -224,7 +266,7 @@ curve_graph :: proc(
 					{inner_box.lo.x + f32(tooltip_idx) * block_size, inner_box.lo.y},
 					{inner_box.lo.x + f32(tooltip_idx) * block_size + block_size, inner_box.hi.y},
 				},
-				paint = vgo.fade(colors().substance, 0.5),
+				paint = vgo.fade(style().color.substance, 0.5),
 			)
 		}
 
@@ -236,7 +278,7 @@ curve_graph :: proc(
 				)
 				vgo.fill_box(
 					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
-					paint = vgo.fade(colors().substance, 0.5),
+					paint = vgo.fade(style().color.substance, 0.5),
 				)
 			}
 
@@ -254,7 +296,7 @@ curve_graph :: proc(
 						16,
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
 						font = global_state.style.default_font,
-						paint = colors().content,
+						paint = style().color.content,
 					)
 				}
 
@@ -286,7 +328,7 @@ curve_graph :: proc(
 				)
 				vgo.fill_box(
 					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
-					paint = vgo.fade(colors().substance, 0.5),
+					paint = vgo.fade(style().color.substance, 0.5),
 				)
 			}
 
@@ -308,7 +350,7 @@ curve_graph :: proc(
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
 						font = global_state.style.default_font,
 						align = {0.5, 0},
-						paint = colors().content,
+						paint = style().color.content,
 					)
 				}
 
@@ -333,7 +375,7 @@ curve_graph :: proc(
 							origin = {(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},
 							font = global_state.style.default_font,
 							align = 0.5,
-							paint = vgo.fade(colors().content, 0.5 if entry.values[f] == 0 else 1.0),
+							paint = vgo.fade(style().color.content, 0.5 if entry.values[f] == 0 else 1.0),
 						)
 					}
 				}
@@ -358,7 +400,7 @@ curve_graph :: proc(
 		// 		box.lo + [2]f32{5, 13},
 		// 		.Center,
 		// 		.Top,
-		// 		paint = colors().content,
+		// 		paint = style().color.content,
 		// 	)
 		// }
 		// for &field, f in fields {
@@ -372,7 +414,7 @@ curve_graph :: proc(
 		// 		{tip_box.lo.x, (tip_box.lo.y + tip_box.hi.y) / 2},
 		// 		.Left,
 		// 		.Center,
-		// 		paint = vgo.fade(colors().content, 0.5),
+		// 		paint = vgo.fade(style().color.content, 0.5),
 		// 	)
 		// 	vgo.fill_text_aligned(
 		// 		fmt.tprintf("%v", entries[tooltip_idx].values[f]),
@@ -381,7 +423,7 @@ curve_graph :: proc(
 		// 		{tip_box.hi.x, (tip_box.lo.y + tip_box.hi.y) / 2},
 		// 		.Right,
 		// 		.Center,
-		// 		paint = colors().content,
+		// 		paint = style().color.content,
 		// 	)
 		// }
 		// end_tooltip()

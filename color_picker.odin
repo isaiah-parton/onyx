@@ -124,8 +124,8 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 			draw_checkerboard_pattern(
 				object.box,
 				box_height(object.box) / 2,
-				vgo.blend(global_state.style.color.checkers[0], value^, vgo.WHITE),
-				vgo.blend(global_state.style.color.checkers[1], value^, vgo.WHITE),
+				vgo.blend(style().color.checkers[0], value^, vgo.WHITE),
+				vgo.blend(style().color.checkers[1], value^, vgo.WHITE),
 			)
 			vgo.fill_text_layout(
 				text_layout,
@@ -158,13 +158,13 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 					vgo.fill_box(
 						current_layout().?.box,
 						global_state.style.rounding,
-						paint = colors().field,
+						paint = style().color.field,
 					)
 					vgo.stroke_box(
 						current_layout().?.box,
 						1,
 						global_state.style.rounding,
-						paint = colors().substance,
+						paint = style().color.substance,
 					)
 
 					shrink(10)
@@ -229,8 +229,8 @@ alpha_slider :: proc(
 			draw_checkerboard_pattern(
 				box,
 				(box.hi[j] - box.lo[j]) / 2,
-				global_state.style.color.checkers[0],
-				global_state.style.color.checkers[1],
+				style().color.checkers[0],
+				style().color.checkers[1],
 			)
 			color.a = 255
 			time := clamp(value^, 0, 1)
@@ -248,7 +248,7 @@ alpha_slider :: proc(
 				vgo.stroke_box(
 					{{box.lo.x, pos}, {box.hi.x, pos + 4}},
 					1,
-					paint = global_state.style.color.content,
+					paint = style().color.content,
 				)
 			}
 		}

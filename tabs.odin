@@ -77,15 +77,15 @@ import "core:slice"
 // 			},
 // 			paint = vgo.mix(
 // 				math.lerp(f32(0.25), f32(1.0), max(object.hover_time * 0.5, object.active_time)),
-// 				global_state.style.color.background,
-// 				global_state.style.color.foreground
+// 				style().color.background,
+// 				style().color.foreground
 // 			),
 // 		)
 // 		vgo.fill_text_layout(
 // 			object.text_layout,
 // 			box_center(box),
 // 			align = 0.5,
-// 			paint = global_state.style.color.accent_content,
+// 			paint = style().color.accent_content,
 // 		)
 // 	}
 // }
@@ -145,7 +145,7 @@ import "core:slice"
 // 				{{option_box.lo.x, option_box.hi.y - 3}, {option_box.hi.x, option_box.hi.y}},
 // 				1.5,
 // 				paint = vgo.fade(
-// 					global_state.style.color.content,
+// 					style().color.content,
 // 					f32(int(hovered || object.index == i)),
 // 				),
 // 			)
@@ -153,7 +153,7 @@ import "core:slice"
 // 				object.label_layouts[i],
 // 				{box_center_x(option_box), option_box.lo.y},
 // 				align = {0.5, 0},
-// 				paint = vgo.fade(global_state.style.color.content, 1 if object.index == i else 0.5),
+// 				paint = vgo.fade(style().color.content, 1 if object.index == i else 0.5),
 // 			)
 // 		}
 // 	}
@@ -178,7 +178,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) {
 		is_visible := object_is_visible(object)
 		inner_box := shrink_box(object.box, 1)
 		if is_visible {
-			vgo.fill_box(object.box, global_state.style.rounding, global_state.style.color.field)
+			vgo.fill_box(object.box, global_state.style.rounding, style().color.field)
 		}
 		option_rounding :=
 			global_state.style.rounding * ((box_height(object.box) - 4) / box_height(object.box))
@@ -202,8 +202,8 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) {
 					shrink_box(option_box, 1),
 					option_rounding,
 					paint = vgo.fade(
-						global_state.style.color.foreground,
-						f32(int(hovered || index^ == T(i))),
+						style().color.foreground,
+						max(f32(int(hovered)) * 0.5, f32(int(index^ == T(i)))),
 					),
 				)
 				vgo.fill_text(
@@ -212,7 +212,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) {
 					box_center(option_box),
 					font = global_state.style.default_font,
 					align = 0.5,
-					paint = vgo.fade(global_state.style.color.content, 1 if int(index^) == i else 0.5),
+					paint = vgo.fade(style().color.content, 1 if int(index^) == i else 0.5),
 				)
 			}
 		}

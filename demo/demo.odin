@@ -28,18 +28,20 @@ FILLER_TEXT :: `1. In the beginning was the Word, and the Word was with God, and
 Section :: enum {
 	Button,
 	Boolean,
-	Multiple_Choice,
+	Menu,
 	Analog,
 	Text,
-	Graph,
+	Chart,
+	Grid,
 }
 
 State :: struct {
-	button_section: Button_Section_State,
+	button_section:  Button_Section_State,
 	boolean_section: Boolean_Section_State,
-	graph_section: Graph_Section_State,
-	text_section: Text_Section_State,
-	current_section:      Section,
+	graph_section:   Graph_Section_State,
+	text_section:    Text_Section_State,
+	analog_section:  Analog_Section_State,
+	current_section: Section,
 }
 
 Boolean_Section_State :: struct {
@@ -56,9 +58,24 @@ boolean_section :: proc(state: ^Boolean_Section_State) {
 	}
 }
 
-Button_Section_State :: struct {
-
+Analog_Section_State :: struct {
+	slider_value: f32,
 }
+
+analog_section :: proc(state: ^Analog_Section_State) {
+	using onyx
+	set_width(0)
+	set_height(0)
+	slider(&state.slider_value, 0, 100)
+	space(20)
+	progress_bar(state.slider_value / 100.0)
+	space(20)
+	dial(state.slider_value / 100.0)
+	space(20)
+	pie({33, 15, 52}, 100, {vgo.RED, vgo.GREEN, vgo.BLUE})
+}
+
+Button_Section_State :: struct {}
 
 button_section :: proc(state: ^Button_Section_State) {
 	using onyx
@@ -68,16 +85,21 @@ button_section :: proc(state: ^Button_Section_State) {
 		set_width(0)
 		for accent, i in Button_Accent {
 			push_id(i)
-				button(fmt.tprint(accent), accent = accent)
+			button(fmt.tprint(accent), accent = accent)
 			pop_id()
 			space(10)
 		}
 		end_layout()
 	}
+	space(10)
+	set_width(0)
+	if button("Delayed", delay = 0.75).clicked {
+
+	}
 }
 
 Text_Section_State :: struct {
-	text: string,
+	text:           string,
 	multiline_text: string,
 }
 
@@ -96,11 +118,12 @@ Graph_Section_State :: struct {
 	displayed_low:  f32,
 	displayed_high: f32,
 	data:           [20]f32,
+	old_data:           [20]f32,
 	low:            f32,
 	high:           f32,
 	color:          vgo.Color,
 	show_points:    bool,
-	style:          onyx.Line_Graph_Fill_Style,
+	style:          onyx.Line_Chart_Fill_Style,
 }
 
 graph_section :: proc(state: ^Graph_Section_State) {
@@ -118,13 +141,22 @@ graph_section :: proc(state: ^Graph_Section_State) {
 		space(10)
 		boolean(&state.show_points, "Show Points")
 		space(10)
-		option_slider(reflect.enum_field_names(Line_Graph_Fill_Style), &state.style)
+		option_slider(reflect.enum_field_names(Line_Chart_Fill_Style), &state.style)
 		end_layout()
 	}
 	space(10)
 	set_size(remaining_space())
-	if begin_graph(30, state.displayed_low - 10, state.displayed_high + 10) {
-		curve_graph(
+
+	low := state.displayed_low - 10
+	high := state.displayed_high + 10
+	median := (low + high) / 2
+	if begin_graph(30, low, high, offset = {0, median * -30}) {
+		curve_line_chart(
+			state.old_data[:],
+			vgo.fade(state.color, 0.5),
+			fill_style = .None,
+		)
+		curve_line_chart(
 			state.displayed_data[:],
 			state.color,
 			show_points = state.show_points,
@@ -141,21 +173,22 @@ graph_section :: proc(state: ^Graph_Section_State) {
 			draw_frames(2)
 		}
 	}
-	state.displayed_low +=
-		(state.low - state.displayed_low) * 10 * vgo.frame_time()
-	state.displayed_high +=
-		(state.high - state.displayed_high) * 10 * vgo.frame_time()
+	state.displayed_low += (state.low - state.displayed_low) * 10 * vgo.frame_time()
+	state.displayed_high += (state.high - state.displayed_high) * 10 * vgo.frame_time()
 }
 
 randomize_graphs :: proc(state: ^Graph_Section_State) {
 	modifier: f32 = rand.float32_range(-1, 1)
 	state.low = 0
 	state.high = 0
+	state.old_data = state.data
+	last_value := rand.float32_range(-5, 5)
 	for i in 0 ..< len(state.data) {
-		value := f32(i) * modifier + rand.float32_range(-2, 2)
+		value := last_value + rand.float32_range(-2, 2)
 		state.data[i] = value
 		state.low = min(state.low, value)
 		state.high = max(state.high, value)
+		last_value = value
 	}
 }
 
@@ -211,7 +244,7 @@ main :: proc() {
 
 			{
 				box := view_box()
-				vgo.fill_box(box, paint = colors().background)
+				vgo.fill_box(box, paint = style().color.background)
 			}
 
 			set_next_box(view_box())
@@ -222,7 +255,7 @@ main :: proc() {
 
 					shrink(100)
 
-					vgo.fill_box(current_layout().?.box, 10, colors().foreground)
+					vgo.fill_box(current_layout().?.box, 10, style().color.foreground)
 
 					shrink(30)
 
@@ -236,7 +269,12 @@ main :: proc() {
 						for section, i in Section {
 							set_rounded_corners(vstack_corners(i, len(Section)))
 							push_id(i)
-							text, _ := strings.replace_all(fmt.tprint(section), "_", " ", allocator = context.temp_allocator)
+							text, _ := strings.replace_all(
+								fmt.tprint(section),
+								"_",
+								" ",
+								allocator = context.temp_allocator,
+							)
 							if button(text, active = state.current_section == section).clicked {
 								state.current_section = section
 							}
@@ -251,7 +289,11 @@ main :: proc() {
 
 					set_width(remaining_space().x)
 					if begin_layout(.Top) {
-						vgo.fill_box(current_layout().?.box, rounded_corners(ALL_CORNERS), paint = colors().background)
+						vgo.fill_box(
+							current_layout().?.box,
+							rounded_corners(ALL_CORNERS),
+							paint = style().color.background,
+						)
 						shrink(10)
 
 						#partial switch state.current_section {
@@ -259,9 +301,11 @@ main :: proc() {
 							button_section(&state.button_section)
 						case .Boolean:
 							boolean_section(&state.boolean_section)
+						case .Analog:
+							analog_section(&state.analog_section)
 						case .Text:
 							text_section(&state.text_section)
-						case .Graph:
+						case .Chart:
 							graph_section(&state.graph_section)
 						}
 

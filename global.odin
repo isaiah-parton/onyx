@@ -89,8 +89,6 @@ Global_State :: struct {
 	frames_so_far:            int,
 	frames_this_second:       int,
 	id_stack:                 Stack(Id, MAX_IDS),
-	wave_effects:             [dynamic]Wave_Effect,
-	transient_objects:        small_array.Small_Array(512, Object),
 	objects:                  [dynamic]^Object,
 	object_map:               map[Id]^Object,
 	object_stack:             Stack(^Object, 128),
@@ -105,8 +103,7 @@ Global_State :: struct {
 	drag_offset:              [2]f32,
 	form:                     Form,
 	form_active:              bool,
-	active_container:         Id,
-	next_active_container:    Id,
+	tooltip_boxes: [dynamic]Box,
 	panels:                   [MAX_PANELS]Maybe(Panel),
 	panel_map:                map[Id]^Panel,
 	panel_stack:              Stack(^Panel, MAX_PANELS),
@@ -150,10 +147,6 @@ Global_State :: struct {
 
 draw_frames :: proc(how_many: int) {
 	global_state.frames_to_draw = max(global_state.frames_to_draw, how_many)
-}
-
-colors :: proc() -> ^Color_Scheme {
-	return &global_state.style.color
 }
 
 view_box :: proc() -> Box {
@@ -430,9 +423,6 @@ new_frame :: proc() {
 
 	global_state.object_index = 0
 
-	global_state.active_container = global_state.next_active_container
-	global_state.next_active_container = 0
-
 	clear(&global_state.debug.hovered_objects)
 
 	clean_up_layers()
@@ -440,9 +430,7 @@ new_frame :: proc() {
 	clean_up_objects()
 	update_object_references()
 
-	for len(global_state.wave_effects) > 0 && global_state.wave_effects[0].time > 1.0 {
-		pop(&global_state.wave_effects)
-	}
+	clear(&global_state.tooltip_boxes)
 
 	if key_pressed(.Escape) {
 		global_state.focused_object = 0
@@ -556,7 +544,7 @@ draw_shadow :: proc(box: vgo.Box) {
 			move_box(box, 3),
 			global_state.style.rounding,
 			6,
-			global_state.style.color.shadow,
+			style().color.shadow,
 		)
 	}
 }

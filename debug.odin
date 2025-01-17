@@ -92,9 +92,6 @@ draw_object_debug_boxes :: proc(state: Debug_State) {
 	for object in global_state.objects {
 		draw_object_debug_box(state, object)
 	}
-	for &object in global_state.transient_objects.data[:global_state.transient_objects.len] {
-		draw_object_debug_box(state, &object)
-	}
 }
 
 @(private)
@@ -168,7 +165,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		fmt.sbprintf(&b, "\nControl Vertices: %i", len(vgo.renderer().cvs.data))
 		fmt.sbprintf(&b, "\nDraw calls: %i", vgo.draw_call_count())
 		fmt.sbprintf(&b, "\nLayers: %i", len(global_state.layers))
-		fmt.sbprintf(&b, "\nObjects: %i", len(global_state.objects) + global_state.transient_objects.len)
+		fmt.sbprintf(&b, "\nObjects: %i", len(global_state.objects))
 		fmt.sbprintf(&b, "\nPanels: %i", len(global_state.panel_map))
 		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, {})
 	}

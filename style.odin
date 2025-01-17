@@ -38,6 +38,10 @@ Style_Shape :: struct {
 	table_row_height:    f32,
 }
 
+style :: proc() -> ^Style {
+	return &global_state.style
+}
+
 rounded_corners :: proc(corners: Corners) -> [4]f32 {
 	return {
 		global_state.style.rounding * f32(i32(.Top_Left in corners)),
@@ -140,5 +144,5 @@ set_style_rounding :: proc(amount: f32) {
 }
 
 set_color_scheme :: proc(scheme: Color_Scheme) {
-	global_state.style.color = scheme
+	style().color = scheme
 }

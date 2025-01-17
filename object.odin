@@ -128,7 +128,6 @@ clean_up_objects :: proc() {
 			object.dead = true
 		}
 	}
-	small_array.clear(&global_state.transient_objects)
 }
 
 animate :: proc(value, duration: f32, condition: bool) -> f32 {
@@ -201,20 +200,6 @@ make_object_children_array :: proc() -> [dynamic]^Object {
 
 persistent_object :: proc(id: Id) -> ^Object {
 	object := global_state.object_map[id] or_else new_persistent_object(id)
-	return object
-}
-
-make_transient_object :: proc() -> ^Object {
-	small_array.append(&global_state.transient_objects, Object{})
-	object :=
-		small_array.get_ptr_safe(
-			&global_state.transient_objects,
-			global_state.transient_objects.len - 1,
-		) or_else nil
-	assert(object != nil)
-	object.id = Id(global_state.transient_objects.len)
-	object.state.output_mask = OBJECT_STATE_ALL
-
 	return object
 }
 
@@ -355,7 +340,7 @@ foreground :: proc(loc := #caller_location) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
 		draw_shadow(object.box)
-		vgo.fill_box(object.box, paint = global_state.style.color.foreground)
+		vgo.fill_box(object.box, paint = style().color.foreground)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
 		}
@@ -367,7 +352,7 @@ background :: proc(loc := #caller_location) {
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
-		vgo.fill_box(object.box, paint = global_state.style.color.field)
+		vgo.fill_box(object.box, paint = style().color.field)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
 		}
@@ -382,13 +367,13 @@ spinner :: proc(loc := #caller_location) {
 		vgo.spinner(
 			box_center(object.box),
 			box_height(object.box) * 0.5,
-			global_state.style.color.substance,
+			style().color.substance,
 		)
 	}
 }
 
 draw_skeleton :: proc(box: Box, rounding: f32) {
-	vgo.fill_box(box, rounding, global_state.style.color.substance)
+	vgo.fill_box(box, rounding, style().color.substance)
 	vgo.fill_box(box, rounding, vgo.Paint{kind = .Skeleton})
 
 	draw_frames(1)
@@ -396,7 +381,7 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 
 divider :: proc() {
 	layout := current_layout().?
-	vgo.fill_box(cut_box(&layout.box, current_options().side, 1), paint = colors().substance)
+	vgo.fill_box(cut_box(&layout.box, current_options().side, 1), paint = style().color.substance)
 }
 
 object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {

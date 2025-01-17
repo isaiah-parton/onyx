@@ -136,12 +136,12 @@ begin_panel :: proc(
 						move_box(panel.box, 3),
 						global_state.style.rounding,
 						6,
-						vgo.fade(global_state.style.color.shadow, 1.0 - (0.1 * panel.fade)),
+						vgo.fade(style().color.shadow, 1.0 - (0.1 * panel.fade)),
 					)
 				}
 			}
 
-			vgo.fill_box(panel.box, rounding, paint = global_state.style.color.foreground)
+			vgo.fill_box(panel.box, rounding, paint = style().color.foreground)
 		}
 	}
 
@@ -169,9 +169,9 @@ end_panel :: proc() {
 			if point_in_box(mouse_point(), object.box) {
 				hover_object(object)
 			}
-			icon_color := global_state.style.color.substance
+			icon_color := style().color.substance
 			if .Hovered in object.state.current {
-				icon_color = global_state.style.color.accent
+				icon_color = style().color.accent
 				global_state.cursor_type = .Resize_NWSE
 			}
 			vgo.fill_polygon(
@@ -278,13 +278,13 @@ draw_panel_snap_widgets :: proc(state: Panel_Snap_State) {
 		for orb in orbs {
 			distance_to_mouse := linalg.length(mouse_point() - orb.position)
 			if distance_to_mouse <= RADIUS {
-				vgo.stroke_box(orb.box, 2, paint = colors().accent)
+				vgo.stroke_box(orb.box, 2, paint = style().color.accent)
 				if mouse_released(.Left) {
 					panel.box = orb.box
 					panel.is_snapped = true
 				}
 			} else {
-				vgo.fill_circle(orb.position, RADIUS, vgo.fade(colors().accent, 0.5))
+				vgo.fill_circle(orb.position, RADIUS, vgo.fade(style().color.accent, 0.5))
 			}
 		}
 	}

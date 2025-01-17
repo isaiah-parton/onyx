@@ -45,6 +45,7 @@ Button :: struct {
 	waves:      Wave_Effects,
 	hover_time: f32,
 	press_time: f32,
+	active_time: f32,
 }
 
 Button_Result :: struct {
@@ -56,6 +57,7 @@ button :: proc(
 	text: string,
 	accent: Button_Accent = .Normal,
 	font_size: f32 = global_state.style.default_text_size,
+	delay: f32 = 0,
 	active: bool = false,
 	is_loading: bool = false,
 	text_align: f32 = 0,
@@ -81,8 +83,6 @@ button :: proc(
 
 		handle_object_click(object)
 
-		extras.press_time = animate(extras.press_time, 0.2, active)
-
 		extras.hover_time = animate(extras.hover_time, 0.1, .Hovered in object.state.current)
 
 		if .Hovered in object.state.current {
@@ -94,8 +94,7 @@ button :: proc(
 		}
 
 		if object_is_visible(object) {
-			base_color := global_state.style.color.substance
-			base_color = vgo.blend(base_color, global_state.style.color.accent, extras.press_time)
+			base_color := vgo.mix(extras.active_time, style().color.substance, style().color.accent)
 			text_color: vgo.Color
 			rounding := current_options().radius
 
@@ -106,7 +105,7 @@ button :: proc(
 					rounding,
 					vgo.mix(0.2 * extras.hover_time, base_color, vgo.WHITE),
 				)
-				text_color = colors().accent_content
+				text_color = style().color.accent_content
 			case .Outlined:
 				color := vgo.mix(0.2 * extras.hover_time, base_color, vgo.WHITE)
 				vgo.stroke_box(object.box, 1, rounding, paint = color)
@@ -115,17 +114,26 @@ button :: proc(
 					rounding,
 					paint = vgo.fade(color, math.lerp(f32(0.25), f32(0.5), extras.press_time)),
 				)
-				text_color = colors().content
+				text_color = style().color.content
 			case .Subtle:
 				vgo.fill_box(
 					object.box,
 					rounding,
 					paint = vgo.fade(base_color, (extras.hover_time + f32(i32(active))) * 0.25),
 				)
-				text_color = colors().content
+				text_color = style().color.content
 			}
 
 			vgo.push_scissor(vgo.make_box(object.box, rounding))
+			if delay > 0 && extras.press_time > 0 {
+				vgo.fill_box(
+					get_box_cut_left(
+						object.box,
+						box_width(object.box) * min(extras.press_time / delay, 1),
+					),
+					paint = style().color.accent,
+				)
+			}
 			draw_and_update_wave_effects(object, &extras.waves)
 			vgo.pop_scissor()
 
@@ -133,7 +141,7 @@ button :: proc(
 				vgo.spinner(
 					box_center(object.box),
 					box_height(object.box) * 0.3,
-					global_state.style.color.accent_content,
+					style().color.accent_content,
 				)
 			} else {
 				vgo.fill_text_layout(
@@ -152,8 +160,14 @@ button :: proc(
 			}
 		}
 
-		result.clicked = object_was_clicked(object, with = .Left)
+		result.clicked = object_was_clicked(object, with = .Left) && extras.press_time >= delay
 		result.hovered = .Hovered in object.state.previous
+
+		if .Pressed in object.state.previous {
+			extras.press_time += global_state.delta_time
+		} else {
+			extras.press_time = 0
+		}
 
 		end_object()
 	}
@@ -212,9 +226,9 @@ add_image_button :: proc(using info: ^Image_Button) -> bool {
 		vgo.fill_box(
 			self.box,
 			core.style.rounding,
-			paint = vgo.fade(core.style.color.substance, self.hover_time * 0.5),
+			paint = vgo.fade(core.style().color.substance, self.hover_time * 0.5),
 		)
-		// draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style.color.substance)
+		// draw_rounded_box_stroke(self.box, core.style.rounding, 1, core.style().color.substance)
 	}
 
 	clicked = .Clicked in self.state
@@ -260,11 +274,11 @@ add_floating_button :: proc(using info: ^Floating_Button_Info) -> bool {
 			self.box,
 			rounding,
 			vgo.fade(
-				vgo.mix(self.hover_time, core.style.color.field, core.style.color.accent),
+				vgo.mix(self.hover_time, core.style().color.field, core.style().color.accent),
 				math.lerp(f32(0.75), f32(1.0), self.hover_time),
 			),
 		)
-		vgo.fill_text_layout(text_layout, box_center(self.box), core.style.color.content)
+		vgo.fill_text_layout(text_layout, box_center(self.box), core.style().color.content)
 	}
 
 	clicked = .Clicked in self.state

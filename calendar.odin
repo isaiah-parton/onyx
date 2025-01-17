@@ -126,7 +126,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 			set_width(remaining_space().x)
 			WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
 			for weekday in WEEKDAY_ABBREVIATIONS {
-				label(text = weekday, align = 0.5, color = vgo.fade(colors().content, 0.5))
+				label(text = weekday, align = 0.5, color = vgo.fade(style().color.content, 0.5))
 			}
 		}
 
@@ -256,21 +256,21 @@ display_calendar_day :: proc(self: ^Calendar_Day) {
 			vgo.fill_box(
 				self.box,
 				corners,
-				vgo.fade(global_state.style.color.substance, 1 if self.is_this_month else 0.5),
+				vgo.fade(style().color.substance, 1 if self.is_this_month else 0.5),
 			)
 		} else {
 			if .Hovered in self.state.current {
 				vgo.fill_box(
 					self.box,
 					global_state.style.shape.rounding,
-					paint = global_state.style.color.substance,
+					paint = style().color.substance,
 				)
 			} else if self.is_today {
 				vgo.stroke_box(
 					self.box,
 					1,
 					global_state.style.shape.rounding,
-					paint = global_state.style.color.substance,
+					paint = style().color.substance,
 				)
 			}
 		}
@@ -278,7 +278,7 @@ display_calendar_day :: proc(self: ^Calendar_Day) {
 			vgo.fill_box(
 				self.box,
 				global_state.style.shape.rounding,
-				vgo.fade(global_state.style.color.content, self.focus_time),
+				vgo.fade(style().color.content, self.focus_time),
 			)
 		}
 		vgo.fill_text(
@@ -289,8 +289,8 @@ display_calendar_day :: proc(self: ^Calendar_Day) {
 			align = 0.5,
 			paint = vgo.mix(
 				self.focus_time,
-				global_state.style.color.content if self.is_this_month else vgo.fade(global_state.style.color.content, 0.5),
-				global_state.style.color.field,
+				style().color.content if self.is_this_month else vgo.fade(style().color.content, 0.5),
+				style().color.field,
 			),
 		)
 	}

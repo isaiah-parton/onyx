@@ -82,42 +82,10 @@ begin_tooltip :: proc(
 		}
 	}
 
-	bg_color := global_state.style.color.background
-
 	draw_shadow(box)
 	begin_layer(kind = .Topmost, loc = loc)
-	vgo.fill_box(box, global_state.style.rounding, bg_color)
-
-	#partial switch side {
-	case .Top:
-		center := box_center_x(box)
-		left := box.lo.x + global_state.style.rounding
-		right := box.hi.x - global_state.style.rounding
-		vgo.begin_path()
-		vgo.move_to({center, box.hi.y + offset})
-		vgo.quad_bezier_to({center, box.hi.y}, {right, box.hi.y})
-		vgo.line_to({left, box.hi.y})
-		vgo.quad_bezier_to({center, box.hi.y}, {center, box.hi.y + offset})
-		vgo.fill_path(bg_color)
-	case .Bottom:
-		center := box_center_x(box)
-		left := box.lo.x + global_state.style.rounding
-		right := box.hi.x - global_state.style.rounding
-		vgo.begin_path()
-		vgo.move_to({center, box.lo.y - offset})
-		vgo.quad_bezier_to({center, box.lo.y}, {right, box.lo.y})
-		vgo.line_to({left, box.lo.y})
-		vgo.quad_bezier_to({center, box.lo.y}, {center, box.lo.y - offset})
-		vgo.fill_path(bg_color)
-	case .Right:
-		center := box_center_y(box)
-		top := box.lo.y + global_state.style.rounding
-		bottom := box.hi.y - global_state.style.rounding
-	case .Left:
-		center := box_center_y(box)
-		top := box.lo.y + global_state.style.rounding
-		bottom := box.hi.y - global_state.style.rounding
-	}
+	vgo.fill_box(box, global_state.style.rounding, style().color.background)
+	vgo.stroke_box(box, 1, global_state.style.rounding, style().color.substance)
 
 	return true
 }
@@ -125,4 +93,28 @@ begin_tooltip :: proc(
 end_tooltip :: proc() {
 	end_layer()
 	end_object()
+}
+
+avoid_other_tooltip_boxes :: proc(box0: Box, margin: f32, bounds: Box) -> Box {
+	box0 := box0
+	for box1 in global_state.tooltip_boxes {
+		if box1 == box0 do continue
+		min_distance := (box_size(box0) + box_size(box1)) / 2
+		center0 := box_center(box0)
+		center1 := box_center(box1)
+		difference := center1 - center0
+		distance := linalg.length(difference)
+		normal := linalg.normalize(difference)
+		box0 = move_box(box0, normal * linalg.min(distance - min_distance, 0))
+	}
+	return box0
+}
+
+make_tooltip_box :: proc(origin, size, align: [2]f32, bounds: Box) -> Box {
+	box: Box
+	box.lo = linalg.clamp(origin - align * size, bounds.lo, bounds.hi - size)
+	box.hi = box.lo + size
+	box = avoid_other_tooltip_boxes(box, 4, bounds)
+	append(&global_state.tooltip_boxes, box)
+	return box
 }
