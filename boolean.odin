@@ -137,7 +137,8 @@ boolean :: proc(
 						box_height(gadget_box) *
 						((1 - state_time) if value^ else -(1 - state_time)),
 					}
-					vgo.check(gadget_center, gadget_size.y / 4, style().color.field)
+					vgo.fill_box({gadget_center - gadget_size * 0.25, gadget_center + gadget_size * 0.25}, 2, style().color.field)
+					// vgo.check(gadget_center, gadget_size.y / 4, style().color.field)
 				}
 				if state_time > 0 && state_time < 1 {
 					vgo.pop_scissor()

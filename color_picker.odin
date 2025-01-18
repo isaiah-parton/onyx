@@ -155,21 +155,8 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 				if begin_layout(side = .Left) {
 					defer end_layout()
 
-					vgo.fill_box(
-						current_layout().?.box,
-						global_state.style.rounding,
-						paint = style().color.field,
-					)
-					vgo.stroke_box(
-						current_layout().?.box,
-						1,
-						global_state.style.rounding,
-						paint = style().color.substance,
-					)
-
-					shrink(10)
-
 					foreground()
+					shrink(10)
 					alpha_slider(&extras.hsva.w)
 					space(10)
 					hsv_wheel((^[3]f32)(&extras.hsva))

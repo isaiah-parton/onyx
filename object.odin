@@ -336,6 +336,7 @@ focus_object :: proc(object: ^Object) {
 
 foreground :: proc(loc := #caller_location) {
 	object := persistent_object(hash(loc))
+	object.box = current_box()
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
@@ -349,6 +350,7 @@ foreground :: proc(loc := #caller_location) {
 
 background :: proc(loc := #caller_location) {
 	object := persistent_object(hash(loc))
+	object.box = current_box()
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL

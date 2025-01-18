@@ -7,53 +7,113 @@ import "core:math"
 import "core:math/ease"
 import "core:math/linalg"
 
-Graph :: struct {
-	low:  f32,
-	high: f32,
-	offset: [2]f32,
+Graph_Tooltip_Entry :: struct {
+	text_layout: vgo.Text_Layout,
+	color:       vgo.Color,
 }
 
-begin_graph :: proc(grid_step: [2]f32, low, high: f32, offset: [2]f32 = {}, loc := #caller_location) -> bool {
+Graph_Helper_Dot :: struct {
+	point: [2]f32,
+	color: vgo.Color,
+}
+
+Graph :: struct {
+	low, high:               f32,
+	start, end:              f32,
+	step:                    [2]f32,
+	offset:                  [2]f32,
+	active_point_index:      int,
+	show_tooltip:            bool,
+	tooltip_entries:         [dynamic]Graph_Tooltip_Entry,
+	helper_dots:         [dynamic]Graph_Helper_Dot,
+	tooltip_size:            [2]f32,
+	crosshair_snap_distance: f32,
+	crosshair_point:         [2]f32,
+	crosshair_color:         vgo.Color,
+	show_crosshair: bool,
+	snap_crosshair:					bool,
+}
+
+begin_graph :: proc(
+	start, end: f32,
+	low, high: f32,
+	offset: [2]f32 = {},
+	labels: []string = {},
+	format: string = "%.0f",
+	show_tooltip: bool = false,
+	show_crosshair: bool = false,
+	snap_crosshair: bool = false,
+	loc := #caller_location,
+) -> bool {
 	object := persistent_object(hash(loc))
+	object.state.input_mask = OBJECT_STATE_ALL
 	begin_object(object) or_return
 
 	object.box = next_box({})
 
 	range := high - low
 
+	grid_step: [2]f32 = box_size(object.box) / {(end - start - 1), range}
+
 	push_clip(object.box)
 	vgo.push_scissor(vgo.make_box(object.box, global_state.style.rounding))
 
-	vgo.fill_box(object.box, paint = style().color.field)
-	grid_offset := [2]f32{0, (low / range) * box_height(object.box)}
+	// vgo.fill_box(object.box, paint = style().color.field)
+	grid_offset := [2]f32{start * -grid_step.x, (low / range) * box_height(object.box)}
 	grid_size := box_size(object.box)
 	grid_origin := [2]f32{object.box.lo.x, object.box.hi.y}
-	grid_pseudo_origin := grid_origin + linalg.mod(grid_offset, grid_step)
+	grid_pseudo_origin := grid_origin + linalg.mod(grid_offset, grid_step) + {0, -grid_step.y}
+	grid_minor_color := vgo.fade(style().color.substance, 0.5)
+	grid_major_color := style().color.substance
 
-	object.variant = Graph {
-		low  = low,
-		high = high,
-		offset = grid_offset,
+	graph := Graph {
+		low                     = low,
+		high                    = high,
+		start                   = start,
+		end                     = end,
+		step                    = grid_step,
+		offset                  = grid_offset,
+		active_point_index      = -1,
+		show_tooltip            = show_tooltip,
+		crosshair_snap_distance = math.F32_MAX,
+		show_crosshair = show_crosshair,
+		snap_crosshair = snap_crosshair,
+		tooltip_entries         = make(
+			[dynamic]Graph_Tooltip_Entry,
+			allocator = context.temp_allocator,
+		),
+		helper_dots         = make(
+			[dynamic]Graph_Helper_Dot,
+			allocator = context.temp_allocator,
+		),
+	}
+
+	graph.crosshair_point = mouse_point()
+
+	if point_in_box(mouse_point(), object.box) {
+		hover_object(object)
+	}
+	handle_object_click(object)
+
+	if .Hovered in object.state.current {
+		graph.active_point_index = int(
+			start +
+			math.round((global_state.mouse_pos.x - (grid_origin.x + grid_offset.x)) / grid_step.x),
+		)
 	}
 
 	if grid_step.y > 1 {
-		for y: f32 = grid_pseudo_origin.y; y < grid_pseudo_origin.y + grid_size.y; y += grid_step.y {
-			vgo.line(
-				{object.box.lo.x, math.floor(y) + 0.5},
-				{object.box.hi.x, math.floor(y) + 0.5},
-				1,
-				style().color.foreground,
-			)
+		for y: f32 = grid_pseudo_origin.y;
+		    y >= grid_pseudo_origin.y - grid_size.y;
+		    y -= grid_step.y {
+			vgo.line({object.box.lo.x, y + 0.5}, {object.box.hi.x, y + 0.5}, 1, grid_minor_color)
 		}
 	}
 	if grid_step.x > 1 {
-		for x: f32 = grid_pseudo_origin.x; x < grid_pseudo_origin.x + grid_size.x; x += grid_step.x {
-			vgo.line(
-				{math.floor(x) + 0.5, object.box.lo.y},
-				{math.floor(x) + 0.5, object.box.hi.y},
-				1,
-				style().color.foreground,
-			)
+		for x: f32 = grid_pseudo_origin.x;
+		    x <= grid_pseudo_origin.x + grid_size.x;
+		    x += grid_step.x {
+			vgo.line({x + 0.5, object.box.lo.y}, {x + 0.5, object.box.hi.y}, 1, grid_minor_color)
 		}
 	}
 	baseline := grid_origin.y + grid_offset.y
@@ -61,16 +121,77 @@ begin_graph :: proc(grid_step: [2]f32, low, high: f32, offset: [2]f32 = {}, loc 
 		{object.box.lo.x, math.floor(baseline) + 0.5},
 		{object.box.hi.x, math.floor(baseline) + 0.5},
 		1,
-		style().color.substance,
+		grid_major_color,
 	)
+
+	object.variant = graph
 
 	return true
 }
 
-end_graph :: proc() {
+end_graph :: proc() -> bool {
+	object := current_object().? or_return
+	graph := &object.variant.(Graph)
+
+	if graph.show_crosshair {
+		color := graph.crosshair_color
+		if color == {} {
+			color = style().color.content
+		}
+		vgo.line(
+			{object.box.lo.x, graph.crosshair_point.y},
+			{object.box.hi.x, graph.crosshair_point.y},
+			1,
+			color,
+		)
+		vgo.line(
+			{graph.crosshair_point.x, object.box.lo.y},
+			{graph.crosshair_point.x, object.box.hi.y},
+			1,
+			color,
+		)
+	}
+
+	if graph.show_tooltip && .Hovered in object.state.current && len(graph.tooltip_entries) > 0 {
+		tooltip_origin := mouse_point()
+		tooltip_padding := style().text_padding
+		tooltip_size := graph.tooltip_size + tooltip_padding * 2
+		tooltip_size.x += 15
+		tooltip_box := make_tooltip_box(
+			tooltip_origin + {-10, 0},
+			tooltip_size,
+			{1, 0.5},
+			object.box,
+		)
+
+		vgo.fill_box(tooltip_box, style().rounding, style().color.field)
+		vgo.stroke_box(tooltip_box, 1, style().rounding, style().color.substance)
+		descent: f32
+		#reverse for &entry, i in graph.tooltip_entries {
+			vgo.fill_circle(tooltip_box.lo + 10 + {0, tooltip_padding.y + descent}, 3, entry.color)
+			vgo.fill_text_layout(
+				entry.text_layout,
+				{tooltip_box.hi.x, tooltip_box.lo.y} +
+				{-tooltip_padding.x, tooltip_padding.y} +
+				{0, descent},
+				align = {1, 0},
+				paint = style().color.content,
+			)
+			descent += entry.text_layout.size.y
+		}
+	}
+
+	{
+		for helper_dot in graph.helper_dots {
+			vgo.fill_circle(helper_dot.point, 6, helper_dot.color)
+			vgo.fill_circle(helper_dot.point, 5, style().color.field)
+		}
+	}
+
 	vgo.pop_scissor()
 	pop_clip()
 	end_object()
+	return true
 }
 
 Line_Chart_Fill_Style :: enum {
@@ -89,6 +210,19 @@ curve_line_chart :: proc(
 	object := current_object().?
 
 	graph := &object.variant.(Graph)
+	if graph.active_point_index >= 0 && graph.active_point_index < len(data) {
+		text_layout := vgo.make_text_layout(
+			fmt.tprintf(format, data[graph.active_point_index]),
+			style().default_text_size,
+			style().default_font,
+		)
+		graph.tooltip_size.x = max(graph.tooltip_size.x, text_layout.size.x)
+		graph.tooltip_size.y += text_layout.size.y
+		append(
+			&graph.tooltip_entries,
+			Graph_Tooltip_Entry{text_layout = text_layout, color = color},
+		)
+	}
 	inner_box := object.box
 
 	if point_in_box(mouse_point(), object.box) {
@@ -97,26 +231,32 @@ curve_line_chart :: proc(
 	handle_object_click(object)
 
 	if object_is_visible(object) {
-		point_spacing: f32 = (inner_box.hi.x - inner_box.lo.x) / f32(len(data) - 1)
-		active_point_index: int = -1
-		if .Hovered in object.state.current {
-			active_point_index = int(
-				math.round((global_state.mouse_pos.x - inner_box.lo.x) / point_spacing),
-			)
-		}
-
 		points := make([dynamic][2]f32, allocator = context.temp_allocator)
 		for value, i in data {
+			point := [2]f32 {
+				inner_box.lo.x +
+				((f32(i) - graph.start) / (graph.end - graph.start - 1)) *
+					(inner_box.hi.x - inner_box.lo.x),
+				inner_box.hi.y +
+				(f32(value - graph.low) / f32(graph.high - graph.low)) *
+					(inner_box.lo.y - inner_box.hi.y),
+			}
 			append(
 				&points,
-				[2]f32 {
-					inner_box.lo.x +
-					(f32(i) / f32(len(data) - 1)) * (inner_box.hi.x - inner_box.lo.x),
-					inner_box.hi.y +
-					(f32(value - graph.low) / f32(graph.high - graph.low)) *
-						(inner_box.lo.y - inner_box.hi.y),
-				},
+				point,
 			)
+			if graph.active_point_index == i {
+				append(&graph.helper_dots, Graph_Helper_Dot{point = point, color = color})
+				if graph.snap_crosshair {
+					mouse_distance := linalg.distance(point, mouse_point())
+					snap_distance := graph.crosshair_snap_distance
+					if mouse_distance < snap_distance {
+						graph.crosshair_snap_distance = mouse_distance
+						graph.crosshair_point = point
+						graph.crosshair_color = color
+					}
+				}
+			}
 		}
 
 		baseline := inner_box.hi.y + graph.offset.y
@@ -183,44 +323,15 @@ curve_line_chart :: proc(
 			shape1.width = 1
 			shape0.paint = stroke_paint
 			shape1.paint = stroke_paint
-			shape0.quad_max.y = inner_box.hi.y
-			shape1.quad_max.y = inner_box.hi.y
+			shape0.quad_max.y = max(a.y, ab.y, mp.y) + 1
+			shape1.quad_max.y = max(d.y, cd.y, mp.y) + 1
 			vgo.add_shape(shape0)
 			vgo.add_shape(shape1)
 		}
 
-		for point, i in points {
-			point_time: f32 = f32(i) / f32(len(data) - 1)
-			if show_points {
+		if show_points {
+			for point, i in points {
 				vgo.fill_circle(point, 3, color)
-			}
-			if active_point_index == i {
-				vgo.fill_circle(point, 6, color)
-				vgo.fill_circle(point, 5, style().color.field)
-
-				tooltip_text_layout := vgo.make_text_layout(
-					fmt.tprintf(format, data[i]),
-					global_state.style.default_text_size * 0.75,
-					global_state.style.default_font,
-				)
-				tooltip_size := tooltip_text_layout.size + global_state.style.text_padding * 2
-				tooltip_size.x += tooltip_text_layout.size.y
-				tooltip_margin :: 10
-				tooltip_box := make_tooltip_box(point + {0, -tooltip_margin}, tooltip_size, {0.5, 1}, object.box)
-				previous_draw_order := vgo.get_draw_order()
-				vgo.set_draw_order(99)
-				vgo.disable_scissor()
-				vgo.fill_box(tooltip_box, 4, style().color.field)
-				vgo.stroke_box(tooltip_box, 1, 4, style().color.substance)
-				vgo.fill_circle(tooltip_box.lo + box_height(tooltip_box) / 2, 3, paint = color)
-				vgo.fill_text_layout(
-					tooltip_text_layout,
-					{tooltip_box.hi.x - global_state.style.text_padding.x, box_center_y(tooltip_box)},
-					align = {1, 0.5},
-					paint = style().color.content,
-				)
-				vgo.enable_scissor()
-				vgo.set_draw_order(previous_draw_order)
 			}
 		}
 	}

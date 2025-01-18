@@ -99,11 +99,11 @@ avoid_other_tooltip_boxes :: proc(box0: Box, margin: f32, bounds: Box) -> Box {
 	box0 := box0
 	for box1 in global_state.tooltip_boxes {
 		if box1 == box0 do continue
-		min_distance := (box_size(box0) + box_size(box1)) / 2
+		min_distance := (box_size(box0) + box_size(box1)) / 2 + margin
 		center0 := box_center(box0)
 		center1 := box_center(box1)
 		difference := center1 - center0
-		distance := linalg.length(difference)
+		distance := linalg.abs(difference)
 		normal := linalg.normalize(difference)
 		box0 = move_box(box0, normal * linalg.min(distance - min_distance, 0))
 	}
@@ -115,6 +115,7 @@ make_tooltip_box :: proc(origin, size, align: [2]f32, bounds: Box) -> Box {
 	box.lo = linalg.clamp(origin - align * size, bounds.lo, bounds.hi - size)
 	box.hi = box.lo + size
 	box = avoid_other_tooltip_boxes(box, 4, bounds)
+	box = snapped_box(box)
 	append(&global_state.tooltip_boxes, box)
 	return box
 }

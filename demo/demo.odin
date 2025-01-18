@@ -118,11 +118,13 @@ Graph_Section_State :: struct {
 	displayed_low:  f32,
 	displayed_high: f32,
 	data:           [20]f32,
-	old_data:           [20]f32,
+	old_data:       [20]f32,
 	low:            f32,
 	high:           f32,
 	color:          vgo.Color,
 	show_points:    bool,
+	show_crosshair: bool,
+	snap_crosshair: bool,
 	style:          onyx.Line_Chart_Fill_Style,
 }
 
@@ -139,7 +141,9 @@ graph_section :: proc(state: ^Graph_Section_State) {
 		space(10)
 		color_picker(&state.color)
 		space(10)
-		boolean(&state.show_points, "Show Points")
+		boolean(&state.show_points, "Points")
+		boolean(&state.show_crosshair, "Crosshair")
+		boolean(&state.snap_crosshair, "Snap Crosshair")
 		space(10)
 		option_slider(reflect.enum_field_names(Line_Chart_Fill_Style), &state.style)
 		end_layout()
@@ -147,15 +151,19 @@ graph_section :: proc(state: ^Graph_Section_State) {
 	space(10)
 	set_size(remaining_space())
 
-	low := state.displayed_low - 10
-	high := state.displayed_high + 10
+	low := state.displayed_low - 2
+	high := state.displayed_high + 2
 	median := (low + high) / 2
-	if begin_graph(30, low, high, offset = {0, median * -30}) {
-		curve_line_chart(
-			state.old_data[:],
-			vgo.fade(state.color, 0.5),
-			fill_style = .None,
-		)
+	if begin_graph(
+		0,
+		20,
+		low,
+		high,
+		offset = {0, median * -30},
+		show_crosshair = state.show_crosshair,
+		snap_crosshair = state.snap_crosshair,
+	) {
+		curve_line_chart(state.old_data[:], vgo.fade(state.color, 0.5), fill_style = .None)
 		curve_line_chart(
 			state.displayed_data[:],
 			state.color,

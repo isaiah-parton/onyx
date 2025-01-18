@@ -158,11 +158,11 @@ current_axis :: proc() -> Axis {
 }
 
 current_box :: proc() -> Box {
-	if object, ok := current_object().?; ok {
-		return object.box
-	}
 	if layout, ok := current_layout().?; ok {
 		return layout.box
+	}
+	if object, ok := current_object().?; ok {
+		return object.box
 	}
 	return view_box()
 }

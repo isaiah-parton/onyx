@@ -93,6 +93,8 @@ button :: proc(
 			hover_object(object)
 		}
 
+		extras.active_time = animate(extras.active_time, 0.15, active)
+
 		if object_is_visible(object) {
 			base_color := vgo.mix(extras.active_time, style().color.substance, style().color.accent)
 			text_color: vgo.Color
