@@ -4,7 +4,7 @@ import "../vgo"
 
 Color_Scheme :: struct {
 	substance, hover, accent, accent_content, content, shadow: vgo.Color,
-	field, foreground, background: vgo.Color,
+	field, foreground, foreground_accent, background: vgo.Color,
 	checkers: [2]vgo.Color,
 }
 
@@ -89,6 +89,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		},
 		background = {35, 35, 35, 255},
 		foreground = {45, 45, 45, 255},
+		foreground_accent = {35, 35, 35, 255},
 		field = {35, 10, 10, 255},
 		substance = {100, 100, 100, 255},
 		accent = {216, 176, 66 , 255},

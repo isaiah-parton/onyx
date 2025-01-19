@@ -314,28 +314,33 @@ raw_input :: proc(
 			if .Active in object.state.previous {
 				if content_layout.glyph_selection[0] != content_layout.glyph_selection[1] {
 					for &line, i in content_layout.lines {
-						selection := content_layout.glyph_selection
-						range := [2]int {
-							max(min(selection.x, selection.y), line.glyph_range[0]),
-							min(max(selection.x, selection.y), line.glyph_range[1]),
+						to_ordered_range :: proc(range: [2]$T) -> [2]T {
+							range := range
+							if range.x > range.y {
+								range = range.yx
+							}
+							return range
 						}
-						if range[0] < range[1] {
+						selection_range := to_ordered_range(content_layout.glyph_selection)
+						highlight_range := [2]int {
+							max(selection_range.x, line.glyph_range.x),
+							min(selection_range.y, line.glyph_range.y),
+						}
+						if highlight_range.x <= highlight_range.y {
 							box := Box{
-								text_origin + content_layout.glyphs[range[0]].offset,
+								text_origin + content_layout.glyphs[highlight_range.x].offset,
 								text_origin +
-								content_layout.glyphs[range[1]].offset +
+								content_layout.glyphs[highlight_range.y].offset +
 								{0, line_height},
 							}
+							box.hi.x += content_layout.font.space_advance * content_layout.font_scale * f32(i32(selection_range.y > line.glyph_range.y))// Newline highlighting
 							vgo.fill_box(
-								box,
+								snapped_box(box),
 								paint = vgo.fade(style().color.accent, 1.0 / 3.0),
 							)
 						}
 					}
 				}
-				vgo.disable_scissor()
-				vgo.fill_text(fmt.tprint(content_layout.glyph_selection), 14, object.box.hi, style().default_font, paint = vgo.WHITE)
-				vgo.enable_scissor()
 			}
 			vgo.fill_text_layout(content_layout, text_origin, paint = style().color.content)
 			if .Active in object.state.previous && len(content_layout.glyphs) > 0 {

@@ -18,8 +18,8 @@ Graph_Helper_Dot :: struct {
 }
 
 Graph :: struct {
-	low, high:               f32,
-	start, end:              f32,
+time_range: [2]f32,
+value_range: [2]f32,
 	step:                    [2]f32,
 	offset:                  [2]f32,
 	active_point_index:      int,
@@ -35,8 +35,8 @@ Graph :: struct {
 }
 
 begin_graph :: proc(
-	start, end: f32,
-	low, high: f32,
+value_range: [2]f32,
+time_range: [2]f32,
 	offset: [2]f32 = {},
 	labels: []string = {},
 	format: string = "%.0f",
@@ -51,26 +51,21 @@ begin_graph :: proc(
 
 	object.box = next_box({})
 
-	range := high - low
-
-	grid_step: [2]f32 = box_size(object.box) / {(end - start - 1), range}
+	grid_step: [2]f32 = box_size(object.box) / {time_range.y - time_range.x - 1, value_range.y - value_range.x}
 
 	push_clip(object.box)
 	vgo.push_scissor(vgo.make_box(object.box, global_state.style.rounding))
 
-	// vgo.fill_box(object.box, paint = style().color.field)
-	grid_offset := [2]f32{start * -grid_step.x, (low / range) * box_height(object.box)}
+	grid_offset := [2]f32{time_range.x * -grid_step.x, value_range.x * grid_step.y}
 	grid_size := box_size(object.box)
 	grid_origin := [2]f32{object.box.lo.x, object.box.hi.y}
 	grid_pseudo_origin := grid_origin + linalg.mod(grid_offset, grid_step) + {0, -grid_step.y}
-	grid_minor_color := vgo.fade(style().color.substance, 0.5)
+	grid_minor_color := style().color.foreground
 	grid_major_color := style().color.substance
 
 	graph := Graph {
-		low                     = low,
-		high                    = high,
-		start                   = start,
-		end                     = end,
+		time_range = time_range,
+		value_range = value_range,
 		step                    = grid_step,
 		offset                  = grid_offset,
 		active_point_index      = -1,
@@ -97,11 +92,12 @@ begin_graph :: proc(
 
 	if .Hovered in object.state.current {
 		graph.active_point_index = int(
-			start +
+			time_range.x +
 			math.round((global_state.mouse_pos.x - (grid_origin.x + grid_offset.x)) / grid_step.x),
 		)
 	}
 
+	vgo.fill_box(object.box, paint = style().color.foreground_accent)
 	if grid_step.y > 1 {
 		for y: f32 = grid_pseudo_origin.y;
 		    y >= grid_pseudo_origin.y - grid_size.y;
@@ -235,10 +231,10 @@ curve_line_chart :: proc(
 		for value, i in data {
 			point := [2]f32 {
 				inner_box.lo.x +
-				((f32(i) - graph.start) / (graph.end - graph.start - 1)) *
+				((f32(i) - graph.time_range.x) / (graph.time_range.y - graph.time_range.x - 1)) *
 					(inner_box.hi.x - inner_box.lo.x),
 				inner_box.hi.y +
-				(f32(value - graph.low) / f32(graph.high - graph.low)) *
+				(f32(value - graph.value_range.x) / f32(graph.value_range.y - graph.value_range.x)) *
 					(inner_box.lo.y - inner_box.hi.y),
 			}
 			append(

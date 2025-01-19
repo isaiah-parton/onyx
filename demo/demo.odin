@@ -117,6 +117,7 @@ Graph_Section_State :: struct {
 	displayed_data: [20]f32,
 	displayed_low:  f32,
 	displayed_high: f32,
+	time_range: [2]f32,
 	data:           [20]f32,
 	old_data:       [20]f32,
 	low:            f32,
@@ -142,10 +143,19 @@ graph_section :: proc(state: ^Graph_Section_State) {
 		color_picker(&state.color)
 		space(10)
 		boolean(&state.show_points, "Points")
+		space(10)
 		boolean(&state.show_crosshair, "Crosshair")
+		space(10)
 		boolean(&state.snap_crosshair, "Snap Crosshair")
 		space(10)
 		option_slider(reflect.enum_field_names(Line_Chart_Fill_Style), &state.style)
+		end_layout()
+	}
+	space(10)
+	if begin_layout(.Left) {
+		set_align(.Center)
+		set_width(0)
+		range_slider(&state.time_range.x, &state.time_range.y, 0, 20)
 		end_layout()
 	}
 	space(10)
@@ -155,10 +165,8 @@ graph_section :: proc(state: ^Graph_Section_State) {
 	high := state.displayed_high + 2
 	median := (low + high) / 2
 	if begin_graph(
-		0,
-		20,
-		low,
-		high,
+		time_range = state.time_range,
+		value_range = {low, high},
 		offset = {0, median * -30},
 		show_crosshair = state.show_crosshair,
 		snap_crosshair = state.snap_crosshair,
@@ -237,6 +245,7 @@ main :: proc() {
 
 	rand.reset(rand.uint64())
 	state.graph_section.color = vgo.GREEN
+	state.graph_section.time_range = {0, 20}
 	randomize_graphs(&state.graph_section)
 
 	for {
@@ -297,11 +306,6 @@ main :: proc() {
 
 					set_width(remaining_space().x)
 					if begin_layout(.Top) {
-						vgo.fill_box(
-							current_layout().?.box,
-							rounded_corners(ALL_CORNERS),
-							paint = style().color.background,
-						)
 						shrink(10)
 
 						#partial switch state.current_section {

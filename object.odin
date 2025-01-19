@@ -63,6 +63,7 @@ Object_Variant :: union {
 	Calendar,
 	Calendar_Day,
 	Graph,
+	Range_Slider,
 }
 
 Object :: struct {
