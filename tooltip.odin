@@ -85,7 +85,7 @@ begin_tooltip :: proc(
 	draw_shadow(box)
 	begin_layer(kind = .Topmost, loc = loc)
 	vgo.fill_box(box, global_state.style.rounding, style().color.background)
-	vgo.stroke_box(box, 1, global_state.style.rounding, style().color.substance)
+	vgo.stroke_box(box, 1, global_state.style.rounding, style().color.button)
 
 	return true
 }

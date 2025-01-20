@@ -16,13 +16,17 @@ Boolean :: struct {
 	animation_timer: f32,
 }
 
+Boolean_Result :: struct {
+	changed: bool,
+}
+
 boolean :: proc(
 	value: ^bool,
 	text: string = "",
 	text_side: Side = .Left,
 	type: Boolean_Type = .Checkbox,
 	loc := #caller_location,
-) {
+) -> (result: Boolean_Result) {
 	object := persistent_object(hash(loc))
 	if object.variant == nil {
 		object.variant = Boolean{}
@@ -110,13 +114,15 @@ boolean :: proc(
 				vgo.fill_box(
 					{{gadget_center.x, object.box.lo.y}, object.box.hi},
 					{0, global_state.style.rounding, 0, global_state.style.rounding},
-					vgo.fade(style().color.substance, 0.2),
+					vgo.fade(style().color.button, 0.2),
 				)
 			}
 
 			opacity: f32 = 0.5 if object.disabled else 1
 
 			state_time := ease.quadratic_in_out(extras.animation_timer)
+			gadget_fill_color := style().color.accent
+			gadget_accent_color := vgo.mix(0.333, gadget_fill_color, vgo.BLACK)
 
 			switch type {
 			case .Checkbox:
@@ -129,7 +135,7 @@ boolean :: proc(
 				vgo.fill_box(
 					gadget_box,
 					global_state.style.rounding,
-					vgo.fade(style().color.accent, state_time),
+					vgo.fade(gadget_fill_color, state_time),
 				)
 				if state_time > 0 {
 					gadget_center += {
@@ -137,7 +143,7 @@ boolean :: proc(
 						box_height(gadget_box) *
 						((1 - state_time) if value^ else -(1 - state_time)),
 					}
-					vgo.fill_box({gadget_center - gadget_size * 0.25, gadget_center + gadget_size * 0.25}, 2, style().color.field)
+					vgo.fill_box({gadget_center - gadget_size * 0.25, gadget_center + gadget_size * 0.25}, 2, gadget_accent_color)
 					// vgo.check(gadget_center, gadget_size.y / 4, style().color.field)
 				}
 				if state_time > 0 && state_time < 1 {
@@ -149,13 +155,13 @@ boolean :: proc(
 				vgo.fill_circle(
 					gadget_center,
 					radius,
-					vgo.mix(state_time, style().color.field, style().color.accent),
+					vgo.mix(state_time, style().color.field, gadget_fill_color),
 				)
 				if state_time > 0 {
 					vgo.fill_circle(
 						gadget_center,
 						(radius - 5) * state_time,
-						vgo.fade(style().color.field, state_time),
+						vgo.fade(gadget_accent_color, state_time),
 					)
 				}
 			case .Switch:
@@ -179,7 +185,7 @@ boolean :: proc(
 				vgo.fill_circle(
 					lever_center,
 					inner_radius,
-					vgo.mix(state_time, style().color.foreground, style().color.field),
+					vgo.mix(state_time, style().color.foreground, gadget_accent_color),
 				)
 			}
 
@@ -212,6 +218,8 @@ boolean :: proc(
 
 		if .Clicked in object.state.current {
 			value^ = !value^
+			result.changed = true
 		}
 	}
+	return
 }

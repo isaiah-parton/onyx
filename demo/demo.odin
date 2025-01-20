@@ -33,6 +33,7 @@ Section :: enum {
 	Text,
 	Chart,
 	Grid,
+	Theme,
 }
 
 State :: struct {
@@ -41,6 +42,7 @@ State :: struct {
 	graph_section:   Graph_Section_State,
 	text_section:    Text_Section_State,
 	analog_section:  Analog_Section_State,
+	theme_section:   Theme_Section_State,
 	current_section: Section,
 }
 
@@ -117,7 +119,7 @@ Graph_Section_State :: struct {
 	displayed_data: [20]f32,
 	displayed_low:  f32,
 	displayed_high: f32,
-	time_range: [2]f32,
+	time_range:     [2]f32,
 	data:           [20]f32,
 	old_data:       [20]f32,
 	low:            f32,
@@ -170,6 +172,7 @@ graph_section :: proc(state: ^Graph_Section_State) {
 		offset = {0, median * -30},
 		show_crosshair = state.show_crosshair,
 		snap_crosshair = state.snap_crosshair,
+		show_tooltip = true,
 	) {
 		curve_line_chart(state.old_data[:], vgo.fade(state.color, 0.5), fill_style = .None)
 		curve_line_chart(
@@ -205,6 +208,54 @@ randomize_graphs :: proc(state: ^Graph_Section_State) {
 		state.low = min(state.low, value)
 		state.high = max(state.high, value)
 		last_value = value
+	}
+}
+
+Theme_Section_State :: struct {}
+
+theme_section :: proc(state: ^Theme_Section_State) {
+	using onyx
+	struct_info := runtime.type_info_base(type_info_of(onyx.Color_Scheme)).variant.(runtime.Type_Info_Struct)
+	set_width(remaining_space().x)
+	set_height(26)
+	set_side(.Bottom)
+	if begin_layout(.Right) {
+		set_width(0)
+		if button("Reset").clicked {
+			style().color = dark_color_scheme()
+		}
+		space(10)
+		slider(&style().rounding, 0, 10)
+		end_layout()
+	}
+
+	set_side(.Top)
+	for i in 0..<struct_info.field_count {
+		push_id(int(i))
+		if begin_layout(.Left) {
+			color := (^vgo.Color)(uintptr(&style().color) + struct_info.offsets[i])
+			set_align(.Center)
+			set_size_mode(.Fixed)
+			set_width(150)
+			label(struct_info.names[i])
+			space(10)
+			set_width(remaining_space().y)
+			set_rounded_corners({.Top_Left, .Bottom_Right})
+			color_picker(color, true)
+			set_rounded_corners(ALL_CORNERS)
+			space(10)
+			set_width((remaining_space().x - 30) / 4)
+			slider(&color.r, 0, 255)
+			space(10)
+			slider(&color.g, 0, 255)
+			space(10)
+			slider(&color.b, 0, 255)
+			space(10)
+			slider(&color.a, 0, 255)
+			end_layout()
+		}
+		space(10)
+		pop_id()
 	}
 }
 
@@ -292,7 +343,7 @@ main :: proc() {
 								" ",
 								allocator = context.temp_allocator,
 							)
-							if button(text, active = state.current_section == section).clicked {
+							if button(text, active = state.current_section == section).pressed {
 								state.current_section = section
 							}
 							space(1)
@@ -319,11 +370,12 @@ main :: proc() {
 							text_section(&state.text_section)
 						case .Chart:
 							graph_section(&state.graph_section)
+						case .Theme:
+							theme_section(&state.theme_section)
 						}
 
 						end_layout()
 					}
-
 
 					end_layout()
 				}

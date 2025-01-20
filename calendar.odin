@@ -256,21 +256,21 @@ display_calendar_day :: proc(self: ^Calendar_Day) {
 			vgo.fill_box(
 				self.box,
 				corners,
-				vgo.fade(style().color.substance, 1 if self.is_this_month else 0.5),
+				vgo.fade(style().color.button, 1 if self.is_this_month else 0.5),
 			)
 		} else {
 			if .Hovered in self.state.current {
 				vgo.fill_box(
 					self.box,
 					global_state.style.shape.rounding,
-					paint = style().color.substance,
+					paint = style().color.button,
 				)
 			} else if self.is_today {
 				vgo.stroke_box(
 					self.box,
 					1,
 					global_state.style.shape.rounding,
-					paint = style().color.substance,
+					paint = style().color.button,
 				)
 			}
 		}

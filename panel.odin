@@ -169,7 +169,7 @@ end_panel :: proc() {
 			if point_in_box(mouse_point(), object.box) {
 				hover_object(object)
 			}
-			icon_color := style().color.substance
+			icon_color := style().color.button
 			if .Hovered in object.state.current {
 				icon_color = style().color.accent
 				global_state.cursor_type = .Resize_NWSE

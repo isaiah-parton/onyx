@@ -12,6 +12,13 @@ Options :: struct {
 	size: [2]f32,
 	align: Align,
 	radius: [4]f32,
+	size_mode: Size_Mode,
+}
+
+Size_Mode :: enum {
+	Max,
+	Min,
+	Fixed,
 }
 
 current_options :: proc() -> ^Options {
@@ -107,7 +114,14 @@ next_box_from_layout :: proc(layout: ^Layout, options: ^Options, size: [2]f32, f
 
 	size := size
 	if !fixed {
-		size = linalg.max(size, options.size)
+		switch options.size_mode {
+		case .Max:
+			size = linalg.max(size, options.size)
+		case .Min:
+			size = linalg.min(size, options.size)
+		case .Fixed:
+			size = options.size
+		}
 	}
 
 	if !layout.does_grow {
@@ -205,6 +219,10 @@ shrink :: proc(amount: [4]f32) {
 space :: proc(amount: f32) {
 	layout := current_layout().?
 	cut_box(&layout.box, current_options().side, amount)
+}
+
+set_size_mode :: proc(mode: Size_Mode) {
+	current_options().size_mode = mode
 }
 
 set_size :: proc(size: [2]f32) {

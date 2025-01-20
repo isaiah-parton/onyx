@@ -5,6 +5,12 @@ import "base:intrinsics"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
+import "core:strings"
+import "core:strconv"
+
+Slider :: struct {
+	input: Input,
+}
 
 slider :: proc(
 	value: ^$T,
@@ -18,66 +24,82 @@ slider :: proc(
 		return
 	}
 	object := persistent_object(hash(loc))
-	object.size = global_state.style.visual_size * {1, 0.75}
+	object.size = global_state.style.visual_size
 	object.box = next_box(object.size)
+	if object.variant == nil {
+		object.variant = Slider{}
+	}
+	extras := &object.variant.(Slider)
 	if begin_object(object) {
 		defer end_object()
 
-		mouse := mouse_point()
-		is_visible := object_is_visible(object)
-		handle_object_click(object, true)
-
-		if (.Pressed in object.state.current) {
-			value^ = T(
-				clamp(
-					lower +
-					f64((mouse.x - object.box.lo.x) / box_width(object.box)) * f64(upper - lower),
-					max(lower, lower_limit),
-					min(upper, upper_limit),
-				),
-			)
-			draw_frames(1)
-		}
-
-		time := f32(clamp((f64(value^) - lower) / (upper - lower), 0, 1))
-
-		if point_in_box(mouse, object.box) {
+		if point_in_box(mouse_point(), object.box) {
 			hover_object(object)
 		}
 
-		if .Hovered in object.state.current {
-			set_cursor(.Resize_EW)
+		handle_object_click(object, true)
+
+		if .Pressed in (object.state.previous - object.state.current) && mouse_point() == object.input.click_point {
+			object.state.current += {.Active}
 		}
 
-		if is_visible {
-			radius := current_options().radius
-			vgo.push_scissor(vgo.make_box(object.box, radius))
-			vgo.fill_box(object.box, paint = style().color.field)
-			vgo.fill_box(
-				get_box_cut_left(object.box, box_width(object.box) * time),
-				paint = style().color.substance,
-			)
-			if lower_limit > lower {
-				x :=
-					object.box.lo.x +
-					f32((lower_limit - lower) / (upper - lower)) * box_width(object.box)
-				vgo.line({x, object.box.lo.y}, {x, object.box.hi.y}, 1, style().color.accent)
+		if .Active in object.state.current {
+			if .Active not_in object.state.previous {
+				strings.builder_reset(&extras.input.builder)
+				fmt.sbprintf(&extras.input.builder, format, value^)
+				extras.input.editor.selection = {len(extras.input.builder.buf), 0}
 			}
-			if upper_limit < upper {
-				x :=
-					object.box.lo.x +
-					f32((upper_limit - lower) / (upper - lower)) * box_width(object.box)
-				vgo.line({x, object.box.lo.y}, {x, object.box.hi.y}, 1, style().color.accent)
+			input_from_object(object, &extras.input, fmt.tprintf(format, value^), is_monospace = true)
+			if .Changed in object.state.current {
+				if parsed_value, ok := strconv.parse_f64(strings.to_string(extras.input.builder)); ok {
+					value^ = T(clamp(parsed_value, max(lower, lower_limit), min(upper, upper_limit)))
+				}
 			}
-			vgo.fill_text(
-				fmt.tprintf(format, value^),
-				style().default_text_size,
-				box_center(object.box),
-				font = style().monospace_font,
-				align = 0.5,
-				paint = style().color.content,
-			)
-			vgo.pop_scissor()
+		} else {
+			if (.Pressed in object.state.current) {
+				value^ = T(
+					clamp(
+						f64(value^) +
+						f64((global_state.mouse_pos.x - global_state.last_mouse_pos.x) / box_width(object.box)) * f64(upper - lower),
+						max(lower, lower_limit),
+						min(upper, upper_limit),
+					),
+				)
+				draw_frames(1)
+			}
+			if .Hovered in object.state.current {
+				set_cursor(.Resize_EW)
+			}
+			if object_is_visible(object) {
+				radius := current_options().radius
+				vgo.push_scissor(vgo.make_box(object.box, radius))
+				vgo.fill_box(object.box, paint = style().color.button_background)
+				vgo.fill_box(
+					get_box_cut_left(object.box, box_width(object.box) * f32(clamp((f64(value^) - lower) / (upper - lower), 0, 1))),
+					paint = style().color.button,
+				)
+				if lower_limit > lower {
+					x :=
+						object.box.lo.x +
+						f32((lower_limit - lower) / (upper - lower)) * box_width(object.box)
+					vgo.line({x, object.box.lo.y}, {x, object.box.hi.y}, 1, style().color.accent)
+				}
+				if upper_limit < upper {
+					x :=
+						object.box.lo.x +
+						f32((upper_limit - lower) / (upper - lower)) * box_width(object.box)
+					vgo.line({x, object.box.lo.y}, {x, object.box.hi.y}, 1, style().color.accent)
+				}
+				vgo.fill_text(
+					fmt.tprintf(format, value^),
+					style().default_text_size,
+					box_center(object.box),
+					font = style().monospace_font,
+					align = 0.5,
+					paint = style().color.content,
+				)
+				vgo.pop_scissor()
+			}
 		}
 	}
 }
@@ -151,23 +173,7 @@ range_slider :: proc(
 						object.box.hi.y,
 					},
 				},
-				paint = style().color.substance,
-			)
-			vgo.fill_text(
-				fmt.tprintf(format, lower_value^),
-				style().default_text_size,
-				{object.box.lo.x + style().text_padding.x, box_center_y(object.box)},
-				font = style().monospace_font,
-				align = {0, 0.5},
-				paint = style().color.content,
-			)
-			vgo.fill_text(
-				fmt.tprintf(format, upper_value^),
-				style().default_text_size,
-				{object.box.hi.x - style().text_padding.x, box_center_y(object.box)},
-				font = style().monospace_font,
-				align = {1, 0.5},
-				paint = style().color.content,
+				paint = style().color.button,
 			)
 			vgo.pop_scissor()
 		}

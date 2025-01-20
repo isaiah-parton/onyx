@@ -190,7 +190,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) {
 				(object.state.current >= {.Hovered}) && point_in_box(global_state.mouse_pos, option_box)
 			if int(index^) != i {
 				if hovered {
-					if .Clicked in object.state.current {
+					if .Pressed in object.state.current && index^ != T(i) {
 						index^ = T(i)
 						object.state.current += {.Changed}
 					}

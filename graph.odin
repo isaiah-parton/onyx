@@ -18,25 +18,25 @@ Graph_Helper_Dot :: struct {
 }
 
 Graph :: struct {
-time_range: [2]f32,
-value_range: [2]f32,
+	time_range:              [2]f32,
+	value_range:             [2]f32,
 	step:                    [2]f32,
 	offset:                  [2]f32,
 	active_point_index:      int,
 	show_tooltip:            bool,
 	tooltip_entries:         [dynamic]Graph_Tooltip_Entry,
-	helper_dots:         [dynamic]Graph_Helper_Dot,
+	helper_dots:             [dynamic]Graph_Helper_Dot,
 	tooltip_size:            [2]f32,
 	crosshair_snap_distance: f32,
 	crosshair_point:         [2]f32,
 	crosshair_color:         vgo.Color,
-	show_crosshair: bool,
-	snap_crosshair:					bool,
+	show_crosshair:          bool,
+	snap_crosshair:          bool,
 }
 
 begin_graph :: proc(
-value_range: [2]f32,
-time_range: [2]f32,
+	value_range: [2]f32,
+	time_range: [2]f32,
 	offset: [2]f32 = {},
 	labels: []string = {},
 	format: string = "%.0f",
@@ -51,7 +51,8 @@ time_range: [2]f32,
 
 	object.box = next_box({})
 
-	grid_step: [2]f32 = box_size(object.box) / {time_range.y - time_range.x - 1, value_range.y - value_range.x}
+	grid_step: [2]f32 =
+		box_size(object.box) / {time_range.y - time_range.x - 1, value_range.y - value_range.x}
 
 	push_clip(object.box)
 	vgo.push_scissor(vgo.make_box(object.box, global_state.style.rounding))
@@ -61,23 +62,23 @@ time_range: [2]f32,
 	grid_origin := [2]f32{object.box.lo.x, object.box.hi.y}
 	grid_pseudo_origin := grid_origin + linalg.mod(grid_offset, grid_step) + {0, -grid_step.y}
 	grid_minor_color := style().color.foreground
-	grid_major_color := style().color.substance
+	grid_major_color := style().color.button
 
 	graph := Graph {
-		time_range = time_range,
-		value_range = value_range,
+		time_range              = time_range,
+		value_range             = value_range,
 		step                    = grid_step,
 		offset                  = grid_offset,
 		active_point_index      = -1,
 		show_tooltip            = show_tooltip,
 		crosshair_snap_distance = math.F32_MAX,
-		show_crosshair = show_crosshair,
-		snap_crosshair = snap_crosshair,
+		show_crosshair          = show_crosshair,
+		snap_crosshair          = snap_crosshair,
 		tooltip_entries         = make(
 			[dynamic]Graph_Tooltip_Entry,
 			allocator = context.temp_allocator,
 		),
-		helper_dots         = make(
+		helper_dots             = make(
 			[dynamic]Graph_Helper_Dot,
 			allocator = context.temp_allocator,
 		),
@@ -102,14 +103,14 @@ time_range: [2]f32,
 		for y: f32 = grid_pseudo_origin.y;
 		    y >= grid_pseudo_origin.y - grid_size.y;
 		    y -= grid_step.y {
-			vgo.line({object.box.lo.x, y + 0.5}, {object.box.hi.x, y + 0.5}, 1, grid_minor_color)
+			vgo.line({object.box.lo.x, y}, {object.box.hi.x, y}, 1, grid_minor_color)
 		}
 	}
 	if grid_step.x > 1 {
 		for x: f32 = grid_pseudo_origin.x;
 		    x <= grid_pseudo_origin.x + grid_size.x;
 		    x += grid_step.x {
-			vgo.line({x + 0.5, object.box.lo.y}, {x + 0.5, object.box.hi.y}, 1, grid_minor_color)
+			vgo.line({x, object.box.lo.y}, {x, object.box.hi.y}, 1, grid_minor_color)
 		}
 	}
 	baseline := grid_origin.y + grid_offset.y
@@ -129,7 +130,7 @@ end_graph :: proc() -> bool {
 	object := current_object().? or_return
 	graph := &object.variant.(Graph)
 
-	if graph.show_crosshair {
+	if .Hovered in object.state.current && graph.show_crosshair {
 		color := graph.crosshair_color
 		if color == {} {
 			color = style().color.content
@@ -148,7 +149,14 @@ end_graph :: proc() -> bool {
 		)
 	}
 
-	if graph.show_tooltip && .Hovered in object.state.current && len(graph.tooltip_entries) > 0 {
+	{
+		for helper_dot in graph.helper_dots {
+			vgo.fill_circle(helper_dot.point, 6, helper_dot.color)
+			vgo.fill_circle(helper_dot.point, 5, style().color.field)
+		}
+	}
+
+	if .Hovered in object.state.current && graph.show_tooltip && len(graph.tooltip_entries) > 0 {
 		tooltip_origin := mouse_point()
 		tooltip_padding := style().text_padding
 		tooltip_size := graph.tooltip_size + tooltip_padding * 2
@@ -161,7 +169,7 @@ end_graph :: proc() -> bool {
 		)
 
 		vgo.fill_box(tooltip_box, style().rounding, style().color.field)
-		vgo.stroke_box(tooltip_box, 1, style().rounding, style().color.substance)
+		vgo.stroke_box(tooltip_box, 1, style().rounding, style().color.button)
 		descent: f32
 		#reverse for &entry, i in graph.tooltip_entries {
 			vgo.fill_circle(tooltip_box.lo + 10 + {0, tooltip_padding.y + descent}, 3, entry.color)
@@ -174,13 +182,6 @@ end_graph :: proc() -> bool {
 				paint = style().color.content,
 			)
 			descent += entry.text_layout.size.y
-		}
-	}
-
-	{
-		for helper_dot in graph.helper_dots {
-			vgo.fill_circle(helper_dot.point, 6, helper_dot.color)
-			vgo.fill_circle(helper_dot.point, 5, style().color.field)
 		}
 	}
 
@@ -234,13 +235,11 @@ curve_line_chart :: proc(
 				((f32(i) - graph.time_range.x) / (graph.time_range.y - graph.time_range.x - 1)) *
 					(inner_box.hi.x - inner_box.lo.x),
 				inner_box.hi.y +
-				(f32(value - graph.value_range.x) / f32(graph.value_range.y - graph.value_range.x)) *
+				(f32(value - graph.value_range.x) /
+						f32(graph.value_range.y - graph.value_range.x)) *
 					(inner_box.lo.y - inner_box.hi.y),
 			}
-			append(
-				&points,
-				point,
-			)
+			append(&points, point)
 			if graph.active_point_index == i {
 				append(&graph.helper_dots, Graph_Helper_Dot{point = point, color = color})
 				if graph.snap_crosshair {

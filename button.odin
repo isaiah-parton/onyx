@@ -50,6 +50,7 @@ Button :: struct {
 
 Button_Result :: struct {
 	clicked: bool,
+	pressed: bool,
 	hovered: bool,
 }
 
@@ -96,7 +97,7 @@ button :: proc(
 		extras.active_time = animate(extras.active_time, 0.15, active)
 
 		if object_is_visible(object) {
-			base_color := vgo.mix(extras.active_time, style().color.substance, style().color.accent)
+			base_color := vgo.mix(extras.active_time, style().color.button, style().color.accent)
 			text_color: vgo.Color
 			rounding := current_options().radius
 
@@ -163,7 +164,8 @@ button :: proc(
 		}
 
 		result.clicked = object_was_clicked(object, with = .Left) && extras.press_time >= delay
-		result.hovered = .Hovered in object.state.previous
+		result.pressed = .Pressed in object.state.current
+		result.hovered = .Hovered in object.state.current
 
 		if .Pressed in object.state.previous {
 			extras.press_time += global_state.delta_time

@@ -63,6 +63,7 @@ Object_Variant :: union {
 	Calendar,
 	Calendar_Day,
 	Graph,
+	Slider,
 	Range_Slider,
 }
 
@@ -289,6 +290,7 @@ begin_object :: proc(object: ^Object) -> bool {
 
 	object.layer = current_layer().? or_return
 	update_object_state(object)
+
 	if global_state.disable_objects do object.disabled = true
 
 	push_stack(&global_state.object_stack, object) or_return
@@ -298,6 +300,9 @@ begin_object :: proc(object: ^Object) -> bool {
 
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
+		if .Active in (object.state.current - object.state.previous) {
+			global_state.last_activated_object = object.id
+		}
 		transfer_object_state_to_its_layer(object)
 		pop_stack(&global_state.object_stack)
 		if parent, ok := current_object().?; ok {
@@ -370,13 +375,13 @@ spinner :: proc(loc := #caller_location) {
 		vgo.spinner(
 			box_center(object.box),
 			box_height(object.box) * 0.5,
-			style().color.substance,
+			style().color.button,
 		)
 	}
 }
 
 draw_skeleton :: proc(box: Box, rounding: f32) {
-	vgo.fill_box(box, rounding, style().color.substance)
+	vgo.fill_box(box, rounding, style().color.button)
 	vgo.fill_box(box, rounding, vgo.Paint{kind = .Skeleton})
 
 	draw_frames(1)
@@ -384,7 +389,7 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 
 divider :: proc() {
 	layout := current_layout().?
-	vgo.fill_box(cut_box(&layout.box, current_options().side, 1), paint = style().color.substance)
+	vgo.fill_box(cut_box(&layout.box, current_options().side, 1), paint = style().color.button)
 }
 
 object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {

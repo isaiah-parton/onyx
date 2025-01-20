@@ -3,7 +3,7 @@ package onyx
 import "../vgo"
 
 Color_Scheme :: struct {
-	substance, hover, accent, accent_content, content, shadow: vgo.Color,
+	button, button_background, hover, accent, accent_content, content, shadow: vgo.Color,
 	field, foreground, foreground_accent, background: vgo.Color,
 	checkers: [2]vgo.Color,
 }
@@ -73,7 +73,7 @@ light_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
 		// background = {255, 255, 255, 255},
 		// foreground = {255, 255, 255, 255},
-		substance = {162, 167, 167, 255},
+		button = {162, 167, 167, 255},
 		accent = {59, 130, 246, 255},
 		accent_content = {25, 25, 25, 255},
 		content = {25, 25, 25, 255},
@@ -90,9 +90,10 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		background = {35, 35, 35, 255},
 		foreground = {45, 45, 45, 255},
 		foreground_accent = {35, 35, 35, 255},
-		field = {35, 10, 10, 255},
-		substance = {100, 100, 100, 255},
-		accent = {216, 176, 66 , 255},
+		field = {27, 27, 27, 255},
+		button = {100, 101, 103, 255},
+		button_background = {64, 65, 66, 255},
+		accent = {77, 182, 77, 255},
 		accent_content = {10, 10, 10, 255},
 		content = {255, 255, 255, 255},
 		shadow = {0, 0, 0, 25},

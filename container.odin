@@ -241,7 +241,7 @@ scrollbar :: proc(
 			vgo.fill_box(
 				handle_box,
 				rounding,
-				paint = style().color.accent if .Hovered in object.state.current else style().color.substance,
+				paint = style().color.accent if .Hovered in object.state.current else style().color.button,
 			)
 		}
 

@@ -81,17 +81,20 @@ Color_Picker :: struct {
 	hsva:      [4]f32,
 }
 
-color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_location) {
+color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool = true, loc := #caller_location) {
 	if value == nil {
 		return
 	}
 	object := persistent_object(hash(loc))
-	text_layout := vgo.make_text_layout(
-		fmt.tprintf("#%6x", vgo.hex_from_color(value^)),
-		global_state.style.default_text_size,
-		global_state.style.monospace_font,
-	)
-	object.size = text_layout.size + global_state.style.text_padding * 2
+	text_layout: vgo.Text_Layout
+	if show_hex {
+		text_layout := vgo.make_text_layout(
+			fmt.tprintf("#%6x", vgo.hex_from_color(value^)),
+			global_state.style.default_text_size,
+			global_state.style.monospace_font,
+		)
+		object.size = text_layout.size + global_state.style.text_padding * 2
+	}
 	if object.variant == nil {
 		object.variant = Color_Picker{}
 	}
@@ -154,6 +157,8 @@ color_picker :: proc(value: ^vgo.Color, show_alpha: bool = true, loc := #caller_
 				)
 				if begin_layout(side = .Left) {
 					defer end_layout()
+					push_options({})
+					defer pop_options()
 
 					foreground()
 					shrink(10)

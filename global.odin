@@ -97,6 +97,7 @@ Global_State :: struct {
 	hovered_object:           Id,
 	next_hovered_object:      Id,
 	last_focused_object:      Id,
+	last_activated_object: Id,
 	focused_object:           Id,
 	dragged_object:           Id,
 	disable_objects:          bool,
@@ -512,10 +513,13 @@ shutdown :: proc() {
 	vgo.shutdown()
 }
 
+delta_time :: proc() -> f32 {
+	return global_state.delta_time
+}
 
-
-
-
+should_close_window :: proc() -> bool {
+	return bool(glfw.WindowShouldClose(global_state.window))
+}
 
 set_rounded_corners :: proc(corners: Corners) {
 	current_options().radius = rounded_corners(corners)
