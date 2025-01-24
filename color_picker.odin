@@ -106,6 +106,7 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 		extras := &object.variant.(Color_Picker)
 		handle_object_click(object)
 
+		object.hover_time = animate(object.hover_time, 0.1, .Hovered in object.state.current)
 		if .Open in object.state.current {
 			extras.open_time = animate(extras.open_time, 0.3, true)
 		} else {
@@ -122,20 +123,22 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 		}
 
 		if object_is_visible(object) {
-			checker_box := object.box
-			vgo.push_scissor(vgo.make_box(checker_box, current_options().radius))
+			accent_color := vgo.BLACK if max(vgo.luminance_of(value^), 1 - f32(value.a) / 255) > 0.45 else vgo.WHITE
+			vgo.push_scissor(vgo.make_box(object.box, current_options().radius))
 			draw_checkerboard_pattern(
 				object.box,
 				box_height(object.box) / 2,
 				vgo.blend(style().color.checkers[0], value^, vgo.WHITE),
 				vgo.blend(style().color.checkers[1], value^, vgo.WHITE),
 			)
-			vgo.fill_text_layout(
-				text_layout,
-				box_center(object.box),
-				align = 0.5,
-				paint = vgo.BLACK if max(vgo.luminance_of(value^), 1 - f32(value.a) / 255) > 0.45 else vgo.WHITE,
-			)
+			if show_hex {
+				vgo.fill_text_layout(
+					text_layout,
+					box_center(object.box),
+					align = 0.5,
+					paint = accent_color,
+				)
+			}
 			vgo.pop_scissor()
 		}
 
@@ -160,7 +163,9 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 					push_options({})
 					defer pop_options()
 
+					set_rounded_corners(ALL_CORNERS)
 					foreground()
+					vgo.stroke_box(current_box(), 1, current_options().radius, paint = style().color.button)
 					shrink(10)
 					alpha_slider(&extras.hsva.w)
 					space(10)

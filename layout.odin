@@ -21,6 +21,14 @@ Size_Mode :: enum {
 	Fixed,
 }
 
+default_options :: proc() -> Options {
+	return Options{
+		radius = style().rounding,
+		size_mode = .Max,
+		side = .Top,
+	}
+}
+
 current_options :: proc() -> ^Options {
 	return &global_state.options_stack.items[max(global_state.options_stack.height - 1, 0)]
 }

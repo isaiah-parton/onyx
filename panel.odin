@@ -115,7 +115,7 @@ begin_panel :: proc(
 				hover_object(object)
 			}
 
-			if .Clicked in object.state.current && object.input.click_count == 2 {
+			if .Clicked in object.state.current && object.click.count == 2 {
 				panel.box.hi = panel.box.lo + panel.last_min_size
 			} else if object_is_dragged(object, beyond = 100 if panel.is_snapped else 1) {
 				if !panel.moving {

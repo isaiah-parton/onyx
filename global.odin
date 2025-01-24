@@ -97,21 +97,25 @@ Global_State :: struct {
 	hovered_object:           Id,
 	next_hovered_object:      Id,
 	last_focused_object:      Id,
-	last_activated_object: Id,
+	last_activated_object:    Id,
+	object_to_activate:       Maybe(Id),
 	focused_object:           Id,
 	dragged_object:           Id,
 	disable_objects:          bool,
 	drag_offset:              [2]f32,
+	mouse_press_point:              [2]f32,
 	form:                     Form,
 	form_active:              bool,
-	tooltip_boxes: [dynamic]Box,
+	tooltip_boxes:            [dynamic]Box,
 	panels:                   [MAX_PANELS]Maybe(Panel),
 	panel_map:                map[Id]^Panel,
 	panel_stack:              Stack(^Panel, MAX_PANELS),
 	panel_snapping:           Panel_Snap_State,
 	layout_stack:             Stack(Layout, MAX_LAYOUTS),
-	options_stack:             Stack(Options, MAX_LAYOUTS),
+	options_stack:            Stack(Options, MAX_LAYOUTS),
 	next_box:                 Maybe(Box),
+	next_id:									Maybe(Id),
+	next_state:								Maybe(Object_Status_Set),
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
 	layer_stack:              Stack(^Layer, MAX_LAYERS),
@@ -160,6 +164,10 @@ view_width :: proc() -> f32 {
 
 view_height :: proc() -> f32 {
 	return global_state.view.y
+}
+
+add_object_state :: proc(state: Object_Status_Set) {
+	global_state.next_state = state
 }
 
 load_default_fonts :: proc() -> bool {
@@ -270,6 +278,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 			switch action {
 			case glfw.PRESS:
 				global_state.keys[Keyboard_Key(key)] = true
+				global_state.mouse_press_point = mouse_point()
 			case glfw.RELEASE:
 				global_state.keys[Keyboard_Key(key)] = false
 			case glfw.REPEAT:
@@ -419,6 +428,7 @@ new_frame :: proc() {
 	global_state.layer_stack.height = 0
 	global_state.object_stack.height = 0
 	global_state.panel_stack.height = 0
+	global_state.options_stack.items[0] = default_options()
 
 	reset_panel_snap_state(&global_state.panel_snapping)
 
@@ -433,6 +443,11 @@ new_frame :: proc() {
 
 	clear(&global_state.tooltip_boxes)
 
+	global_state.object_to_activate = nil
+	if key_pressed(.Tab) {
+		cycle_object_active(1 - int(key_down(.Left_Shift)) * 2)
+	}
+
 	if key_pressed(.Escape) {
 		global_state.focused_object = 0
 	}
@@ -445,6 +460,33 @@ new_frame :: proc() {
 	vgo.new_frame()
 
 	profiler_begin_scope(.Construct)
+}
+
+cycle_object_active :: proc(increment: int = 1) {
+	objects: [dynamic]^Object
+	defer delete(objects)
+
+	for object in global_state.objects {
+		if .Is_Input in object.flags {
+			append(&objects, object)
+		}
+	}
+
+	slice.sort_by(objects[:], proc(i, j: ^Object) -> bool {
+		return i.call_index < j.call_index
+	})
+
+	for i in 0 ..< len(objects) {
+		if objects[i].id == global_state.last_activated_object {
+			j := i + increment
+			for j < 0 do j += len(objects)
+			for j >= len(objects) do j -= len(objects)
+			object := objects[j]
+			global_state.object_to_activate = object.id
+			object.input.editor.selection = {len(object.input.builder.buf), 0}
+			break
+		}
+	}
 }
 
 present :: proc() {
@@ -544,11 +586,6 @@ __get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
 
 draw_shadow :: proc(box: vgo.Box) {
 	if vgo.disable_scissor() {
-		vgo.box_shadow(
-			move_box(box, 3),
-			global_state.style.rounding,
-			6,
-			style().color.shadow,
-		)
+		vgo.box_shadow(move_box(box, 3), global_state.style.rounding, 6, style().color.shadow)
 	}
 }

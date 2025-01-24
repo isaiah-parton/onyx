@@ -30,7 +30,7 @@ Section :: enum {
 	Boolean,
 	Menu,
 	Analog,
-	Text,
+	Input,
 	Chart,
 	Grid,
 	Theme,
@@ -40,7 +40,7 @@ State :: struct {
 	button_section:  Button_Section_State,
 	boolean_section: Boolean_Section_State,
 	graph_section:   Graph_Section_State,
-	text_section:    Text_Section_State,
+	input_section:    Input_Section_State,
 	analog_section:  Analog_Section_State,
 	theme_section:   Theme_Section_State,
 	current_section: Section,
@@ -61,18 +61,21 @@ boolean_section :: proc(state: ^Boolean_Section_State) {
 }
 
 Analog_Section_State :: struct {
-	slider_value: f32,
+	float_value: f32,
+	integer_value: int,
 }
 
 analog_section :: proc(state: ^Analog_Section_State) {
 	using onyx
 	set_width(0)
 	set_height(0)
-	slider(&state.slider_value, 0, 100)
+	slider(&state.float_value, 0, 100)
+	space(10)
+	slider(&state.integer_value, 0, 10)
 	space(20)
-	progress_bar(state.slider_value / 100.0)
+	progress_bar(state.float_value / 100.0)
 	space(20)
-	dial(state.slider_value / 100.0)
+	dial(state.float_value / 100.0)
 	space(20)
 	pie({33, 15, 52}, 100, {vgo.RED, vgo.GREEN, vgo.BLUE})
 }
@@ -100,30 +103,30 @@ button_section :: proc(state: ^Button_Section_State) {
 	}
 }
 
-Text_Section_State :: struct {
+Input_Section_State :: struct {
 	text:           string,
 	multiline_text: string,
+	number: f32,
 }
 
-text_section :: proc(state: ^Text_Section_State) {
+input_section :: proc(state: ^Input_Section_State) {
 	using onyx
 	set_width(200)
 	set_height(30)
-	raw_input(&state.text, placeholder = "placeholder")
+	input(&state.text, placeholder = "placeholder")
 	space(10)
 	set_height(100)
-	raw_input(&state.multiline_text, placeholder = "placeholder", is_multiline = true)
+	input(&state.multiline_text, placeholder = "placeholder", flags = {.Multiline})
+	space(10)
+	set_height(30)
+	input(&state.number, prefix = "$")
 }
 
 Graph_Section_State :: struct {
 	displayed_data: [20]f32,
-	displayed_low:  f32,
-	displayed_high: f32,
 	time_range:     [2]f32,
+	value_range: [2]f32,
 	data:           [20]f32,
-	old_data:       [20]f32,
-	low:            f32,
-	high:           f32,
 	color:          vgo.Color,
 	show_points:    bool,
 	show_crosshair: bool,
@@ -158,23 +161,20 @@ graph_section :: proc(state: ^Graph_Section_State) {
 		set_align(.Center)
 		set_width(0)
 		range_slider(&state.time_range.x, &state.time_range.y, 0, 20)
+		space(10)
+		range_slider(&state.value_range.x, &state.value_range.y, -20, 20)
 		end_layout()
 	}
 	space(10)
 	set_size(remaining_space())
 
-	low := state.displayed_low - 2
-	high := state.displayed_high + 2
-	median := (low + high) / 2
 	if begin_graph(
 		time_range = state.time_range,
-		value_range = {low, high},
-		offset = {0, median * -30},
+		value_range = state.value_range,
 		show_crosshair = state.show_crosshair,
 		snap_crosshair = state.snap_crosshair,
 		show_tooltip = true,
 	) {
-		curve_line_chart(state.old_data[:], vgo.fade(state.color, 0.5), fill_style = .None)
 		curve_line_chart(
 			state.displayed_data[:],
 			state.color,
@@ -192,21 +192,14 @@ graph_section :: proc(state: ^Graph_Section_State) {
 			draw_frames(2)
 		}
 	}
-	state.displayed_low += (state.low - state.displayed_low) * 10 * vgo.frame_time()
-	state.displayed_high += (state.high - state.displayed_high) * 10 * vgo.frame_time()
 }
 
 randomize_graphs :: proc(state: ^Graph_Section_State) {
 	modifier: f32 = rand.float32_range(-1, 1)
-	state.low = 0
-	state.high = 0
-	state.old_data = state.data
 	last_value := rand.float32_range(-5, 5)
 	for i in 0 ..< len(state.data) {
 		value := last_value + rand.float32_range(-2, 2)
 		state.data[i] = value
-		state.low = min(state.low, value)
-		state.high = max(state.high, value)
 		last_value = value
 	}
 }
@@ -321,7 +314,7 @@ main :: proc() {
 
 				if begin_layout(side = .Left) {
 
-					shrink(100)
+					shrink(40)
 
 					vgo.fill_box(current_layout().?.box, 10, style().color.foreground)
 
@@ -366,8 +359,8 @@ main :: proc() {
 							boolean_section(&state.boolean_section)
 						case .Analog:
 							analog_section(&state.analog_section)
-						case .Text:
-							text_section(&state.text_section)
+						case .Input:
+							input_section(&state.input_section)
 						case .Chart:
 							graph_section(&state.graph_section)
 						case .Theme:

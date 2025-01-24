@@ -57,14 +57,13 @@ Object_Variant :: union {
 	Button,
 	Boolean,
 	Container,
-	Input,
 	Color_Picker,
 	Date_Picker,
 	Calendar,
 	Calendar_Day,
 	Graph,
-	Slider,
 	Range_Slider,
+	Slider,
 }
 
 Object :: struct {
@@ -73,7 +72,6 @@ Object :: struct {
 	frames:          int,
 	size:            [2]f32,
 	layer:           ^Layer,
-	local_position:  [2]f32,
 	box:             Box,
 	dead:            bool,
 	disabled:        bool,
@@ -81,7 +79,8 @@ Object :: struct {
 	will_be_hovered: bool,
 	flags:           Object_Flags,
 	state:           Object_State,
-	input:           Object_Input,
+	click:           Object_Click,
+	input: Input_State,
 	variant:         Object_Variant,
 	hover_time: f32,
 }
@@ -93,29 +92,12 @@ Object_State :: struct {
 	output_mask: Object_Status_Set,
 }
 
-Object_Content :: struct {
-	side:          Side,
-	justify:       Align,
-	align:         Align,
-	next_position: [2]f32,
-	offset:        [2]f32,
-	space_left:    [2]f32,
-	size:          [2]f32,
-	desired_size:  [2]f32,
-	padding:       [4]f32,
-	objects:       [dynamic]^Object,
-}
-
-Object_Metrics :: struct {
-	size:         [2]f32,
-	desired_size: [2]f32,
-}
-
-Object_Input :: struct {
-	click_count:        int,
-	click_release_time: time.Time,
-	click_point:        [2]f32,
-	click_mouse_button: Mouse_Button,
+Object_Click :: struct {
+	count:        int,
+	release_time: time.Time,
+	press_time: time.Time,
+	point:        [2]f32,
+	button: Mouse_Button,
 }
 
 clean_up_objects :: proc() {
@@ -193,7 +175,7 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 }
 
 destroy_object :: proc(object: ^Object) {
-
+	destroy_input(&object.input)
 }
 
 make_object_children_array :: proc() -> [dynamic]^Object {
@@ -214,18 +196,18 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 		object.state.current += {.Hovered}
 		pressed_buttons := global_state.mouse_bits - global_state.last_mouse_bits
 		if pressed_buttons != {} {
-			if object.input.click_mouse_button == global_state.mouse_button &&
-			   time.since(object.input.click_release_time) <= MAX_CLICK_DELAY {
-				object.input.click_count = max((object.input.click_count + 1) % 4, 1)
+			if object.click.button == global_state.mouse_button &&
+			   time.since(object.click.release_time) <= MAX_CLICK_DELAY {
+				object.click.count = max((object.click.count + 1) % 4, 1)
 			} else {
-				object.input.click_count = 1
+				object.click.count = 1
 			}
-			object.input.click_mouse_button = global_state.mouse_button
-			object.input.click_point = global_state.mouse_pos
-			object.input.click_release_time = time.now()
+			object.click.button = global_state.mouse_button
+			object.click.point = global_state.mouse_pos
+			object.click.press_time = time.now()
 			object.state.current += {.Pressed}
 			draw_frames(1)
-			global_state.focused_object = object.id
+			// global_state.focused_object = object.id
 			if sticky do global_state.dragged_object = object.id
 		}
 		// TODO: Lose click if mouse moved too much (allow for dragging containers by their contents)
@@ -235,19 +217,20 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 		// }
 	} else if global_state.dragged_object != object.id {
 		object.state.current -= {.Pressed, .Hovered}
-		object.input.click_count = 0
+		object.click.count = 0
 	}
 	if object.state.current >= {.Pressed} {
 		released_buttons := global_state.last_mouse_bits - global_state.mouse_bits
-		if object.input.click_mouse_button in released_buttons {
+		if object.click.button in released_buttons {
 			object.state.current += {.Clicked}
 			object.state.current -= {.Pressed, .Dragged}
+			object.click.release_time = time.now()
 			global_state.dragged_object = 0
 		}
 	} else {
-		if object.input.click_count > 0 &&
+		if object.click.count > 0 &&
 		   linalg.length(global_state.mouse_pos - global_state.last_mouse_pos) > 2 {
-			object.input.click_count = 0
+			object.click.count = 0
 		}
 	}
 }
@@ -265,6 +248,15 @@ update_object_state :: proc(object: ^Object) {
 
 	if global_state.focused_object == object.id {
 		object.state.current += {.Focused}
+	}
+
+	if id, ok := global_state.object_to_activate.?; ok {
+		if id == object.id {
+			object.state.current += {.Active}
+			global_state.last_activated_object = object.id
+		} else {
+			object.state.current -= {.Active}
+		}
 	}
 }
 
@@ -290,6 +282,11 @@ begin_object :: proc(object: ^Object) -> bool {
 
 	object.layer = current_layer().? or_return
 	update_object_state(object)
+
+	if state, ok := global_state.next_state.?; ok {
+		object.state.current += state
+		global_state.next_state = nil
+	}
 
 	if global_state.disable_objects do object.disabled = true
 
@@ -347,7 +344,7 @@ foreground :: proc(loc := #caller_location) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
 		draw_shadow(object.box)
-		vgo.fill_box(object.box, paint = style().color.foreground)
+		vgo.fill_box(object.box, current_options().radius, paint = style().color.foreground)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
 		}

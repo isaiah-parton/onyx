@@ -45,6 +45,7 @@ Button :: struct {
 	waves:      Wave_Effects,
 	hover_time: f32,
 	press_time: f32,
+	hold_time: f32,
 	active_time: f32,
 }
 
@@ -85,6 +86,12 @@ button :: proc(
 		handle_object_click(object)
 
 		extras.hover_time = animate(extras.hover_time, 0.1, .Hovered in object.state.current)
+		extras.press_time = animate(extras.press_time, 0.15, .Pressed in object.state.current)
+		extras.hold_time = max(extras.hold_time + delta_time() * f32(i32(.Pressed in object.state.current) - i32(.Pressed not_in object.state.current)), 0)
+		if extras.press_time <= 0 {
+			extras.hold_time = 0
+		}
+		draw_frames(int(extras.hold_time > 0))
 
 		if .Hovered in object.state.current {
 			set_cursor(.Pointing_Hand)
@@ -103,11 +110,25 @@ button :: proc(
 
 			switch accent {
 			case .Normal:
+				base_color = vgo.mix(0.2 * extras.hover_time, base_color, vgo.WHITE)
+				stroke_color := base_color
+				fill_color := vgo.mix(f32(i32(delay > 0)) * extras.press_time, base_color, style().color.button_background)
 				vgo.fill_box(
 					object.box,
 					rounding,
-					vgo.mix(0.2 * extras.hover_time, base_color, vgo.WHITE),
+					fill_color,
 				)
+				if delay > 0 && extras.press_time > 0 {
+					vgo.push_scissor(vgo.make_box(object.box, rounding))
+					vgo.fill_box(get_box_cut_bottom(object.box, box_height(object.box) * ease.cubic_in(clamp(extras.hold_time / delay, 0, 1))), paint = base_color)
+					vgo.pop_scissor()
+					// vgo.stroke_box(object.box, 1, rounding, vgo.fade(stroke_color, extras.press_time))
+					vgo.fill_box(
+						object.box,
+						rounding,
+						vgo.fade(stroke_color, 1 - extras.press_time),
+					)
+				}
 				text_color = style().color.accent_content
 			case .Outlined:
 				color := vgo.mix(0.2 * extras.hover_time, base_color, vgo.WHITE)
@@ -128,15 +149,6 @@ button :: proc(
 			}
 
 			vgo.push_scissor(vgo.make_box(object.box, rounding))
-			if delay > 0 && extras.press_time > 0 {
-				vgo.fill_box(
-					get_box_cut_left(
-						object.box,
-						box_width(object.box) * min(extras.press_time / delay, 1),
-					),
-					paint = style().color.accent,
-				)
-			}
 			draw_and_update_wave_effects(object, &extras.waves)
 			vgo.pop_scissor()
 
@@ -163,15 +175,9 @@ button :: proc(
 			}
 		}
 
-		result.clicked = object_was_clicked(object, with = .Left) && extras.press_time >= delay
+		result.clicked = object_was_clicked(object, with = .Left) && extras.hold_time >= delay
 		result.pressed = .Pressed in object.state.current
 		result.hovered = .Hovered in object.state.current
-
-		if .Pressed in object.state.previous {
-			extras.press_time += global_state.delta_time
-		} else {
-			extras.press_time = 0
-		}
 
 		end_object()
 	}
