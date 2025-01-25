@@ -55,7 +55,8 @@ solve_menu_box :: proc(anchor_box: Box, size: [2]f32, margin: f32, side: Side, a
 begin_menu :: proc(text: string, width: f32, how_many_items, how_many_dividers: int, loc := #caller_location) -> bool {
 	object := persistent_object(hash(loc))
 	text_layout := vgo.make_text_layout(text, style().default_text_size, style().default_font)
-	object.size = text_layout.size + global_state.style.text_padding * 2
+	object.size = text_layout.size + global_state.style.text_padding * {1, 2}
+	object.size.x += object.size.y
 	if begin_object(object) {
 		object.box = next_box(object.size)
 		handle_object_click(object)
@@ -91,6 +92,10 @@ begin_menu :: proc(text: string, width: f32, how_many_items, how_many_dividers: 
 				align = {0, 0.5},
 				paint = text_color,
 			)
+			box := shrink_box(get_box_cut_right(object.box, box_height(object.box)), 8)
+			vgo.fill_box({box.lo, {box.hi.x, box.lo.y + 1}}, paint = text_color)
+			vgo.fill_box({{box.lo.x, box_center_y(box)}, {box.hi.x, box_center_y(box) + 1}}, paint = text_color)
+			vgo.fill_box({{box.lo.x, box.hi.y}, {box.hi.x, box.hi.y + 1}}, paint = text_color)
 		}
 		end_object()
 	}
@@ -114,6 +119,10 @@ begin_submenu :: proc(text: string, width: f32, how_many_items, how_many_divider
 
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
+		}
+
+		if .Hovered in object.state.current {
+			global_state.focused_object = object.id
 		}
 
 		if object_is_visible(object) {
