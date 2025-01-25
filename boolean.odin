@@ -127,7 +127,8 @@ boolean :: proc(
 			switch type {
 			case .Checkbox:
 				if state_time < 1 {
-					vgo.fill_box(gadget_box, global_state.style.rounding, style().color.field)
+					vgo.fill_box(gadget_box, global_state.style.rounding, style().color.foreground)
+					vgo.stroke_box(gadget_box, 1, global_state.style.rounding, style().color.foreground_stroke)
 				}
 				if state_time > 0 && state_time < 1 {
 					vgo.push_scissor(vgo.make_box(object.box, global_state.style.rounding))
@@ -155,13 +156,19 @@ boolean :: proc(
 				vgo.fill_circle(
 					gadget_center,
 					radius,
-					vgo.mix(state_time, style().color.field, gadget_fill_color),
+					style().color.foreground,
+				)
+				vgo.stroke_circle(
+					gadget_center,
+					radius,
+					1,
+					style().color.foreground_stroke,
 				)
 				if state_time > 0 {
 					vgo.fill_circle(
 						gadget_center,
 						(radius - 5) * state_time,
-						vgo.fade(gadget_accent_color, state_time),
+						vgo.fade(style().color.accent, state_time),
 					)
 				}
 			case .Switch:
@@ -175,7 +182,8 @@ boolean :: proc(
 					box_center_y(inner_box),
 				}
 				if state_time < 1 {
-					vgo.fill_box(gadget_box, paint = style().color.field, radius = outer_radius)
+					vgo.fill_box(gadget_box, paint = style().color.button_background, radius = outer_radius)
+					vgo.stroke_box(gadget_box, 1, paint = style().color.foreground_stroke, radius = outer_radius)
 				}
 				vgo.fill_box(
 					{gadget_box.lo, lever_center + outer_radius},
@@ -185,7 +193,7 @@ boolean :: proc(
 				vgo.fill_circle(
 					lever_center,
 					inner_radius,
-					vgo.mix(state_time, style().color.foreground, gadget_accent_color),
+					vgo.mix(state_time, style().color.button, gadget_accent_color),
 				)
 			}
 

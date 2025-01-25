@@ -54,7 +54,7 @@ slider :: proc(
 		handle_object_click(object, true)
 
 		if object_was_clicked_in_place(object) {
-			add_object_state({.Active})
+			focus_next_object()
 		}
 
 		if .Pressed in object.state.current {
@@ -111,6 +111,7 @@ slider :: proc(
 				paint = style().color.content,
 			)
 			vgo.pop_scissor()
+			vgo.stroke_box(object.box, 1, current_options().radius, paint = style().color.button)
 		}
 
 		push_id(object.id)
@@ -195,6 +196,7 @@ range_slider :: proc(
 		}
 
 		if is_visible {
+
 			radius := current_options().radius
 			vgo.push_scissor(vgo.make_box(object.box, radius))
 			vgo.fill_box(object.box, paint = style().color.field)
@@ -227,24 +229,26 @@ range_slider :: proc(
 				paint = style().color.content,
 			)
 			vgo.pop_scissor()
+			vgo.stroke_box(object.box, 1, current_options().radius, paint = style().color.button)
 
 			push_id(object.id)
 			push_options(default_options())
 
 			was_clicked_in_place := object_was_clicked_in_place(object)
-			click_index := int(mouse_point().x > box_center_x(object.box))
+			center_x := box_center_x(object.box)
+			click_index := int(mouse_point().x > center_x)
 
-			set_next_box({object.box.lo, {box_center_x(object.box), object.box.hi.y}})
+			set_next_box({object.box.lo, {center_x, object.box.hi.y}})
 			set_rounded_corners({.Top_Left, .Bottom_Left})
 			if was_clicked_in_place && click_index == 0 {
-				add_object_state({.Active})
+				focus_next_object()
 			}
 			input(lower_value, format, flags = {.Hidden_Unless_Active, .Monospace})
 
-			set_next_box({{box_center_x(object.box), object.box.lo.y}, object.box.hi})
+			set_next_box({{center_x, object.box.lo.y}, object.box.hi})
 			set_rounded_corners({.Top_Right, .Bottom_Right})
 			if was_clicked_in_place && click_index == 1 {
-				add_object_state({.Active})
+				focus_next_object()
 			}
 			input(upper_value, format, flags = {.Hidden_Unless_Active, .Monospace})
 

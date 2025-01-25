@@ -4,7 +4,8 @@ import "../vgo"
 
 Color_Scheme :: struct {
 	button, button_background, hover, accent, accent_content, content, shadow: vgo.Color,
-	field, foreground, foreground_accent, background: vgo.Color,
+	field, foreground, foreground_stroke, foreground_accent, background: vgo.Color,
+	grid_background, grid_minor_lines, grid_major_lines: vgo.Color,
 	checkers: [2]vgo.Color,
 }
 
@@ -13,6 +14,7 @@ Style :: struct {
 	monospace_font: vgo.Font,
 	header_font:    Maybe(vgo.Font),
 	default_font:   vgo.Font,
+	bold_font: vgo.Font,
 	color:          Color_Scheme,
 	using shape:    Style_Shape,
 }
@@ -87,13 +89,17 @@ dark_color_scheme :: proc() -> Color_Scheme {
 			{210, 210, 210, 255},
 			{160, 160, 160, 255},
 		},
-		background = {35, 35, 35, 255},
-		foreground = {45, 45, 45, 255},
-		foreground_accent = {35, 35, 35, 255},
-		field = {27, 27, 27, 255},
-		button = {100, 101, 103, 255},
-		button_background = {64, 65, 66, 255},
-		accent = {77, 182, 77, 255},
+		background = {0, 0, 0, 255},
+		foreground = {16, 15, 17, 255},
+		foreground_stroke = {60, 60, 60, 255},
+		foreground_accent = {30, 30, 30, 255},
+		grid_background = {0, 0, 0, 255},
+		grid_minor_lines = {16, 15, 17, 255},
+		grid_major_lines = {45, 45, 150, 255},
+		field = {20, 20, 20, 255},
+		button = {67, 65, 69, 255},
+		button_background = {40, 38, 42, 255},
+		accent = {34, 117, 34, 255},
 		accent_content = {10, 10, 10, 255},
 		content = {255, 255, 255, 255},
 		shadow = {0, 0, 0, 25},

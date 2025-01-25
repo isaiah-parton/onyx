@@ -33,6 +33,7 @@ Section :: enum {
 	Input,
 	Chart,
 	Grid,
+	Navigation,
 	Theme,
 }
 
@@ -40,9 +41,10 @@ State :: struct {
 	button_section:  Button_Section_State,
 	boolean_section: Boolean_Section_State,
 	graph_section:   Graph_Section_State,
-	input_section:    Input_Section_State,
+	input_section:   Input_Section_State,
 	analog_section:  Analog_Section_State,
 	theme_section:   Theme_Section_State,
+	nav_section: Nav_Section_State,
 	current_section: Section,
 }
 
@@ -61,7 +63,7 @@ boolean_section :: proc(state: ^Boolean_Section_State) {
 }
 
 Analog_Section_State :: struct {
-	float_value: f32,
+	float_value:   f32,
 	integer_value: int,
 }
 
@@ -106,7 +108,7 @@ button_section :: proc(state: ^Button_Section_State) {
 Input_Section_State :: struct {
 	text:           string,
 	multiline_text: string,
-	number: f32,
+	number:         f32,
 }
 
 input_section :: proc(state: ^Input_Section_State) {
@@ -125,7 +127,7 @@ input_section :: proc(state: ^Input_Section_State) {
 Graph_Section_State :: struct {
 	displayed_data: [20]f32,
 	time_range:     [2]f32,
-	value_range: [2]f32,
+	value_range:    [2]f32,
 	data:           [20]f32,
 	color:          vgo.Color,
 	show_points:    bool,
@@ -204,6 +206,36 @@ randomize_graphs :: proc(state: ^Graph_Section_State) {
 	}
 }
 
+Tab :: enum {
+	First,
+	Second,
+	Third,
+}
+
+Nav_Section_State :: struct {
+	tab: Tab,
+}
+
+nav_section :: proc(state: ^Nav_Section_State) {
+	using onyx
+	set_width(remaining_space().x)
+	set_height(50)
+	if begin_layout(.Left) {
+		vgo.fill_box(current_box(), paint = style().color.field)
+		set_width(0)
+		set_height(30)
+		set_align(.Far)
+		for member, i in Tab {
+			push_id(i)
+			if tab(fmt.tprint(member), state.tab == member) {
+				state.tab = member
+			}
+			pop_id()
+		}
+		end_layout()
+	}
+}
+
 Theme_Section_State :: struct {}
 
 theme_section :: proc(state: ^Theme_Section_State) {
@@ -223,7 +255,7 @@ theme_section :: proc(state: ^Theme_Section_State) {
 	}
 
 	set_side(.Top)
-	for i in 0..<struct_info.field_count {
+	for i in 0 ..< struct_info.field_count {
 		push_id(int(i))
 		if begin_layout(.Left) {
 			color := (^vgo.Color)(uintptr(&style().color) + struct_info.offsets[i])
@@ -316,7 +348,7 @@ main :: proc() {
 
 					shrink(40)
 
-					vgo.fill_box(current_layout().?.box, 10, style().color.foreground)
+					foreground()
 
 					shrink(30)
 
@@ -328,7 +360,6 @@ main :: proc() {
 						set_height(26)
 
 						for section, i in Section {
-							set_rounded_corners(vstack_corners(i, len(Section)))
 							push_id(i)
 							text, _ := strings.replace_all(
 								fmt.tprint(section),
@@ -336,10 +367,10 @@ main :: proc() {
 								" ",
 								allocator = context.temp_allocator,
 							)
-							if button(text, active = state.current_section == section).pressed {
+							if button(text, active = state.current_section == section, accent = .Subtle).pressed {
 								state.current_section = section
 							}
-							space(1)
+							space(2)
 							pop_id()
 						}
 
@@ -363,6 +394,8 @@ main :: proc() {
 							input_section(&state.input_section)
 						case .Chart:
 							graph_section(&state.graph_section)
+						case .Navigation:
+							nav_section(&state.nav_section)
 						case .Theme:
 							theme_section(&state.theme_section)
 						}

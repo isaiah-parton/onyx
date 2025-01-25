@@ -115,7 +115,7 @@ Global_State :: struct {
 	options_stack:            Stack(Options, MAX_LAYOUTS),
 	next_box:                 Maybe(Box),
 	next_id:									Maybe(Id),
-	next_state:								Maybe(Object_Status_Set),
+	focus_next: bool,
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
 	layer_stack:              Stack(^Layer, MAX_LAYERS),
@@ -166,22 +166,25 @@ view_height :: proc() -> f32 {
 	return global_state.view.y
 }
 
-add_object_state :: proc(state: Object_Status_Set) {
-	global_state.next_state = state
+focus_next_object :: proc() {
+	global_state.focus_next = true
 }
 
 load_default_fonts :: proc() -> bool {
 	DEFAULT_FONT :: "Roboto-Regular"
+	BOLD_FONT :: "Roboto-Medium"
 	MONOSPACE_FONT :: "RobotoMono-Regular"
 	HEADER_FONT :: "RobotoSlab-Regular"
 	ICON_FONT :: "remixicon"
 
 	DEFAULT_FONT_IMAGE :: #load(FONT_PATH + "/" + DEFAULT_FONT + ".png", []u8)
+	BOLD_FONT_IMAGE :: #load(FONT_PATH + "/" + BOLD_FONT + ".png", []u8)
 	MONOSPACE_FONT_IMAGE :: #load(FONT_PATH + "/" + MONOSPACE_FONT + ".png", []u8)
 	HEADER_FONT_IMAGE :: #load(FONT_PATH + "/" + HEADER_FONT + ".png", []u8)
 	ICON_FONT_IMAGE :: #load(FONT_PATH + "/" + ICON_FONT + ".png", []u8)
 
 	DEFAULT_FONT_JSON :: #load(FONT_PATH + "/" + DEFAULT_FONT + ".json", []u8)
+	BOLD_FONT_JSON :: #load(FONT_PATH + "/" + BOLD_FONT + ".json", []u8)
 	MONOSPACE_FONT_JSON :: #load(FONT_PATH + "/" + MONOSPACE_FONT + ".json", []u8)
 	HEADER_FONT_JSON :: #load(FONT_PATH + "/" + HEADER_FONT + ".json", []u8)
 	ICON_FONT_JSON :: #load(FONT_PATH + "/" + ICON_FONT + ".json", []u8)
@@ -189,6 +192,10 @@ load_default_fonts :: proc() -> bool {
 	global_state.style.default_font = vgo.load_font_from_slices(
 		DEFAULT_FONT_IMAGE,
 		DEFAULT_FONT_JSON,
+	) or_return
+	global_state.style.bold_font = vgo.load_font_from_slices(
+		BOLD_FONT_IMAGE,
+		BOLD_FONT_JSON,
 	) or_return
 	global_state.style.monospace_font = vgo.load_font_from_slices(
 		MONOSPACE_FONT_IMAGE,

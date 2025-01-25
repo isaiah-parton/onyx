@@ -283,9 +283,10 @@ begin_object :: proc(object: ^Object) -> bool {
 	object.layer = current_layer().? or_return
 	update_object_state(object)
 
-	if state, ok := global_state.next_state.?; ok {
-		object.state.current += state
-		global_state.next_state = nil
+	if global_state.focus_next {
+		global_state.focus_next = false
+		object.state.current += {.Active}
+		global_state.focused_object = object.id
 	}
 
 	if global_state.disable_objects do object.disabled = true
@@ -345,6 +346,7 @@ foreground :: proc(loc := #caller_location) {
 		object.state.input_mask = OBJECT_STATE_ALL
 		draw_shadow(object.box)
 		vgo.fill_box(object.box, current_options().radius, paint = style().color.foreground)
+		vgo.stroke_box(object.box, 1, current_options().radius, paint = style().color.foreground_stroke)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
 		}

@@ -7,11 +7,11 @@ import "core:math"
 import "core:math/linalg"
 
 Options :: struct {
-	padding: [4]f32,
-	side: Side,
-	size: [2]f32,
-	align: Align,
-	radius: [4]f32,
+	padding:   [4]f32,
+	side:      Side,
+	size:      [2]f32,
+	align:     Align,
+	radius:    [4]f32,
 	size_mode: Size_Mode,
 }
 
@@ -22,11 +22,7 @@ Size_Mode :: enum {
 }
 
 default_options :: proc() -> Options {
-	return Options{
-		radius = style().rounding,
-		size_mode = .Max,
-		side = .Top,
-	}
+	return Options{radius = style().rounding, size_mode = .Max, side = .Top}
 }
 
 current_options :: proc() -> ^Options {
@@ -46,10 +42,10 @@ pop_options :: proc() {
 }
 
 Layout :: struct {
-	box:                Box,
-	bounds:             Box,
-	does_grow:          bool,
-	content_size:       [2]f32,
+	box:          Box,
+	bounds:       Box,
+	does_grow:    bool,
+	content_size: [2]f32,
 }
 
 Axis :: enum {
@@ -116,7 +112,12 @@ grow_side_of_box :: proc(box: Box, side: Side, size: [2]f32) -> Box {
 	return box
 }
 
-next_box_from_layout :: proc(layout: ^Layout, options: ^Options, size: [2]f32, fixed: bool) -> Box {
+next_box_from_layout :: proc(
+	layout: ^Layout,
+	options: ^Options,
+	size: [2]f32,
+	fixed: bool,
+) -> Box {
 	i := int(options.side) / 2
 	j := 1 - i
 
@@ -136,11 +137,7 @@ next_box_from_layout :: proc(layout: ^Layout, options: ^Options, size: [2]f32, f
 		size = linalg.min(size, box_size(layout.box))
 	}
 
-	layout.content_size = solve_layout_content_size(
-		layout.content_size,
-		options.side,
-		size,
-	)
+	layout.content_size = solve_layout_content_size(layout.content_size, options.side, size)
 
 	if layout.does_grow {
 		layout.box = grow_side_of_box(layout.box, options.side, size)
@@ -192,9 +189,9 @@ current_box :: proc() -> Box {
 begin_layout :: proc(side: Side, size: [2]f32 = {}, does_grow: bool = false) -> bool {
 	box := next_box(size)
 	layout := Layout {
-		does_grow          = does_grow,
-		box                = box,
-		bounds             = box,
+		does_grow = does_grow,
+		box       = box,
+		bounds    = box,
 	}
 	options := current_options()^
 	options.side = side

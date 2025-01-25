@@ -61,8 +61,8 @@ begin_graph :: proc(
 	grid_size := box_size(object.box)
 	grid_origin := [2]f32{object.box.lo.x, object.box.hi.y}
 	grid_pseudo_origin := grid_origin + linalg.mod(grid_offset, grid_step) + {0, -grid_step.y}
-	grid_minor_color := style().color.foreground
-	grid_major_color := style().color.button
+	grid_minor_color := style().color.grid_minor_lines
+	grid_major_color := style().color.grid_major_lines
 
 	graph := Graph {
 		time_range              = time_range,
@@ -98,7 +98,7 @@ begin_graph :: proc(
 		)
 	}
 
-	vgo.fill_box(object.box, paint = style().color.foreground_accent)
+	vgo.fill_box(object.box, paint = style().color.grid_background)
 	if grid_step.y > 1 {
 		for y: f32 = grid_pseudo_origin.y;
 		    y >= grid_pseudo_origin.y - grid_size.y;
@@ -151,8 +151,7 @@ end_graph :: proc() -> bool {
 
 	{
 		for helper_dot in graph.helper_dots {
-			vgo.fill_circle(helper_dot.point, 6, helper_dot.color)
-			vgo.fill_circle(helper_dot.point, 5, style().color.field)
+			vgo.fill_circle(helper_dot.point, 5, helper_dot.color)
 		}
 	}
 

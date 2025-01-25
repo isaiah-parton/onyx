@@ -37,15 +37,15 @@ draw_and_update_wave_effects :: proc(object: ^Object, array: ^Wave_Effects) {
 
 Button_Accent :: enum {
 	Normal,
-	Outlined,
+	Primary,
 	Subtle,
 }
 
 Button :: struct {
-	waves:      Wave_Effects,
-	hover_time: f32,
-	press_time: f32,
-	hold_time: f32,
+	waves:       Wave_Effects,
+	hover_time:  f32,
+	press_time:  f32,
+	hold_time:   f32,
 	active_time: f32,
 }
 
@@ -75,7 +75,7 @@ button :: proc(
 
 	extras := &object.variant.(Button)
 
-	text_layout := vgo.make_text_layout(text, font_size, global_state.style.default_font)
+	text_layout := vgo.make_text_layout(text, font_size, global_state.style.bold_font)
 
 	object.size = text_layout.size + global_state.style.text_padding * 2
 
@@ -87,7 +87,15 @@ button :: proc(
 
 		extras.hover_time = animate(extras.hover_time, 0.1, .Hovered in object.state.current)
 		extras.press_time = animate(extras.press_time, 0.15, .Pressed in object.state.current)
-		extras.hold_time = max(extras.hold_time + delta_time() * f32(i32(.Pressed in object.state.current) - i32(.Pressed not_in object.state.current)), 0)
+		extras.hold_time = max(
+			extras.hold_time +
+			delta_time() *
+				f32(
+					i32(.Pressed in object.state.current) -
+					i32(.Pressed not_in object.state.current),
+				),
+			0,
+		)
 		if extras.press_time <= 0 {
 			extras.hold_time = 0
 		}
@@ -104,53 +112,65 @@ button :: proc(
 		extras.active_time = animate(extras.active_time, 0.15, active)
 
 		if object_is_visible(object) {
-			base_color := vgo.mix(extras.active_time, style().color.button, style().color.accent)
-			text_color: vgo.Color
+			text_color: vgo.Color = style().color.content
 			rounding := current_options().radius
 
 			switch accent {
-			case .Normal:
-				base_color = vgo.mix(0.2 * extras.hover_time, base_color, vgo.WHITE)
+			case .Primary:
+				base_color := vgo.mix(0.2 * extras.hover_time, style().color.accent, vgo.WHITE)
 				stroke_color := base_color
-				fill_color := vgo.mix(f32(i32(delay > 0)) * extras.press_time, base_color, style().color.button_background)
-				vgo.fill_box(
-					object.box,
-					rounding,
-					fill_color,
+				fill_color := vgo.mix(
+					f32(i32(delay > 0)) * extras.press_time,
+					base_color,
+					style().color.button_background,
 				)
+				vgo.fill_box(object.box, rounding, fill_color)
 				if delay > 0 && extras.press_time > 0 {
 					vgo.push_scissor(vgo.make_box(object.box, rounding))
-					vgo.fill_box(get_box_cut_bottom(object.box, box_height(object.box) * ease.cubic_in(clamp(extras.hold_time / delay, 0, 1))), paint = base_color)
+					vgo.fill_box(
+						get_box_cut_bottom(
+							object.box,
+							box_height(object.box) *
+							ease.cubic_in(clamp(extras.hold_time / delay, 0, 1)),
+						),
+						paint = base_color,
+					)
 					vgo.pop_scissor()
-					// vgo.stroke_box(object.box, 1, rounding, vgo.fade(stroke_color, extras.press_time))
+					vgo.stroke_box(
+						object.box,
+						1,
+						rounding,
+						vgo.fade(stroke_color, extras.press_time),
+					)
 					vgo.fill_box(
 						object.box,
 						rounding,
 						vgo.fade(stroke_color, 1 - extras.press_time),
 					)
 				}
-				text_color = style().color.accent_content
-			case .Outlined:
-				color := vgo.mix(0.2 * extras.hover_time, base_color, vgo.WHITE)
+			case .Normal:
+				color := style().color.button
 				vgo.stroke_box(object.box, 1, rounding, paint = color)
 				vgo.fill_box(
 					object.box,
 					rounding,
-					paint = vgo.fade(color, math.lerp(f32(0.25), f32(0.5), extras.press_time)),
+					paint = vgo.fade(color, math.lerp(f32(0.5), f32(0.8), extras.hover_time)),
 				)
-				text_color = style().color.content
 			case .Subtle:
 				vgo.fill_box(
 					object.box,
 					rounding,
-					paint = vgo.fade(base_color, (extras.hover_time + f32(i32(active))) * 0.25),
+					paint = vgo.fade(
+						style().color.button,
+						max(f32(i32(.Hovered in object.state.current)) * 0.5, f32(i32(active))) *
+						0.75,
+					),
 				)
-				text_color = style().color.content
 			}
 
-			vgo.push_scissor(vgo.make_box(object.box, rounding))
-			draw_and_update_wave_effects(object, &extras.waves)
-			vgo.pop_scissor()
+			// vgo.push_scissor(vgo.make_box(object.box, rounding))
+			// draw_and_update_wave_effects(object, &extras.waves)
+			// vgo.pop_scissor()
 
 			if is_loading {
 				vgo.spinner(

@@ -4,6 +4,7 @@ import "../vgo"
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
+import "core:io"
 import "core:math"
 import "core:math/linalg"
 import "core:mem"
@@ -12,7 +13,6 @@ import "core:strconv"
 import "core:strings"
 import "core:time"
 import "core:unicode"
-import "core:io"
 import "tedit"
 
 Input_Decal :: enum {
@@ -22,10 +22,11 @@ Input_Decal :: enum {
 }
 
 Input_State :: struct {
-	editor:      tedit.Editor,
-	builder:     strings.Builder,
-	anchor:      int,
-	offset:      [2]f32,
+	editor:  tedit.Editor,
+	builder: strings.Builder,
+	anchor:  int,
+	offset:  [2]f32,
+	action_time: time.Time,
 }
 
 input_select_all :: proc(object: ^Object) {
@@ -47,6 +48,7 @@ Input_Result :: struct {
 }
 
 Input_Flag :: enum {
+	Undecorated,
 	Obfuscated,
 	Multiline,
 	Monospace,
@@ -73,7 +75,10 @@ input :: proc(
 	placeholder: string = "",
 	flags: Input_Flags = {},
 	loc := #caller_location,
-) -> (result: Input_Result) where intrinsics.type_is_string(T) || intrinsics.type_is_numeric(T) {
+) -> (
+	result: Input_Result,
+) where intrinsics.type_is_string(T) ||
+	intrinsics.type_is_numeric(T) {
 	if content == nil {
 		return {}
 	}
@@ -110,7 +115,7 @@ input :: proc(
 
 		style := style()
 		text_size := style.content_text_size
-		text_font :=	(style.monospace_font if (monospace) else style.default_font)
+		text_font := (style.monospace_font if (monospace) else style.default_font)
 		vgo.set_font(text_font)
 
 		text_origin: [2]f32
@@ -122,7 +127,8 @@ input :: proc(
 				box_center_y(object.box) - text_font.line_height * text_size * 0.5,
 			}
 		}
-		result.confirmed = result.confirmed || (!(!key_down(.Left_Control) && multiline) && key_pressed(.Enter))
+		result.confirmed =
+			result.confirmed || (!(!key_down(.Left_Control) && multiline) && key_pressed(.Enter))
 
 		content_layout, prefix_layout: vgo.Text_Layout
 		if len(prefix) > 0 {
@@ -142,7 +148,9 @@ input :: proc(
 				set_cursor(.I_Beam)
 			}
 			if .Active in object.state.current {
-				if global_state.last_focused_object != global_state.focused_object && global_state.focused_object != object.id && !key_down(.Left_Control) {
+				if global_state.last_focused_object != global_state.focused_object &&
+				   global_state.focused_object != object.id &&
+				   !key_down(.Left_Control) {
 					object.state.current -= {.Active}
 				}
 			} else if .Pressed in object.state.current {
@@ -151,7 +159,7 @@ input :: proc(
 			if key_pressed(.Escape) {
 				object.state.current -= {.Active}
 			} else if .Active in lost_state(object.state) {
-				result.confirmed = true
+				object.state.current += {.Changed}
 			}
 
 			if is_visible {
@@ -236,7 +244,9 @@ input :: proc(
 				}
 				if cmd != .None {
 					tedit.editor_execute(&object.input.editor, cmd)
-					object.state.current += {.Changed}
+					if cmd in tedit.EDIT_COMMANDS {
+						object.state.current += {.Changed}
+					}
 					draw_frames(1)
 				}
 			}
@@ -252,7 +262,10 @@ input :: proc(
 					if object.click.count == 3 {
 						tedit.editor_execute(&object.input.editor, .Select_All)
 					} else {
-						object.input.editor.selection = {content_layout.mouse_index, content_layout.mouse_index}
+						object.input.editor.selection = {
+							content_layout.mouse_index,
+							content_layout.mouse_index,
+						}
 					}
 				}
 				switch object.click.count {
@@ -282,7 +295,11 @@ input :: proc(
 					} else {
 						object.input.editor.selection[1] = max(
 							0,
-							strings.last_index_proc(content_string[:object.input.anchor], is_separator) + 1,
+							strings.last_index_proc(
+								content_string[:object.input.anchor],
+								is_separator,
+							) +
+							1,
 						)
 						if (content_layout.mouse_index > 0 &&
 							   content_string[content_layout.mouse_index - 1] == ' ') {
@@ -294,7 +311,8 @@ input :: proc(
 							)
 						}
 						if object.input.editor.selection[0] == -1 {
-							object.input.editor.selection[0] = len(content_string) - content_layout.mouse_index
+							object.input.editor.selection[0] =
+								len(content_string) - content_layout.mouse_index
 						}
 						object.input.editor.selection[0] += content_layout.mouse_index
 					}
@@ -332,7 +350,7 @@ input :: proc(
 
 			text_origin -= object.input.offset
 			if object_is_visible(object) {
-				vgo.fill_box(object.box, current_options().radius, paint = style.color.field)
+				vgo.fill_box(object.box, current_options().radius, paint = style.color.foreground)
 				vgo.push_scissor(vgo.make_box(object.box, current_options().radius))
 				if len(content_string) == 0 {
 					vgo.fill_text(
@@ -358,12 +376,23 @@ input :: proc(
 				}
 				vgo.fill_text_layout(content_layout, text_origin, paint = style.color.content)
 				if .Active in object.state.previous {
-					draw_text_layout_cursor(content_layout, text_origin, style.color.accent)
+					draw_frames(1)
+					draw_text_layout_cursor(
+						content_layout,
+						text_origin,
+						vgo.fade(
+							style.color.accent,
+							clamp(0.5 + cast(f32)math.sin(time.duration_seconds(time.since(global_state.start_time)) * 8), 0, 1),
+						),
+					)
 				}
 				vgo.pop_scissor()
-				if .Active in object.state.current {
-					vgo.stroke_box(object.box, 1, radius = current_options().radius, paint = style.color.accent)
-				}
+				vgo.stroke_box(
+					object.box,
+					1,
+					radius = current_options().radius,
+					paint = style.color.accent if .Active in object.state.current else style.color.button,
+				)
 			}
 		}
 
@@ -375,7 +404,8 @@ input :: proc(
 				delete(content^)
 				content^ = strings.clone_to_cstring(strings.to_string(object.input.builder))
 			} else when intrinsics.type_is_numeric(T) {
-				if parsed_value, ok := strconv.parse_f64(strings.to_string(object.input.builder)); ok {
+				if parsed_value, ok := strconv.parse_f64(strings.to_string(object.input.builder));
+				   ok {
 					content^ = T(parsed_value)
 				}
 			}
