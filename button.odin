@@ -86,7 +86,7 @@ button :: proc(
 		handle_object_click(object)
 
 		extras.hover_time = animate(extras.hover_time, 0.1, .Hovered in object.state.current)
-		extras.press_time = animate(extras.press_time, 0.15, .Pressed in object.state.current)
+		extras.press_time = animate(extras.press_time, 0.08, .Pressed in object.state.current)
 		extras.hold_time = max(
 			extras.hold_time +
 			delta_time() *
@@ -162,7 +162,7 @@ button :: proc(
 					rounding,
 					paint = vgo.fade(
 						style().color.button,
-						max(f32(i32(.Hovered in object.state.current)) * 0.5, f32(i32(active))) *
+						max((extras.hover_time + extras.press_time) * 0.5, f32(i32(active))) *
 						0.75,
 					),
 				)

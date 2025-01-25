@@ -284,6 +284,23 @@ theme_section :: proc(state: ^Theme_Section_State) {
 	}
 }
 
+menu_section :: proc() {
+	using onyx
+	set_size(0)
+	if begin_menu("Menu", 120, 4, 1) {
+		menu_button("Edit")
+		if begin_submenu("Export as", 120, 2, 0) {
+			menu_button(".json")
+			menu_button(".xml")
+			end_menu()
+		}
+		menu_button("Pin to top")
+		menu_divider()
+		menu_button("Delete")
+		end_menu()
+	}
+}
+
 main :: proc() {
 
 	when ODIN_DEBUG {
@@ -348,14 +365,10 @@ main :: proc() {
 
 					shrink(40)
 
-					foreground()
-
-					shrink(30)
-
 					set_rounded_corners(ALL_CORNERS)
 
 					set_height(remaining_space().y)
-					set_width(200)
+					set_width(120)
 					if begin_layout(.Top) {
 						set_height(26)
 
@@ -370,7 +383,7 @@ main :: proc() {
 							if button(text, active = state.current_section == section, accent = .Subtle).pressed {
 								state.current_section = section
 							}
-							space(2)
+							space(4)
 							pop_id()
 						}
 
@@ -381,13 +394,16 @@ main :: proc() {
 
 					set_width(remaining_space().x)
 					if begin_layout(.Top) {
-						shrink(10)
+						foreground()
+						shrink(20)
 
 						#partial switch state.current_section {
 						case .Button:
 							button_section(&state.button_section)
 						case .Boolean:
 							boolean_section(&state.boolean_section)
+						case .Menu:
+							menu_section()
 						case .Analog:
 							analog_section(&state.analog_section)
 						case .Input:

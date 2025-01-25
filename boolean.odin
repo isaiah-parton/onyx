@@ -126,26 +126,18 @@ boolean :: proc(
 
 			switch type {
 			case .Checkbox:
-				if state_time < 1 {
-					vgo.fill_box(gadget_box, global_state.style.rounding, style().color.foreground)
-					vgo.stroke_box(gadget_box, 1, global_state.style.rounding, style().color.foreground_stroke)
-				}
+				vgo.fill_box(gadget_box, global_state.style.rounding, style().color.foreground)
+				vgo.stroke_box(gadget_box, 1, global_state.style.rounding, style().color.foreground_stroke)
 				if state_time > 0 && state_time < 1 {
 					vgo.push_scissor(vgo.make_box(object.box, global_state.style.rounding))
 				}
-				vgo.fill_box(
-					gadget_box,
-					global_state.style.rounding,
-					vgo.fade(gadget_fill_color, state_time),
-				)
 				if state_time > 0 {
 					gadget_center += {
 						0,
 						box_height(gadget_box) *
 						((1 - state_time) if value^ else -(1 - state_time)),
 					}
-					vgo.fill_box({gadget_center - gadget_size * 0.25, gadget_center + gadget_size * 0.25}, 2, gadget_accent_color)
-					// vgo.check(gadget_center, gadget_size.y / 4, style().color.field)
+					vgo.check(gadget_center, gadget_size.y / 4, 1, style().color.content)
 				}
 				if state_time > 0 && state_time < 1 {
 					vgo.pop_scissor()
@@ -168,7 +160,7 @@ boolean :: proc(
 					vgo.fill_circle(
 						gadget_center,
 						(radius - 5) * state_time,
-						vgo.fade(style().color.accent, state_time),
+						vgo.fade(style().color.content, state_time),
 					)
 				}
 			case .Switch:
@@ -181,19 +173,12 @@ boolean :: proc(
 					(box_width(inner_box) - box_height(inner_box)) * state_time,
 					box_center_y(inner_box),
 				}
-				if state_time < 1 {
-					vgo.fill_box(gadget_box, paint = style().color.button_background, radius = outer_radius)
-					vgo.stroke_box(gadget_box, 1, paint = style().color.foreground_stroke, radius = outer_radius)
-				}
-				vgo.fill_box(
-					{gadget_box.lo, lever_center + outer_radius},
-					radius = outer_radius,
-					paint = vgo.fade(style().color.accent, state_time),
-				)
+				vgo.fill_box(gadget_box, paint = style().color.button_background, radius = outer_radius)
+				vgo.stroke_box(gadget_box, 1, paint = style().color.foreground_stroke, radius = outer_radius)
 				vgo.fill_circle(
 					lever_center,
 					inner_radius,
-					vgo.mix(state_time, style().color.button, gadget_accent_color),
+					vgo.mix(state_time, style().color.button, style().color.content),
 				)
 			}
 

@@ -103,7 +103,7 @@ Global_State :: struct {
 	dragged_object:           Id,
 	disable_objects:          bool,
 	drag_offset:              [2]f32,
-	mouse_press_point:              [2]f32,
+	mouse_press_point:        [2]f32,
 	form:                     Form,
 	form_active:              bool,
 	tooltip_boxes:            [dynamic]Box,
@@ -114,8 +114,10 @@ Global_State :: struct {
 	layout_stack:             Stack(Layout, MAX_LAYOUTS),
 	options_stack:            Stack(Options, MAX_LAYOUTS),
 	next_box:                 Maybe(Box),
-	next_id:									Maybe(Id),
-	focus_next: bool,
+	press_on_hover: bool,
+	next_id:                  Maybe(Id),
+	group_stack: Stack(Group, 32),
+	focus_next:               bool,
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
 	layer_stack:              Stack(^Layer, MAX_LAYERS),
@@ -137,6 +139,7 @@ Global_State :: struct {
 	mouse_scroll:             [2]f32,
 	mouse_bits:               Mouse_Bits,
 	last_mouse_bits:          Mouse_Bits,
+	mouse_release_time: time.Time,
 	keys, last_keys:          #sparse[Keyboard_Key]bool,
 	runes:                    [dynamic]rune,
 	visible:                  bool,
@@ -310,6 +313,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 				global_state.mouse_bits += {Mouse_Button(button)}
 				global_state.click_mouse_pos = global_state.mouse_pos
 			case glfw.RELEASE:
+				global_state.mouse_release_time = time.now()
 				global_state.mouse_bits -= {Mouse_Button(button)}
 			}
 		},

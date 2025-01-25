@@ -6,7 +6,7 @@ Color_Scheme :: struct {
 	button, button_background, hover, accent, accent_content, content, shadow: vgo.Color,
 	field, foreground, foreground_stroke, foreground_accent, background: vgo.Color,
 	grid_background, grid_minor_lines, grid_major_lines: vgo.Color,
-	checkers: [2]vgo.Color,
+	checkers0, checkers1: vgo.Color,
 }
 
 Style :: struct {
@@ -63,7 +63,7 @@ default_style_shape :: proc() -> Style_Shape {
 		tab_text_size = 18,
 		content_text_size = 14,
 		rounding = 4,
-		menu_padding = 2,
+		menu_padding = 4,
 		popup_margin = 7,
 		scrollbar_thickness = 8,
 		table_row_height = 40,
@@ -85,10 +85,8 @@ light_color_scheme :: proc() -> Color_Scheme {
 
 dark_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
-		checkers = {
-			{210, 210, 210, 255},
-			{160, 160, 160, 255},
-		},
+		checkers0 = {210, 210, 210, 255},
+		checkers1 = {160, 160, 160, 255},
 		background = {0, 0, 0, 255},
 		foreground = {16, 15, 17, 255},
 		foreground_stroke = {60, 60, 60, 255},

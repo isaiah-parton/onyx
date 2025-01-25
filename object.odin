@@ -83,10 +83,12 @@ Object :: struct {
 	input: Input_State,
 	variant:         Object_Variant,
 	hover_time: f32,
+	press_time: f32,
 }
 
 Object_State :: struct {
 	current:     Object_Status_Set,
+	next:     Object_Status_Set,
 	previous:    Object_Status_Set,
 	input_mask:  Object_Status_Set,
 	output_mask: Object_Status_Set,
@@ -95,7 +97,7 @@ Object_State :: struct {
 Object_Click :: struct {
 	count:        int,
 	release_time: time.Time,
-	press_time: time.Time,
+	press_time: 	time.Time,
 	point:        [2]f32,
 	button: Mouse_Button,
 }
@@ -193,6 +195,15 @@ object_was_updated_this_frame :: proc(object: ^Object) -> bool {
 
 handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 	if global_state.hovered_object == object.id {
+		if global_state.press_on_hover {
+			if .Pressed not_in object.state.current {
+				object.click.press_time = time.now()
+				global_state.focused_object = object.id
+			}
+			object.state.current += {.Pressed}
+			object.click.count = max(object.click.count, 1)
+		}
+
 		object.state.current += {.Hovered}
 		pressed_buttons := global_state.mouse_bits - global_state.last_mouse_bits
 		if pressed_buttons != {} {
@@ -206,9 +217,8 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 			object.click.point = global_state.mouse_pos
 			object.click.press_time = time.now()
 			object.state.current += {.Pressed}
-			draw_frames(1)
-			// global_state.focused_object = object.id
 			if sticky do global_state.dragged_object = object.id
+			draw_frames(1)
 		}
 		// TODO: Lose click if mouse moved too much (allow for dragging containers by their contents)
 		// if !info.sticky && linalg.length(core.click_mouse_pos - core.mouse_pos) > 8 {
@@ -221,16 +231,11 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 	}
 	if object.state.current >= {.Pressed} {
 		released_buttons := global_state.last_mouse_bits - global_state.mouse_bits
-		if object.click.button in released_buttons {
+		if released_buttons != {} {
 			object.state.current += {.Clicked}
 			object.state.current -= {.Pressed, .Dragged}
 			object.click.release_time = time.now()
 			global_state.dragged_object = 0
-		}
-	} else {
-		if object.click.count > 0 &&
-		   linalg.length(global_state.mouse_pos - global_state.last_mouse_pos) > 2 {
-			object.click.count = 0
 		}
 	}
 }
@@ -245,6 +250,8 @@ object_is_visible :: proc(object: ^Object) -> bool {
 update_object_state :: proc(object: ^Object) {
 	object.state.previous = object.state.current
 	object.state.current -= {.Dragged, .Clicked, .Focused, .Changed, .Hovered}
+	object.state.current += object.state.next
+	object.state.next = {}
 
 	if global_state.focused_object == object.id {
 		object.state.current += {.Focused}
@@ -300,6 +307,9 @@ end_object :: proc() {
 	if object, ok := current_object().?; ok {
 		if .Active in (object.state.current - object.state.previous) {
 			global_state.last_activated_object = object.id
+		}
+		if group, ok := current_group().?; ok {
+			group.current_state += object.state.current
 		}
 		transfer_object_state_to_its_layer(object)
 		pop_stack(&global_state.object_stack)

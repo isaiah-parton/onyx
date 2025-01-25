@@ -26,6 +26,7 @@ Input_State :: struct {
 	builder: strings.Builder,
 	anchor:  int,
 	offset:  [2]f32,
+	last_mouse_index: int,
 	action_time: time.Time,
 }
 
@@ -141,12 +142,15 @@ input :: proc(
 			is_visible := object_is_visible(object)
 
 			handle_object_click(object, true)
+
 			if point_in_box(mouse_point(), object.box) {
 				hover_object(object)
 			}
+
 			if .Hovered in object.state.current {
 				set_cursor(.I_Beam)
 			}
+
 			if .Active in object.state.current {
 				if global_state.last_focused_object != global_state.focused_object &&
 				   global_state.focused_object != object.id &&
@@ -156,6 +160,7 @@ input :: proc(
 			} else if .Pressed in object.state.current {
 				object.state.current += {.Active}
 			}
+
 			if key_pressed(.Escape) {
 				object.state.current -= {.Active}
 			} else if .Active in lost_state(object.state) {
@@ -173,6 +178,11 @@ input :: proc(
 					local_mouse = mouse_point() - (text_origin - object.input.offset),
 				)
 			}
+
+			if .Pressed not_in object.state.current && object.input.last_mouse_index != content_layout.mouse_index {
+				object.click.count = 0
+			}
+			object.input.last_mouse_index = content_layout.mouse_index
 
 			if .Active in object.state.current {
 				if .Active not_in object.state.previous {
@@ -382,7 +392,7 @@ input :: proc(
 						text_origin,
 						vgo.fade(
 							style.color.accent,
-							clamp(0.5 + cast(f32)math.sin(time.duration_seconds(time.since(global_state.start_time)) * 8), 0, 1),
+							clamp(0.5 + cast(f32)math.sin(time.duration_seconds(time.since(global_state.start_time)) * 7) * 1.5, 0, 1),
 						),
 					)
 				}

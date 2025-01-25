@@ -128,8 +128,8 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 			draw_checkerboard_pattern(
 				object.box,
 				box_height(object.box) / 2,
-				vgo.blend(style().color.checkers[0], value^, vgo.WHITE),
-				vgo.blend(style().color.checkers[1], value^, vgo.WHITE),
+				vgo.blend(style().color.checkers0, value^, vgo.WHITE),
+				vgo.blend(style().color.checkers1, value^, vgo.WHITE),
 			)
 			if show_hex {
 				vgo.fill_text_layout(
@@ -226,8 +226,8 @@ alpha_slider :: proc(
 			draw_checkerboard_pattern(
 				box,
 				(box.hi[j] - box.lo[j]) / 2,
-				style().color.checkers[0],
-				style().color.checkers[1],
+				style().color.checkers0,
+				style().color.checkers1,
 			)
 			color.a = 255
 			time := clamp(value^, 0, 1)
