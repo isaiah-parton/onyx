@@ -23,9 +23,7 @@ fnv32a :: proc(data: []byte, seed: u32) -> u32 {
 	}
 	return h;
 }
-/*
-	Unique id creation
-*/
+
 hash :: proc {
 	hash_string,
 	hash_rawptr,
@@ -35,7 +33,7 @@ hash :: proc {
 	hash_int,
 }
 hash_int :: #force_inline proc(num: int) -> Id {
-	hash := global_state.id_stack.items[global_state.id_stack.height - 1] if global_state.id_stack.height > 0 else FNV1A32_OFFSET_BASIS
+	hash := global_state.id_stack.items[global_state.id_stack.height - 1]
 	return hash ~ (Id(num) * FNV1A32_PRIME)
 }
 hash_string :: #force_inline proc(str: string) -> Id {
@@ -49,7 +47,7 @@ hash_uintptr :: #force_inline proc(ptr: uintptr) -> Id {
 	return hash_bytes(([^]u8)(&ptr)[:size_of(ptr)])
 }
 hash_bytes :: proc(bytes: []byte) -> Id {
-	return fnv32a(bytes, global_state.id_stack.items[global_state.id_stack.height - 1] if global_state.id_stack.height > 0 else FNV1A32_OFFSET_BASIS)
+	return fnv32a(bytes, global_state.id_stack.items[global_state.id_stack.height - 1])
 }
 hash_loc :: proc(loc: runtime.Source_Code_Location) -> Id {
 	hash := hash_bytes(transmute([]byte)loc.file_path)

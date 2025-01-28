@@ -470,6 +470,9 @@ new_frame :: proc() {
 
 	vgo.new_frame()
 
+	global_state.id_stack.height = 0
+	push_stack(&global_state.id_stack, FNV1A32_OFFSET_BASIS)
+
 	profiler_begin_scope(.Construct)
 }
 
