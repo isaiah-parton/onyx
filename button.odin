@@ -42,7 +42,6 @@ Button_Accent :: enum {
 }
 
 Button :: struct {
-	waves:       Wave_Effects,
 	hover_time:  f32,
 	press_time:  f32,
 	hold_time:   f32,
@@ -167,10 +166,6 @@ button :: proc(
 					),
 				)
 			}
-
-			// vgo.push_scissor(vgo.make_box(object.box, rounding))
-			// draw_and_update_wave_effects(object, &extras.waves)
-			// vgo.pop_scissor()
 
 			if is_loading {
 				vgo.spinner(

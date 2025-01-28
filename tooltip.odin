@@ -2,6 +2,7 @@ package onyx
 
 import "../vgo"
 import "core:fmt"
+import "core:time"
 import "core:math"
 import "core:math/linalg"
 
@@ -24,12 +25,20 @@ Tooltip_Info :: struct {
 	mode:   Tooltip_Mode,
 }
 
-begin_tooltip :: proc(
+begin_tooltip_for_last_object :: proc(size: [2]f32, side: Side = .Bottom, delay: time.Duration = time.Second) -> bool {
+	object := last_object().? or_return
+	if time.since(object.hovered_time) < delay || .Hovered not_in object.state.current {
+		return false
+	}
+	begin_tooltip_with_options(size, side, origin = object.box)
+	return true
+}
+
+begin_tooltip_with_options:: proc(
 	size: [2]f32,
-	side: Side,
-	offset: Maybe(f32),
+	side: Side = .Bottom,
 	origin: union {[2]f32, Box} = nil,
-	bounds: Maybe(Box) = nil,
+	offset: f32 = DEFAULT_TOOLTIP_OFFSET,
 	loc := #caller_location,
 ) -> bool {
 	object := persistent_object(hash(loc))
@@ -55,37 +64,33 @@ begin_tooltip :: proc(
 		anchor_point = global_state.mouse_pos
 	}
 
-	box: Box
-
-	offset := offset.? or_else DEFAULT_TOOLTIP_OFFSET
-
 	switch side {
 	case .Top:
-		box = {
+		object.box = {
 			{anchor_point.x - size.x / 2, anchor_point.y - size.y - offset},
 			{anchor_point.x + size.x / 2, anchor_point.y - offset},
 		}
 	case .Bottom:
-		box = {
+		object.box = {
 			{anchor_point.x - size.x / 2, anchor_point.y + offset},
-			{anchor_point.x + size.x / 2, anchor_point.y + size.y * offset},
+			{anchor_point.x + size.x / 2, anchor_point.y + size.y + offset},
 		}
 	case .Left:
-		box = {
+		object.box = {
 			{anchor_point.x - size.x - offset, anchor_point.y - size.y / 2},
 			{anchor_point.x - offset, anchor_point.y + size.y / 2},
 		}
 	case .Right:
-		box = {
+		object.box = {
 			{anchor_point.x + offset, anchor_point.y - size.y / 2},
 			{anchor_point.x + size.x + offset, anchor_point.y + size.y / 2},
 		}
 	}
 
-	draw_shadow(box)
 	begin_layer(kind = .Topmost, loc = loc)
-	vgo.fill_box(box, global_state.style.rounding, style().color.background)
-	vgo.stroke_box(box, 1, global_state.style.rounding, style().color.button)
+	draw_shadow(object.box)
+	vgo.fill_box(object.box, global_state.style.rounding, style().color.foreground)
+	vgo.stroke_box(object.box, 1, global_state.style.rounding, style().color.foreground_stroke)
 
 	return true
 }

@@ -109,6 +109,8 @@ Input_Section_State :: struct {
 	text:           string,
 	multiline_text: string,
 	number:         f32,
+	date: Maybe(onyx.Date),
+	until: Maybe(onyx.Date),
 }
 
 input_section :: proc(state: ^Input_Section_State) {
@@ -122,6 +124,11 @@ input_section :: proc(state: ^Input_Section_State) {
 	space(10)
 	set_height(30)
 	input(&state.number, prefix = "$")
+	space(20)
+	calendar(&state.date, &state.until)
+	space(20)
+	label(fmt.tprint(state.date))
+	label(fmt.tprint(state.until))
 }
 
 Graph_Section_State :: struct {
@@ -251,6 +258,8 @@ theme_section :: proc(state: ^Theme_Section_State) {
 		}
 		space(10)
 		slider(&style().rounding, 0, 10)
+		space(10)
+		slider(&style().default_text_size, 10, 30)
 		end_layout()
 	}
 
@@ -298,6 +307,11 @@ menu_section :: proc() {
 		menu_divider()
 		menu_button("Delete")
 		end_menu()
+	}
+	tooltip_text_layout := vgo.make_text_layout("Click to open!", style().default_text_size, style().default_font)
+	if begin_tooltip_for_last_object(tooltip_text_layout.size + style().text_padding * 2) {
+		vgo.fill_text_layout(tooltip_text_layout, box_center(current_object().?.box), 0.5, style().color.content)
+		end_tooltip()
 	}
 }
 

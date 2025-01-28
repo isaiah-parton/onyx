@@ -35,13 +35,13 @@ boolean :: proc(
 
 	gadget_size: [2]f32
 
+	base_size := global_state.style.visual_size.y * 0.8
+
 	switch type {
-	case .Checkbox:
-		gadget_size = global_state.style.visual_size.y * 0.8
-	case .Radio:
-		gadget_size = global_state.style.visual_size.y * 0.8
+	case .Checkbox, .Radio:
+		gadget_size = base_size
 	case .Switch:
-		gadget_size = [2]f32{1.75, 1} * global_state.style.visual_size.y * 0.8
+		gadget_size = [2]f32{1.75, 1} * base_size
 	}
 
 	text_layout: vgo.Text_Layout

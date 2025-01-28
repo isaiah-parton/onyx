@@ -123,6 +123,7 @@ begin_submenu :: proc(text: string, width: f32, how_many_items, how_many_divider
 
 		if .Hovered in object.state.current {
 			global_state.focused_object = object.id
+			object.state.current += {.Focused}
 		}
 
 		if object_is_visible(object) {
@@ -179,6 +180,7 @@ begin_menu_with_activator :: proc(
 	set_next_box(box)
 	push_id(activator.id)
 	push_stack(&global_state.object_stack, activator)
+	begin_layer(kind = .Background)
 	begin_layout(.Top) or_return
 	begin_group() or_return
 	foreground()
@@ -198,6 +200,7 @@ end_menu :: proc() {
 		object.state.next += group.current_state
 	}
 	end_layout()
+	end_layer()
 	pop_stack(&global_state.object_stack)
 	pop_id()
 }

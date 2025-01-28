@@ -32,6 +32,47 @@ Debug_State :: struct {
 	wireframe:             bool,
 }
 
+log :: proc(format: string, args: ..any) {
+
+	fmt.printfln(format, ..args)
+}
+
+print_object_debug_logs :: proc(object: ^Object) {
+	new_state := object.state.current - object.state.previous
+	old_state := object.state.previous - object.state.current
+	if new_state > {} || old_state > {} {
+		fmt.printf("[%v] %x \t", time.now(), object.id)
+		if new_state > {} {
+			fmt.print("+{")
+			i := 0
+			for member in new_state {
+				if i > 0 {
+					fmt.print(", ")
+				}
+				i += 1
+				fmt.print(member)
+			}
+			fmt.print("} ")
+		}
+		if old_state > {} {
+			if new_state > {} {
+				fmt.print("\n\t\t\t\t\t\t\t")
+			}
+			fmt.print("-{")
+			i := 0
+			for member in old_state {
+				if i > 0 {
+					fmt.print(", ")
+				}
+				i += 1
+				fmt.print(member)
+			}
+			fmt.print("}")
+		}
+		fmt.print("\n")
+	}
+}
+
 destroy_debug_state :: proc(state: ^Debug_State) {
 	delete(state.hovered_objects)
 }

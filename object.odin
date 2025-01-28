@@ -60,7 +60,6 @@ Object_Variant :: union {
 	Color_Picker,
 	Date_Picker,
 	Calendar,
-	Calendar_Day,
 	Graph,
 	Range_Slider,
 	Slider,
@@ -82,6 +81,7 @@ Object :: struct {
 	click:           Object_Click,
 	input: Input_State,
 	variant:         Object_Variant,
+	hovered_time: time.Time,
 	hover_time: f32,
 	press_time: f32,
 }
@@ -204,6 +204,10 @@ handle_object_click :: proc(object: ^Object, sticky: bool = false) {
 			object.click.count = max(object.click.count, 1)
 		}
 
+		if .Hovered not_in object.state.previous {
+			object.hovered_time = time.now()
+		}
+
 		object.state.current += {.Hovered}
 		pressed_buttons := global_state.mouse_bits - global_state.last_mouse_bits
 		if pressed_buttons != {} {
@@ -305,6 +309,9 @@ begin_object :: proc(object: ^Object) -> bool {
 
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
+		when ODIN_DEBUG {
+			print_object_debug_logs(object)
+		}
 		if .Active in (object.state.current - object.state.previous) {
 			global_state.last_activated_object = object.id
 		}

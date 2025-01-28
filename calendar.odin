@@ -61,9 +61,10 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	}
 	extras := &object.variant.(Calendar)
 
-	object.size = {280, 0}
+	object.size = {234, 0}
 	row_height := object.size.x / DAYS_PER_WEEK
-	object.size.y = row_height * 2
+	header_height := f32(20)
+	object.size.y = row_height + header_height
 
 	page := extras.page.? or_else todays_calendar_page()
 	if extras.page == nil {
@@ -73,226 +74,199 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 	from_date := date^
 	to_date := until^ if until != nil else Maybe(Date)(nil)
 
-	selection_times := [2]t.Time {
-		t.datetime_to_time(dt.DateTime{from_date.? or_else Date{}, {}}) or_else t.Time{},
-		t.datetime_to_time(
-			dt.DateTime{to_date.? or_else (from_date.? or_else Date{}), {}},
-		) or_else t.Time{},
-	}
+	from_ordinal := dt.date_to_ordinal(from_date.? or_else dt.Date{}) or_else 0
+	to_ordinal := dt.date_to_ordinal(to_date.? or_else dt.Date{}) or_else from_ordinal
+	today_ordinal, _ := dt.date_to_ordinal(todays_date())
 
-	month_start := t.datetime_to_time(page.year, page.month, 1, 0, 0, 0) or_else t.Time{}
+	page_date := dt.Date{i64(page.year), i8(page.month), i8(1)}
 
-	weekday := t.weekday(month_start)
-	calendar_start := month_start._nsec - i64(weekday) * i64(t.Hour * HOURS_PER_DAY)
+	ordinal, _ := dt.date_to_ordinal(page_date)
+	ordinal_day_of_week := dt.day_of_week(ordinal)
+	ordinal -= i64(ordinal_day_of_week)
 
 	how_many_days := 0
 	if days_in_month, err := dt.last_day_of_month(page.year, page.month); err == nil {
 		how_many_days = int(days_in_month)
 	}
+	how_many_days += int(ordinal_day_of_week)
 
-	how_many_days = int(
-		(month_start._nsec - calendar_start) / i64(t.Hour * HOURS_PER_DAY) + i64(how_many_days),
-	)
-	how_many_days = int(math.ceil(f32(how_many_days) / DAYS_PER_WEEK)) * DAYS_PER_WEEK
-	how_many_weeks := math.ceil(f32(how_many_days) / DAYS_PER_WEEK)
-	object.size.y +=
-		how_many_weeks * row_height + (how_many_weeks + 1) * CALENDAR_WEEK_SPACING
+	how_many_weeks := int(math.ceil(f32(how_many_days) / DAYS_PER_WEEK))
+
+	how_many_days = how_many_weeks * DAYS_PER_WEEK
+
+	object.size.y += f32(how_many_weeks) * row_height + f32(how_many_weeks) * CALENDAR_WEEK_SPACING
+
 	extras.focus_time = animate(extras.focus_time, 0.2, date^ != nil)
+
 	allow_range := until != nil
+
+	object.box = next_box(object.size)
 
 	if begin_object(object) {
 		defer end_object()
 
+		set_next_box(object.box)
+		begin_layout(.Top)
+		defer end_layout()
+
 		push_id(object.id)
 		defer pop_id()
 
+		set_width(remaining_space().x)
+		set_height(20)
+
 		if begin_layout(side = .Left) {
 			defer end_layout()
 
+			set_align(.Center)
+			set_width(0)
 			if button(text = "<<", accent = .Subtle).clicked {
 				extras.page = move_calendar_page(page, -1)
 			}
-			label(text = fmt.tprintf("%s %i", t.Month(page.month), page.year))
+
+			set_side(.Right)
 			if button(text = ">>", accent = .Subtle).clicked {
 				extras.page = move_calendar_page(page, 1)
 			}
+
+			vgo.fill_text(
+				fmt.tprintf("%s %i", t.Month(page.month), page.year),
+				style().default_text_size,
+				box_center(current_layout().?.box),
+				style().default_font,
+				0.5,
+				paint = style().color.content,
+			)
 		}
 
-		set_height(remaining_space().y * 0.1428)
-
+		set_height(row_height)
 		if begin_layout(side = .Left) {
 			defer end_layout()
 
-			set_width(remaining_space().x)
+			set_width(remaining_space().x / 7)
 			WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
 			for weekday in WEEKDAY_ABBREVIATIONS {
 				label(text = weekday, align = 0.5, color = vgo.fade(style().color.content, 0.5))
 			}
 		}
 
-		set_height(remaining_space().y)
+		divider()
 
+		space(CALENDAR_WEEK_SPACING)
 		if begin_layout(side = .Left) {
+			set_width(remaining_space().x / 7)
 			defer end_layout()
-
-			time: t.Time = {calendar_start}
 			for i in 0 ..< how_many_days {
-				push_id(int(time._nsec))
-				defer pop_id()
-
 				if (i > 0) && (i % 7 == 0) {
 					end_layout()
+					space(CALENDAR_WEEK_SPACING)
 					begin_layout(side = .Left)
+					set_width(remaining_space().x / 7)
 				}
 
-				year, month, day := t.date(time)
-				cell_date := Date{i64(year), i8(month), i8(day)}
 				cell_year, cell_month, cell_day := t.date(t.now())
+				ordinal_date := dt.ordinal_to_date(ordinal) or_continue
 
-				if calendar_day(day, cell_year == year && cell_month == month && cell_day == day, page.month == i8(month), time, selection_times, extras.focus_time).clicked {
-					if allow_range {
-						if from_date == nil {
-							from_date = cell_date
+				button_object := persistent_object(hash(int(ordinal)))
+				if begin_object(button_object) {
+					button_object.box = next_box({})
+
+					if point_in_box(mouse_point(), button_object.box) {
+						hover_object(button_object)
+					}
+
+					handle_object_click(button_object)
+
+					if object_is_visible(button_object) {
+						stroke_color := style().color.foreground_stroke
+						if from_ordinal <= ordinal && ordinal <= to_ordinal {
+							if from_ordinal < to_ordinal {
+								vgo.fill_box(
+									button_object.box,
+									hstack_corner_radius(
+										int(ordinal - from_ordinal),
+										int(to_ordinal - from_ordinal) + 1,
+									) *
+									style().rounding,
+									vgo.fade(style().color.accent, 0.5),
+								)
+							}
+							if from_ordinal == ordinal || to_ordinal == ordinal {
+								vgo.fill_box(
+									button_object.box,
+									style().rounding,
+									paint = style().color.accent,
+								)
+							}
+							stroke_color = style().color.content
 						} else {
-							if cell_date == from_date || cell_date == to_date {
-								from_date, to_date = nil, nil
+							vgo.fill_box(
+								button_object.box,
+								style().rounding,
+								paint = vgo.fade(
+									style().color.button,
+									0.5 * f32(i32(.Hovered in button_object.state.current)),
+								),
+							)
+						}
+						if ordinal == today_ordinal {
+							vgo.stroke_box(
+								button_object.box,
+								1,
+								style().rounding,
+								paint = stroke_color,
+							)
+						}
+						vgo.fill_text(
+							fmt.tprint(ordinal_date.day),
+							style().default_text_size,
+							box_center(button_object.box),
+							style().default_font,
+							0.5,
+							paint = vgo.fade(
+								style().color.content,
+								max(
+									0.5,
+									f32(i32(from_ordinal == ordinal)),
+									f32(i32(ordinal_date.month == page_date.month)),
+								),
+							),
+						)
+					}
+
+					if .Pressed in (button_object.state.current - button_object.state.previous) {
+						if allow_range {
+							if from_date == nil {
+								from_date = ordinal_date
 							} else {
-								if time._nsec <=
-								   (t.datetime_to_time(dt.DateTime{from_date.?, {}}) or_else t.Time{})._nsec {
-									from_date = cell_date
+								if ordinal == from_ordinal || ordinal == to_ordinal {
+									from_date, to_date = nil, nil
 								} else {
-									to_date = cell_date
+									if ordinal <= from_ordinal {
+										from_date = ordinal_date
+									} else {
+										to_date = ordinal_date
+									}
 								}
 							}
-						}
-					} else {
-						if cell_date == from_date {
-							from_date = nil
 						} else {
-							from_date = cell_date
+							if ordinal_date == from_date {
+								from_date = nil
+							} else {
+								from_date = ordinal_date
+							}
+						}
+						date^ = from_date
+						if until != nil {
+							until^ = to_date
 						}
 					}
-					date^ = from_date
-					if until != nil {
-						until^ = to_date
-					}
+
+					end_object()
 				}
-
-				time._nsec += i64(t.Hour * 24)
+				ordinal += 1
 			}
 		}
-	}
-}
-
-Calendar_Day :: struct {
-	using object:  ^Object,
-	day:           int,
-	is_today:      bool,
-	is_this_month: bool,
-	time:          t.Time,
-	selection:     [2]t.Time,
-	focus_time:    f32,
-}
-
-calendar_day :: proc(
-	day: int,
-	is_today: bool,
-	is_this_month: bool,
-	time: t.Time,
-	selection: [2]t.Time,
-	focus_time: f32,
-	loc := #caller_location,
-) -> (
-	result: Button_Result,
-) {
-	object := persistent_object(hash(loc))
-	if object.variant == nil {
-		object.variant = Calendar_Day {
-			object = object,
-		}
-	}
-
-	self := &object.variant.(Calendar_Day)
-	self.day = day
-	self.is_today = is_today
-	self.is_this_month = is_this_month
-	self.time = time
-	self.selection = selection
-	if begin_object(object) {
-		defer end_object()
-
-		result = {
-			clicked = .Clicked in self.state.previous,
-			hovered = .Hovered in self.state.previous,
-		}
-	}
-	return
-}
-
-display_calendar_day :: proc(self: ^Calendar_Day) {
-	if point_in_box(mouse_point(), self.box) {
-		hover_object(self)
-	}
-	handle_object_click(self)
-	if .Hovered in self.state.current {
-		set_cursor(.Pointing_Hand)
-	}
-	is_within_range :=
-		self.time._nsec >= self.selection[0]._nsec && self.time._nsec <= self.selection[1]._nsec
-	is_first_day := self.selection[0]._nsec == self.time._nsec
-	is_last_day := self.selection[1]._nsec == self.time._nsec
-	self.focus_time = animate(self.focus_time, 0.2, is_first_day || is_last_day)
-	if object_is_visible(self) {
-		if is_within_range {
-			corners: [4]f32
-			if is_first_day {
-				corners[0] = global_state.style.rounding
-				corners[2] = global_state.style.rounding
-			}
-			if is_last_day {
-				corners[1] = global_state.style.rounding
-				corners[3] = global_state.style.rounding
-			}
-			vgo.fill_box(
-				self.box,
-				corners,
-				vgo.fade(style().color.button, 1 if self.is_this_month else 0.5),
-			)
-		} else {
-			if .Hovered in self.state.current {
-				vgo.fill_box(
-					self.box,
-					global_state.style.shape.rounding,
-					paint = style().color.button,
-				)
-			} else if self.is_today {
-				vgo.stroke_box(
-					self.box,
-					1,
-					global_state.style.shape.rounding,
-					paint = style().color.button,
-				)
-			}
-		}
-		if self.focus_time > 0 {
-			vgo.fill_box(
-				self.box,
-				global_state.style.shape.rounding,
-				vgo.fade(style().color.content, self.focus_time),
-			)
-		}
-		vgo.fill_text(
-			fmt.tprint(self.day),
-			global_state.style.default_text_size,
-			box_center(self.box),
-			font = global_state.style.default_font,
-			align = 0.5,
-			paint = vgo.mix(
-				self.focus_time,
-				style().color.content if self.is_this_month else vgo.fade(style().color.content, 0.5),
-				style().color.field,
-			),
-		)
 	}
 }
 
