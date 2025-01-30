@@ -47,6 +47,7 @@ Layout :: struct {
 	box:          Box,
 	bounds:       Box,
 	does_grow:    bool,
+	spacing_size: [2]f32,
 	content_size: [2]f32,
 }
 
@@ -221,6 +222,7 @@ shrink :: proc(amount: [4]f32) {
 	layout := current_layout().?
 	layout.box.lo += amount.xy
 	layout.box.hi -= amount.zw
+	layout.spacing_size += (amount.xy + amount.zw)
 }
 
 space :: proc(amount: f32) {
@@ -263,4 +265,11 @@ set_side :: proc(side: Side) {
 
 set_align :: proc(align: Align) {
 	current_options().align = align
+}
+
+wiggle_next_object :: proc(time, amount: f32) {
+	box := next_box({})
+	box = move_box(box, {math.sin(f32(seconds()) * 30) * math.sin(time * math.PI) * amount, 0})
+	set_next_box(box)
+	draw_frames(int(time > 0 && time < 1) * 2)
 }

@@ -72,6 +72,10 @@ global_state: Global_State
 Global_State :: struct {
 	ready:                    bool,
 	window:                   glfw.WindowHandle,
+	window_x: i32,
+	window_y: i32,
+	window_width: i32,
+	window_height: i32,
 	debug:                    Debug_State,
 	view:                     [2]f32,
 	desired_fps:              int,
@@ -152,6 +156,10 @@ Global_State :: struct {
 	frames:                   int,
 	drawn_frames:             int,
 	cursors:                  [Mouse_Cursor]glfw.CursorHandle,
+}
+
+seconds :: proc() -> f64 {
+	return time.duration_seconds(time.diff(global_state.start_time, global_state.last_frame_time))
 }
 
 draw_frames :: proc(how_many: int) {
@@ -468,6 +476,19 @@ new_frame :: proc() {
 	if key_pressed(.F3) {
 		global_state.debug.enabled = !global_state.debug.enabled
 		draw_frames(1)
+	}
+
+	if key_pressed(.F11) {
+		monitor := glfw.GetWindowMonitor(global_state.window)
+		if monitor == nil {
+			monitor = glfw.GetPrimaryMonitor()
+			mode := glfw.GetVideoMode(monitor)
+			global_state.window_x, global_state.window_y = glfw.GetWindowPos(global_state.window)
+			global_state.window_width, global_state.window_height = glfw.GetWindowSize(global_state.window)
+			glfw.SetWindowMonitor(global_state.window, monitor, 0, 0, mode.width, mode.height, mode.refresh_rate)
+		} else {
+			glfw.SetWindowMonitor(global_state.window, nil, global_state.window_x, global_state.window_y, global_state.window_width, global_state.window_height, 0)
+		}
 	}
 
 	vgo.new_frame()

@@ -21,6 +21,7 @@ Object_Flag :: enum {
 	Hover_Through,
 	Sticky_Press,
 	Sticky_Hover,
+	No_Tab_Cycle,
 }
 
 Object_Flags :: bit_set[Object_Flag;u8]
@@ -365,7 +366,7 @@ hover_object :: proc(object: ^Object) {
 }
 
 focus_object :: proc(object: ^Object) {
-	global_state.focused_object = object.id
+	global_state.next_focused_object = object.id
 }
 
 foreground :: proc(loc := #caller_location) {

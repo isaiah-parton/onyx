@@ -90,7 +90,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		checkers0 = {210, 210, 210, 255},
 		checkers1 = {160, 160, 160, 255},
 		background = {0, 0, 0, 255},
-		foreground = {16, 15, 17, 255},
+		foreground = {18, 19, 20, 255},
 		foreground_stroke = {60, 60, 60, 255},
 		foreground_accent = {30, 30, 30, 255},
 		grid_background = {0, 0, 0, 255},
@@ -102,7 +102,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		accent = {34, 117, 34, 255},
 		accent_content = {10, 10, 10, 255},
 		content = {255, 255, 255, 255},
-		shadow = {0, 0, 0, 25},
+		shadow = {0, 0, 0, 75},
 		hover = {120, 125, 140, 95}
 	}
 }

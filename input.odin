@@ -97,9 +97,6 @@ input :: proc(
 		if .Active not_in object.state.current {
 			strings.builder_reset(&object.input.builder)
 			write_input_value(strings.to_writer(&object.input.builder), content, format)
-		} else {
-			// b := strings.builder_make(allocator = context.temp_allocator)
-			// content_string = strings.to_string(b)
 		}
 		content_string = strings.to_string(object.input.builder)
 
@@ -117,6 +114,7 @@ input :: proc(
 		style := style()
 		text_size := style.content_text_size
 		text_font := (style.monospace_font if (monospace) else style.default_font)
+
 		vgo.set_font(text_font)
 
 		text_origin: [2]f32
@@ -128,8 +126,6 @@ input :: proc(
 				box_center_y(object.box) - text_font.line_height * text_size * 0.5,
 			}
 		}
-		result.confirmed =
-			result.confirmed || (!(!key_down(.Left_Control) && multiline) && key_pressed(.Enter))
 
 		content_layout, prefix_layout: vgo.Text_Layout
 		if len(prefix) > 0 {
@@ -189,10 +185,6 @@ input :: proc(
 					if .Select_All in flags {
 						tedit.editor_execute(&object.input.editor, .Select_All)
 					}
-				}
-
-				if key_pressed(.Enter) && !(.Multiline in flags && !key_down(.Left_Control)) {
-					result.confirmed = true
 				}
 
 				cmd: tedit.Command
@@ -412,9 +404,13 @@ input :: proc(
 				delete(content^)
 				content^ = strings.clone_to_cstring(strings.to_string(object.input.builder))
 			} else when intrinsics.type_is_numeric(T) {
-				if parsed_value, ok := strconv.parse_f64(strings.to_string(object.input.builder));
-				   ok {
-					content^ = T(parsed_value)
+				if strings.builder_len(object.input.builder) == 0 {
+					content^ = T(0)
+				} else {
+					if parsed_value, ok := strconv.parse_f64(strings.to_string(object.input.builder));
+					   ok {
+						content^ = T(parsed_value)
+					}
 				}
 			}
 			result.changed = true

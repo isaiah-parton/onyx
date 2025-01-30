@@ -42,6 +42,7 @@ solve_anchored_zoom_scroll :: proc(content_box, view_box: Box, old_zoom, new_zoo
 begin_container :: proc(
 	space: Maybe([2]f32) = nil,
 	can_zoom: bool = false,
+	hide_scrollbars: bool = false,
 	loc := #caller_location,
 ) -> bool {
 	object := persistent_object(hash(loc))
@@ -56,6 +57,7 @@ begin_container :: proc(
 		object.state.input_mask = OBJECT_STATE_ALL
 	}
 	self := &object.variant.(Container)
+	self.hide_scrollbars = hide_scrollbars
 
 	push_id(self.id)
 
@@ -95,7 +97,7 @@ end_container :: proc() {
 	layout := current_layout().?
 	object := current_object().?
 	extras := &object.variant.(Container)
-	extras.space_needed = linalg.max(layout.content_size, extras.space_needed)
+	extras.space_needed = linalg.max(layout.content_size + layout.spacing_size, extras.space_needed)
 
 	end_layout()
 
@@ -126,6 +128,7 @@ end_container :: proc() {
 			extras.target_scroll -= delta_scroll * 100
 		}
 	}
+
 	if false {
 		extras.target_zoom = clamp(extras.target_zoom, extras.min_zoom, extras.max_zoom)
 		delta_zoom := extras.target_zoom - extras.zoom
@@ -216,7 +219,6 @@ scrollbar :: proc(
 		defer end_object()
 
 		object.box = box
-
 
 		if point_in_box(mouse_point(), object.box) {
 			hover_object(object)

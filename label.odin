@@ -35,7 +35,7 @@ icon :: proc(which_one: rune, size: f32 = global_state.style.icon_size) -> bool 
 	glyph := vgo.get_font_glyph(font, which_one) or_return
 	box := next_box({glyph.advance * size, font.line_height * size})
 	if get_clip(current_clip(), box) != .Full {
-		vgo.fill_glyph(glyph, size, box_center(box) - size / 2, style().color.content)
+		vgo.fill_glyph(glyph, size, linalg.floor(box_center(box) - size / 2), style().color.content)
 	}
 	return true
 }
