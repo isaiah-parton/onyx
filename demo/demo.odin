@@ -35,6 +35,7 @@ Section :: enum {
 	Grid,
 	Navigation,
 	Theme,
+	Icon,
 }
 
 State :: struct {
@@ -45,6 +46,7 @@ State :: struct {
 	analog_section:  Analog_Section_State,
 	theme_section:   Theme_Section_State,
 	nav_section: Nav_Section_State,
+	icon_section: Icon_Section_State,
 	current_section: Section,
 }
 
@@ -98,11 +100,6 @@ button_section :: proc(state: ^Button_Section_State) {
 		}
 		end_layout()
 	}
-	space(10)
-	set_width(0)
-	if button("Delayed", delay = 0.75).clicked {
-
-	}
 }
 
 Input_Section_State :: struct {
@@ -124,11 +121,6 @@ input_section :: proc(state: ^Input_Section_State) {
 	space(10)
 	set_height(30)
 	input(&state.number, prefix = "$")
-	space(20)
-	calendar(&state.date, &state.until)
-	space(20)
-	label(fmt.tprint(state.date))
-	label(fmt.tprint(state.until))
 }
 
 Graph_Section_State :: struct {
@@ -293,25 +285,87 @@ theme_section :: proc(state: ^Theme_Section_State) {
 	}
 }
 
+recursive_menu :: proc(depth: int = 1, loc := #caller_location) {
+	using onyx
+	push_id(hash(loc))
+	push_id("salty")
+	push_id(depth)
+	if begin_submenu("Open menu", 120, 3, 0) {
+		menu_button("Option")
+		menu_button("Option")
+		recursive_menu(depth + 1)
+		end_menu()
+	}
+	pop_id()
+	pop_id()
+	pop_id()
+}
+
 menu_section :: proc() {
 	using onyx
 	set_size(0)
-	if begin_menu("Menu", 120, 4, 1) {
-		menu_button("Edit")
-		if begin_submenu("Export as", 120, 2, 0) {
-			menu_button(".json")
-			menu_button(".xml")
+	if begin_menu("Open menu", 120, 5, 1) {
+		menu_button("Option")
+		menu_button("Option")
+		if begin_submenu("Open menu", 120, 3, 0) {
+			menu_button("Option")
+			menu_button("Option")
 			end_menu()
 		}
-		menu_button("Pin to top")
+		if begin_submenu("Open menu", 120, 3, 0) {
+			menu_button("Option")
+			menu_button("Option")
+			end_menu()
+		}
 		menu_divider()
-		menu_button("Delete")
+		menu_button("Close")
 		end_menu()
 	}
 	tooltip_text_layout := vgo.make_text_layout("Click to open!", style().default_text_size, style().default_font)
 	if begin_tooltip_for_last_object(tooltip_text_layout.size + style().text_padding * 2) {
 		vgo.fill_text_layout(tooltip_text_layout, box_center(current_object().?.box), 0.5, style().color.content)
 		end_tooltip()
+	}
+}
+
+Icon_Section_State :: struct {
+	size: f32,
+}
+
+icon_section :: proc(state: ^Icon_Section_State) {
+	using onyx
+
+	set_size(0)
+	slider(&state.size, 20, 100)
+	space(20)
+
+	state.size = max(state.size, 20)
+
+	first_icon := rune(0xE000)
+	icon_size := state.size
+	icon_cell_size := icon_size * 1.25
+	how_many_icons := int(0xF429 - first_icon)
+	how_many_columns := int(math.floor(remaining_space().x / icon_cell_size))
+	how_many_rows := int(math.ceil(f32(how_many_icons) / f32(how_many_columns)))
+	set_size(remaining_space())
+	if begin_container(space = [2]f32{f32(how_many_columns), f32(how_many_rows)} * icon_cell_size) {
+		vgo.fill_box(current_object().?.box, style().rounding, paint = style().color.background)
+		vgo.stroke_box(current_object().?.box, 1, style().rounding, paint = style().color.foreground_stroke)
+		set_height(icon_cell_size)
+		if begin_layout(.Left) {
+			set_width(icon_cell_size)
+			for i in 0..<how_many_icons {
+				if i % how_many_columns == 0 && i > 0 {
+					end_layout()
+					begin_layout(.Left)
+					set_width(icon_cell_size)
+				}
+				icon(first_icon + rune(i), size = icon_size)
+			}
+			end_layout()
+		}
+
+		end_container()
 	}
 }
 
@@ -428,6 +482,8 @@ main :: proc() {
 							nav_section(&state.nav_section)
 						case .Theme:
 							theme_section(&state.theme_section)
+						case .Icon:
+							icon_section(&state.icon_section)
 						}
 
 						end_layout()

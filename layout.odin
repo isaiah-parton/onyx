@@ -13,6 +13,8 @@ Options :: struct {
 	align:     Align,
 	radius:    [4]f32,
 	size_mode: Size_Mode,
+	hover_to_focus: bool,
+	object_height: int,
 }
 
 Size_Mode :: enum {

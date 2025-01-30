@@ -40,6 +40,7 @@ slider :: proc(
 	object.size = global_state.style.visual_size
 	if object.variant == nil {
 		object.variant = Slider{}
+		object.flags += {.Sticky_Press, .Sticky_Hover}
 	}
 	extras := &object.variant.(Slider)
 	if begin_object(object) {
@@ -50,8 +51,6 @@ slider :: proc(
 		if point_in_box(mouse_point(), object.box) {
 			hover_object(object)
 		}
-
-		handle_object_click(object, true)
 
 		if object_was_clicked_in_place(object) {
 			focus_next_object()
@@ -143,6 +142,7 @@ range_slider :: proc(
 	object.box = next_box(object.size)
 	if object.variant == nil {
 		object.variant = Range_Slider{}
+		object.flags += {.Sticky_Press, .Sticky_Hover}
 	}
 	extras := &object.variant.(Range_Slider)
 	if begin_object(object) {
@@ -150,7 +150,6 @@ range_slider :: proc(
 
 		mouse := mouse_point()
 		is_visible := object_is_visible(object)
-		handle_object_click(object, true)
 
 		lower_time := clamp((f64(lower_value^) - lower) / (upper - lower), 0, 1)
 		upper_time := clamp((f64(upper_value^) - lower) / (upper - lower), 0, 1)
@@ -261,12 +260,12 @@ range_slider :: proc(
 
 slider_handle :: proc(box: Box, shape: int, loc := #caller_location) -> (pressed, held: bool) {
 	object := persistent_object(hash(loc))
+	object.flags += {.Sticky_Press, .Sticky_Hover}
 	if begin_object(object) {
 		object.box = box
 		if point_in_box(mouse_point(), object.box) {
 			hover_object(object)
 		}
-		handle_object_click(object, true)
 		if object_is_visible(object) {
 			vertices: [][2]f32
 			switch shape {

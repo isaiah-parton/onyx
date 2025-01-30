@@ -82,7 +82,7 @@ button :: proc(
 
 		object.box = next_box(object.size)
 
-		handle_object_click(object)
+
 
 		extras.hover_time = animate(extras.hover_time, 0.1, .Hovered in object.state.current)
 		extras.press_time = animate(extras.press_time, 0.08, .Pressed in object.state.current)
@@ -179,7 +179,7 @@ button :: proc(
 					{
 						math.lerp(
 							object.box.lo.x + global_state.style.text_padding.x,
-							object.box.hi.y - global_state.style.text_padding.x,
+							object.box.hi.x - global_state.style.text_padding.x,
 							text_align,
 						),
 						box_center_y(object.box),

@@ -68,7 +68,7 @@ boolean :: proc(
 
 		object.box = next_box(object.size, true)
 
-		handle_object_click(object)
+
 		if .Hovered in object.state.current {
 			set_cursor(.Pointing_Hand)
 		}

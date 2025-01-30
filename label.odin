@@ -29,3 +29,13 @@ header :: proc(text: string) {
 		font = global_state.style.header_font.? or_else global_state.style.default_font,
 	)
 }
+
+icon :: proc(which_one: rune, size: f32 = global_state.style.icon_size) -> bool {
+	font := style().icon_font
+	glyph := vgo.get_font_glyph(font, which_one) or_return
+	box := next_box({glyph.advance * size, font.line_height * size})
+	if get_clip(current_clip(), box) != .Full {
+		vgo.fill_glyph(glyph, size, box_center(box) - size / 2, style().color.content)
+	}
+	return true
+}

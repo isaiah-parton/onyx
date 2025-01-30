@@ -109,7 +109,7 @@ begin_panel :: proc(
 				object.state.input_mask = OBJECT_STATE_ALL
 			}
 
-			handle_object_click(object, sticky = true)
+
 
 			if point_in_box(global_state.mouse_pos, object.box) {
 				hover_object(object)
@@ -165,7 +165,6 @@ end_panel :: proc() {
 		if begin_object(object) {
 			defer end_object()
 
-			handle_object_click(object, sticky = true)
 			if point_in_box(mouse_point(), object.box) {
 				hover_object(object)
 			}

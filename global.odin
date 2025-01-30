@@ -96,10 +96,11 @@ Global_State :: struct {
 	last_hovered_object:      Id,
 	hovered_object:           Id,
 	next_hovered_object:      Id,
-	last_focused_object:      Id,
 	last_activated_object:    Id,
 	object_to_activate:       Maybe(Id),
+	last_focused_object:      Id,
 	focused_object:           Id,
+	next_focused_object:      Id,
 	dragged_object:           Id,
 	disable_objects:          bool,
 	drag_offset:              [2]f32,
@@ -114,9 +115,9 @@ Global_State :: struct {
 	layout_stack:             Stack(Layout, MAX_LAYOUTS),
 	options_stack:            Stack(Options, MAX_LAYOUTS),
 	next_box:                 Maybe(Box),
-	press_on_hover: bool,
+	press_on_hover:           bool,
 	next_id:                  Maybe(Id),
-	group_stack: Stack(Group, 32),
+	group_stack:              Stack(Group, 32),
 	focus_next:               bool,
 	layers:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
@@ -139,7 +140,7 @@ Global_State :: struct {
 	mouse_scroll:             [2]f32,
 	mouse_bits:               Mouse_Bits,
 	last_mouse_bits:          Mouse_Bits,
-	mouse_release_time: time.Time,
+	mouse_release_time:       time.Time,
 	keys, last_keys:          #sparse[Keyboard_Key]bool,
 	runes:                    [dynamic]rune,
 	visible:                  bool,
@@ -178,7 +179,7 @@ load_default_fonts :: proc() -> bool {
 	BOLD_FONT :: "Roboto-Medium"
 	MONOSPACE_FONT :: "RobotoMono-Regular"
 	HEADER_FONT :: "RobotoSlab-Regular"
-	ICON_FONT :: "remixicon"
+	ICON_FONT :: "FluentSystemIcons-Resizable"
 
 	DEFAULT_FONT_IMAGE :: #load(FONT_PATH + "/" + DEFAULT_FONT + ".png", []u8)
 	BOLD_FONT_IMAGE :: #load(FONT_PATH + "/" + BOLD_FONT + ".png", []u8)
@@ -211,6 +212,7 @@ load_default_fonts :: proc() -> bool {
 	global_state.style.icon_font = vgo.load_font_from_slices(
 		ICON_FONT_IMAGE,
 		ICON_FONT_JSON,
+		true,
 	) or_return
 
 	vgo.set_fallback_font(global_state.style.icon_font)
@@ -491,12 +493,13 @@ cycle_object_active :: proc(increment: int = 1) {
 	})
 
 	for i in 0 ..< len(objects) {
+		objects[i].state.current -= {.Active}
 		if objects[i].id == global_state.last_activated_object {
 			j := i + increment
 			for j < 0 do j += len(objects)
 			for j >= len(objects) do j -= len(objects)
 			object := objects[j]
-			global_state.object_to_activate = object.id
+			object.state.next += {.Active}
 			object.input.editor.selection = {len(object.input.builder.buf), 0}
 			break
 		}

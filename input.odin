@@ -141,8 +141,6 @@ input :: proc(
 
 			is_visible := object_is_visible(object)
 
-			handle_object_click(object, true)
-
 			if point_in_box(mouse_point(), object.box) {
 				hover_object(object)
 			}

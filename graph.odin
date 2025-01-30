@@ -89,7 +89,6 @@ begin_graph :: proc(
 	if point_in_box(mouse_point(), object.box) {
 		hover_object(object)
 	}
-	handle_object_click(object)
 
 	if .Hovered in object.state.current {
 		graph.active_point_index = int(
@@ -224,7 +223,6 @@ curve_line_chart :: proc(
 	if point_in_box(mouse_point(), object.box) {
 		hover_object(object)
 	}
-	handle_object_click(object)
 
 	if object_is_visible(object) {
 		points := make([dynamic][2]f32, allocator = context.temp_allocator)

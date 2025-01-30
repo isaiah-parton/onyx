@@ -15,7 +15,6 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 		if point_in_box(mouse_point(), object.box) {
 			hover_object(object)
 		}
-		handle_object_click(object)
 		if .Hovered in object.state.current {
 			set_cursor(.Pointing_Hand)
 		}
@@ -195,8 +194,6 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) {
 	object.box = next_box(object.size)
 	if begin_object(object) {
 		defer end_object()
-
-		handle_object_click(object)
 
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)

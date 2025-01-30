@@ -2,9 +2,10 @@ package onyx
 
 import "../vgo"
 import "core:fmt"
-import "core:time"
 import "core:math"
+import "core:math/ease"
 import "core:math/linalg"
+import "core:time"
 
 DEFAULT_TOOLTIP_OFFSET :: 10
 
@@ -25,22 +26,46 @@ Tooltip_Info :: struct {
 	mode:   Tooltip_Mode,
 }
 
-begin_tooltip_for_last_object :: proc(size: [2]f32, side: Side = .Bottom, delay: time.Duration = time.Second) -> bool {
+begin_tooltip_for_last_object :: proc(
+	size: [2]f32,
+	side: Side = .Bottom,
+	delay: time.Duration = time.Second,
+) -> bool {
 	object := last_object().? or_return
-	if time.since(object.hovered_time) < delay || .Hovered not_in object.state.current {
+	hover_time := time.since(object.hovered_time)
+	ANIMATION_SECONDS :: 0.15
+	if hover_time < delay || .Hovered not_in object.state.current {
 		return false
 	}
-	begin_tooltip_with_options(size, side, origin = object.box)
+	draw_frames(
+		int(hover_time >= delay) &
+		int(hover_time <= delay + time.Duration(f64(time.Second) * ANIMATION_SECONDS)),
+	)
+	begin_tooltip_with_options(
+		size,
+		side,
+		origin = object.box,
+		scale = math.lerp(
+			f32(0.7),
+			f32(1.0),
+			f32(
+				ease.cubic_out(
+					clamp(
+						time.duration_seconds(hover_time - delay) * (1.0 / ANIMATION_SECONDS),
+						0,
+						1,
+					),
+				),
+			),
+		),
+	)
 	return true
 }
 
-begin_tooltip_with_options:: proc(
-	size: [2]f32,
-	side: Side = .Bottom,
-	origin: union {[2]f32, Box} = nil,
-	offset: f32 = DEFAULT_TOOLTIP_OFFSET,
-	loc := #caller_location,
-) -> bool {
+begin_tooltip_with_options :: proc(size: [2]f32, side: Side = .Bottom, origin: union {
+		[2]f32,
+		Box,
+	} = nil, offset: f32 = DEFAULT_TOOLTIP_OFFSET, scale: f32 = 1, loc := #caller_location) -> bool {
 	object := persistent_object(hash(loc))
 	begin_object(object) or_return
 
@@ -87,7 +112,11 @@ begin_tooltip_with_options:: proc(
 		}
 	}
 
-	begin_layer(kind = .Topmost, loc = loc)
+	begin_layer(kind = .Background, loc = loc)
+	vgo.push_matrix()
+	vgo.translate(anchor_point)
+	vgo.scale(scale)
+	vgo.translate(-anchor_point)
 	draw_shadow(object.box)
 	vgo.fill_box(object.box, global_state.style.rounding, style().color.foreground)
 	vgo.stroke_box(object.box, 1, global_state.style.rounding, style().color.foreground_stroke)
@@ -96,6 +125,7 @@ begin_tooltip_with_options:: proc(
 }
 
 end_tooltip :: proc() {
+	vgo.pop_matrix()
 	end_layer()
 	end_object()
 }

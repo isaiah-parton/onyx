@@ -32,16 +32,11 @@ Debug_State :: struct {
 	wireframe:             bool,
 }
 
-log :: proc(format: string, args: ..any) {
-
-	fmt.printfln(format, ..args)
-}
-
 print_object_debug_logs :: proc(object: ^Object) {
 	new_state := object.state.current - object.state.previous
 	old_state := object.state.previous - object.state.current
 	if new_state > {} || old_state > {} {
-		fmt.printf("[%v] %x \t", time.now(), object.id)
+		fmt.printf("[%8i] %x \t", global_state.frames, object.id)
 		if new_state > {} {
 			fmt.print("+{")
 			i := 0
@@ -56,7 +51,7 @@ print_object_debug_logs :: proc(object: ^Object) {
 		}
 		if old_state > {} {
 			if new_state > {} {
-				fmt.print("\n\t\t\t\t\t\t\t")
+				fmt.print("\n\t\t\t")
 			}
 			fmt.print("-{")
 			i := 0
@@ -170,6 +165,12 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 	state.hovered_object_index += int(global_state.mouse_scroll.y)
 	state.hovered_object_index = validate_debug_object_index(state^)
 
+	if global_state.hovered_object != 0 {
+		if object, ok := global_state.object_map[global_state.hovered_object]; ok {
+			vgo.stroke_box(object.box, 1, paint = vgo.WHITE)
+		}
+	}
+
 	if state.wireframe {
 		vgo.reset_drawing()
 		draw_object_debug_boxes(state^)
@@ -221,7 +222,6 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			font = global_state.style.monospace_font,
 		)
 		origin := [2]f32{0, global_state.view.y}
-		vgo.fill_text_layout(text_layout, origin + 2, align = {0, 1}, paint = vgo.BLACK)
 		vgo.fill_text_layout(text_layout, origin, align = {0, 1})
 	}
 

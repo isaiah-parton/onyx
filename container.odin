@@ -68,7 +68,6 @@ begin_container :: proc(
 	if point_in_box(mouse_point(), self.box) {
 		hover_object(object)
 	}
-	handle_object_click(self, true)
 
 	self.space = space.? or_else linalg.max(box_size(self.box), self.space_needed)
 	self.space_needed = 0
@@ -212,12 +211,12 @@ scrollbar :: proc(
 		return
 	}
 	object := persistent_object(hash(loc))
+	object.flags += {.Sticky_Press, .Sticky_Hover}
 	if begin_object(object) {
 		defer end_object()
 
 		object.box = box
 
-		handle_object_click(object, sticky = true)
 
 		if point_in_box(mouse_point(), object.box) {
 			hover_object(object)

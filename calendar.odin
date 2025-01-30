@@ -24,6 +24,7 @@ Calendar :: struct {
 	using object: ^Object,
 	page:         Maybe(Calendar_Page),
 	focus_time:   f32,
+	range:        [2]dt.Ordinal,
 }
 
 move_calendar_page :: proc(page: Calendar_Page, months: i8) -> Calendar_Page {
@@ -49,8 +50,10 @@ dates_are_equal :: proc(a, b: Date) -> bool {
 	return a.year == b.year && a.month == b.month && a.day == b.day
 }
 
-calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_location) {
-	assert(date != nil, loc = loc)
+calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_location) {
+	if from == nil {
+		return
+	}
 	object := persistent_object(hash(loc))
 
 	if object.variant == nil {
@@ -63,7 +66,7 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 
 	object.size = {234, 0}
 	row_height := object.size.x / DAYS_PER_WEEK
-	header_height := f32(20)
+	header_height := f32(30)
 	object.size.y = row_height + header_height
 
 	page := extras.page.? or_else todays_calendar_page()
@@ -71,8 +74,8 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 		extras.page = page
 	}
 
-	from_date := date^
-	to_date := until^ if until != nil else Maybe(Date)(nil)
+	from_date := from^
+	to_date := to^ if to != nil else Maybe(Date)(nil)
 
 	from_ordinal := dt.date_to_ordinal(from_date.? or_else dt.Date{}) or_else 0
 	to_ordinal := dt.date_to_ordinal(to_date.? or_else dt.Date{}) or_else from_ordinal
@@ -96,11 +99,13 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 
 	object.size.y += f32(how_many_weeks) * row_height + f32(how_many_weeks) * CALENDAR_WEEK_SPACING
 
-	extras.focus_time = animate(extras.focus_time, 0.2, date^ != nil)
+	extras.focus_time = animate(extras.focus_time, 0.2, from^ != nil)
 
-	allow_range := until != nil
+	allow_range := to != nil
 
 	object.box = next_box(object.size)
+	object.state.input_mask = {}
+	object.flags += {.Sticky_Press, .Sticky_Hover}
 
 	if begin_object(object) {
 		defer end_object()
@@ -113,30 +118,27 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 		defer pop_id()
 
 		set_width(remaining_space().x)
-		set_height(20)
+		set_height(header_height)
 
 		if begin_layout(side = .Left) {
 			defer end_layout()
 
 			set_align(.Center)
 			set_width(0)
-			if button(text = "<<", accent = .Subtle).clicked {
-				extras.page = move_calendar_page(page, -1)
-			}
+			label(fmt.tprintf("%s %i", t.Month(page.month), page.year), align = 0.5)
 
 			set_side(.Right)
-			if button(text = ">>", accent = .Subtle).clicked {
+			set_size_mode(.Fixed)
+			set_width(remaining_space().y)
+			if button(text = "\uE0F6", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
+				extras.page = todays_calendar_page()
+			}
+			if button(text = "\uE126", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
 				extras.page = move_calendar_page(page, 1)
 			}
-
-			vgo.fill_text(
-				fmt.tprintf("%s %i", t.Month(page.month), page.year),
-				style().default_text_size,
-				box_center(current_layout().?.box),
-				style().default_font,
-				0.5,
-				paint = style().color.content,
-			)
+			if button(text = "\uE0fe", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
+				extras.page = move_calendar_page(page, -1)
+			}
 		}
 
 		set_height(row_height)
@@ -153,9 +155,33 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 		divider()
 
 		space(CALENDAR_WEEK_SPACING)
+
+		layout := current_layout().?
+		calendar_box := layout.box
+		row := clamp(int((mouse_point().y - calendar_box.lo.y) / (row_height + CALENDAR_WEEK_SPACING)), 0, how_many_weeks - 1)
+		column := clamp(int((mouse_point().x - calendar_box.lo.x) / (remaining_space().x / 7)), 0, 6)
+
+		if point_in_box(mouse_point(), calendar_box) {
+			hover_object(object)
+		}
+		selected_ordinal := ordinal + i64(row) * 7 + i64(column)
+
+		previous_range := extras.range
+		if .Pressed in object.state.current {
+			if .Pressed in object.state.previous {
+				extras.range[1] = selected_ordinal
+			} else {
+				extras.range = selected_ordinal
+			}
+		}
+		if previous_range != extras.range {
+			object.state.current += {.Changed}
+		}
+
 		if begin_layout(side = .Left) {
 			set_width(remaining_space().x / 7)
 			defer end_layout()
+
 			for i in 0 ..< how_many_days {
 				if (i > 0) && (i % 7 == 0) {
 					end_layout()
@@ -167,104 +193,74 @@ calendar :: proc(date: ^Maybe(Date), until: ^Maybe(Date) = nil, loc := #caller_l
 				cell_year, cell_month, cell_day := t.date(t.now())
 				ordinal_date := dt.ordinal_to_date(ordinal) or_continue
 
-				button_object := persistent_object(hash(int(ordinal)))
-				if begin_object(button_object) {
-					button_object.box = next_box({})
+				box := next_box({})
 
-					if point_in_box(mouse_point(), button_object.box) {
-						hover_object(button_object)
-					}
-
-					handle_object_click(button_object)
-
-					if object_is_visible(button_object) {
-						stroke_color := style().color.foreground_stroke
-						if from_ordinal <= ordinal && ordinal <= to_ordinal {
-							if from_ordinal < to_ordinal {
-								vgo.fill_box(
-									button_object.box,
-									hstack_corner_radius(
-										int(ordinal - from_ordinal),
-										int(to_ordinal - from_ordinal) + 1,
-									) *
-									style().rounding,
-									vgo.fade(style().color.accent, 0.5),
-								)
-							}
-							if from_ordinal == ordinal || to_ordinal == ordinal {
-								vgo.fill_box(
-									button_object.box,
-									style().rounding,
-									paint = style().color.accent,
-								)
-							}
-							stroke_color = style().color.content
-						} else {
-							vgo.fill_box(
-								button_object.box,
-								style().rounding,
-								paint = vgo.fade(
-									style().color.button,
-									0.5 * f32(i32(.Hovered in button_object.state.current)),
-								),
-							)
-						}
-						if ordinal == today_ordinal {
-							vgo.stroke_box(
-								button_object.box,
-								1,
-								style().rounding,
-								paint = stroke_color,
-							)
-						}
-						vgo.fill_text(
-							fmt.tprint(ordinal_date.day),
-							style().default_text_size,
-							box_center(button_object.box),
-							style().default_font,
-							0.5,
-							paint = vgo.fade(
-								style().color.content,
-								max(
-									0.5,
-									f32(i32(from_ordinal == ordinal)),
-									f32(i32(ordinal_date.month == page_date.month)),
-								),
-							),
+				stroke_color := style().color.foreground_stroke
+				if from_ordinal <= ordinal && ordinal <= to_ordinal {
+					if from_ordinal < to_ordinal {
+						vgo.fill_box(
+							box,
+							hstack_corner_radius(
+								int(ordinal - from_ordinal),
+								int(to_ordinal - from_ordinal) + 1,
+							) *
+							style().rounding,
+							vgo.fade(style().color.accent, 0.5),
 						)
 					}
-
-					if .Pressed in (button_object.state.current - button_object.state.previous) {
-						if allow_range {
-							if from_date == nil {
-								from_date = ordinal_date
-							} else {
-								if ordinal == from_ordinal || ordinal == to_ordinal {
-									from_date, to_date = nil, nil
-								} else {
-									if ordinal <= from_ordinal {
-										from_date = ordinal_date
-									} else {
-										to_date = ordinal_date
-									}
-								}
-							}
-						} else {
-							if ordinal_date == from_date {
-								from_date = nil
-							} else {
-								from_date = ordinal_date
-							}
-						}
-						date^ = from_date
-						if until != nil {
-							until^ = to_date
-						}
+					if from_ordinal == ordinal || to_ordinal == ordinal {
+						vgo.fill_box(
+							shrink_box(box, 1),
+							style().rounding,
+							paint = style().color.accent,
+						)
 					}
-
-					end_object()
+					stroke_color = style().color.content
+				} else {
+					vgo.fill_box(
+						box,
+						style().rounding,
+						paint = vgo.fade(
+							style().color.button,
+							0.5 * f32(i32(selected_ordinal == ordinal) & i32(.Hovered in object.state.current)),
+						),
+					)
 				}
+				if ordinal == today_ordinal {
+					vgo.stroke_box(
+						box,
+						1,
+						style().rounding,
+						paint = stroke_color,
+					)
+				}
+				vgo.fill_text(
+					fmt.tprint(ordinal_date.day),
+					style().default_text_size,
+					box_center(box),
+					style().default_font,
+					0.5,
+					paint = vgo.fade(
+						style().color.content,
+						max(
+							0.5,
+							f32(i32(from_ordinal <= ordinal) & i32(to_ordinal >= ordinal)),
+							f32(i32(ordinal_date.month == page_date.month)),
+						),
+					),
+				)
 				ordinal += 1
+			}
+		}
+	}
+
+	if .Changed in object.state.current {
+		if date, err := dt.ordinal_to_date(min(extras.range[0], extras.range[1])); err == .None {
+			from^ = date
+		}
+		if to != nil {
+			if date, err := dt.ordinal_to_date(max(extras.range[0], extras.range[1])); err == .None {
+				to^ = date
 			}
 		}
 	}

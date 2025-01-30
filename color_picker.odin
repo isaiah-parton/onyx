@@ -104,7 +104,7 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 		defer end_object()
 
 		extras := &object.variant.(Color_Picker)
-		handle_object_click(object)
+
 
 		object.hover_time = animate(object.hover_time, 0.1, .Hovered in object.state.current)
 		if .Open in object.state.current {
@@ -205,7 +205,7 @@ alpha_slider :: proc(
 	if begin_object(object) {
 		defer end_object()
 
-		handle_object_click(object, true)
+
 
 		i := int(axis)
 		j := 1 - i
@@ -267,7 +267,7 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 	if begin_object(object) {
 		defer end_object()
 
-		handle_object_click(object, sticky = true)
+
 
 		size := min(box_width(object.box), box_height(object.box))
 		outer_radius := size / 2
