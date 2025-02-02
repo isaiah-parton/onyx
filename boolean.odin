@@ -27,7 +27,7 @@ boolean :: proc(
 	type: Boolean_Type = .Checkbox,
 	loc := #caller_location,
 ) -> (result: Boolean_Result) {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	if object.variant == nil {
 		object.variant = Boolean{}
 	}

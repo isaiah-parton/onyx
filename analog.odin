@@ -36,7 +36,7 @@ slider :: proc(
 	if value == nil {
 		return
 	}
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.size = global_state.style.visual_size
 	if object.variant == nil {
 		object.variant = Slider{}
@@ -122,7 +122,8 @@ slider :: proc(
 }
 
 Range_Slider :: struct {
-	using _: Slider,
+	click_value: f64,
+	click_difference: f64,
 	value_index: int,
 }
 
@@ -137,7 +138,7 @@ range_slider :: proc(
 	if lower_value == nil || upper_value == nil {
 		return
 	}
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.size = global_state.style.visual_size * {1, 0.75}
 	object.box = next_box(object.size)
 	if object.variant == nil {
@@ -158,30 +159,46 @@ range_slider :: proc(
 		hovered_index := int(abs(mouse.x - upper_x) < abs(mouse.x - lower_x))
 
 		if .Pressed in object.state.current {
-			if .Pressed not_in object.state.previous {
-				extras.value_index = hovered_index
-				extras.click_value = f64(lower_value^ if extras.value_index == 0 else upper_value^)
-			}
-			if extras.value_index == 0 {
-				lower_value^ = T(
-					clamp(
-						extras.click_value +
-						f64((mouse.x - object.click.point.x) / box_width(object.box)) *
-							f64(upper - lower),
-						lower,
-						f64(upper_value^) - min_gap,
-					),
+			if .Shift in object.click.mods {
+				if .Pressed not_in object.state.previous {
+					extras.click_value = f64(lower_value^)
+					extras.click_difference = f64(upper_value^) - f64(lower_value^)
+				}
+				value := clamp(
+					extras.click_value +
+					f64((mouse.x - object.click.point.x) / box_width(object.box)) *
+						f64(upper - lower),
+					lower,
+					upper - extras.click_difference,
 				)
+				lower_value^ = T(value)
+				upper_value^ = T(value + extras.click_difference)
 			} else {
-				upper_value^ = T(
-					clamp(
-						extras.click_value +
-						f64((mouse.x - object.click.point.x) / box_width(object.box)) *
-							f64(upper - lower),
-						f64(lower_value^) + min_gap,
-						upper,
-					),
-				)
+				if .Pressed not_in object.state.previous {
+					extras.value_index = hovered_index
+					extras.click_value = f64(lower_value^ if extras.value_index == 0 else upper_value^)
+				}
+				if extras.value_index == 0 {
+					lower_value^ = T(
+						clamp(
+							extras.click_value +
+							f64((mouse.x - object.click.point.x) / box_width(object.box)) *
+								f64(upper - lower),
+							lower,
+							f64(upper_value^) - min_gap,
+						),
+					)
+				} else {
+					upper_value^ = T(
+						clamp(
+							extras.click_value +
+							f64((mouse.x - object.click.point.x) / box_width(object.box)) *
+								f64(upper - lower),
+							f64(lower_value^) + min_gap,
+							upper,
+						),
+					)
+				}
 			}
 			draw_frames(1)
 		}
@@ -205,9 +222,10 @@ range_slider :: proc(
 				paint = style().color.button,
 			)
 			if .Hovered in object.state.current {
-				if hovered_index == 0 {
+				if hovered_index == 0 || key_down(.Left_Shift) {
 					vgo.fill_box({value_box.lo, {value_box.lo.x + 1, value_box.hi.y}}, paint = style().color.accent)
-				} else {
+				}
+				if hovered_index == 1 || key_down(.Left_Shift) {
 					vgo.fill_box({{value_box.hi.x - 1, value_box.lo.y}, {value_box.hi.x, value_box.hi.y}}, paint = style().color.accent)
 				}
 			}
@@ -259,7 +277,7 @@ range_slider :: proc(
 }
 
 slider_handle :: proc(box: Box, shape: int, loc := #caller_location) -> (pressed, held: bool) {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.flags += {.Sticky_Press, .Sticky_Hover}
 	if begin_object(object) {
 		object.box = box
@@ -309,7 +327,7 @@ slider_handle :: proc(box: Box, shape: int, loc := #caller_location) -> (pressed
 
 progress_bar :: proc(time: f32, color: vgo.Color = style().color.accent, loc := #caller_location) {
 	time := clamp(time, 0, 1)
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.size = global_state.style.visual_size * {1, 0.5}
 	object.box = next_box(object.size)
 	if begin_object(object) {
@@ -329,7 +347,7 @@ progress_bar :: proc(time: f32, color: vgo.Color = style().color.accent, loc := 
 
 dial :: proc(time: f32, color: vgo.Color = style().color.accent, loc := #caller_location) {
 	time := clamp(time, 0, 1)
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.size = style().visual_size.y * 2
 	object.box = next_box(object.size)
 	if begin_object(object) {
@@ -366,7 +384,7 @@ dial :: proc(time: f32, color: vgo.Color = style().color.accent, loc := #caller_
 }
 
 pie :: proc(values: []f32, total: f32, colors: []vgo.Color = {}, loc := #caller_location) {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.size = style().visual_size.y * 2
 	object.box = next_box(object.size)
 	if begin_object(object) {

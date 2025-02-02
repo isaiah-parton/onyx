@@ -26,7 +26,24 @@ Tooltip_Info :: struct {
 	mode:   Tooltip_Mode,
 }
 
-begin_tooltip_for_last_object :: proc(
+tooltip_for_last_object :: proc(
+	text: string,
+	side: Side = .Bottom,
+	delay: time.Duration = time.Second,
+) {
+	object := last_object().?
+	if .Hovered not_in object.state.current {
+		return
+	}
+	text_layout := vgo.make_text_layout(text, style().default_text_size, style().default_font)
+	if begin_tooltip_for_object(object, text_layout.size + style().text_padding * 2, side, delay) {
+		vgo.fill_text_layout(text_layout, box_center(current_object().?.box), 0.5, paint = style().color.content)
+		end_tooltip()
+	}
+}
+
+begin_tooltip_for_object :: proc(
+	object: ^Object,
 	size: [2]f32,
 	side: Side = .Bottom,
 	delay: time.Duration = time.Second,
@@ -66,7 +83,7 @@ begin_tooltip_with_options :: proc(size: [2]f32, side: Side = .Bottom, origin: u
 		[2]f32,
 		Box,
 	} = nil, offset: f32 = DEFAULT_TOOLTIP_OFFSET, scale: f32 = 1, loc := #caller_location) -> bool {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	begin_object(object) or_return
 
 	anchor_point: [2]f32

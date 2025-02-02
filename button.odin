@@ -66,7 +66,7 @@ button :: proc(
 ) -> (
 	result: Button_Result,
 ) {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 
 	if object.variant == nil {
 		object.variant = Button{}
@@ -74,15 +74,13 @@ button :: proc(
 
 	extras := &object.variant.(Button)
 
-	text_layout := vgo.make_text_layout(text, font_size, global_state.style.bold_font)
+	text_layout := vgo.make_text_layout(text, font_size, global_state.style.bold_font, justify = text_align)
 
 	object.size = text_layout.size + global_state.style.text_padding * 2
 
 	if begin_object(object) {
 
 		object.box = next_box(object.size)
-
-
 
 		extras.hover_time = animate(extras.hover_time, 0.1, .Hovered in object.state.current)
 		extras.press_time = animate(extras.press_time, 0.08, .Pressed in object.state.current)
@@ -184,7 +182,7 @@ button :: proc(
 						),
 						box_center_y(object.box),
 					},
-					align = {text_align, 0.5},
+					align = {0, 0.5},
 					paint = text_color,
 				)
 			}

@@ -45,8 +45,8 @@ State :: struct {
 	input_section:   Input_Section_State,
 	analog_section:  Analog_Section_State,
 	theme_section:   Theme_Section_State,
-	nav_section: Nav_Section_State,
-	icon_section: Icon_Section_State,
+	nav_section:     Nav_Section_State,
+	icon_section:    Icon_Section_State,
 	current_section: Section,
 }
 
@@ -56,6 +56,7 @@ Boolean_Section_State :: struct {
 
 boolean_section :: proc(state: ^Boolean_Section_State) {
 	using onyx
+	shrink(10)
 	for type, i in Boolean_Type {
 		push_id(i)
 		boolean(&state.types[type], fmt.tprint(type), type = type)
@@ -71,8 +72,8 @@ Analog_Section_State :: struct {
 
 analog_section :: proc(state: ^Analog_Section_State) {
 	using onyx
-	set_width(0)
-	set_height(0)
+	shrink(10)
+	set_size(0)
 	slider(&state.float_value, 0, 100)
 	space(10)
 	slider(&state.integer_value, 0, 10)
@@ -88,6 +89,7 @@ Button_Section_State :: struct {}
 
 button_section :: proc(state: ^Button_Section_State) {
 	using onyx
+	shrink(10)
 	set_width(remaining_space().x)
 	set_height(24)
 	if begin_layout(side = .Left) {
@@ -100,18 +102,22 @@ button_section :: proc(state: ^Button_Section_State) {
 		}
 		end_layout()
 	}
+	space(10)
+	set_size(0)
+	button("Button with\nmultiple lines\nof text", text_align = 0.5)
 }
 
 Input_Section_State :: struct {
 	text:           string,
 	multiline_text: string,
 	number:         f32,
-	date: Maybe(onyx.Date),
-	until: Maybe(onyx.Date),
+	date:           Maybe(onyx.Date),
+	until:          Maybe(onyx.Date),
 }
 
 input_section :: proc(state: ^Input_Section_State) {
 	using onyx
+	shrink(10)
 	set_width(200)
 	set_height(30)
 	input(&state.text, placeholder = "placeholder")
@@ -124,10 +130,10 @@ input_section :: proc(state: ^Input_Section_State) {
 }
 
 Graph_Section_State :: struct {
-	displayed_data: [20]f32,
+	displayed_data: [40]f32,
 	time_range:     [2]f32,
 	value_range:    [2]f32,
-	data:           [20]f32,
+	data:           [40]f32,
 	color:          vgo.Color,
 	show_points:    bool,
 	show_crosshair: bool,
@@ -137,6 +143,7 @@ Graph_Section_State :: struct {
 
 graph_section :: proc(state: ^Graph_Section_State) {
 	using onyx
+	shrink(10)
 	set_side(.Bottom)
 	set_height(26)
 	if begin_layout(.Left) {
@@ -161,7 +168,7 @@ graph_section :: proc(state: ^Graph_Section_State) {
 	if begin_layout(.Left) {
 		set_align(.Center)
 		set_width(0)
-		range_slider(&state.time_range.x, &state.time_range.y, 0, 20)
+		range_slider(&state.time_range.x, &state.time_range.y, 0, f64(len(state.data)))
 		space(10)
 		range_slider(&state.value_range.x, &state.value_range.y, -20, 20)
 		end_layout()
@@ -196,12 +203,9 @@ graph_section :: proc(state: ^Graph_Section_State) {
 }
 
 randomize_graphs :: proc(state: ^Graph_Section_State) {
-	modifier: f32 = rand.float32_range(-1, 1)
-	last_value := rand.float32_range(-5, 5)
+	range := [2]f32{0, 10}
 	for i in 0 ..< len(state.data) {
-		value := last_value + rand.float32_range(-2, 2)
-		state.data[i] = value
-		last_value = value
+		state.data[i] = rand.float32_range(range[0], range[1])
 	}
 }
 
@@ -217,6 +221,7 @@ Nav_Section_State :: struct {
 
 nav_section :: proc(state: ^Nav_Section_State) {
 	using onyx
+	shrink(10)
 	set_width(remaining_space().x)
 	set_height(50)
 	if begin_layout(.Left) {
@@ -240,6 +245,7 @@ Theme_Section_State :: struct {}
 theme_section :: proc(state: ^Theme_Section_State) {
 	using onyx
 	struct_info := runtime.type_info_base(type_info_of(onyx.Color_Scheme)).variant.(runtime.Type_Info_Struct)
+	shrink(10)
 	set_width(remaining_space().x)
 	set_height(26)
 	set_side(.Bottom)
@@ -321,53 +327,22 @@ menu_section :: proc() {
 		menu_button("Close")
 		end_menu()
 	}
-	tooltip_text_layout := vgo.make_text_layout("Click to open!", style().default_text_size, style().default_font)
-	if begin_tooltip_for_last_object(tooltip_text_layout.size + style().text_padding * 2) {
-		vgo.fill_text_layout(tooltip_text_layout, box_center(current_object().?.box), 0.5, style().color.content)
+	tooltip_text_layout := vgo.make_text_layout(
+		"Click to open!",
+		style().default_text_size,
+		style().default_font,
+	)
+	if begin_tooltip_for_object(last_object().?, tooltip_text_layout.size + style().text_padding * 2) {
+		vgo.fill_text_layout(
+			tooltip_text_layout,
+			box_center(current_object().?.box),
+			0.5,
+			style().color.content,
+		)
 		end_tooltip()
 	}
 }
 
-Icon_Section_State :: struct {
-	size: f32,
-}
-
-icon_section :: proc(state: ^Icon_Section_State) {
-	using onyx
-
-	set_size(0)
-	slider(&state.size, 20, 100)
-	space(20)
-
-	state.size = max(state.size, 20)
-
-	first_icon := rune(0xE000)
-	icon_size := state.size
-	icon_cell_size := icon_size * 1.25
-	how_many_icons := int(0xF429 - first_icon)
-	how_many_columns := int(math.floor(remaining_space().x / icon_cell_size))
-	how_many_rows := int(math.ceil(f32(how_many_icons) / f32(how_many_columns)))
-	set_size(remaining_space())
-	if begin_container(space = [2]f32{f32(how_many_columns), f32(how_many_rows)} * icon_cell_size) {
-		vgo.fill_box(current_object().?.box, style().rounding, paint = style().color.background)
-		vgo.stroke_box(current_object().?.box, 1, style().rounding, paint = style().color.foreground_stroke)
-		set_height(icon_cell_size)
-		if begin_layout(.Left) {
-			set_width(icon_cell_size)
-			for i in 0..<how_many_icons {
-				if i % how_many_columns == 0 && i > 0 {
-					end_layout()
-					begin_layout(.Left)
-					set_width(icon_cell_size)
-				}
-				icon(first_icon + rune(i), size = icon_size)
-			}
-			end_layout()
-		}
-
-		end_container()
-	}
-}
 
 main :: proc() {
 
@@ -463,7 +438,6 @@ main :: proc() {
 					set_width(remaining_space().x)
 					if begin_layout(.Top) {
 						foreground()
-						shrink(20)
 
 						#partial switch state.current_section {
 						case .Button:

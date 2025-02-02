@@ -7,7 +7,7 @@ import "core:math/linalg"
 import "core:slice"
 
 tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bool) {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	if begin_object(object) {
 		text_layout := vgo.make_text_layout(text, style().default_text_size, style().default_font)
 		object.size = text_layout.size + style().text_padding * 2
@@ -189,7 +189,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) {
 	if index == nil {
 		return
 	}
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.size = global_state.style.visual_size
 	object.box = next_box(object.size)
 	if begin_object(object) {

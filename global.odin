@@ -187,7 +187,7 @@ load_default_fonts :: proc() -> bool {
 	BOLD_FONT :: "Roboto-Medium"
 	MONOSPACE_FONT :: "RobotoMono-Regular"
 	HEADER_FONT :: "RobotoSlab-Regular"
-	ICON_FONT :: "FluentSystemIcons-Resizable"
+	ICON_FONT :: "icons"
 
 	DEFAULT_FONT_IMAGE :: #load(FONT_PATH + "/" + DEFAULT_FONT + ".png", []u8)
 	BOLD_FONT_IMAGE :: #load(FONT_PATH + "/" + BOLD_FONT + ".png", []u8)
@@ -607,6 +607,12 @@ set_rounded_corners :: proc(corners: Corners) {
 
 user_focus_just_changed :: proc() -> bool {
 	return global_state.focused_object != global_state.last_focused_object
+}
+
+set_clipboard_string :: proc(str: string) {
+	cstr := strings.clone_to_cstring(str)
+	defer delete(cstr)
+	glfw.SetClipboardString(global_state.window, cstr)
 }
 
 __set_clipboard_string :: proc(_: rawptr, str: string) -> bool {

@@ -81,6 +81,12 @@ next_box :: proc(size: [2]f32, fixed: bool = false) -> Box {
 	return next_user_defined_box() or_else next_box_from_current_layout(size, fixed)
 }
 
+next_box_is_fully_clipped :: proc() -> bool {
+	box := next_box({})
+	set_next_box(box)
+	return get_clip(current_clip(), box) == .Full
+}
+
 next_user_defined_box :: proc() -> (box: Box, ok: bool) {
 	box, ok = global_state.next_box.?
 	if ok {

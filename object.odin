@@ -102,7 +102,15 @@ Object_Click :: struct {
 	press_time:   time.Time,
 	point:        [2]f32,
 	button:       Mouse_Button,
+	mods: Mod_Keys,
 }
+
+Mod_Key :: enum {
+	Control,
+	Alt,
+	Shift,
+}
+Mod_Keys :: bit_set[Mod_Key]
 
 clean_up_objects :: proc() {
 	for object, index in global_state.objects {
@@ -161,7 +169,7 @@ last_object :: proc() -> Maybe(^Object) {
 	return global_state.object_stack.items[global_state.object_stack.height]
 }
 
-new_persistent_object :: proc(id: Id) -> ^Object {
+new_object :: proc(id: Id) -> ^Object {
 	object := new(Object)
 
 	assert(object != nil)
@@ -174,6 +182,10 @@ new_persistent_object :: proc(id: Id) -> ^Object {
 
 	draw_frames(1)
 
+	when ODIN_DEBUG {
+
+	}
+
 	return object
 }
 
@@ -185,8 +197,8 @@ make_object_children_array :: proc() -> [dynamic]^Object {
 	return make_dynamic_array_len_cap([dynamic]^Object, 0, 16, allocator = context.temp_allocator)
 }
 
-persistent_object :: proc(id: Id) -> ^Object {
-	object := global_state.object_map[id] or_else new_persistent_object(id)
+get_object :: proc(id: Id) -> ^Object {
+	object := global_state.object_map[id] or_else new_object(id)
 	return object
 }
 
@@ -245,14 +257,28 @@ update_object_state :: proc(object: ^Object) {
 			} else {
 				object.click.count = 1
 			}
+
+			object.click.mods = {}
+			if key_down(.Left_Control) || key_down(.Right_Control) {
+				object.click.mods += {.Control}
+			}
+			if key_down(.Right_Shift) || key_down(.Left_Shift) {
+				object.click.mods += {.Shift}
+			}
+			if key_down(.Left_Alt) || key_down(.Right_Alt) {
+				object.click.mods += {.Alt}
+			}
+
 			object.click.button = global_state.mouse_button
 			object.click.point = global_state.mouse_pos
 			object.click.press_time = time.now()
+
 			object.state.current += {.Pressed}
 			if .Sticky_Hover in object.flags {
 				global_state.dragged_object = object.id
 			}
 			global_state.next_focused_object = object.id
+
 			draw_frames(1)
 		}
 		// TODO: Lose click if mouse moved too much (allow for dragging containers by their contents)
@@ -302,6 +328,7 @@ begin_object :: proc(object: ^Object) -> bool {
 	object.frames = global_state.frames
 
 	object.layer = current_layer().? or_return
+
 	update_object_state(object)
 
 	if global_state.focus_next {
@@ -325,23 +352,24 @@ end_object :: proc() {
 				// vgo.stroke_box(object.box, 1, paint = vgo.BLUE)
 			}
 		}
+
 		if .Active in (object.state.current - object.state.previous) {
 			global_state.last_activated_object = object.id
 		}
+
 		if group, ok := current_group().?; ok {
 			group.current_state += object.state.current
 			group.previous_state += object.state.previous
 		}
-		transfer_object_state_to_its_layer(object)
+
+		object.layer.state += object.state.current
+
 		pop_stack(&global_state.object_stack)
+
 		if parent, ok := current_object().?; ok {
 			parent.state.current += object_state_output(object.state) & parent.state.input_mask
 		}
 	}
-}
-
-transfer_object_state_to_its_layer :: proc(object: ^Object) {
-	object.layer.state += object.state.current
 }
 
 object_state_output :: proc(state: Object_State) -> Object_Status_Set {
@@ -370,7 +398,7 @@ focus_object :: proc(object: ^Object) {
 }
 
 foreground :: proc(loc := #caller_location) {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.box = current_box()
 	if begin_object(object) {
 		defer end_object()
@@ -390,12 +418,13 @@ foreground :: proc(loc := #caller_location) {
 }
 
 background :: proc(loc := #caller_location) {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.box = current_box()
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
-		vgo.fill_box(object.box, paint = style().color.field)
+		vgo.fill_box(object.box, current_options().radius, paint = style().color.background)
+		vgo.stroke_box(object.box, 1, current_options().radius, paint = style().color.foreground_stroke)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
 		}
@@ -403,7 +432,7 @@ background :: proc(loc := #caller_location) {
 }
 
 spinner :: proc(loc := #caller_location) {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
 
@@ -420,7 +449,12 @@ draw_skeleton :: proc(box: Box, rounding: f32) {
 
 divider :: proc() {
 	layout := current_layout().?
-	vgo.fill_box(cut_box(&layout.box, current_options().side, 1), paint = style().color.button)
+	side := current_options().side
+	line_box := cut_box(&layout.box, side, 1)
+	j := 1 - int(side) / 2
+	line_box.lo[j] = layout.bounds.lo[j]
+	line_box.hi[j] = layout.bounds.hi[j]
+	vgo.fill_box(line_box, paint = style().color.foreground_stroke)
 }
 
 object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {

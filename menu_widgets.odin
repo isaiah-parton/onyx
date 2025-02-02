@@ -53,7 +53,7 @@ solve_menu_box :: proc(anchor_box: Box, size: [2]f32, margin: f32, side: Side, a
 }
 
 begin_menu :: proc(text: string, width: f32, how_many_items, how_many_dividers: int, loc := #caller_location) -> bool {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	text_layout := vgo.make_text_layout(text, style().default_text_size, style().default_font)
 	object.size = text_layout.size + global_state.style.text_padding * {1, 2}
 	object.size.x += object.size.y
@@ -102,7 +102,7 @@ begin_menu :: proc(text: string, width: f32, how_many_items, how_many_dividers: 
 }
 
 begin_submenu :: proc(text: string, width: f32, how_many_items, how_many_dividers: int, loc := #caller_location) -> bool {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	text_layout := vgo.make_text_layout(text, style().default_text_size, style().default_font)
 	object.size = text_layout.size + global_state.style.text_padding * 2
 	if begin_object(object) {

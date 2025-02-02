@@ -46,6 +46,7 @@ activate_input :: proc(object: ^Object) {
 Input_Result :: struct {
 	confirmed: bool,
 	changed:   bool,
+	is_empty: bool,
 }
 
 Input_Flag :: enum {
@@ -79,19 +80,20 @@ input :: proc(
 ) -> (
 	result: Input_Result,
 ) where intrinsics.type_is_string(T) ||
-	intrinsics.type_is_numeric(T) {
+	intrinsics.type_is_numeric(T) || intrinsics.type_is_union(T) {
 	if content == nil {
 		return {}
 	}
 
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	if .Is_Input not_in object.flags {
 		object.flags += {.Is_Input}
 		object.input.builder = strings.builder_make()
 	}
+	object.size = style().visual_size
 
 	if begin_object(object) {
-		object.box = next_box({})
+		object.box = next_box(object.size)
 
 		content_string: string
 		if .Active not_in object.state.current {
@@ -251,75 +253,10 @@ input :: proc(
 				}
 			}
 
-			is_separator :: proc(r: rune) -> bool {
-				return !unicode.is_alpha(r) && !unicode.is_number(r)
-			}
-
 			last_selection := object.input.editor.selection
-			if .Pressed in object.state.current && content_layout.mouse_index >= 0 {
-				if .Pressed not_in object.state.previous {
-					object.input.anchor = content_layout.mouse_index
-					if object.click.count == 3 {
-						tedit.editor_execute(&object.input.editor, .Select_All)
-					} else {
-						object.input.editor.selection = {
-							content_layout.mouse_index,
-							content_layout.mouse_index,
-						}
-					}
-				}
-				switch object.click.count {
-				case 2:
-					if content_layout.mouse_index < object.input.anchor {
-						if content_string[content_layout.mouse_index] == ' ' {
-							object.input.editor.selection[0] = content_layout.mouse_index
-						} else {
-							object.input.editor.selection[0] = max(
-								0,
-								strings.last_index_proc(
-									content_string[:content_layout.mouse_index],
-									is_separator,
-								) +
-								1,
-							)
-						}
-						object.input.editor.selection[1] = strings.index_proc(
-							content_string[object.input.anchor:],
-							is_separator,
-						)
-						if object.input.editor.selection[1] == -1 {
-							object.input.editor.selection[1] = len(content_string)
-						} else {
-							object.input.editor.selection[1] += object.input.anchor
-						}
-					} else {
-						object.input.editor.selection[1] = max(
-							0,
-							strings.last_index_proc(
-								content_string[:object.input.anchor],
-								is_separator,
-							) +
-							1,
-						)
-						if (content_layout.mouse_index > 0 &&
-							   content_string[content_layout.mouse_index - 1] == ' ') {
-							object.input.editor.selection[0] = 0
-						} else {
-							object.input.editor.selection[0] = strings.index_proc(
-								content_string[content_layout.mouse_index:],
-								is_separator,
-							)
-						}
-						if object.input.editor.selection[0] == -1 {
-							object.input.editor.selection[0] =
-								len(content_string) - content_layout.mouse_index
-						}
-						object.input.editor.selection[0] += content_layout.mouse_index
-					}
-				case 1:
-					object.input.editor.selection[0] = content_layout.mouse_index
-				}
-			}
+
+			text_mouse_selection(object, content_string, &content_layout)
+
 			if .Active in object.state.previous && len(content_layout.glyphs) > 0 {
 				glyph := content_layout.glyphs[content_layout.glyph_selection[0]]
 				glyph_pos := (text_origin - object.input.offset) + glyph.offset
@@ -406,6 +343,7 @@ input :: proc(
 			} else when intrinsics.type_is_numeric(T) {
 				if strings.builder_len(object.input.builder) == 0 {
 					content^ = T(0)
+					result.is_empty = true
 				} else {
 					if parsed_value, ok := strconv.parse_f64(strings.to_string(object.input.builder));
 					   ok {

@@ -45,7 +45,7 @@ begin_container :: proc(
 	hide_scrollbars: bool = false,
 	loc := #caller_location,
 ) -> bool {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	if object.variant == nil {
 		object.variant = Container {
 			object   = object,
@@ -97,7 +97,7 @@ end_container :: proc() {
 	layout := current_layout().?
 	object := current_object().?
 	extras := &object.variant.(Container)
-	extras.space_needed = linalg.max(layout.content_size + layout.spacing_size, extras.space_needed)
+	extras.space_needed = linalg.max(layout.content_size + layout.spacing_size * axis_normal(axis_of_side(current_options().side)), extras.space_needed)
 
 	end_layout()
 
@@ -138,8 +138,8 @@ end_container :: proc() {
 		extras.zoom += delta_zoom * 15 * global_state.delta_time
 	}
 
-	content_size := extras.space_needed * extras.zoom
-	target_content_size := extras.space_needed * extras.target_zoom
+	content_size := extras.space * extras.zoom
+	target_content_size := extras.space * extras.target_zoom
 	view_size := box_size(object.box)
 
 	extras.target_scroll = linalg.max(linalg.min(extras.target_scroll, target_content_size - view_size), 0)
@@ -213,7 +213,7 @@ scrollbar :: proc(
 	if pos == nil {
 		return
 	}
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.flags += {.Sticky_Press, .Sticky_Hover}
 	if begin_object(object) {
 		defer end_object()

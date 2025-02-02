@@ -45,7 +45,7 @@ begin_graph :: proc(
 	snap_crosshair: bool = false,
 	loc := #caller_location,
 ) -> bool {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.state.input_mask = OBJECT_STATE_ALL
 	begin_object(object) or_return
 

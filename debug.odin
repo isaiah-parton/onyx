@@ -209,7 +209,8 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		fmt.sbprintf(&b, "\nLayers: %i", len(global_state.layers))
 		fmt.sbprintf(&b, "\nObjects: %i", len(global_state.objects))
 		fmt.sbprintf(&b, "\nPanels: %i", len(global_state.panel_map))
-		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, {})
+		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 1, paint = vgo.BLACK)
+		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 0)
 	}
 
 	{

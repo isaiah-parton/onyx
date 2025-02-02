@@ -85,7 +85,7 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 	if value == nil {
 		return
 	}
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	text_layout: vgo.Text_Layout
 	if show_hex {
 		text_layout := vgo.make_text_layout(
@@ -196,7 +196,7 @@ alpha_slider :: proc(
 		return
 	}
 	color := color
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.size = global_state.style.visual_size
 	if axis == .Y {
 		object.size.xy = object.size.yx
@@ -261,7 +261,7 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 	if value == nil {
 		return
 	}
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	object.size = 200
 	object.box = next_box(object.size)
 	if begin_object(object) {

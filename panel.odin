@@ -100,7 +100,7 @@ begin_panel :: proc(
 	rounding := f32(0 if panel.is_snapped else global_state.style.rounding)
 
 	{
-		object := persistent_object(hash("panelbg"))
+		object := get_object(hash("panelbg"))
 		object.box = panel.box
 		if begin_object(object) {
 			defer end_object()
@@ -160,7 +160,7 @@ end_panel :: proc() {
 
 	panel := current_panel()
 	if panel.can_resize {
-		object := persistent_object(hash("resize"))
+		object := get_object(hash("resize"))
 		object.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
 		if begin_object(object) {
 			defer end_object()

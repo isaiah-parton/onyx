@@ -54,7 +54,7 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 	if from == nil {
 		return
 	}
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 
 	if object.variant == nil {
 		object.variant = Calendar {
@@ -272,7 +272,7 @@ Date_Picker :: struct {
 }
 
 date_picker :: proc(first, second: ^Maybe(Date), loc := #caller_location) {
-	object := persistent_object(hash(loc))
+	object := get_object(hash(loc))
 	if begin_object(object) {
 		defer end_object()
 
