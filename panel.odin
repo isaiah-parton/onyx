@@ -37,8 +37,8 @@ begin_panel :: proc(
 	position: Maybe([2]f32) = nil,
 	size: Maybe([2]f32) = nil,
 	axis: Axis = .Y,
-	padding: f32 = 0,
 	can_resize: bool = true,
+	sort_method: Layer_Sort_Method = .Floating,
 	loc := #caller_location,
 ) -> bool {
 	MIN_SIZE :: [2]f32{100, 100}
@@ -60,10 +60,8 @@ begin_panel :: proc(
 
 	push_stack(&global_state.panel_stack, panel)
 
-
 	if panel.moving == true {
 		mouse_point := mouse_point()
-		panel.moving = false
 		size := panel.box.hi - panel.box.lo
 		panel.box.lo = mouse_point - panel.move_offset
 		panel.box.hi = panel.box.lo + size
@@ -94,56 +92,56 @@ begin_panel :: proc(
 	panel.last_min_size = panel.min_size
 	panel.min_size = {}
 
-	begin_layer(kind = .Floating) or_return
+	begin_layer(sort_method) or_return
 	panel.layer = current_layer().?
 
 	rounding := f32(0 if panel.is_snapped else global_state.style.rounding)
 
-	{
-		object := get_object(hash("panelbg"))
-		object.box = panel.box
-		if begin_object(object) {
-			defer end_object()
+	object := get_object(hash("panelbg"))
+	object.box = panel.box
+	object.flags += {.Sticky_Hover, .Sticky_Press}
+	begin_object(object) or_return
 
-			if object.variant == nil {
-				object.state.input_mask = OBJECT_STATE_ALL
+	if object.variant == nil {
+		object.state.input_mask = OBJECT_STATE_ALL
+	}
+
+	if point_in_box(global_state.mouse_pos, object.box) {
+		hover_object(object)
+	}
+
+	if .Clicked in object.state.current && object.click.count == 2 {
+		panel.box.hi = panel.box.lo + panel.last_min_size
+	} else if object_is_dragged(object, beyond = 100 if panel.is_snapped else 0) {
+		if !panel.moving {
+			if panel.is_snapped {
+				panel.box.lo = mouse_point() - panel.non_snapped_size / 2
+				panel.box.hi = mouse_point() + panel.non_snapped_size / 2
+				panel.is_snapped = false
 			}
+			panel.non_snapped_size = box_size(panel.box)
+		}
+		panel.moving = true
+		panel.move_offset = global_state.mouse_pos - panel.box.lo
+	}
 
-
-
-			if point_in_box(global_state.mouse_pos, object.box) {
-				hover_object(object)
-			}
-
-			if .Clicked in object.state.current && object.click.count == 2 {
-				panel.box.hi = panel.box.lo + panel.last_min_size
-			} else if object_is_dragged(object, beyond = 100 if panel.is_snapped else 1) {
-				if !panel.moving {
-					if panel.is_snapped {
-						panel.box.lo = mouse_point() - panel.non_snapped_size / 2
-						panel.box.hi = mouse_point() + panel.non_snapped_size / 2
-						panel.is_snapped = false
-					}
-					panel.non_snapped_size = box_size(panel.box)
-				}
-				panel.moving = true
-				panel.move_offset = global_state.mouse_pos - panel.box.lo
-			}
-
-			if !panel.is_snapped {
-				if vgo.disable_scissor() {
-					vgo.box_shadow(
-						move_box(panel.box, 3),
-						global_state.style.rounding,
-						6,
-						vgo.fade(style().color.shadow, 1.0 - (0.1 * panel.fade)),
-					)
-				}
-			}
-
-			vgo.fill_box(panel.box, rounding, paint = style().color.foreground)
+	if !panel.is_snapped {
+		if vgo.disable_scissor() {
+			vgo.box_shadow(
+				move_box(panel.box, 3),
+				global_state.style.rounding,
+				6,
+				vgo.fade(style().color.shadow, 1.0 - (0.1 * panel.fade)),
+			)
 		}
 	}
+
+	if .Pressed not_in object.state.current {
+		panel.moving = false
+	}
+
+	vgo.fill_box(panel.box, paint = style().color.foreground)
+	vgo.stroke_box(panel.box, 1, paint = style().color.foreground_stroke)
 
 	vgo.push_scissor(vgo.make_box(panel.box, rounding))
 	push_clip(panel.box)
@@ -155,6 +153,7 @@ begin_panel :: proc(
 
 end_panel :: proc() {
 	layout := current_layout().?
+	end_object()
 	end_layout()
 	pop_clip()
 
@@ -162,6 +161,7 @@ end_panel :: proc() {
 	if panel.can_resize {
 		object := get_object(hash("resize"))
 		object.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
+		object.flags += {.Sticky_Hover, .Sticky_Press}
 		if begin_object(object) {
 			defer end_object()
 
@@ -190,14 +190,14 @@ end_panel :: proc() {
 		}
 	}
 
-	if panel.fade > 0 {
-		vgo.fill_box(panel.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.05))
-	}
-	panel.fade = animate(
-		panel.fade,
-		0.25,
-		panel.layer.index < global_state.last_highest_layer_index,
-	)
+	// if panel.fade > 0 {
+	// 	vgo.fill_box(panel.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.25))
+	// }
+	// panel.fade = animate(
+	// 	panel.fade,
+	// 	0.25,
+	// 	panel.layer.index < global_state.last_highest_layer_index,
+	// )
 
 	panel.min_size += layout.content_size
 

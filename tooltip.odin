@@ -30,14 +30,15 @@ tooltip_for_last_object :: proc(
 	text: string,
 	side: Side = .Bottom,
 	delay: time.Duration = time.Second,
+	font: vgo.Font = global_state.style.default_font,
 ) {
 	object := last_object().?
 	if .Hovered not_in object.state.current {
 		return
 	}
-	text_layout := vgo.make_text_layout(text, style().default_text_size, style().default_font)
+	text_layout := vgo.make_text_layout(text, style().default_text_size, font)
 	if begin_tooltip_for_object(object, text_layout.size + style().text_padding * 2, side, delay) {
-		vgo.fill_text_layout(text_layout, box_center(current_object().?.box), 0.5, paint = style().color.content)
+		vgo.fill_text_layout(text_layout, current_object().?.box.lo + style().text_padding, paint = style().color.content)
 		end_tooltip()
 	}
 }
@@ -129,19 +130,20 @@ begin_tooltip_with_options :: proc(size: [2]f32, side: Side = .Bottom, origin: u
 		}
 	}
 
-	begin_layer(kind = .Background, loc = loc)
+	begin_layer(.Front, loc = loc)
 	vgo.push_matrix()
 	vgo.translate(anchor_point)
 	vgo.scale(scale)
 	vgo.translate(-anchor_point)
+	vgo.disable_scissor()
 	draw_shadow(object.box)
 	vgo.fill_box(object.box, global_state.style.rounding, style().color.foreground)
 	vgo.stroke_box(object.box, 1, global_state.style.rounding, style().color.foreground_stroke)
-
 	return true
 }
 
 end_tooltip :: proc() {
+	vgo.enable_scissor()
 	vgo.pop_matrix()
 	end_layer()
 	end_object()

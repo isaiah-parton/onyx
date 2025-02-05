@@ -64,15 +64,30 @@ label :: proc(
 	font := global_state.style.default_font,
 	align: [2]f32 = 0,
 	color: vgo.Color = style().color.content,
+	loc := #caller_location,
 ) {
 	text_layout := vgo.make_text_layout(
 		text,
 		font_size,
 		font,
 	)
-	box := next_box(text_layout.size)
-	if get_clip(current_clip(), box) != .Full {
-		vgo.fill_text_layout(text_layout, linalg.lerp(box.lo, box.hi, align), paint = color, align = align)
+	object := get_object(hash(loc))
+	object.size = text_layout.size
+	object.box = next_box(object.size)
+	if begin_object(object) {
+		if object_is_visible(object) {
+			if point_in_box(mouse_point(), object.box) {
+				hover_object(object)
+			}
+			if text_layout.size.x > box_width(object.box) {
+				vgo.push_scissor(vgo.make_box(object.box))
+			}
+			vgo.fill_text_layout(text_layout, linalg.lerp(object.box.lo, object.box.hi, align), paint = color, align = align)
+			if text_layout.size.x > box_width(object.box) {
+				vgo.pop_scissor()
+			}
+		}
+		end_object()
 	}
 }
 

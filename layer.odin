@@ -15,16 +15,19 @@ import "core:math/ease"
 import "core:math/linalg"
 import "core:slice"
 
-Layer_Kind :: enum int {
-	Background,
+// NEW IDEA
+// layers are sorted every frame
+// based on their floating order and sort method
+
+Layer_Sort_Method :: enum {
+	Back,
 	Floating,
-	Topmost,
-	Debug,
+	Front,
 }
 
 Layer_Option :: enum {
+	In_Front_Of_Parent,
 	Isolated,
-	Attached,
 	No_Sorting,
 	Invisible,
 }
@@ -32,57 +35,26 @@ Layer_Option :: enum {
 Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
-	id: Id,
-	parent:       ^Layer,
-	children: [dynamic]^Layer,
-	state:        Object_Status_Set,
-	last_state:   Object_Status_Set,
-	options:      Layer_Options,
-	dead:         bool,
-	deferred:     bool,
-	kind:         Layer_Kind,
-	index:        int,
-	frames:       int,
+	id:             Id,
+	parent:         ^Layer,
+	state:          Object_Status_Set,
+	last_state:     Object_Status_Set,
+	options:        Layer_Options,
+	dead:           bool,
+	last_sort_method,
+	sort_method:    Layer_Sort_Method,
+	index:          int,
+	floating_index: int,
+	next_floating_index: int,
+	min_index:      int,
+	frames:         int,
 }
-
-Layer_Info :: struct {
-	id:       Id,
-	self:     ^Layer,
-	options:  Layer_Options,
-	kind:     Maybe(Layer_Kind),
-	origin:   [2]f32,
-	scale:    Maybe([2]f32),
-	rotation: f32,
-	opacity:  Maybe(f32),
-}
-
 
 clean_up_layers :: proc() {
-	for id, layer in global_state.layer_map {
+	for layer, i in global_state.layer_array {
 		if layer.dead {
-			if layer.parent != nil {
-				for child, c in layer.parent.children {
-					if child.id == layer.id {
-						ordered_remove(&layer.parent.children, c)
-						continue
-					}
-					if child.index >= layer.index {
-						child.index -= 1
-					}
-				}
-			} else {
-				for child, c in global_state.layers {
-					if child.id == layer.id {
-						ordered_remove(&global_state.layers, c)
-						continue
-					}
-					if child.index >= layer.index {
-						child.index -= 1
-					}
-				}
-			}
-
-			delete_key(&global_state.layer_map, id)
+			ordered_remove(&global_state.layer_array, i)
+			delete_key(&global_state.layer_map, layer.id)
 			free(layer)
 			draw_frames(1)
 		} else {
@@ -117,39 +89,26 @@ create_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
 	layer.id = id
 	if id in global_state.layer_map do return
 	global_state.layer_map[id] = layer
+	append(&global_state.layer_array, layer)
 	ok = true
 	return
 }
 
 destroy_layer :: proc(layer: ^Layer) {
-	for child in layer.children {
-		destroy_layer(child)
-		free(child)
-	}
-	delete(layer.children)
+
 }
 
 get_layer :: proc(id: Id) -> (layer: ^Layer, ok: bool) {
 	layer, ok = get_layer_by_id(id)
 	if !ok {
-		layer = create_layer(id) or_return
-		if parent, ok := current_layer().?; ok {
-			layer.parent = parent
-			append(&parent.children, layer)
-			layer.index = layer.parent.index + 1
-			// set_layer_index(layer, parent.index + len(parent.children) + 1)
-		} else {
-			layer.index = len(global_state.layers)
-			append(&global_state.layers, layer)
-		}
-		ok = true
+		layer, ok = create_layer(id)
 	}
 	return
 }
 
 begin_layer :: proc(
+	sort_method: Layer_Sort_Method,
 	options: Layer_Options = {},
-	kind: Layer_Kind = .Floating,
 	loc := #caller_location,
 ) -> bool {
 	id := hash(loc)
@@ -163,20 +122,82 @@ begin_layer :: proc(
 		return false
 	}
 
-	layer.frames = global_state.frames
-	layer.dead = false
+	if .In_Front_Of_Parent in options {
+		if parent, ok := current_layer().?; ok {
+			layer.min_index = parent.index
+		}
+	}
+
+	layer.last_sort_method = layer.sort_method
+	layer.sort_method = sort_method
+
+	// First handle most recent change of sort method
+	if layer.frames == 0 {
+		layer.next_floating_index = global_state.last_layer_counts[.Floating]
+		layer.last_sort_method = layer.sort_method
+	} else if layer.sort_method == .Floating {
+		if layer.last_sort_method == .Back {
+			for other in global_state.layer_array {
+				if other.id != layer.id && other.last_sort_method == .Floating {
+					other.next_floating_index += 1
+				}
+			}
+			layer.next_floating_index = 0
+		} else if layer.last_sort_method == .Front {
+			layer.next_floating_index = global_state.last_layer_counts[.Floating]
+		}
+	}
+
+	layer.floating_index = layer.next_floating_index
+
+	switch sort_method {
+	case .Back:
+		layer.index = global_state.layer_counts[.Back] - min(1, layer.floating_index)
+		if layer.last_sort_method == .Floating {
+			for other in global_state.layer_array {
+				if other.sort_method == .Floating && other.next_floating_index >= layer.floating_index {
+					other.next_floating_index -= 1
+				}
+			}
+		}
+	case .Floating:
+		layer.index =
+			layer.floating_index +
+			global_state.last_layer_counts[.Back]
+	case .Front:
+		layer.index =
+			1 +
+			global_state.layer_counts[.Front] +
+			global_state.last_layer_counts[.Floating] +
+			global_state.last_layer_counts[.Back]
+	}
+
+	global_state.layer_counts[sort_method] += 1
+
 	layer.id = id
+	layer.dead = false
 	layer.options = options
-	layer.kind = kind
+	layer.frames = global_state.frames
+
 	layer.last_state = layer.state
 	layer.state = {}
 
 	if global_state.hovered_layer == layer.id {
 		layer.state += {.Hovered}
-		if mouse_pressed(.Left) && layer.kind == .Floating {
-			bring_layer_to_front(layer)
+		if mouse_pressed(.Left) && layer.last_sort_method == .Floating && layer.sort_method == .Floating {
+			front_index := global_state.last_layer_counts[.Floating] - 1
+			if layer.floating_index < front_index {
+				for &other in global_state.layer_array {
+					if other.sort_method == .Floating && other.next_floating_index > layer.floating_index {
+						other.next_floating_index -= 1
+					}
+				}
+				layer.next_floating_index = front_index
+			}
 		}
 	}
+
+	layer.index = max(layer.index, layer.min_index)
 
 	if global_state.focused_layer == layer.id {
 		layer.state += {.Focused}
@@ -195,46 +216,6 @@ end_layer :: proc() {
 	if layer, ok := current_layer().?; ok {
 		vgo.set_draw_order(layer.index)
 	}
-}
-
-begin_displaying_layer :: proc(layer: ^Layer) {
-	vgo.save_scissor()
-	vgo.push_matrix()
-	// scale: [2]f32 = scale.? or_else 1
-	// vgo.translate(origin)
-	// vgo.scale(scale)
-	// vgo.rotate(rotation)
-	// vgo.translate(-origin)
-}
-
-end_displaying_layer :: proc() {
-	vgo.pop_matrix()
-	vgo.restore_scissor()
-}
-
-get_highest_layer_child :: proc(layer: ^Layer, kind: Layer_Kind) -> int {
-	if layer == nil do return 0
-	highest := int(0)
-	for child in layer.children {
-		if int(child.kind) <= int(kind) {
-			highest = max(highest, child.index)
-		}
-	}
-	return highest
-}
-
-bring_layer_to_front :: proc(layer: ^Layer) {
-	assert(layer != nil)
-	list: []^Layer = global_state.layers[:] if layer.parent == nil else layer.parent.children[:]
-	new_index := len(list)
-	if layer.index >= new_index do return
-	// Second pass lowers other layers
-	for child in list {
-		if child.index > layer.index && child.index <= new_index {
-			child.index -= 1
-		}
-	}
-	layer.index = new_index
 }
 
 get_layer_by_id :: proc(id: Id) -> (result: ^Layer, ok: bool) {

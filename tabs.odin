@@ -185,7 +185,11 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 	}
 // }
 
-option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) {
+Option_Slider_Result :: struct {
+	changed: bool,
+}
+
+option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (result: Option_Slider_Result) {
 	if index == nil {
 		return
 	}
@@ -217,6 +221,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) {
 					if .Pressed in object.state.current && index^ != T(i) {
 						index^ = T(i)
 						object.state.current += {.Changed}
+						result.changed = true
 					}
 					global_state.cursor_type = .Pointing_Hand
 				}
@@ -241,4 +246,5 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) {
 			}
 		}
 	}
+	return
 }

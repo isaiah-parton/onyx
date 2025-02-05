@@ -75,13 +75,23 @@ default_style_shape :: proc() -> Style_Shape {
 
 light_color_scheme :: proc() -> Color_Scheme {
 	return Color_Scheme {
-		// background = {255, 255, 255, 255},
-		// foreground = {255, 255, 255, 255},
-		button = {162, 167, 167, 255},
-		accent = {59, 130, 246, 255},
-		accent_content = {25, 25, 25, 255},
-		content = {25, 25, 25, 255},
-		shadow = {0, 0, 0, 255},
+		button = {190, 198, 193, 255},
+		button_background = {228, 230, 227, 255},
+		hover = {120, 125, 140, 255},
+		accent = {0, 127, 255, 255},
+		accent_content = {10, 10, 10, 255},
+		content = {0, 0, 0, 255},
+		shadow = {0, 0, 0, 10},
+		field = {233, 234, 232, 255},
+		foreground = {255, 255, 255, 255},
+		foreground_stroke = {180, 180, 180, 255},
+		foreground_accent = {30, 30, 30, 255},
+		background = {240, 240, 240, 255},
+		grid_background = {240, 240, 240, 255},
+		grid_minor_lines = {255, 255, 255, 255},
+		grid_major_lines = {26, 181, 111, 255},
+		checkers0 = {210, 210, 210, 255},
+		checkers1 = {160, 160, 160, 255},
 	}
 }
 

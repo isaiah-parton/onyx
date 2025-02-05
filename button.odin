@@ -48,10 +48,30 @@ Button :: struct {
 	active_time: f32,
 }
 
+Button_Event :: union {
+	Clicked,
+	Hovered,
+	Pressed,
+}
+
 Button_Result :: struct {
+	click_count: int,
 	clicked: bool,
-	pressed: bool,
 	hovered: bool,
+	pressed: bool,
+}
+
+Clicked :: struct {
+	times: int,
+	with_button: Mouse_Button,
+}
+
+Hovered :: struct {
+	how_long: time.Duration,
+}
+
+Pressed :: struct {
+	with_button: Mouse_Button,
 }
 
 button :: proc(
@@ -146,7 +166,7 @@ button :: proc(
 					)
 				}
 			case .Normal:
-				color := style().color.button
+				color := vgo.mix(extras.active_time, style().color.button, style().color.accent)
 				vgo.stroke_box(object.box, 1, rounding, paint = color)
 				vgo.fill_box(
 					object.box,
@@ -191,6 +211,7 @@ button :: proc(
 		result.clicked = object_was_clicked(object, with = .Left) && extras.hold_time >= delay
 		result.pressed = .Pressed in object.state.current
 		result.hovered = .Hovered in object.state.current
+		result.click_count = object.click.count
 
 		end_object()
 	}

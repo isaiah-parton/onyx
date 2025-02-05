@@ -22,12 +22,12 @@ Input_Decal :: enum {
 }
 
 Input_State :: struct {
-	editor:  tedit.Editor,
-	builder: strings.Builder,
-	anchor:  int,
-	offset:  [2]f32,
+	editor:           tedit.Editor,
+	builder:          strings.Builder,
+	anchor:           int,
+	offset:           [2]f32,
 	last_mouse_index: int,
-	action_time: time.Time,
+	action_time:      time.Time,
 }
 
 input_select_all :: proc(object: ^Object) {
@@ -46,7 +46,7 @@ activate_input :: proc(object: ^Object) {
 Input_Result :: struct {
 	confirmed: bool,
 	changed:   bool,
-	is_empty: bool,
+	is_empty:  bool,
 }
 
 Input_Flag :: enum {
@@ -80,7 +80,8 @@ input :: proc(
 ) -> (
 	result: Input_Result,
 ) where intrinsics.type_is_string(T) ||
-	intrinsics.type_is_numeric(T) || intrinsics.type_is_union(T) {
+	intrinsics.type_is_numeric(T) ||
+	intrinsics.type_is_union(T) {
 	if content == nil {
 		return {}
 	}
@@ -175,7 +176,8 @@ input :: proc(
 				)
 			}
 
-			if .Pressed not_in object.state.current && object.input.last_mouse_index != content_layout.mouse_index {
+			if .Pressed not_in object.state.current &&
+			   object.input.last_mouse_index != content_layout.mouse_index {
 				object.click.count = 0
 			}
 			object.input.last_mouse_index = content_layout.mouse_index
@@ -319,7 +321,18 @@ input :: proc(
 						text_origin,
 						vgo.fade(
 							style.color.accent,
-							clamp(0.5 + cast(f32)math.sin(time.duration_seconds(time.since(global_state.start_time)) * 7) * 1.5, 0, 1),
+							clamp(
+								0.5 +
+								cast(f32)math.sin(
+										time.duration_seconds(
+											time.since(global_state.start_time),
+										) *
+										7,
+									) *
+									1.5,
+								0,
+								1,
+							),
 						),
 					)
 				}
@@ -342,16 +355,24 @@ input :: proc(
 				content^ = strings.clone_to_cstring(strings.to_string(object.input.builder))
 			} else when intrinsics.type_is_numeric(T) {
 				if strings.builder_len(object.input.builder) == 0 {
-					content^ = T(0)
+					if content^ != T(0) {
+						result.changed = true
+						content^ = T(0)
+					}
 					result.is_empty = true
 				} else {
-					if parsed_value, ok := strconv.parse_f64(strings.to_string(object.input.builder));
-					   ok {
-						content^ = T(parsed_value)
+					if parsed_value, ok := strconv.parse_f64(
+						strings.to_string(object.input.builder),
+					); ok {
+						if content^ != T(parsed_value) {
+							result.changed = true
+							content^ = T(parsed_value)
+						} else {
+							object.state.current -= {.Changed}
+						}
 					}
 				}
 			}
-			result.changed = true
 		}
 
 		end_object()

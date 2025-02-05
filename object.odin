@@ -347,7 +347,7 @@ begin_object :: proc(object: ^Object) -> bool {
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
 		when ODIN_DEBUG {
-			print_object_debug_logs(object)
+			// print_object_debug_logs(object)
 			if .Focused in object.state.current {
 				// vgo.stroke_box(object.box, 1, paint = vgo.BLUE)
 			}
@@ -433,10 +433,12 @@ background :: proc(loc := #caller_location) {
 
 spinner :: proc(loc := #caller_location) {
 	object := get_object(hash(loc))
+	object.box = next_box({})
 	if begin_object(object) {
 		defer end_object()
 
-		vgo.spinner(box_center(object.box), box_height(object.box) * 0.5, style().color.button)
+		vgo.spinner(box_center(object.box), box_height(object.box) * 0.3, style().color.content)
+		draw_frames(1)
 	}
 }
 

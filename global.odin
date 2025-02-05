@@ -65,7 +65,6 @@ Wave_Effect :: struct {
 	time:  f32,
 }
 
-@(private)
 global_state: Global_State
 
 @(private)
@@ -123,9 +122,13 @@ Global_State :: struct {
 	next_id:                  Maybe(Id),
 	group_stack:              Stack(Group, 32),
 	focus_next:               bool,
-	layers:                   [dynamic]^Layer,
+
+	layer_array:                   [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
 	layer_stack:              Stack(^Layer, MAX_LAYERS),
+	last_layer_counts: [Layer_Sort_Method]int,
+	layer_counts: [Layer_Sort_Method]int,
+
 	hovered_layer_index:      int,
 	highest_layer_index:      int,
 	last_highest_layer_index: int,
@@ -133,6 +136,7 @@ Global_State :: struct {
 	hovered_layer:            Id,
 	next_hovered_layer:       Id,
 	focused_layer:            Id,
+
 	clip_stack:               Stack(Box, 128),
 	current_object_clip:      Box,
 	cursor_type:              Mouse_Cursor,
@@ -449,6 +453,8 @@ new_frame :: proc() {
 	global_state.layer_stack.height = 0
 	global_state.object_stack.height = 0
 	global_state.panel_stack.height = 0
+	global_state.last_layer_counts = global_state.layer_counts
+	global_state.layer_counts = {}
 	global_state.options_stack.items[0] = default_options()
 
 	reset_panel_snap_state(&global_state.panel_snapping)
@@ -571,12 +577,12 @@ shutdown :: proc() {
 	delete(global_state.objects)
 	delete(global_state.object_map)
 
-	for layer in global_state.layers {
+	for layer in global_state.layer_array {
 		destroy_layer(layer)
 		free(layer)
 	}
 
-	delete(global_state.layers)
+	delete(global_state.layer_array)
 	delete(global_state.panel_map)
 	delete(global_state.layer_map)
 	delete(global_state.runes)

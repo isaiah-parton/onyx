@@ -151,7 +151,7 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 			push_id(object.id)
 			defer pop_id()
 
-			if begin_layer(options = {.Attached}, kind = .Background) {
+			if begin_layer(.Back, options = {.In_Front_Of_Parent}) {
 				defer end_layer()
 
 				baseline := box_center_y(object.box)

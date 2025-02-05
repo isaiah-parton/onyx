@@ -60,7 +60,7 @@ slider :: proc(
 			if .Pressed not_in object.state.previous {
 				extras.click_value = f64(value^)
 			}
-			value^ = T(
+			new_value := T(
 				clamp(
 					extras.click_value +
 					f64(
@@ -72,6 +72,10 @@ slider :: proc(
 					min(upper, upper_limit),
 				),
 			)
+			if value^ != new_value {
+				object.state.current += {.Changed}
+				value^ = new_value
+			}
 			draw_frames(1)
 		}
 		if .Hovered in object.state.current {
@@ -333,7 +337,7 @@ progress_bar :: proc(time: f32, color: vgo.Color = style().color.accent, loc := 
 	if begin_object(object) {
 		if object_is_visible(object) {
 			radius := current_options().radius
-			vgo.fill_box(object.box, radius, paint = style().color.foreground_accent)
+			vgo.fill_box(object.box, radius, paint = style().color.background)
 			vgo.push_scissor(vgo.make_box(object.box, radius))
 			vgo.fill_box(
 				{object.box.lo, {object.box.lo.x + box_width(object.box) * time, object.box.hi.y}},
@@ -365,7 +369,7 @@ dial :: proc(time: f32, color: vgo.Color = style().color.accent, loc := #caller_
 			start_angle -= extra_angle
 			end_angle += extra_angle
 
-			arc_shape.paint = vgo.paint_index_from_option(style().color.foreground_accent)
+			arc_shape.paint = vgo.paint_index_from_option(style().color.background)
 			vgo.add_shape(arc_shape)
 			vgo.push_scissor(arc_shape)
 			vgo.arc(

@@ -177,7 +177,7 @@ begin_menu_with_activator :: proc(
 
 	push_stack(&global_state.object_stack, activator)
 
-	begin_layer(kind = .Background)
+	begin_layer(.Back)
 
 	set_next_box(box)
 	begin_layout(.Top) or_return
