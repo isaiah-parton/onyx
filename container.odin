@@ -215,6 +215,7 @@ scrollbar :: proc(
 	}
 	object := get_object(hash(loc))
 	object.flags += {.Sticky_Press, .Sticky_Hover}
+	object.state.output_mask = {}
 	if begin_object(object) {
 		defer end_object()
 

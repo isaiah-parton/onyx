@@ -170,7 +170,7 @@ next_box_from_layout :: proc(
 		box.lo[j] = box.hi[j] - size[j]
 	}
 
-	return snapped_box(box)
+	return box//snapped_box(box)
 }
 
 axis_normal :: proc(axis: Axis) -> [2]f32 {
