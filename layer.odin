@@ -144,7 +144,7 @@ begin_layer :: proc(
 			}
 			layer.next_floating_index = 0
 		} else if layer.last_sort_method == .Front {
-			layer.next_floating_index = global_state.last_layer_counts[.Floating]
+			layer.next_floating_index = global_state.last_layer_counts[.Floating] + 1
 		}
 	}
 
@@ -164,6 +164,9 @@ begin_layer :: proc(
 		layer.index =
 			layer.floating_index +
 			global_state.last_layer_counts[.Back]
+		if layer.last_sort_method == .Back {
+			layer.next_floating_index = 1
+		}
 	case .Front:
 		layer.index =
 			1 +
@@ -185,7 +188,7 @@ begin_layer :: proc(
 	if global_state.hovered_layer == layer.id {
 		layer.state += {.Hovered}
 		if mouse_pressed(.Left) && layer.last_sort_method == .Floating && layer.sort_method == .Floating {
-			front_index := global_state.last_layer_counts[.Floating] - 1
+			front_index := global_state.last_layer_counts[.Floating]
 			if layer.floating_index < front_index {
 				for &other in global_state.layer_array {
 					if other.sort_method == .Floating && other.next_floating_index > layer.floating_index {

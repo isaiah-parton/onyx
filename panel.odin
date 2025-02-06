@@ -128,8 +128,8 @@ begin_panel :: proc(
 	if !panel.is_snapped {
 		if vgo.disable_scissor() {
 			vgo.box_shadow(
-				move_box(panel.box, 3),
-				global_state.style.rounding,
+				move_box(panel.box, {0, 2}),
+				rounding,
 				6,
 				vgo.fade(style().color.shadow, 1.0 - (0.1 * panel.fade)),
 			)
@@ -140,11 +140,11 @@ begin_panel :: proc(
 		panel.moving = false
 	}
 
-	vgo.fill_box(panel.box, paint = style().color.foreground)
-	vgo.stroke_box(panel.box, 1, paint = style().color.foreground_stroke)
-
 	vgo.push_scissor(vgo.make_box(panel.box, rounding))
 	push_clip(panel.box)
+
+	vgo.fill_box(panel.box, rounding, paint = style().color.foreground)
+	vgo.stroke_box(panel.box, 1, rounding, paint = style().color.foreground_stroke)
 
 	set_next_box(panel.box)
 	begin_layout(side = .Top) or_return
