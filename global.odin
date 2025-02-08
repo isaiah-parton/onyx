@@ -71,10 +71,10 @@ global_state: Global_State
 Global_State :: struct {
 	ready:                    bool,
 	window:                   glfw.WindowHandle,
-	window_x: i32,
-	window_y: i32,
-	window_width: i32,
-	window_height: i32,
+	window_x:                 i32,
+	window_y:                 i32,
+	window_width:             i32,
+	window_height:            i32,
 	debug:                    Debug_State,
 	view:                     [2]f32,
 	desired_fps:              int,
@@ -100,7 +100,6 @@ Global_State :: struct {
 	hovered_object:           Id,
 	next_hovered_object:      Id,
 	last_activated_object:    Id,
-	object_to_activate:       Maybe(Id),
 	last_focused_object:      Id,
 	focused_object:           Id,
 	next_focused_object:      Id,
@@ -122,13 +121,11 @@ Global_State :: struct {
 	next_id:                  Maybe(Id),
 	group_stack:              Stack(Group, 32),
 	focus_next:               bool,
-
-	layer_array:                   [dynamic]^Layer,
+	layer_array:              [dynamic]^Layer,
 	layer_map:                map[Id]^Layer,
 	layer_stack:              Stack(^Layer, MAX_LAYERS),
-	last_layer_counts: [Layer_Sort_Method]int,
-	layer_counts: [Layer_Sort_Method]int,
-
+	last_layer_counts:        [Layer_Sort_Method]int,
+	layer_counts:             [Layer_Sort_Method]int,
 	hovered_layer_index:      int,
 	highest_layer_index:      int,
 	last_highest_layer_index: int,
@@ -136,7 +133,6 @@ Global_State :: struct {
 	hovered_layer:            Id,
 	next_hovered_layer:       Id,
 	focused_layer:            Id,
-
 	clip_stack:               Stack(Box, 128),
 	current_object_clip:      Box,
 	cursor_type:              Mouse_Cursor,
@@ -453,8 +449,6 @@ new_frame :: proc() {
 	global_state.layer_stack.height = 0
 	global_state.object_stack.height = 0
 	global_state.panel_stack.height = 0
-	global_state.last_layer_counts = global_state.layer_counts
-	global_state.layer_counts = {}
 	global_state.options_stack.items[0] = default_options()
 
 	reset_panel_snap_state(&global_state.panel_snapping)
@@ -463,14 +457,13 @@ new_frame :: proc() {
 
 	clear(&global_state.debug.hovered_objects)
 
-	clean_up_layers()
+	update_layers()
 	update_layer_references()
 	clean_up_objects()
 	update_object_references()
 
 	clear(&global_state.tooltip_boxes)
 
-	global_state.object_to_activate = nil
 	if key_pressed(.Tab) {
 		cycle_object_active(1 - int(key_down(.Left_Shift)) * 2)
 	}
@@ -490,10 +483,28 @@ new_frame :: proc() {
 			monitor = glfw.GetPrimaryMonitor()
 			mode := glfw.GetVideoMode(monitor)
 			global_state.window_x, global_state.window_y = glfw.GetWindowPos(global_state.window)
-			global_state.window_width, global_state.window_height = glfw.GetWindowSize(global_state.window)
-			glfw.SetWindowMonitor(global_state.window, monitor, 0, 0, mode.width, mode.height, mode.refresh_rate)
+			global_state.window_width, global_state.window_height = glfw.GetWindowSize(
+				global_state.window,
+			)
+			glfw.SetWindowMonitor(
+				global_state.window,
+				monitor,
+				0,
+				0,
+				mode.width,
+				mode.height,
+				mode.refresh_rate,
+			)
 		} else {
-			glfw.SetWindowMonitor(global_state.window, nil, global_state.window_x, global_state.window_y, global_state.window_width, global_state.window_height, 0)
+			glfw.SetWindowMonitor(
+				global_state.window,
+				nil,
+				global_state.window_x,
+				global_state.window_y,
+				global_state.window_width,
+				global_state.window_height,
+				0,
+			)
 		}
 	}
 

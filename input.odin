@@ -350,9 +350,11 @@ input :: proc(
 			when T == string {
 				delete(content^)
 				content^ = strings.clone(strings.to_string(object.input.builder))
+				result.changed = true
 			} else when T == cstring {
 				delete(content^)
 				content^ = strings.clone_to_cstring(strings.to_string(object.input.builder))
+				result.changed = true
 			} else when intrinsics.type_is_numeric(T) {
 				if strings.builder_len(object.input.builder) == 0 {
 					if content^ != T(0) {

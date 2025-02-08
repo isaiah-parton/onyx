@@ -35,22 +35,21 @@ Layer_Option :: enum {
 Layer_Options :: bit_set[Layer_Option]
 
 Layer :: struct {
-	id:             Id,
-	parent:         ^Layer,
-	state:          Object_Status_Set,
-	last_state:     Object_Status_Set,
-	options:        Layer_Options,
-	dead:           bool,
-	last_sort_method,
-	sort_method:    Layer_Sort_Method,
-	index:          int,
-	floating_index: int,
-	next_floating_index: int,
-	min_index:      int,
-	frames:         int,
+	id:                            Id,
+	parent:                        ^Layer,
+	state:                         Object_Status_Set,
+	last_state:                    Object_Status_Set,
+	options:                       Layer_Options,
+	dead:                          bool,
+	next_sort_method, sort_method: Layer_Sort_Method,
+	index:                         int,
+	min_index:                     int,
+	floating_index:                int,
+	next_floating_index:           Maybe(int),
+	frames:                        int,
 }
 
-clean_up_layers :: proc() {
+update_layers :: proc() {
 	for layer, i in global_state.layer_array {
 		if layer.dead {
 			ordered_remove(&global_state.layer_array, i)
@@ -59,8 +58,50 @@ clean_up_layers :: proc() {
 			draw_frames(1)
 		} else {
 			layer.dead = true
+
+			switch layer.sort_method {
+			case .Floating:
+				if layer.next_sort_method == .Back {
+					for other in global_state.layer_array {
+						if other.sort_method == .Floating &&
+						   other.floating_index > layer.floating_index {
+							other.floating_index -= 1
+						}
+					}
+					layer.floating_index = 0
+				} else if next_floating_index, ok := layer.next_floating_index.?; ok {
+					for &other in global_state.layer_array {
+						if other.id != layer.id &&
+						   other.sort_method == .Floating &&
+						   other.floating_index > layer.floating_index &&
+						   other.floating_index <= next_floating_index {
+							other.floating_index -= 1
+						}
+					}
+					layer.floating_index = next_floating_index
+					layer.next_floating_index = nil
+				}
+			case .Back:
+				if layer.next_sort_method == .Floating {
+					for other in global_state.layer_array {
+						if other.sort_method == .Floating {
+							other.floating_index += 1
+						}
+					}
+					layer.floating_index = 0
+				}
+			case .Front:
+				if layer.next_sort_method == .Floating {
+					layer.floating_index = global_state.layer_counts[.Floating]
+				}
+			}
+
+			layer.sort_method = layer.next_sort_method
 		}
 	}
+
+	global_state.last_layer_counts = global_state.layer_counts
+	global_state.layer_counts = {}
 }
 
 update_layer_references :: proc() {
@@ -128,51 +169,20 @@ begin_layer :: proc(
 		}
 	}
 
-	layer.last_sort_method = layer.sort_method
-	layer.sort_method = sort_method
+	layer.next_sort_method = sort_method
 
-	// First handle most recent change of sort method
 	if layer.frames == 0 {
-		layer.next_floating_index = global_state.last_layer_counts[.Floating]
-		layer.last_sort_method = layer.sort_method
-	} else if layer.sort_method == .Floating {
-		if layer.last_sort_method == .Back {
-			for other in global_state.layer_array {
-				if other.id != layer.id && other.last_sort_method == .Floating {
-					other.next_floating_index += 1
-				}
-			}
-			layer.next_floating_index = 0
-		} else if layer.last_sort_method == .Front {
-			layer.next_floating_index = global_state.last_layer_counts[.Floating] + 1
-		}
+		layer.sort_method = sort_method
+		layer.floating_index = global_state.layer_counts[.Floating]
 	}
-
-	layer.floating_index = layer.next_floating_index
 
 	switch sort_method {
 	case .Back:
-		layer.index = global_state.layer_counts[.Back] - min(1, layer.floating_index)
-		if layer.last_sort_method == .Floating {
-			for other in global_state.layer_array {
-				if other.sort_method == .Floating && other.next_floating_index >= layer.floating_index {
-					other.next_floating_index -= 1
-				}
-			}
-		}
+		layer.index = global_state.layer_counts[.Back]
 	case .Floating:
-		layer.index =
-			layer.floating_index +
-			global_state.last_layer_counts[.Back]
-		if layer.last_sort_method == .Back {
-			layer.next_floating_index = 1
-		}
+		layer.index = layer.floating_index + 512
 	case .Front:
-		layer.index =
-			1 +
-			global_state.layer_counts[.Front] +
-			global_state.last_layer_counts[.Floating] +
-			global_state.last_layer_counts[.Back]
+		layer.index = global_state.layer_counts[.Front] + 1024
 	}
 
 	global_state.layer_counts[sort_method] += 1
@@ -187,16 +197,8 @@ begin_layer :: proc(
 
 	if global_state.hovered_layer == layer.id {
 		layer.state += {.Hovered}
-		if mouse_pressed(.Left) && layer.last_sort_method == .Floating && layer.sort_method == .Floating {
-			front_index := global_state.last_layer_counts[.Floating]
-			if layer.floating_index < front_index {
-				for &other in global_state.layer_array {
-					if other.sort_method == .Floating && other.next_floating_index > layer.floating_index {
-						other.next_floating_index -= 1
-					}
-				}
-				layer.next_floating_index = front_index
-			}
+		if mouse_pressed(.Left) && layer.sort_method == .Floating {
+			layer.next_floating_index = global_state.last_layer_counts[.Floating] - 1
 		}
 	}
 

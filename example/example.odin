@@ -495,23 +495,23 @@ main :: proc() {
 				vgo.fill_box(box, paint = style().color.background)
 			}
 
-			// example_browser(&state)
+			example_browser(&state)
 
-			for i in 0..<len(panels) {
-				push_id(i)
-				if begin_panel(sort_method = panels[i], size = [2]f32{220, 160}) {
-					layer := current_layer().?
-					shrink(10)
-					set_width(remaining_space().x)
-					set_height(26)
-					option_slider(reflect.enum_field_names(onyx.Layer_Sort_Method), &panels[i])
-					set_size(remaining_space())
-					// label(fmt.tprintf("%v\n%i\n%i", layer.sort_method, layer.index, layer.floating_index))
-					label(fmt.tprint(i), align = 0.5, font_size = 20)
-					end_panel()
-				}
-				pop_id()
-			}
+			// for i in 0..<len(panels) {
+			// 	push_id(i)
+			// 	if begin_panel(sort_method = panels[i], size = [2]f32{220, 160}) {
+			// 		layer := current_layer().?
+			// 		shrink(10)
+			// 		set_width(remaining_space().x)
+			// 		set_height(26)
+			// 		option_slider(reflect.enum_field_names(onyx.Layer_Sort_Method), &panels[i])
+			// 		set_size(remaining_space())
+			// 		label(fmt.tprintf("%v\n%i\n%i", layer.sort_method, layer.index, layer.floating_index))
+			// 		// label(fmt.tprint(i), align = 0.5, font_size = 20)
+			// 		end_panel()
+			// 	}
+			// 	pop_id()
+			// }
 
 			vgo.fill_text(fmt.tprint(global_state.layer_counts), 14, {0, global_state.view.y}, font = style().monospace_font, align = {0, 1}, paint = vgo.WHITE)
 

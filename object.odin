@@ -182,10 +182,6 @@ new_object :: proc(id: Id) -> ^Object {
 
 	draw_frames(1)
 
-	when ODIN_DEBUG {
-
-	}
-
 	return object
 }
 
@@ -200,10 +196,6 @@ make_object_children_array :: proc() -> [dynamic]^Object {
 get_object :: proc(id: Id) -> ^Object {
 	object := global_state.object_map[id] or_else new_object(id)
 	return object
-}
-
-object_was_updated_this_frame :: proc(object: ^Object) -> bool {
-	return object.frames >= global_state.frames
 }
 
 object_is_visible :: proc(object: ^Object) -> bool {
@@ -224,14 +216,14 @@ update_object_state :: proc(object: ^Object) {
 		object.state.current += {.Focused}
 	}
 
-	if id, ok := global_state.object_to_activate.?; ok {
-		if id == object.id {
-			object.state.current += {.Active}
-			global_state.last_activated_object = object.id
-		} else {
-			object.state.current -= {.Active}
-		}
-	}
+	// if id, ok := global_state.object_to_activate.?; ok {
+	// 	if id == object.id {
+	// 		object.state.current += {.Active}
+	// 		global_state.last_activated_object = object.id
+	// 	} else {
+	// 		object.state.current -= {.Active}
+	// 	}
+	// }
 
 	if global_state.hovered_object == object.id {
 		if current_options().hover_to_focus {
@@ -307,19 +299,14 @@ update_object_state :: proc(object: ^Object) {
 	}
 }
 
-assign_next_object_index :: proc(object: ^Object) {
-	object.call_index = global_state.object_index
-	global_state.object_index += 1
-}
-
 begin_object :: proc(object: ^Object) -> bool {
 	assert(object != nil)
 
-	assign_next_object_index(object)
-
+	object.call_index = global_state.object_index
+	global_state.object_index += 1
 	object.dead = false
 
-	if object_was_updated_this_frame(object) {
+	if object.frames >= global_state.frames {
 		when ODIN_DEBUG {
 			fmt.printfln("Object ID collision: %i", object.id)
 		}
@@ -346,12 +333,6 @@ begin_object :: proc(object: ^Object) -> bool {
 
 end_object :: proc() {
 	if object, ok := current_object().?; ok {
-		when ODIN_DEBUG {
-			// print_object_debug_logs(object)
-			if .Focused in object.state.current {
-				// vgo.stroke_box(object.box, 1, paint = vgo.BLUE)
-			}
-		}
 
 		if .Active in (object.state.current - object.state.previous) {
 			global_state.last_activated_object = object.id
