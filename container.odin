@@ -85,10 +85,10 @@ begin_container :: proc(
 	vgo.push_scissor(vgo.make_box(self.box, current_options().radius))
 	push_clip(self.box)
 
-	layout_box := self.box
-	layout_box.hi -= self.scroll_time.yx * (global_state.style.scrollbar_thickness + 4)
-	set_next_box(move_box(layout_box, -self.scroll))
+	layout_origin := self.box.lo + - self.scroll
+	set_next_box({layout_origin, layout_origin + layout_size})
 	begin_layout(side = .Top, does_grow = true) or_return
+	set_width(remaining_space().x)
 
 	return true
 }

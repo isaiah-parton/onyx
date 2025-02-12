@@ -34,11 +34,12 @@ create_panel :: proc(id: Id) -> Maybe(^Panel) {
 }
 
 begin_panel :: proc(
+	sort_method: Layer_Sort_Method = .Floating,
 	position: Maybe([2]f32) = nil,
 	size: Maybe([2]f32) = nil,
 	axis: Axis = .Y,
+	can_drag: bool = true,
 	can_resize: bool = true,
-	sort_method: Layer_Sort_Method = .Floating,
 	loc := #caller_location,
 ) -> bool {
 	MIN_SIZE :: [2]f32{100, 100}

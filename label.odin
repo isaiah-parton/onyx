@@ -63,6 +63,7 @@ label :: proc(
 	font_size := global_state.style.default_text_size,
 	font := global_state.style.default_font,
 	align: [2]f32 = 0,
+	padding: [2]f32 = 0,
 	color: vgo.Color = style().color.content,
 	loc := #caller_location,
 ) {
@@ -82,7 +83,8 @@ label :: proc(
 			if text_layout.size.x > box_width(object.box) {
 				vgo.push_scissor(vgo.make_box(object.box))
 			}
-			vgo.fill_text_layout(text_layout, linalg.lerp(object.box.lo, object.box.hi, align), paint = color, align = align)
+			box := shrink_box(object.box, padding)
+			vgo.fill_text_layout(text_layout, linalg.lerp(box.lo, box.hi, align), paint = color, align = align)
 			if text_layout.size.x > box_width(object.box) {
 				vgo.pop_scissor()
 			}
@@ -104,7 +106,7 @@ icon :: proc(which_one: rune, size: f32 = global_state.style.icon_size) -> bool 
 	glyph := vgo.get_font_glyph(font, which_one) or_return
 	box := next_box({glyph.advance * size, font.line_height * size})
 	if get_clip(current_clip(), box) != .Full {
-		vgo.fill_glyph(glyph, size, linalg.floor(box_center(box) - size / 2), style().color.content)
+		vgo.fill_glyph(glyph, size, linalg.floor(box_center(box)) - size / 2, style().color.content)
 	}
 	return true
 }

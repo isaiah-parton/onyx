@@ -15,6 +15,7 @@ Icon_Section_State :: struct {
 	selected_icon: rune,
 	loaded_icon_names: bool,
 	icon_names: []string,
+	display_size: f32,
 }
 
 destroy_icon_section_state :: proc(state: ^Icon_Section_State) {
@@ -51,6 +52,7 @@ icon_section :: proc(state: ^Icon_Section_State) {
 	}
 
 	last_icon := rune(0xF429)
+	state.display_size = max(state.display_size, 10)
 
 	shrink(10)
 	set_width(remaining_space().x)
@@ -87,10 +89,12 @@ icon_section :: proc(state: ^Icon_Section_State) {
 			if begin_layout(.Top) {
 				background()
 				set_size(remaining_space())
-				icon(state.selected_icon, size = 40)
+				icon(state.selected_icon, size = state.display_size)
 				end_layout()
 			}
 			set_height(0)
+			space(10)
+			slider(&state.display_size, 10, 80)
 			space(10)
 			label(state.icon_names[int(state.selected_icon - first_icon)])
 			space(10)
