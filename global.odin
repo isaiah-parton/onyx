@@ -104,6 +104,7 @@ Global_State :: struct {
 	focused_object:           Id,
 	next_focused_object:      Id,
 	dragged_object:           Id,
+	pressed_object:           Id,
 	disable_objects:          bool,
 	drag_offset:              [2]f32,
 	mouse_press_point:        [2]f32,

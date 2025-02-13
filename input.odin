@@ -60,18 +60,32 @@ Input_Flag :: enum {
 
 Input_Flags :: bit_set[Input_Flag;u8]
 
-write_input_value :: proc(w: io.Writer, value: ^$T, format: string) {
-	when T == string {
-		io.write_string(w, value^)
-	} else when T == cstring {
-		fmt.wprint(w, value^)
-	} else when intrinsics.type_is_numeric(T) {
-		fmt.wprintf(w, format, value^)
+input :: proc(
+	value: any,
+	format: string = "%v",
+	prefix: string = "",
+	placeholder: string = "",
+	flags: Input_Flags = {},
+	loc := #caller_location,
+) -> Input_Result {
+	type_info := runtime.type_info_base(type_info_of(value.id))
+	if pointer_info, ok := type_info.variant.(runtime.Type_Info_Pointer); ok {
+		return raw_input(
+			(^rawptr)(value.data)^,
+			pointer_info.elem,
+			format,
+			prefix,
+			placeholder,
+			flags,
+			loc,
+		)
 	}
+	return raw_input(value.data, type_info, format, prefix, placeholder, flags, loc)
 }
 
-input :: proc(
-	content: ^$T,
+raw_input :: proc(
+	data: rawptr,
+	type_info: ^runtime.Type_Info,
 	format: string = "%v",
 	prefix: string = "",
 	placeholder: string = "",
@@ -79,16 +93,14 @@ input :: proc(
 	loc := #caller_location,
 ) -> (
 	result: Input_Result,
-) where intrinsics.type_is_string(T) ||
-	intrinsics.type_is_numeric(T) ||
-	intrinsics.type_is_union(T) {
-	if content == nil {
+) {
+	if data == nil || type_info == nil {
 		return {}
 	}
 
 	object := get_object(hash(loc))
 	if .Is_Input not_in object.flags {
-		object.flags += {.Is_Input}
+		object.flags += {.Is_Input, .Sticky_Press}
 		object.input.builder = strings.builder_make()
 	}
 	object.size = style().visual_size
@@ -99,7 +111,7 @@ input :: proc(
 		content_string: string
 		if .Active not_in object.state.current {
 			strings.builder_reset(&object.input.builder)
-			write_input_value(strings.to_writer(&object.input.builder), content, format)
+			fmt.sbprintf(&object.input.builder, format, any{id = type_info.id, data = data})
 		}
 		content_string = strings.to_string(object.input.builder)
 
@@ -185,7 +197,11 @@ input :: proc(
 			if .Active in object.state.current {
 				if .Active not_in object.state.previous {
 					strings.builder_reset(&object.input.builder)
-					write_input_value(strings.to_writer(&object.input.builder), content, format)
+					fmt.sbprintf(
+						&object.input.builder,
+						format,
+						any{id = type_info.id, data = data},
+					)
 					if .Select_All in flags {
 						tedit.editor_execute(&object.input.editor, .Select_All)
 					}
@@ -347,39 +363,73 @@ input :: proc(
 		}
 
 		if .Changed in object.state.current {
-			when T == string {
-				delete(content^)
-				content^ = strings.clone(strings.to_string(object.input.builder))
-				result.changed = true
-			} else when T == cstring {
-				delete(content^)
-				content^ = strings.clone_to_cstring(strings.to_string(object.input.builder))
-				result.changed = true
-			} else when intrinsics.type_is_numeric(T) {
-				if strings.builder_len(object.input.builder) == 0 {
-					if content^ != T(0) {
-						result.changed = true
-						content^ = T(0)
-					}
-					result.is_empty = true
-				} else {
-					if parsed_value, ok := strconv.parse_f64(
-						strings.to_string(object.input.builder),
-					); ok {
-						if content^ != T(parsed_value) {
-							result.changed = true
-							content^ = T(parsed_value)
-						} else {
-							object.state.current -= {.Changed}
-						}
-					}
-				}
-			}
+			replace_input_content(data, type_info, strings.to_string(object.input.builder))
 		}
 
 		end_object()
 	}
 	return
+}
+
+replace_input_content :: proc(
+	data: rawptr,
+	type_info: ^runtime.Type_Info,
+	text: string,
+	allocator := context.allocator,
+) -> bool {
+	#partial switch v in type_info.variant {
+	case (runtime.Type_Info_String):
+		if v.is_cstring {
+			cstring_pointer := (^cstring)(data)
+			delete(cstring_pointer^)
+			cstring_pointer^ = strings.clone_to_cstring(text, allocator = allocator)
+		} else {
+			string_pointer := (^string)(data)
+			delete(string_pointer^)
+			string_pointer^ = strings.clone(text, allocator = allocator)
+		}
+	case (runtime.Type_Info_Float):
+		switch type_info.id {
+		case f16:
+			(^f16)(data)^ = cast(f16)strconv.parse_f32(text) or_return
+		case f32:
+			(^f32)(data)^ = strconv.parse_f32(text) or_return
+		case f64:
+			(^f64)(data)^ = strconv.parse_f64(text) or_return
+		}
+	case (runtime.Type_Info_Integer):
+		switch type_info.id {
+		case int:
+			(^int)(data)^ = strconv.parse_int(text) or_return
+		case i8:
+			(^i8)(data)^ = cast(i8)strconv.parse_i64(text) or_return
+		case i16:
+			(^i16)(data)^ = cast(i16)strconv.parse_i64(text) or_return
+		case i32:
+			(^i32)(data)^ = cast(i32)strconv.parse_i64(text) or_return
+		case i64:
+			(^i64)(data)^ = strconv.parse_i64(text) or_return
+		case i128:
+			(^i128)(data)^ = strconv.parse_i128(text) or_return
+		case uint:
+			(^uint)(data)^ = strconv.parse_uint(text) or_return
+		case u8:
+			(^u8)(data)^ = cast(u8)strconv.parse_u64(text) or_return
+		case u16:
+			(^u16)(data)^ = cast(u16)strconv.parse_u64(text) or_return
+		case u32:
+			(^u32)(data)^ = cast(u32)strconv.parse_u64(text) or_return
+		case u64:
+			(^u64)(data)^ = strconv.parse_u64(text) or_return
+		case u128:
+			(^u128)(data)^ = strconv.parse_u128(text) or_return
+		case:
+			return false
+		}
+	case:
+		break
+	}
+	return true
 }
 
 draw_text_layout_cursor :: proc(layout: vgo.Text_Layout, origin: [2]f32, color: vgo.Color) {

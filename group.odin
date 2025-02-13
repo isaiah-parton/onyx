@@ -1,12 +1,13 @@
 package onyx
 
 Group :: struct {
+	id: Id,
 	current_state: Object_Status_Set,
 	previous_state: Object_Status_Set,
 }
 
-begin_group :: proc(allow_sweep: bool = false) -> bool {
-	return push_stack(&global_state.group_stack, Group{})
+begin_group :: proc(allow_sweep: bool = false, loc := #caller_location) -> bool {
+	return push_stack(&global_state.group_stack, Group{id = hash(loc)})
 }
 
 end_group :: proc() -> (group: ^Group, ok: bool) {

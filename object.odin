@@ -270,6 +270,7 @@ update_object_state :: proc(object: ^Object) {
 				global_state.dragged_object = object.id
 			}
 			global_state.next_focused_object = object.id
+			global_state.pressed_object = object.id
 
 			draw_frames(1)
 		}
