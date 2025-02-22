@@ -61,8 +61,10 @@ boolean :: proc(
 				global_state.style.text_padding.x * 2
 			object.size.y = gadget_size.y
 		}
+	} else {
+		object.size = base_size
 	}
-	object.box = align_box_inside(next_box(object.size), object.size, 0.5)
+	object.box = snapped_box(align_box_inside(next_box(object.size), object.size, 0.5))
 
 	if begin_object(object) {
 		defer end_object()

@@ -180,7 +180,7 @@ raw_input :: proc(
 			if key_pressed(.Escape) {
 				object.state.current -= {.Active}
 			} else if .Active in lost_state(object.state) {
-				object.state.current += {.Changed}
+				result.confirmed = true
 			}
 
 			if is_visible {
@@ -369,12 +369,14 @@ raw_input :: proc(
 					)
 				}
 				vgo.pop_scissor()
-				vgo.stroke_box(
-					object.box,
-					1,
-					radius = current_options().radius,
-					paint = style.color.accent if .Active in object.state.current else style.color.button,
-				)
+				if .Undecorated not_in flags {
+					vgo.stroke_box(
+						object.box,
+						1,
+						radius = current_options().radius,
+						paint = style.color.accent if .Active in object.state.current else style.color.button,
+					)
+				}
 			}
 		}
 
