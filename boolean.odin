@@ -62,12 +62,10 @@ boolean :: proc(
 			object.size.y = gadget_size.y
 		}
 	}
+	object.box = align_box_inside(next_box(object.size), object.size, 0.5)
 
 	if begin_object(object) {
 		defer end_object()
-
-		object.box = next_box(object.size, true)
-
 
 		if .Hovered in object.state.current {
 			set_cursor(.Pointing_Hand)

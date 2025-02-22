@@ -74,6 +74,7 @@ Object :: struct {
 	size:            [2]f32,
 	layer:           ^Layer,
 	box:             Box,
+	cut_side: Side,
 	dead:            bool,
 	disabled:        bool,
 	isolated:        bool,
@@ -315,6 +316,7 @@ begin_object :: proc(object: ^Object) -> bool {
 	}
 	object.frames = global_state.frames
 
+	object.cut_side = current_options().side
 	object.layer = current_layer().? or_return
 
 	update_object_state(object)

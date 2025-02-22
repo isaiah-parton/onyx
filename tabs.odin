@@ -204,7 +204,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 		}
 
 		is_visible := object_is_visible(object)
-		inner_box := shrink_box(object.box, 1)
+		inner_box := shrink_box(object.box, 2)
 		if is_visible {
 			vgo.stroke_box(object.box, 1, style().rounding, style().color.button)
 		}
@@ -228,7 +228,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 			}
 			if is_visible {
 				vgo.fill_box(
-					option_box,
+					shrink_box(option_box, 1),
 					option_rounding,
 					paint = vgo.fade(
 						style().color.button,

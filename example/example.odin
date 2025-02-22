@@ -62,6 +62,7 @@ Boolean_Section_State :: struct {
 boolean_section :: proc(state: ^Boolean_Section_State) {
 	using onyx
 	shrink(10)
+	set_size_method(.Dont_Care)
 	for type, i in Boolean_Type {
 		push_id(i)
 		boolean(&state.types[type], fmt.tprint(type), type = type)
@@ -125,13 +126,13 @@ input_section :: proc(state: ^Input_Section_State) {
 	shrink(10)
 	set_width(200)
 	set_height(30)
-	input(&state.text, placeholder = "placeholder")
+	input(state.text, placeholder = "placeholder")
 	space(10)
 	set_height(100)
-	input(&state.multiline_text, placeholder = "placeholder", flags = {.Multiline})
+	input(state.multiline_text, placeholder = "placeholder", flags = {.Multiline})
 	space(10)
 	set_height(30)
-	input(&state.number, prefix = "$")
+	input(state.number, prefix = "$")
 }
 
 Graph_Section_State :: struct {
@@ -283,7 +284,7 @@ theme_section :: proc(state: ^Theme_Section_State) {
 		if begin_layout(.Left) {
 			color := (^vgo.Color)(uintptr(&style().color) + struct_info.offsets[i])
 			set_align(.Center)
-			set_size_mode(.Fixed)
+			set_width_method(.Exact)
 			set_width(150)
 			label(struct_info.names[i])
 			space(10)
@@ -380,6 +381,8 @@ example_browser :: proc(state: ^State) {
 			set_width(120)
 			if begin_layout(.Top) {
 				set_height(26)
+
+				input(state.current_section)
 
 				for section, i in Section {
 					push_id(i)

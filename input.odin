@@ -9,10 +9,12 @@ import "core:math"
 import "core:math/linalg"
 import "core:mem"
 import "core:slice"
+import "core:reflect"
 import "core:strconv"
 import "core:strings"
 import "core:time"
 import "core:unicode"
+import "core:unicode/utf8"
 import "tedit"
 
 Input_Decal :: enum {
@@ -28,6 +30,8 @@ Input_State :: struct {
 	offset:           [2]f32,
 	last_mouse_index: int,
 	action_time:      time.Time,
+	match_list: [dynamic]string,
+	closest_match: string,
 }
 
 input_select_all :: proc(object: ^Object) {
@@ -35,8 +39,10 @@ input_select_all :: proc(object: ^Object) {
 }
 
 destroy_input :: proc(input: ^Input_State) {
+	delete(input.match_list)
 	tedit.destroy_editor(&input.editor)
 	strings.builder_destroy(&input.builder)
+	input^ = {}
 }
 
 activate_input :: proc(object: ^Object) {
@@ -97,16 +103,17 @@ raw_input :: proc(
 	if data == nil || type_info == nil {
 		return {}
 	}
+	type_info := runtime.type_info_base(type_info)
 
 	object := get_object(hash(loc))
 	if .Is_Input not_in object.flags {
-		object.flags += {.Is_Input, .Sticky_Press}
+		object.flags += {.Is_Input, .Sticky_Press, .Sticky_Hover}
 		object.input.builder = strings.builder_make()
 	}
 	object.size = style().visual_size
+	object.box = next_box(object.size)
 
 	if begin_object(object) {
-		object.box = next_box(object.size)
 
 		content_string: string
 		if .Active not_in object.state.current {
@@ -234,6 +241,11 @@ raw_input :: proc(
 							result.confirmed = true
 						}
 					} else {
+						if len(object.input.closest_match) > 0 {
+							strings.builder_reset(&object.input.builder)
+							strings.write_string(&object.input.builder, object.input.closest_match)
+							object.state.current += {.Changed}
+						}
 						result.confirmed = true
 					}
 				}
@@ -305,7 +317,7 @@ raw_input :: proc(
 
 			text_origin -= object.input.offset
 			if object_is_visible(object) {
-				vgo.fill_box(object.box, current_options().radius, paint = style.color.foreground)
+				vgo.fill_box(object.box, current_options().radius, paint = style.color.field)
 				vgo.push_scissor(vgo.make_box(object.box, current_options().radius))
 				if len(content_string) == 0 {
 					vgo.fill_text(
@@ -328,6 +340,10 @@ raw_input :: proc(
 						text_origin,
 						vgo.fade(style.color.accent, 1.0 / 3.0),
 					)
+					if len(object.input.closest_match) > 0 {
+						text_layout := vgo.make_text_layout(object.input.closest_match, text_size)
+						vgo.fill_text_layout_range(text_layout, {len(content_layout.glyphs) - 1, len(text_layout.glyphs)}, text_origin, paint = vgo.fade(style.color.content, 0.5))
+					}
 				}
 				vgo.fill_text_layout(content_layout, text_origin, paint = style.color.content)
 				if .Active in object.state.previous {
@@ -363,7 +379,29 @@ raw_input :: proc(
 		}
 
 		if .Changed in object.state.current {
-			replace_input_content(data, type_info, strings.to_string(object.input.builder))
+			if enum_info, ok := type_info.variant.(runtime.Type_Info_Enum); ok {
+				most_matching_runes: int
+				clear(&object.input.match_list)
+				for name, i in enum_info.names {
+					matching_runes := fuzzy_match(strings.to_string(object.input.builder), name)
+					if matching_runes > most_matching_runes {
+						most_matching_runes = matching_runes
+						inject_at(&object.input.match_list, 0, name)
+					} else if matching_runes > 0 {
+						append(&object.input.match_list, name)
+					}
+				}
+				object.input.closest_match = ""
+				most_matching_runes = 0
+				for name, i in enum_info.names {
+					matching_runes := match_start(strings.to_string(object.input.builder), name)
+					if matching_runes > most_matching_runes {
+						most_matching_runes = matching_runes
+						object.input.closest_match = name
+					}
+				}
+			}
+			result.changed = replace_input_content(data, type_info, strings.to_string(object.input.builder))
 		}
 
 		end_object()
@@ -425,6 +463,13 @@ replace_input_content :: proc(
 			(^u128)(data)^ = strconv.parse_u128(text) or_return
 		case:
 			return false
+		}
+	case (runtime.Type_Info_Enum):
+		for name, i in v.names {
+			if text == name {
+				mem.copy(data, &v.values[i], v.base.size)
+				break
+			}
 		}
 	case:
 		break

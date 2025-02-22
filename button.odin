@@ -48,30 +48,11 @@ Button :: struct {
 	active_time: f32,
 }
 
-Button_Event :: union {
-	Clicked,
-	Hovered,
-	Pressed,
-}
-
 Button_Result :: struct {
 	click_count: int,
 	clicked: bool,
 	hovered: bool,
 	pressed: bool,
-}
-
-Clicked :: struct {
-	times: int,
-	with_button: Mouse_Button,
-}
-
-Hovered :: struct {
-	how_long: time.Duration,
-}
-
-Pressed :: struct {
-	with_button: Mouse_Button,
 }
 
 button :: proc(

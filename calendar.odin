@@ -128,7 +128,7 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 			label(fmt.tprintf("%s %i", t.Month(page.month), page.year), align = 0.5)
 
 			set_side(.Right)
-			set_size_mode(.Fixed)
+			set_width_method(.Exact)
 			set_width(remaining_space().y)
 			if button(text = "\uE0F6", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
 				extras.page = todays_calendar_page()

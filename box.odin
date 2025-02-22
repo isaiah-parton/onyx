@@ -188,35 +188,12 @@ squish_box :: proc(box: Box, side: Side, amount: f32) -> (result: Box) {
 	return
 }
 
-align_inner :: proc(b: Box, size: [2]f32, align: [2]Alignment) -> Box {
-	a: Box
-	switch align.x {
-	case .Far:
-		a.hi.x = b.hi.x
-		a.lo.x = b.hi.x - size.x
-	case .Middle:
-		c := (b.lo.x + b.hi.x) / 2
-		d := size.x / 2
-		a.lo.x = c - d
-		a.hi.x = c + d
-	case .Near:
-		a.lo.x = b.lo.x
-		a.hi.x = b.lo.x + size.x
+align_box_inside :: proc(bounds: Box, size, align: [2]f32) -> Box {
+	origin := bounds.lo + (bounds.hi - bounds.lo - size) * align
+	return Box{
+		origin,
+		origin + size,
 	}
-	switch align.y {
-	case .Far:
-		a.hi.y = b.hi.y
-		a.lo.y = b.hi.y - size.y
-	case .Middle:
-		c := (b.lo.y + b.hi.y) / 2
-		d := size.y / 2
-		a.lo.y = c - d
-		a.hi.y = c + d
-	case .Near:
-		a.lo.y = b.lo.y
-		a.hi.y = b.lo.y + size.y
-	}
-	return a
 }
 
 point_aligned_in_box :: proc(box: Box, align_h: Alignment, align_v: Alignment) -> [2]f32 {
