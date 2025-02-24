@@ -88,7 +88,7 @@ analog_section :: proc(state: ^Analog_Section_State) {
 	space(20)
 	dial(state.float_value / 100.0)
 	space(20)
-	pie({33, 15, 52}, 100, {vgo.RED, vgo.GREEN, vgo.BLUE})
+	pie({33, 15, 52}, 100, {vgo.Red, vgo.Green, vgo.Blue})
 }
 
 Button_Section_State :: struct {}
@@ -478,7 +478,7 @@ main :: proc() {
 	panels: [5]onyx.Layer_Sort_Method
 
 	rand.reset(rand.uint64())
-	state.graph_section.color = vgo.GREEN
+	state.graph_section.color = vgo.Green
 	state.graph_section.time_range = {0, 20}
 	randomize_graphs(&state.graph_section)
 
@@ -516,7 +516,7 @@ main :: proc() {
 			// 	pop_id()
 			// }
 
-			vgo.fill_text(fmt.tprint(global_state.layer_counts), 14, {0, global_state.view.y}, font = style().monospace_font, align = {0, 1}, paint = vgo.WHITE)
+			vgo.fill_text(fmt.tprint(global_state.layer_counts), 14, {0, global_state.view.y}, font = style().monospace_font, align = {0, 1}, paint = vgo.White)
 
 			present()
 		}

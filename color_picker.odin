@@ -123,13 +123,13 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 		}
 
 		if object_is_visible(object) {
-			accent_color := vgo.BLACK if max(vgo.luminance_of(value^), 1 - f32(value.a) / 255) > 0.45 else vgo.WHITE
+			accent_color := vgo.Black if max(vgo.luminance_of(value^), 1 - f32(value.a) / 255) > 0.45 else vgo.White
 			vgo.push_scissor(vgo.make_box(object.box, current_options().radius))
 			draw_checkerboard_pattern(
 				object.box,
 				box_height(object.box) / 2,
-				vgo.blend(style().color.checkers0, value^, vgo.WHITE),
-				vgo.blend(style().color.checkers1, value^, vgo.WHITE),
+				vgo.blend(style().color.checkers0, value^, vgo.White),
+				vgo.blend(style().color.checkers1, value^, vgo.White),
 			)
 			if show_hex {
 				vgo.fill_text_layout(
@@ -188,7 +188,7 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 
 alpha_slider :: proc(
 	value: ^f32,
-	color: vgo.Color = vgo.BLACK,
+	color: vgo.Color = vgo.Black,
 	axis: Axis = .Y,
 	loc := #caller_location,
 ) {
@@ -327,7 +327,7 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 				{point_a, point_b, point_c},
 				paint = vgo.make_tri_gradient(
 					{point_a, point_b, point_c},
-					{vgo.color_from_hsva({value.x, 1, 1, 1}), vgo.BLACK, vgo.WHITE},
+					{vgo.color_from_hsva({value.x, 1, 1, 1}), vgo.Black, vgo.White},
 				),
 			)
 
@@ -338,7 +338,7 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 			)
 			r: f32 =
 				9 if (object.state.current >= {.Pressed} && .Active not_in object.state.current) else 7
-			vgo.fill_circle(point, r + 1, paint = vgo.BLACK if value.z > 0.5 else vgo.WHITE)
+			vgo.fill_circle(point, r + 1, paint = vgo.Black if value.z > 0.5 else vgo.White)
 			vgo.fill_circle(point, r, paint = vgo.color_from_hsva({value.x, value.y, value.z, 1}))
 		}
 	}

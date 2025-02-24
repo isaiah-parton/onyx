@@ -122,7 +122,7 @@ boolean :: proc(
 
 			state_time := ease.quadratic_in_out(extras.animation_timer)
 			gadget_fill_color := style().color.accent
-			gadget_accent_color := vgo.mix(0.4, gadget_fill_color, vgo.BLACK)
+			gadget_accent_color := vgo.mix(0.4, gadget_fill_color, vgo.Black)
 
 			switch type {
 			case .Checkbox:
