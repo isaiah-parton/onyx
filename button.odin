@@ -20,7 +20,7 @@ draw_and_update_wave_effects :: proc(object: ^Object, array: ^Wave_Effects) {
 		vgo.fill_circle(
 			wave.point,
 			linalg.length(object.box.hi - object.box.lo) * min(wave.time, 0.75) * 1.33,
-			paint = vgo.fade(vgo.WHITE, (1 - max(0, wave.time - 0.75) * 4) * 0.2),
+			paint = vgo.fade(vgo.White, (1 - max(0, wave.time - 0.75) * 4) * 0.2),
 		)
 
 		if !(wave.time >= 0.75 && .Pressed in object.state.current && i == array.len - 1) {
@@ -115,7 +115,7 @@ button :: proc(
 
 			switch accent {
 			case .Primary:
-				base_color := vgo.mix(0.2 * extras.hover_time, style().color.accent, vgo.WHITE)
+				base_color := vgo.mix(0.2 * extras.hover_time, style().color.accent, vgo.White)
 				stroke_color := base_color
 				fill_color := vgo.mix(
 					f32(i32(delay > 0)) * extras.press_time,

@@ -98,7 +98,7 @@ profiler_end_scope :: proc(scope: Profiler_Scope) {
 
 @(private)
 draw_object_debug_margin :: proc(box: Box, margin: [4]f32) {
-	vgo.set_paint(vgo.fade(vgo.YELLOW, 0.5))
+	vgo.set_paint(vgo.fade(vgo.Yellow, 0.5))
 	if margin.x > 0 do vgo.fill_box(attach_box_left(box, margin.x))
 	if margin.y > 0 do vgo.fill_box(attach_box_top(box, margin.y))
 	if margin.z > 0 do vgo.fill_box(attach_box_right(box, margin.z))
@@ -108,7 +108,7 @@ draw_object_debug_margin :: proc(box: Box, margin: [4]f32) {
 @(private)
 draw_object_debug_padding :: proc(box: Box, padding: [4]f32) {
 	box := box
-	vgo.set_paint(vgo.fade(vgo.TURQUOISE, 0.5))
+	vgo.set_paint(vgo.fade(vgo.Turquoise, 0.5))
 	if padding.x > 0 do vgo.fill_box(cut_box_left(&box, padding.x))
 	if padding.y > 0 do vgo.fill_box(cut_box_top(&box, padding.y))
 	if padding.z > 0 do vgo.fill_box(cut_box_right(&box, padding.z))
@@ -118,9 +118,9 @@ draw_object_debug_padding :: proc(box: Box, padding: [4]f32) {
 @(private)
 draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
 	if object_is_being_debugged(state, object) {
-		vgo.fill_box(object.box, paint = vgo.fade(vgo.BLUE, 0.25))
+		vgo.fill_box(object.box, paint = vgo.fade(vgo.Blue, 0.25))
 	}
-	vgo.stroke_box(object.box, 1, paint = vgo.BLUE)
+	vgo.stroke_box(object.box, 1, paint = vgo.Blue)
 }
 
 @(private)
@@ -167,7 +167,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 
 	if global_state.hovered_object != 0 {
 		if object, ok := global_state.object_map[global_state.hovered_object]; ok {
-			vgo.stroke_box(object.box, 1, paint = vgo.WHITE)
+			vgo.stroke_box(object.box, 1, paint = vgo.White)
 		}
 	}
 
@@ -179,7 +179,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 	}
 
 	DEBUG_TEXT_SIZE :: 14
-	vgo.set_paint(vgo.WHITE)
+	vgo.set_paint(vgo.White)
 	vgo.set_font(global_state.style.monospace_font)
 
 	{
@@ -209,7 +209,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		fmt.sbprintf(&b, "\nObjects: %i", len(global_state.objects))
 		fmt.sbprintf(&b, "\nLayers: %i", len(global_state.layer_array))
 		fmt.sbprintf(&b, "\nPanels: %i", len(global_state.panel_map))
-		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 1, paint = vgo.BLACK)
+		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 1, paint = vgo.Black)
 		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 0)
 	}
 
@@ -254,13 +254,13 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		size := info_text_layout.size + {0, header_text_layout.size.y}
 		origin := linalg.clamp(mouse_point() + 10, 0, global_state.view - size)
 
-		vgo.fill_box({origin, origin + size}, paint = vgo.fade(vgo.BLACK, 0.75))
-		vgo.fill_box({origin, origin + header_text_layout.size}, paint = vgo.BLUE)
-		vgo.fill_text_layout(header_text_layout, origin, paint = vgo.BLACK)
+		vgo.fill_box({origin, origin + size}, paint = vgo.fade(vgo.Black, 0.75))
+		vgo.fill_box({origin, origin + header_text_layout.size}, paint = vgo.Blue)
+		vgo.fill_text_layout(header_text_layout, origin, paint = vgo.Black)
 		vgo.fill_text_layout(
 			info_text_layout,
 			origin + {0, header_text_layout.size.y},
-			paint = vgo.WHITE,
+			paint = vgo.White,
 		)
 	}
 }
