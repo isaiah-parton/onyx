@@ -74,6 +74,7 @@ boolean_section :: proc(state: ^Boolean_Section_State) {
 Analog_Section_State :: struct {
 	float_value:   f32,
 	integer_value: int,
+	float_range: [2]f32,
 }
 
 analog_section :: proc(state: ^Analog_Section_State) {
@@ -83,6 +84,20 @@ analog_section :: proc(state: ^Analog_Section_State) {
 	slider(&state.float_value, 0, 100)
 	space(10)
 	slider(&state.integer_value, 0, 10)
+	space(10)
+	set_height(30)
+	if layout(.Left) {
+		header("Range sliders")
+	}
+	space(10)
+	set_height(30)
+	set_width(remaining_space().x)
+	if layout(.Left) {
+		set_width(0)
+		set_size_method(.Max)
+		range_slider(&state.float_range[0], &state.float_range[1], 0, 100)
+	}
+	set_height(0)
 	space(20)
 	progress_bar(state.float_value / 100.0)
 	space(20)
@@ -515,8 +530,6 @@ main :: proc() {
 			// 	}
 			// 	pop_id()
 			// }
-
-			vgo.fill_text(fmt.tprint(global_state.layer_counts), 14, {0, global_state.view.y}, font = style().monospace_font, align = {0, 1}, paint = vgo.White)
 
 			present()
 		}

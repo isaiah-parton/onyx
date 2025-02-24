@@ -240,6 +240,18 @@ end_layout :: proc() {
 	pop_options()
 }
 
+@(deferred_out=__layout)
+layout :: proc(side: Side, size: [2]f32 = {}, does_grow: bool = false) -> bool {
+	return begin_layout(side, size, does_grow)
+}
+
+@(private)
+__layout :: proc(ok: bool) {
+	if ok {
+		end_layout()
+	}
+}
+
 axis_of_side :: proc(side: Side) -> Axis {
 	return Axis(int(side) / 2)
 }
