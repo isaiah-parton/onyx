@@ -170,6 +170,13 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 					alpha_slider(&extras.hsva.w)
 					space(10)
 					hsv_wheel((^[3]f32)(&extras.hsva))
+					space(10)
+					// todo figure out how to do row placement
+					nearest := vgo.find_nearest_color(vgo.color_from_hsva(extras.hsva))
+					label(
+						nearest.name,
+						color = nearest.color,
+					)
 				}
 
 				if object_was_just_changed(object) {
