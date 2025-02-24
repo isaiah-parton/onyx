@@ -115,7 +115,7 @@ button :: proc(
 
 			switch accent {
 			case .Primary:
-				base_color := vgo.mix(0.2 * extras.hover_time, style().color.accent, vgo.White)
+				base_color := vgo.mix(0.15 * (extras.hover_time + extras.press_time), style().color.accent, vgo.White)
 				stroke_color := base_color
 				fill_color := vgo.mix(
 					f32(i32(delay > 0)) * extras.press_time,
@@ -152,7 +152,7 @@ button :: proc(
 				vgo.fill_box(
 					object.box,
 					rounding,
-					paint = vgo.fade(color, math.lerp(f32(0.5), f32(0.8), extras.hover_time)),
+				paint = vgo.fade(color, math.lerp(f32(0.5), f32(0.8), (extras.hover_time + extras.press_time) * 0.5)),
 				)
 			case .Subtle:
 				vgo.fill_box(

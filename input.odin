@@ -234,6 +234,16 @@ raw_input :: proc(
 				}
 				if key_pressed(.Backspace) do cmd = .Delete_Word_Left if control_down else .Backspace
 				if key_pressed(.Delete) do cmd = .Delete_Word_Right if control_down else .Delete
+				if key_pressed(.Tab) {
+					if len(object.input.closest_match) > 0 {
+						strings.builder_reset(&object.input.builder)
+						strings.write_string(&object.input.builder, object.input.closest_match)
+						object.input.editor.selection = strings.builder_len(object.input.builder)
+						object.state.current += {.Changed}
+						consume_key_press(.Tab)
+					}
+					// result.confirmed = true
+				}
 				if key_pressed(.Enter) {
 					cmd = .New_Line
 					if multiline {

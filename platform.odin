@@ -107,6 +107,10 @@ key_released :: proc(key: Keyboard_Key) -> bool {
 	return global_state.last_keys[key] && !global_state.keys[key]
 }
 
+consume_key_press :: proc(key: Keyboard_Key) {
+	global_state.keys[key] = false
+}
+
 mouse_down :: proc(button: Mouse_Button) -> bool {
 	return button in global_state.mouse_bits
 }

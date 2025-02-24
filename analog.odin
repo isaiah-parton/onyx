@@ -216,7 +216,6 @@ range_slider :: proc(
 		}
 
 		if is_visible {
-
 			radius := current_options().radius
 			vgo.push_scissor(vgo.make_box(object.box, radius))
 			vgo.fill_box(object.box, paint = style().color.field)
