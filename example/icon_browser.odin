@@ -1,6 +1,6 @@
 package demo
 
-import "../ronin"
+import "local:ronin"
 import kn "local:katana"
 import "core:encoding/json"
 import "core:os"
@@ -126,7 +126,7 @@ icon_section :: proc(state: ^Icon_Section_State) {
 				begin_layout(as_row) or_continue
 				defer end_layout()
 
-				set_width(icon_cell_size)
+				set_width(exactly(icon_cell_size))
 				if get_clip(view_box(), get_current_layout().box) == .Full {
 					continue
 				}

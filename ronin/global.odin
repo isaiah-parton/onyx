@@ -21,7 +21,7 @@ import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
 
 EMBED_DEFAULT_FONTS :: #config(ONYX_EMBED_FONTS, false)
-FONT_PATH :: #config(ONYX_FONT_PATH, "../fonts")
+FONT_PATH :: #config(ONYX_FONT_PATH, "fonts")
 MAX_IDS :: 32
 MAX_LAYERS :: 100
 MAX_LAYOUTS :: 100

@@ -1,6 +1,6 @@
 package demo
 
-import "../ronin"
+import "local:ronin"
 import kn "local:katana"
 import "base:runtime"
 import "core:c/libc"
@@ -496,17 +496,32 @@ main :: proc() {
 			}
 
 			// example_browser(&state)
-			shrink(50)
 			set_size(to_layout_size)
-			if do_layout(left_to_right, split_golden) {
-				shrink(2)
-				set_padding(2)
-				button("A")
-				if do_layout(top_to_bottom, split_golden) {
-					button("B")
-					if do_layout(right_to_left, split_golden) {
-						button("C")
-						button("D")
+			if do_carousel() {
+				if do_page(left_to_right, split_golden) {
+					shrink(50)
+					shrink(2)
+					set_padding(2)
+					foreground()
+					if do_layout(top_to_bottom, split_golden) {
+						foreground()
+						if do_layout(right_to_left, split_golden) {
+							foreground()
+							foreground()
+						}
+					}
+				}
+				if do_page(left_to_right, split_golden) {
+					shrink(50)
+					shrink(2)
+					set_padding(2)
+					button("A")
+					if do_layout(top_to_bottom, split_golden) {
+						button("B")
+						if do_layout(right_to_left, split_golden) {
+							button("C")
+							button("D")
+						}
 					}
 				}
 			}

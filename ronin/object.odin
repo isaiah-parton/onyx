@@ -65,6 +65,7 @@ Object_Variant :: union {
 	Graph,
 	Range_Slider,
 	Slider,
+	Carousel,
 }
 
 Object :: struct {
@@ -143,6 +144,17 @@ animate :: proc(value, duration: f32, condition: bool) -> f32 {
 		draw_frames(2)
 		value = max(0, value - global_state.delta_time * (1 / duration))
 	}
+
+	return value
+}
+
+animate_lerp :: proc(value, speed, target: f32) -> f32 {
+	value := value
+
+	diff := target - value
+	draw_frames(int(abs(diff) > 0.01) * 2)
+
+	value += diff * global_state.delta_time * speed
 
 	return value
 }
@@ -406,21 +418,22 @@ focus_object :: proc(object: ^Object) {
 
 foreground :: proc(loc := #caller_location) {
 	object := get_object(hash(loc))
-	set_next_box(get_current_layout().box)
+	// set_next_box(get_current_layout().box)
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
+		style := get_current_style()
 		draw_shadow(object.box)
 		kn.fill_box(
 			object.box,
 			get_current_options().radius,
-			paint = get_current_style().color.foreground,
+			paint = style.color.foreground,
 		)
 		kn.stroke_box(
 			object.box,
-			1,
+			style.line_width,
 			get_current_options().radius,
-			paint = get_current_style().color.foreground_stroke,
+			paint = style.color.foreground_stroke,
 		)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)

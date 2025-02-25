@@ -1,6 +1,7 @@
 package ronin
 
-Exact_Size :: f32
+Exact_Width_Or_Height :: f32
+Exact_Size :: [2]f32
 Preferred_Size_Of_Object :: struct {}
 Factor_Of_Remaining_Width :: distinct f32
 Factor_Of_Remaining_Height :: distinct f32
@@ -26,6 +27,7 @@ of_layout_size :: proc(fraction: [2]f32) -> [2]f32 {return remaining_space() * f
 
 Size_Option :: union {
 	Exact_Size,
+	Exact_Width_Or_Height,
 	Size_Method,
 	Factor_Of_Predefined_Scale,
 	Factor_Of_Remaining_Width,
@@ -53,11 +55,14 @@ Options :: struct {
 	object_height:  int,
 }
 
-exact_size_and_method_from_options :: proc(axis: int, opts: ..Size_Option) -> (value: Exact_Size, method: Size_Method) {
+exact_size_and_method_from_options :: proc(axis: int, opts: ..Size_Option) -> (value: f32, method: Size_Method) {
 	for opt in opts {
 		switch v in opt {
+		case Exact_Width_Or_Height:
+			value = f32(v)
+			method = .Fixed
 		case Exact_Size:
-			value = v
+			value = v[axis]
 			method = .Fixed
 		case Factor_Of_Predefined_Scale:
 			value = get_current_style().scale * f32(v)

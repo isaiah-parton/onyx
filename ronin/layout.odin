@@ -45,6 +45,7 @@ right_to_left :: Cut_Contents_From_Side(.Right)
 top_to_bottom :: Cut_Contents_From_Side(.Top)
 bottom_to_top :: Cut_Contents_From_Side(.Bottom)
 
+with_box :: Box
 as_row :: left_to_right
 as_reversed_row :: right_to_left
 as_column :: top_to_bottom
@@ -60,6 +61,7 @@ is_dynamic :: Dynamic{}
 with_wireframe :: Show_Wireframe(true)
 
 Layout_Property :: union {
+	Box,
 	Cut_From_Side,
 	Cut_Contents_From_Side,
 	Define_Content_Sizes,
@@ -200,11 +202,15 @@ get_current_axis :: proc() -> int {
 begin_layout :: proc(props: ..Layout_Property) -> bool {
 	current_layout := get_current_layout()
 	current_axis := int(current_layout.side) / 2
+
+	layout := Layout{}
+
 	cut_from_side := current_layout.side
 	cut_contents_from_side := Side.Left
-	layout := Layout{}
+	box: Maybe(Box)
 	options := get_current_options()^
 	size_option: Size_Option
+
 	for prop in props {
 		#partial switch v in prop {
 		case Cut_From_Side:
@@ -219,16 +225,24 @@ begin_layout :: proc(props: ..Layout_Property) -> bool {
 			size_option = Factor_Of_Remaining_Cut_Space(1 / v)
 		case Show_Wireframe:
 			layout.show_wireframe = bool(v)
+		case Box:
+			box = Box(v)
 		}
 	}
-	box := cut_box(
-		&current_layout.box,
-		cut_from_side,
-		solve_size(options.size[current_axis], 0, options.methods[current_axis]),
-	)
+	if box == nil {
+		cut_size := solve_size(options.size[current_axis], 0, options.methods[current_axis])
+		if current_layout.does_grow {
+			current_layout.box = grow_side_of_box(current_layout.box, current_layout.side, cut_size)
+		}
+		box = cut_box(
+			&current_layout.box,
+			cut_from_side,
+			cut_size,
+		)
+	}
 	layout.side = cut_contents_from_side
-	layout.box = box
-	layout.bounds = box
+	layout.box = box.?
+	layout.bounds = box.?
 	push_options(options)
 	ok := push_layout(layout)
 	set_cut_size(size_option)
