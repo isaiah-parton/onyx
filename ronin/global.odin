@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "base:runtime"
 import "core:container/small_array"
 import "core:fmt"
@@ -21,7 +21,7 @@ import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
 
 EMBED_DEFAULT_FONTS :: #config(ONYX_EMBED_FONTS, false)
-FONT_PATH :: #config(ONYX_FONT_PATH, "../onyx/fonts")
+FONT_PATH :: #config(ONYX_FONT_PATH, "../fonts")
 MAX_IDS :: 32
 MAX_LAYERS :: 100
 MAX_LAYOUTS :: 100
@@ -202,29 +202,29 @@ load_default_fonts :: proc() -> bool {
 	HEADER_FONT_JSON :: #load(FONT_PATH + "/" + HEADER_FONT + ".json", []u8)
 	ICON_FONT_JSON :: #load(FONT_PATH + "/" + ICON_FONT + ".json", []u8)
 
-	global_state.style.default_font = vgo.load_font_from_slices(
+	global_state.style.default_font = kn.load_font_from_slices(
 		DEFAULT_FONT_IMAGE,
 		DEFAULT_FONT_JSON,
 	) or_return
-	global_state.style.bold_font = vgo.load_font_from_slices(
+	global_state.style.bold_font = kn.load_font_from_slices(
 		BOLD_FONT_IMAGE,
 		BOLD_FONT_JSON,
 	) or_return
-	global_state.style.monospace_font = vgo.load_font_from_slices(
+	global_state.style.monospace_font = kn.load_font_from_slices(
 		MONOSPACE_FONT_IMAGE,
 		MONOSPACE_FONT_JSON,
 	) or_return
-	global_state.style.header_font = vgo.load_font_from_slices(
+	global_state.style.header_font = kn.load_font_from_slices(
 		HEADER_FONT_IMAGE,
 		HEADER_FONT_JSON,
 	) or_return
-	global_state.style.icon_font = vgo.load_font_from_slices(
+	global_state.style.icon_font = kn.load_font_from_slices(
 		ICON_FONT_IMAGE,
 		ICON_FONT_JSON,
 		true,
 	) or_return
 
-	vgo.set_fallback_font(global_state.style.icon_font)
+	kn.set_fallback_font(global_state.style.icon_font)
 
 	return true
 }
@@ -330,13 +330,6 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		},
 	)
 
-	// &{
-	// 	nextInChain = &wgpu.InstanceExtras{
-	// 		sType = .InstanceExtras,
-	// 		backends = {.Vulkan},
-	// 	},
-	// }
-
 	global_state.instance = wgpu.CreateInstance()
 	global_state.surface = glfwglue.GetSurface(global_state.instance, window)
 
@@ -370,7 +363,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 			info := wgpu.AdapterGetInfo(adapter)
 			fmt.printfln("Using %v on %v", info.backendType, info.description)
 
-			descriptor := vgo.device_descriptor()
+			descriptor := kn.device_descriptor()
 			wgpu.AdapterRequestDevice(adapter, &descriptor, on_device, userdata)
 		case .Error:
 			fmt.panicf("Unable to acquire adapter: %s", message)
@@ -387,7 +380,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 		on_adapter,
 		&global_state,
 	)
-	global_state.surface_config = vgo.surface_configuration(
+	global_state.surface_config = kn.surface_configuration(
 		global_state.device,
 		global_state.adapter,
 		global_state.surface,
@@ -396,7 +389,7 @@ start :: proc(window: glfw.WindowHandle, style: Maybe(Style) = nil) -> bool {
 	global_state.surface_config.height = u32(height)
 	wgpu.SurfaceConfigure(global_state.surface, &global_state.surface_config)
 
-	vgo.start(global_state.device, global_state.surface)
+	kn.start(global_state.device, global_state.surface)
 
 	if style == nil {
 		global_state.style.color = dark_color_scheme()
@@ -509,10 +502,20 @@ new_frame :: proc() {
 		}
 	}
 
-	vgo.new_frame()
+	kn.new_frame()
 
 	global_state.id_stack.height = 0
+	global_state.layout_stack.height = 0
+	global_state.object_stack.height = 0
+	global_state.layer_stack.height = 0
+	global_state.panel_stack.height = 0
+
 	push_stack(&global_state.id_stack, FNV1A32_OFFSET_BASIS)
+	begin_layer(.Back)
+	push_stack(
+		&global_state.layout_stack,
+		Layout{box = view_box(), bounds = view_box(), side = .Top},
+	)
 
 	profiler_begin_scope(.Construct)
 }
@@ -571,7 +574,7 @@ present :: proc() {
 	global_state.cursor_type = .Normal
 
 	if global_state.frames_to_draw > 0 && global_state.visible {
-		vgo.present()
+		kn.present()
 		global_state.drawn_frames += 1
 		global_state.frames_to_draw -= 1
 	}
@@ -599,16 +602,16 @@ shutdown :: proc() {
 	delete(global_state.layer_map)
 	delete(global_state.runes)
 
-	vgo.destroy_font(&global_state.style.default_font)
-	vgo.destroy_font(&global_state.style.monospace_font)
-	vgo.destroy_font(&global_state.style.icon_font)
+	kn.destroy_font(&global_state.style.default_font)
+	kn.destroy_font(&global_state.style.monospace_font)
+	kn.destroy_font(&global_state.style.icon_font)
 	if font, ok := global_state.style.header_font.?; ok {
-		vgo.destroy_font(&font)
+		kn.destroy_font(&font)
 	}
 
 	destroy_debug_state(&global_state.debug)
 
-	vgo.shutdown()
+	kn.shutdown()
 }
 
 delta_time :: proc() -> f32 {
@@ -620,7 +623,7 @@ should_close_window :: proc() -> bool {
 }
 
 set_rounded_corners :: proc(corners: Corners) {
-	current_options().radius = rounded_corners(corners)
+	get_current_options().radius = rounded_corners(corners)
 }
 
 user_focus_just_changed :: proc() -> bool {
@@ -646,8 +649,13 @@ __get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
 	return
 }
 
-draw_shadow :: proc(box: vgo.Box) {
-	if vgo.disable_scissor() {
-		vgo.box_shadow(move_box(box, 3), global_state.style.rounding, 6, style().color.shadow)
+draw_shadow :: proc(box: kn.Box) {
+	if kn.disable_scissor() {
+		kn.box_shadow(
+			move_box(box, 3),
+			global_state.style.rounding,
+			6,
+			get_current_style().color.shadow,
+		)
 	}
 }

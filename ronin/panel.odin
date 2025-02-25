@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -127,12 +127,12 @@ begin_panel :: proc(
 	}
 
 	if !panel.is_snapped {
-		if vgo.disable_scissor() {
-			vgo.box_shadow(
+		if kn.disable_scissor() {
+			kn.box_shadow(
 				move_box(panel.box, {0, 2}),
 				rounding,
 				6,
-				vgo.fade(style().color.shadow, 1.0 - (0.1 * panel.fade)),
+				kn.fade(get_current_style().color.shadow, 1.0 - (0.1 * panel.fade)),
 			)
 		}
 	}
@@ -141,19 +141,19 @@ begin_panel :: proc(
 		panel.moving = false
 	}
 
-	vgo.push_scissor(vgo.make_box(panel.box, rounding))
+	kn.push_scissor(kn.make_box(panel.box, rounding))
 	push_clip(panel.box)
 
-	vgo.fill_box(panel.box, rounding, paint = style().color.foreground)
-	vgo.stroke_box(panel.box, 1, rounding, paint = style().color.foreground_stroke)
+	kn.fill_box(panel.box, rounding, paint = get_current_style().color.foreground)
+	kn.stroke_box(panel.box, 1, rounding, paint = get_current_style().color.foreground_stroke)
 
 	set_next_box(panel.box)
-	begin_layout(side = .Top) or_return
+	begin_layout(as_column) or_return
 	return true
 }
 
 end_panel :: proc() {
-	layout := current_layout().?
+	layout := get_current_layout()
 	end_object()
 	end_layout()
 	pop_clip()
@@ -161,7 +161,7 @@ end_panel :: proc() {
 	panel := current_panel()
 	if panel.can_resize {
 		object := get_object(hash("resize"))
-		object.box = Box{panel.box.hi - global_state.style.visual_size.y * 0.5, panel.box.hi}
+		object.box = Box{panel.box.hi - get_current_style().scale * 0.5, panel.box.hi}
 		object.flags += {.Sticky_Hover, .Sticky_Press}
 		if begin_object(object) {
 			defer end_object()
@@ -169,12 +169,12 @@ end_panel :: proc() {
 			if point_in_box(mouse_point(), object.box) {
 				hover_object(object)
 			}
-			icon_color := style().color.button
+			icon_color := get_current_style().color.button
 			if .Hovered in object.state.current {
-				icon_color = style().color.accent
+				icon_color = get_current_style().color.accent
 				global_state.cursor_type = .Resize_NWSE
 			}
-			vgo.fill_polygon(
+			kn.fill_polygon(
 				{
 					{object.box.hi.x, object.box.lo.y},
 					object.box.hi,
@@ -192,7 +192,7 @@ end_panel :: proc() {
 	}
 
 	// if panel.fade > 0 {
-	// 	vgo.fill_box(panel.box, 0, vgo.fade(vgo.BLACK, panel.fade * 0.25))
+	// 	kn.fill_box(panel.box, 0, kn.fade(kn.BLACK, panel.fade * 0.25))
 	// }
 	// panel.fade = animate(
 	// 	panel.fade,
@@ -203,7 +203,7 @@ end_panel :: proc() {
 	panel.min_size += layout.content_size + layout.spacing_size
 
 	pop_id()
-	vgo.pop_scissor()
+	kn.pop_scissor()
 	end_layer()
 	pop_stack(&global_state.panel_stack)
 }
@@ -278,13 +278,13 @@ draw_panel_snap_widgets :: proc(state: Panel_Snap_State) {
 		for orb in orbs {
 			distance_to_mouse := linalg.length(mouse_point() - orb.position)
 			if distance_to_mouse <= RADIUS {
-				vgo.stroke_box(orb.box, 2, paint = style().color.accent)
+				kn.stroke_box(orb.box, 2, paint = get_current_style().color.accent)
 				if mouse_released(.Left) {
 					panel.box = orb.box
 					panel.is_snapped = true
 				}
 			} else {
-				vgo.fill_circle(orb.position, RADIUS, vgo.fade(style().color.accent, 0.5))
+				kn.fill_circle(orb.position, RADIUS, kn.fade(get_current_style().color.accent, 0.5))
 			}
 		}
 	}

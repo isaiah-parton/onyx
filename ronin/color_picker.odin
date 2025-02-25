@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -64,13 +64,13 @@ triangle_barycentric :: proc(a, b, c, p: [2]f32) -> (u, v, w: f32) {
 	return
 }
 
-draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: vgo.Color) {
-	vgo.fill_box(box, paint = primary)
+draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: kn.Color) {
+	kn.fill_box(box, paint = primary)
 	for x in 0 ..< int(math.ceil(box_width(box) / size.x)) {
 		for y in 0 ..< int(math.ceil(box_height(box) / size.y)) {
 			if (x + y) % 2 == 0 {
 				pos := box.lo + [2]f32{f32(x), f32(y)} * size
-				vgo.fill_box({pos, linalg.min(pos + size, box.hi)}, paint = secondary)
+				kn.fill_box({pos, linalg.min(pos + size, box.hi)}, paint = secondary)
 			}
 		}
 	}
@@ -81,15 +81,15 @@ Color_Picker :: struct {
 	hsva:      [4]f32,
 }
 
-color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool = true, loc := #caller_location) {
+color_picker :: proc(value: ^kn.Color, show_hex: bool = false, show_alpha: bool = true, loc := #caller_location) {
 	if value == nil {
 		return
 	}
 	object := get_object(hash(loc))
-	text_layout: vgo.Text_Layout
+	text_layout: kn.Text_Layout
 	if show_hex {
-		text_layout := vgo.make_text_layout(
-			fmt.tprintf("#%6x", vgo.hex_from_color(value^)),
+		text_layout := kn.make_text_layout(
+			fmt.tprintf("#%6x", kn.hex_from_color(value^)),
 			global_state.style.default_text_size,
 			global_state.style.monospace_font,
 		)
@@ -98,7 +98,6 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 	if object.variant == nil {
 		object.variant = Color_Picker{}
 	}
-	object.box = next_box(object.size)
 	object.state.input_mask = OBJECT_STATE_ALL
 	if begin_object(object) {
 		defer end_object()
@@ -106,7 +105,7 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 		extras := &object.variant.(Color_Picker)
 
 
-		object.hover_time = animate(object.hover_time, 0.1, .Hovered in object.state.current)
+		object.animation.hover = animate(object.animation.hover, 0.1, .Hovered in object.state.current)
 		if .Open in object.state.current {
 			extras.open_time = animate(extras.open_time, 0.3, true)
 		} else {
@@ -123,29 +122,29 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 		}
 
 		if object_is_visible(object) {
-			accent_color := vgo.Black if max(vgo.luminance_of(value^), 1 - f32(value.a) / 255) > 0.45 else vgo.White
-			vgo.push_scissor(vgo.make_box(object.box, current_options().radius))
+			accent_color := kn.Black if max(kn.luminance_of(value^), 1 - f32(value.a) / 255) > 0.45 else kn.White
+			kn.push_scissor(kn.make_box(object.box, get_current_options().radius))
 			draw_checkerboard_pattern(
 				object.box,
 				box_height(object.box) / 2,
-				vgo.blend(style().color.checkers0, value^, vgo.White),
-				vgo.blend(style().color.checkers1, value^, vgo.White),
+				kn.blend(get_current_style().color.checkers0, value^, kn.White),
+				kn.blend(get_current_style().color.checkers1, value^, kn.White),
 			)
 			if show_hex {
-				vgo.fill_text_layout(
+				kn.fill_text_layout(
 					text_layout,
 					box_center(object.box),
 					align = 0.5,
 					paint = accent_color,
 				)
 			}
-			vgo.pop_scissor()
+			kn.pop_scissor()
 		}
 
 		PADDING :: 10
 		if .Open in object.state.current {
 			if .Open not_in object.state.previous {
-				extras.hsva = vgo.hsva_from_color(value^)
+				extras.hsva = kn.hsva_from_color(value^)
 			}
 
 			push_id(object.id)
@@ -158,22 +157,21 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 				set_next_box(
 					{{object.box.hi.x, baseline - 100}, {object.box.hi.x + 200, baseline + 100}},
 				)
-				if begin_layout(side = .Left) {
-					defer end_layout()
+				if do_layout(as_row) {
 					push_options({})
 					defer pop_options()
 
 					set_rounded_corners(ALL_CORNERS)
 					foreground()
-					vgo.stroke_box(current_box(), 1, current_options().radius, paint = style().color.button)
+					kn.stroke_box(get_current_layout().box, 1, get_current_options().radius, paint = get_current_style().color.button)
 					shrink(10)
 					alpha_slider(&extras.hsva.w)
-					space(10)
+					space()
 					hsv_wheel((^[3]f32)(&extras.hsva))
 				}
 
 				if object_was_just_changed(object) {
-					value^ = vgo.color_from_hsva(extras.hsva)
+					value^ = kn.color_from_hsva(extras.hsva)
 					object.state.current += {.Changed}
 				}
 
@@ -188,7 +186,7 @@ color_picker :: proc(value: ^vgo.Color, show_hex: bool = false, show_alpha: bool
 
 alpha_slider :: proc(
 	value: ^f32,
-	color: vgo.Color = vgo.Black,
+	color: kn.Color = kn.Black,
 	axis: Axis = .Y,
 	loc := #caller_location,
 ) {
@@ -197,11 +195,10 @@ alpha_slider :: proc(
 	}
 	color := color
 	object := get_object(hash(loc))
-	object.size = global_state.style.visual_size
+	object.size = global_state.style.scale
 	if axis == .Y {
 		object.size.xy = object.size.yx
 	}
-	object.box = next_box(object.size)
 	if begin_object(object) {
 		defer end_object()
 
@@ -226,26 +223,26 @@ alpha_slider :: proc(
 			draw_checkerboard_pattern(
 				box,
 				(box.hi[j] - box.lo[j]) / 2,
-				style().color.checkers0,
-				style().color.checkers1,
+				get_current_style().color.checkers0,
+				get_current_style().color.checkers1,
 			)
 			color.a = 255
 			time := clamp(value^, 0, 1)
 			pos := box.lo[i] + (box.hi[i] - box.lo[i] - 4) * time
 			if axis == .Y {
-				vgo.fill_box(
+				kn.fill_box(
 					box,
-					paint = vgo.make_linear_gradient(
+					paint = kn.make_linear_gradient(
 						box.lo,
 						{box.lo.x, box.hi.y},
-						vgo.fade(color, 0.0),
+						kn.fade(color, 0.0),
 						color,
 					),
 				)
-				vgo.stroke_box(
+				kn.stroke_box(
 					{{box.lo.x, pos}, {box.hi.x, pos + 4}},
 					1,
-					paint = style().color.content,
+					paint = get_current_style().color.content,
 				)
 			}
 		}
@@ -263,7 +260,6 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 	}
 	object := get_object(hash(loc))
 	object.size = 200
-	object.box = next_box(object.size)
 	if begin_object(object) {
 		defer end_object()
 
@@ -310,11 +306,11 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 		}
 
 		if object_is_visible(object) {
-			vgo.stroke_circle(
+			kn.stroke_circle(
 				center,
 				outer_radius,
 				width = (outer_radius - inner_radius),
-				paint = vgo.make_wheel_gradient(center),
+				paint = kn.make_wheel_gradient(center),
 			)
 
 			point_a, point_b, point_c := make_a_triangle(
@@ -323,11 +319,11 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 				inner_radius,
 			)
 
-			vgo.fill_polygon(
+			kn.fill_polygon(
 				{point_a, point_b, point_c},
-				paint = vgo.make_tri_gradient(
+				paint = kn.make_tri_gradient(
 					{point_a, point_b, point_c},
-					{vgo.color_from_hsva({value.x, 1, 1, 1}), vgo.Black, vgo.White},
+					{kn.color_from_hsva({value.x, 1, 1, 1}), kn.Black, kn.White},
 				),
 			)
 
@@ -338,8 +334,8 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 			)
 			r: f32 =
 				9 if (object.state.current >= {.Pressed} && .Active not_in object.state.current) else 7
-			vgo.fill_circle(point, r + 1, paint = vgo.Black if value.z > 0.5 else vgo.White)
-			vgo.fill_circle(point, r, paint = vgo.color_from_hsva({value.x, value.y, value.z, 1}))
+			kn.fill_circle(point, r + 1, paint = kn.Black if value.z > 0.5 else kn.White)
+			kn.fill_circle(point, r, paint = kn.color_from_hsva({value.x, value.y, value.z, 1}))
 		}
 	}
 	return

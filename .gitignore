@@ -4,3 +4,4 @@ odinfmt.json
 *.sh
 *.pdb
 *.dll
+example/example

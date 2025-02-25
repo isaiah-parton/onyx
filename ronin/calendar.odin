@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -103,7 +103,6 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 
 	allow_range := to != nil
 
-	object.box = next_box(object.size)
 	object.state.input_mask = {}
 	object.flags += {.Sticky_Press, .Sticky_Hover}
 
@@ -111,53 +110,47 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 		defer end_object()
 
 		set_next_box(object.box)
-		begin_layout(.Top)
+		begin_layout(as_column)
 		defer end_layout()
 
 		push_id(object.id)
 		defer pop_id()
 
-		set_width(remaining_space().x)
-		set_height(header_height)
+		set_width(to_layout_width)
+		set_height(exactly(header_height))
 
-		if begin_layout(side = .Left) {
-			defer end_layout()
-
-			set_align(.Center)
-			set_width(0)
+		if do_layout(as_row) {
+			set_align(0.5)
+			set_width(whatever)
 			label(fmt.tprintf("%s %i", t.Month(page.month), page.year), align = 0.5)
-
-			set_side(.Right)
-			set_width_method(.Exact)
-			set_width(remaining_space().y)
-			if button(text = "\uE0F6", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
-				extras.page = todays_calendar_page()
-			}
-			if button(text = "\uE126", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
-				extras.page = move_calendar_page(page, 1)
-			}
-			if button(text = "\uE0fe", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
-				extras.page = move_calendar_page(page, -1)
+			set_width(to_layout_width)
+			if do_layout(right_to_left) {
+				set_width(to_layout_height)
+				if button(text = "\uE0F6", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
+					extras.page = todays_calendar_page()
+				}
+				if button(text = "\uE126", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
+					extras.page = move_calendar_page(page, 1)
+				}
+				if button(text = "\uE0fe", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
+					extras.page = move_calendar_page(page, -1)
+				}
 			}
 		}
 
-		set_height(row_height)
-		if begin_layout(side = .Left) {
-			defer end_layout()
-
-			set_width(remaining_space().x / 7)
+		set_height(exactly(row_height))
+		if do_layout(as_row, split_sevenths) {
 			WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
 			for weekday in WEEKDAY_ABBREVIATIONS {
-				label(text = weekday, align = 0.5, color = vgo.fade(style().color.content, 0.5))
+				label(text = weekday, align = 0.5, color = kn.fade(get_current_style().color.content, 0.5))
 			}
 		}
 
 		divider()
 
-		space(CALENDAR_WEEK_SPACING)
+		space()
 
-		layout := current_layout().?
-		calendar_box := layout.box
+		calendar_box := get_current_layout().box
 		row := clamp(int((mouse_point().y - calendar_box.lo.y) / (row_height + CALENDAR_WEEK_SPACING)), 0, how_many_weeks - 1)
 		column := clamp(int((mouse_point().x - calendar_box.lo.x) / (remaining_space().x / 7)), 0, 6)
 
@@ -178,70 +171,68 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 			object.state.current += {.Changed}
 		}
 
-		if begin_layout(side = .Left) {
-			set_width(remaining_space().x / 7)
-			defer end_layout()
+		if do_layout(as_row, split_sevenths) {
+
 
 			for i in 0 ..< how_many_days {
 				if (i > 0) && (i % 7 == 0) {
 					end_layout()
-					space(CALENDAR_WEEK_SPACING)
-					begin_layout(side = .Left)
-					set_width(remaining_space().x / 7)
+					space()
+					begin_layout(as_row, split_sevenths)
 				}
+
+				box := cut_layout(.Left, row_height)
 
 				cell_year, cell_month, cell_day := t.date(t.now())
 				ordinal_date := dt.ordinal_to_date(ordinal) or_continue
 
-				box := next_box({})
-
-				stroke_color := style().color.foreground_stroke
+				stroke_color := get_current_style().color.foreground_stroke
 				if from_ordinal <= ordinal && ordinal <= to_ordinal {
 					if from_ordinal < to_ordinal {
-						vgo.fill_box(
+						kn.fill_box(
 							box,
 							hstack_corner_radius(
 								int(ordinal - from_ordinal),
 								int(to_ordinal - from_ordinal) + 1,
 							) *
-							style().rounding,
-							vgo.fade(style().color.accent, 0.5),
+							get_current_style().rounding,
+							kn.fade(get_current_style().color.accent, 0.5),
 						)
 					}
 					if from_ordinal == ordinal || to_ordinal == ordinal {
-						vgo.fill_box(
+						kn.fill_box(
 							shrink_box(box, 1),
-							style().rounding,
-							paint = style().color.accent,
+							get_current_style().rounding,
+							paint = get_current_style().color.accent,
 						)
 					}
-					stroke_color = style().color.content
+					stroke_color = get_current_style().color.content
 				} else {
-					vgo.fill_box(
+					kn.fill_box(
 						box,
-						style().rounding,
-						paint = vgo.fade(
-							style().color.button,
+						get_current_style().rounding,
+						paint = kn.fade(
+							get_current_style().color.button,
 							0.5 * f32(i32(selected_ordinal == ordinal) & i32(.Hovered in object.state.current)),
 						),
 					)
 				}
 				if ordinal == today_ordinal {
-					vgo.stroke_box(
+					kn.stroke_box(
 						box,
 						1,
-						style().rounding,
+						get_current_style().rounding,
 						paint = stroke_color,
 					)
 				}
-				vgo.fill_text(
+				kn.fill_text(
 					fmt.tprint(ordinal_date.day),
-					style().default_text_size,
+					get_current_style().default_text_size,
 					box_center(box),
-					style().default_font,
+					get_current_style().default_font,
 					0.5,
-					paint = vgo.fade(
-						style().color.content,
+					paint = kn.fade(
+						get_current_style().color.content,
 						max(
 							0.5,
 							f32(i32(from_ordinal <= ordinal) & i32(to_ordinal >= ordinal)),
@@ -273,6 +264,7 @@ Date_Picker :: struct {
 
 date_picker :: proc(first, second: ^Maybe(Date), loc := #caller_location) {
 	object := get_object(hash(loc))
+	object.size = {3, 1} * get_current_style().scale
 	if begin_object(object) {
 		defer end_object()
 

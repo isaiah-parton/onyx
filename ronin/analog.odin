@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "base:intrinsics"
 import "core:fmt"
 import "core:math"
@@ -36,36 +36,32 @@ slider :: proc(
 	if value == nil {
 		return
 	}
-	object := get_object(hash(loc))
-	object.size = global_state.style.visual_size
-	if object.variant == nil {
-		object.variant = Slider{}
-		object.flags += {.Sticky_Press, .Sticky_Hover}
+	self := get_object(hash(loc))
+	self.size = get_current_style().scale
+	if self.variant == nil {
+		self.variant = Slider{}
+		self.flags += {.Sticky_Press, .Sticky_Hover}
 	}
-	extras := &object.variant.(Slider)
-	if begin_object(object) {
-		defer end_object()
-
-		object.box = next_box(object.size)
-
-		if point_in_box(mouse_point(), object.box) {
-			hover_object(object)
+	extras := &self.variant.(Slider)
+	if do_object(self) {
+		if point_in_box(mouse_point(), self.box) {
+			hover_object(self)
 		}
 
-		if object_was_clicked_in_place(object) {
+		if object_was_clicked_in_place(self) {
 			focus_next_object()
 		}
 
-		if .Pressed in object.state.current {
-			if .Pressed not_in object.state.previous {
+		if .Pressed in self.state.current {
+			if .Pressed not_in self.state.previous {
 				extras.click_value = f64(value^)
 			}
 			new_value := T(
 				clamp(
 					extras.click_value +
 					f64(
-						(global_state.mouse_pos.x - object.click.point.x) /
-						box_width(object.box),
+						(global_state.mouse_pos.x - self.click.point.x) /
+						box_width(self.box),
 					) *
 						f64(upper - lower),
 					max(lower, lower_limit),
@@ -73,52 +69,52 @@ slider :: proc(
 				),
 			)
 			if value^ != new_value {
-				object.state.current += {.Changed}
+				self.state.current += {.Changed}
 				value^ = new_value
 			}
 			draw_frames(1)
 		}
-		if .Hovered in object.state.current {
+		if .Hovered in self.state.current {
 			set_cursor(.Resize_EW)
 		}
-		if object_is_visible(object) {
-			radius := current_options().radius
-			vgo.push_scissor(vgo.make_box(object.box, radius))
-			vgo.fill_box(object.box, paint = style().color.button_background)
-			vgo.fill_box(
+		if object_is_visible(self) {
+			radius := get_current_options().radius
+			kn.push_scissor(kn.make_box(self.box, radius))
+			kn.fill_box(self.box, paint = get_current_style().color.button_background)
+			kn.fill_box(
 				get_box_cut_left(
-					object.box,
-					box_width(object.box) *
+					self.box,
+					box_width(self.box) *
 					f32(clamp((f64(value^) - lower) / (upper - lower), 0, 1)),
 				),
-				paint = style().color.button,
+				paint = get_current_style().color.button,
 			)
 			if lower_limit > lower {
 				x :=
-					object.box.lo.x +
-					f32((lower_limit - lower) / (upper - lower)) * box_width(object.box)
-				vgo.line({x, object.box.lo.y}, {x, object.box.hi.y}, 1, style().color.accent)
+					self.box.lo.x +
+					f32((lower_limit - lower) / (upper - lower)) * box_width(self.box)
+				kn.line({x, self.box.lo.y}, {x, self.box.hi.y}, 1, get_current_style().color.accent)
 			}
 			if upper_limit < upper {
 				x :=
-					object.box.lo.x +
-					f32((upper_limit - lower) / (upper - lower)) * box_width(object.box)
-				vgo.line({x, object.box.lo.y}, {x, object.box.hi.y}, 1, style().color.accent)
+					self.box.lo.x +
+					f32((upper_limit - lower) / (upper - lower)) * box_width(self.box)
+				kn.line({x, self.box.lo.y}, {x, self.box.hi.y}, 1, get_current_style().color.accent)
 			}
-			vgo.fill_text(
+			kn.fill_text(
 				fmt.tprintf(format, value^),
-				style().default_text_size,
-				box_center(object.box),
-				font = style().monospace_font,
+				get_current_style().default_text_size,
+				box_center(self.box),
+				font = get_current_style().monospace_font,
 				align = 0.5,
-				paint = style().color.content,
+				paint = get_current_style().color.content,
 			)
-			vgo.pop_scissor()
-			vgo.stroke_box(object.box, 1, current_options().radius, paint = style().color.button)
+			kn.pop_scissor()
+			kn.stroke_box(self.box, 1, get_current_options().radius, paint = get_current_style().color.button)
 		}
 
-		push_id(object.id)
-		set_next_box(object.box)
+		push_id(self.id)
+		set_next_box(self.box)
 		input(value, format, flags = {.Hidden_Unless_Active, .Select_All})
 		pop_id()
 	}
@@ -143,15 +139,13 @@ range_slider :: proc(
 		return
 	}
 	object := get_object(hash(loc))
-	object.size = global_state.style.visual_size * {1, 0.75}
-	object.box = next_box(object.size)
+	object.size = {1, 0.75} * get_current_style().scale
 	if object.variant == nil {
 		object.variant = Range_Slider{}
 		object.flags += {.Sticky_Press, .Sticky_Hover}
 	}
 	extras := &object.variant.(Range_Slider)
-	if begin_object(object) {
-		defer end_object()
+	if do_object(object) {
 
 		mouse := mouse_point()
 		is_visible := object_is_visible(object)
@@ -216,40 +210,40 @@ range_slider :: proc(
 		}
 
 		if is_visible {
-			radius := current_options().radius
-			vgo.push_scissor(vgo.make_box(object.box, radius))
-			vgo.fill_box(object.box, paint = style().color.field)
+			radius := get_current_options().radius
+			kn.push_scissor(kn.make_box(object.box, radius))
+			kn.fill_box(object.box, paint = get_current_style().color.field)
 			value_box := Box{{lower_x, object.box.lo.y}, {upper_x, object.box.hi.y}}
-			vgo.fill_box(
+			kn.fill_box(
 				value_box,
-				paint = style().color.button,
+				paint = get_current_style().color.button,
 			)
 			if .Hovered in object.state.current {
 				if hovered_index == 0 || key_down(.Left_Shift) {
-					vgo.fill_box({value_box.lo, {value_box.lo.x + 1, value_box.hi.y}}, paint = style().color.accent)
+					kn.fill_box({value_box.lo, {value_box.lo.x + 1, value_box.hi.y}}, paint = get_current_style().color.accent)
 				}
 				if hovered_index == 1 || key_down(.Left_Shift) {
-					vgo.fill_box({{value_box.hi.x - 1, value_box.lo.y}, {value_box.hi.x, value_box.hi.y}}, paint = style().color.accent)
+					kn.fill_box({{value_box.hi.x - 1, value_box.lo.y}, {value_box.hi.x, value_box.hi.y}}, paint = get_current_style().color.accent)
 				}
 			}
-			vgo.fill_text(
+			kn.fill_text(
 				fmt.tprintf(format, lower_value^),
-				style().default_text_size,
-				{object.box.lo.x + style().text_padding.x, box_center_y(object.box)},
-				font = style().monospace_font,
+				get_current_style().default_text_size,
+				{object.box.lo.x + get_current_style().text_padding.x, box_center_y(object.box)},
+				font = get_current_style().monospace_font,
 				align = {0, 0.5},
-				paint = style().color.content,
+				paint = get_current_style().color.content,
 			)
-			vgo.fill_text(
+			kn.fill_text(
 				fmt.tprintf(format, upper_value^),
-				style().default_text_size,
-				{object.box.hi.x - style().text_padding.x, box_center_y(object.box)},
-				font = style().monospace_font,
+				get_current_style().default_text_size,
+				{object.box.hi.x - get_current_style().text_padding.x, box_center_y(object.box)},
+				font = get_current_style().monospace_font,
 				align = {1, 0.5},
-				paint = style().color.content,
+				paint = get_current_style().color.content,
 			)
-			vgo.pop_scissor()
-			vgo.stroke_box(object.box, 1, current_options().radius, paint = style().color.button)
+			kn.pop_scissor()
+			kn.stroke_box(object.box, 1, get_current_options().radius, paint = get_current_style().color.button)
 
 			push_id(object.id)
 			push_options(default_options())
@@ -314,9 +308,9 @@ slider_handle :: proc(box: Box, shape: int, loc := #caller_location) -> (pressed
 					object.box.lo,
 				}
 			}
-			vgo.fill_polygon(
+			kn.fill_polygon(
 				vertices,
-				paint = style().color.accent if .Hovered in object.state.current else style().color.button,
+				paint = get_current_style().color.accent if .Hovered in object.state.current else get_current_style().color.button,
 			)
 		}
 
@@ -328,31 +322,29 @@ slider_handle :: proc(box: Box, shape: int, loc := #caller_location) -> (pressed
 	return
 }
 
-progress_bar :: proc(time: f32, color: vgo.Color = style().color.accent, loc := #caller_location) {
+progress_bar :: proc(time: f32, color: kn.Color = get_current_style().color.accent, loc := #caller_location) {
 	time := clamp(time, 0, 1)
 	object := get_object(hash(loc))
-	object.size = global_state.style.visual_size * {1, 0.5}
-	object.box = next_box(object.size)
+	object.size = {5, 1} * get_current_style().scale
 	if begin_object(object) {
 		if object_is_visible(object) {
-			radius := current_options().radius
-			vgo.fill_box(object.box, radius, paint = style().color.background)
-			vgo.push_scissor(vgo.make_box(object.box, radius))
-			vgo.fill_box(
+			radius := get_current_options().radius
+			kn.fill_box(object.box, radius, paint = get_current_style().color.background)
+			kn.push_scissor(kn.make_box(object.box, radius))
+			kn.fill_box(
 				{object.box.lo, {object.box.lo.x + box_width(object.box) * time, object.box.hi.y}},
 				paint = color,
 			)
-			vgo.pop_scissor()
+			kn.pop_scissor()
 		}
 		end_object()
 	}
 }
 
-dial :: proc(time: f32, color: vgo.Color = style().color.accent, loc := #caller_location) {
+dial :: proc(time: f32, color: kn.Color = get_current_style().color.accent, loc := #caller_location) {
 	time := clamp(time, 0, 1)
 	object := get_object(hash(loc))
-	object.size = style().visual_size.y * 2
-	object.box = next_box(object.size)
+	object.size = get_current_style().scale * 2
 	if begin_object(object) {
 		if object_is_visible(object) {
 			width := f32(4)
@@ -363,15 +355,15 @@ dial :: proc(time: f32, color: vgo.Color = style().color.accent, loc := #caller_
 			start_angle := f32(math.PI * 0.75)
 			end_angle := f32(math.PI * 2.25)
 
-			arc_shape := vgo.make_arc(center, start_angle, end_angle, radius - width, radius)
+			arc_shape := kn.make_arc(center, start_angle, end_angle, radius - width, radius)
 
 			start_angle -= extra_angle
 			end_angle += extra_angle
 
-			arc_shape.paint = vgo.paint_index_from_option(style().color.background)
-			vgo.add_shape(arc_shape)
-			vgo.push_scissor(arc_shape)
-			vgo.arc(
+			arc_shape.paint = kn.paint_index_from_option(get_current_style().color.background)
+			kn.add_shape(arc_shape)
+			kn.push_scissor(arc_shape)
+			kn.arc(
 				center,
 				start_angle,
 				start_angle + (end_angle - start_angle) * time,
@@ -380,31 +372,29 @@ dial :: proc(time: f32, color: vgo.Color = style().color.accent, loc := #caller_
 				square = true,
 				paint = color,
 			)
-			vgo.pop_scissor()
+			kn.pop_scissor()
 		}
 		end_object()
 	}
 }
 
-pie :: proc(values: []f32, total: f32, colors: []vgo.Color = {}, loc := #caller_location) {
-	object := get_object(hash(loc))
-	object.size = style().visual_size.y * 2
-	object.box = next_box(object.size)
-	if begin_object(object) {
-		if object_is_visible(object) {
-			radius := min(box_width(object.box), box_height(object.box)) / 2
-			center := box_center(object.box)
+pie :: proc(values: []f32, total: f32, colors: []kn.Color = {}, loc := #caller_location) {
+	self := get_object(hash(loc))
+	self.size = get_current_style().scale * 2
+	if do_object(self) {
+		if object_is_visible(self) {
+		radius := min(box_width(self.box), box_height(self.box)) / 2
+		center := box_center(self.box)
 			angle := f32(0)
 			for value, i in values {
 				slice_angle := (value / total) * math.TAU
-				slice_color := style().color.accent
+				slice_color := get_current_style().color.accent
 				if len(colors) > 0 {
 					slice_color = colors[i % len(colors)]
 				}
-				vgo.fill_pie(center, angle, angle + slice_angle, radius, paint = slice_color)
+				kn.fill_pie(center, angle, angle + slice_angle, radius, paint = slice_color)
 				angle += slice_angle
 			}
 		}
-		end_object()
 	}
 }

@@ -8,7 +8,7 @@ package onyx
 //
 // All layers are stored contiguously in the order they are to be rendered
 // a layer's index is an important value and must always be valid
-import "../vgo"
+import kn "../../katana/katana"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -211,7 +211,7 @@ begin_layer :: proc(
 	global_state.highest_layer_index = max(global_state.highest_layer_index, layer.index)
 
 	push_stack(&global_state.layer_stack, layer)
-	vgo.set_draw_order(layer.index)
+	kn.set_draw_order(layer.index)
 
 	return true
 }
@@ -219,7 +219,7 @@ begin_layer :: proc(
 end_layer :: proc() {
 	pop_stack(&global_state.layer_stack)
 	if layer, ok := current_layer().?; ok {
-		vgo.set_draw_order(layer.index)
+		kn.set_draw_order(layer.index)
 	}
 }
 

@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "base:runtime"
 import "core:fmt"
 import "core:math/linalg"
@@ -98,29 +98,29 @@ profiler_end_scope :: proc(scope: Profiler_Scope) {
 
 @(private)
 draw_object_debug_margin :: proc(box: Box, margin: [4]f32) {
-	vgo.set_paint(vgo.fade(vgo.Yellow, 0.5))
-	if margin.x > 0 do vgo.fill_box(attach_box_left(box, margin.x))
-	if margin.y > 0 do vgo.fill_box(attach_box_top(box, margin.y))
-	if margin.z > 0 do vgo.fill_box(attach_box_right(box, margin.z))
-	if margin.w > 0 do vgo.fill_box(attach_box_bottom(box, margin.w))
+	kn.set_paint(kn.fade(kn.Yellow, 0.5))
+	if margin.x > 0 do kn.fill_box(attach_box_left(box, margin.x))
+	if margin.y > 0 do kn.fill_box(attach_box_top(box, margin.y))
+	if margin.z > 0 do kn.fill_box(attach_box_right(box, margin.z))
+	if margin.w > 0 do kn.fill_box(attach_box_bottom(box, margin.w))
 }
 
 @(private)
 draw_object_debug_padding :: proc(box: Box, padding: [4]f32) {
 	box := box
-	vgo.set_paint(vgo.fade(vgo.Turquoise, 0.5))
-	if padding.x > 0 do vgo.fill_box(cut_box_left(&box, padding.x))
-	if padding.y > 0 do vgo.fill_box(cut_box_top(&box, padding.y))
-	if padding.z > 0 do vgo.fill_box(cut_box_right(&box, padding.z))
-	if padding.w > 0 do vgo.fill_box(cut_box_bottom(&box, padding.w))
+	kn.set_paint(kn.fade(kn.Turquoise, 0.5))
+	if padding.x > 0 do kn.fill_box(cut_box_left(&box, padding.x))
+	if padding.y > 0 do kn.fill_box(cut_box_top(&box, padding.y))
+	if padding.z > 0 do kn.fill_box(cut_box_right(&box, padding.z))
+	if padding.w > 0 do kn.fill_box(cut_box_bottom(&box, padding.w))
 }
 
 @(private)
 draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
 	if object_is_being_debugged(state, object) {
-		vgo.fill_box(object.box, paint = vgo.fade(vgo.Blue, 0.25))
+		kn.fill_box(object.box, paint = kn.fade(kn.Blue, 0.25))
 	}
-	vgo.stroke_box(object.box, 1, paint = vgo.Blue)
+	kn.stroke_box(object.box, 1, paint = kn.Blue)
 }
 
 @(private)
@@ -167,54 +167,54 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 
 	if global_state.hovered_object != 0 {
 		if object, ok := global_state.object_map[global_state.hovered_object]; ok {
-			vgo.stroke_box(object.box, 1, paint = vgo.White)
+			kn.stroke_box(object.box, 1, paint = kn.White)
 		}
 	}
 
 	if state.wireframe {
-		vgo.reset_drawing()
+		kn.reset_drawing()
 		draw_object_debug_boxes(state^)
 	} else {
-		vgo.set_draw_order(1000)
+		kn.set_draw_order(1000)
 	}
 
 	DEBUG_TEXT_SIZE :: 14
-	vgo.set_paint(vgo.White)
-	vgo.set_font(global_state.style.monospace_font)
+	kn.set_paint(kn.White)
+	kn.set_font(global_state.style.monospace_font)
 
 	{
 		total: time.Duration
 		b := strings.builder_make(context.temp_allocator)
-		fmt.sbprintf(&b, "FPS: %.0f", vgo.get_fps())
+		fmt.sbprintf(&b, "FPS: %.0f", kn.get_fps())
 		for scope, s in Profiler_Scope {
 			total += __prof.d[scope]
 			fmt.sbprintf(&b, "\n%v: %.3fms", scope, time.duration_milliseconds(__prof.d[scope]))
 			if scope == .Render {
-				for timer in vgo.Debug_Timer {
+				for timer in kn.Debug_Timer {
 					fmt.sbprintf(
 						&b,
 						"\n  %v: %.3fms",
 						timer,
-						time.duration_milliseconds(vgo.renderer().timers[timer]),
+						time.duration_milliseconds(kn.renderer().timers[timer]),
 					)
 				}
 			}
 		}
 		fmt.sbprintf(&b, "\nTotal: %.3fms", time.duration_milliseconds(total))
-		fmt.sbprintf(&b, "\nShapes: %i", len(vgo.renderer().shapes.data))
-		fmt.sbprintf(&b, "\nPaints: %i", len(vgo.renderer().paints.data))
-		fmt.sbprintf(&b, "\nMatrices: %i", len(vgo.renderer().xforms.data))
-		fmt.sbprintf(&b, "\nControl Vertices: %i", len(vgo.renderer().cvs.data))
-		fmt.sbprintf(&b, "\nDraw calls: %i", vgo.draw_call_count())
+		fmt.sbprintf(&b, "\nShapes: %i", len(kn.renderer().shapes.data))
+		fmt.sbprintf(&b, "\nPaints: %i", len(kn.renderer().paints.data))
+		fmt.sbprintf(&b, "\nMatrices: %i", len(kn.renderer().xforms.data))
+		fmt.sbprintf(&b, "\nControl Vertices: %i", len(kn.renderer().cvs.data))
+		fmt.sbprintf(&b, "\nDraw calls: %i", kn.draw_call_count())
 		fmt.sbprintf(&b, "\nObjects: %i", len(global_state.objects))
 		fmt.sbprintf(&b, "\nLayers: %i", len(global_state.layer_array))
 		fmt.sbprintf(&b, "\nPanels: %i", len(global_state.panel_map))
-		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 1, paint = vgo.Black)
-		vgo.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 0)
+		kn.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 1, paint = kn.Black)
+		kn.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 0)
 	}
 
 	{
-		text_layout := vgo.make_text_layout(
+		text_layout := kn.make_text_layout(
 			fmt.tprintf(
 				"Scroll = Cycle objects\nF3 = Exit debug\nF6 = Turn %s FPS cap\nF7 = Toggle wireframes",
 				"on" if global_state.disable_frame_skip else "off",
@@ -223,7 +223,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			font = global_state.style.monospace_font,
 		)
 		origin := [2]f32{0, global_state.view.y}
-		vgo.fill_text_layout(text_layout, origin, align = {0, 1})
+		kn.fill_text_layout(text_layout, origin, align = {0, 1})
 	}
 
 	if object, ok := currently_debugged_object(state^); ok {
@@ -241,7 +241,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		)
 
 		variant_typeid := reflect.union_variant_typeid(object.variant)
-		header_text_layout := vgo.make_text_layout(
+		header_text_layout := kn.make_text_layout(
 			fmt.tprintf(
 				"%i/%i: %v",
 				state.hovered_object_index + 1,
@@ -250,17 +250,17 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			),
 			DEBUG_TEXT_SIZE,
 		)
-		info_text_layout := vgo.make_text_layout(strings.to_string(b), DEBUG_TEXT_SIZE)
+		info_text_layout := kn.make_text_layout(strings.to_string(b), DEBUG_TEXT_SIZE)
 		size := info_text_layout.size + {0, header_text_layout.size.y}
 		origin := linalg.clamp(mouse_point() + 10, 0, global_state.view - size)
 
-		vgo.fill_box({origin, origin + size}, paint = vgo.fade(vgo.Black, 0.75))
-		vgo.fill_box({origin, origin + header_text_layout.size}, paint = vgo.Blue)
-		vgo.fill_text_layout(header_text_layout, origin, paint = vgo.Black)
-		vgo.fill_text_layout(
+		kn.fill_box({origin, origin + size}, paint = kn.fade(kn.Black, 0.75))
+		kn.fill_box({origin, origin + header_text_layout.size}, paint = kn.Blue)
+		kn.fill_text_layout(header_text_layout, origin, paint = kn.Black)
+		kn.fill_text_layout(
 			info_text_layout,
 			origin + {0, header_text_layout.size.y},
-			paint = vgo.White,
+			paint = kn.White,
 		)
 	}
 }

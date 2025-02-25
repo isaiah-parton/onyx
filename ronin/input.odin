@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
@@ -110,10 +110,9 @@ raw_input :: proc(
 		object.flags += {.Is_Input, .Sticky_Press, .Sticky_Hover}
 		object.input.builder = strings.builder_make()
 	}
-	object.size = style().visual_size
-	object.box = next_box(object.size)
+	object.size = get_current_style().scale * [2]f32{3, 1}
 
-	if begin_object(object) {
+	if do_object(object) {
 
 		content_string: string
 		if .Active not_in object.state.current {
@@ -133,11 +132,11 @@ raw_input :: proc(
 		obfuscated := .Obfuscated in flags
 		monospace := .Monospace in flags
 
-		style := style()
+		style := get_current_style()
 		text_size := style.content_text_size
 		text_font := (style.monospace_font if (monospace) else style.default_font)
 
-		vgo.set_font(text_font)
+		kn.set_font(text_font)
 
 		text_origin: [2]f32
 		if multiline {
@@ -149,9 +148,9 @@ raw_input :: proc(
 			}
 		}
 
-		content_layout, prefix_layout: vgo.Text_Layout
+		content_layout, prefix_layout: kn.Text_Layout
 		if len(prefix) > 0 {
-			prefix_layout = vgo.make_text_layout(prefix, text_size)
+			prefix_layout = kn.make_text_layout(prefix, text_size)
 			text_origin.x += prefix_layout.size.x
 		}
 
@@ -184,9 +183,9 @@ raw_input :: proc(
 			}
 
 			if is_visible {
-				options := vgo.DEFAULT_TEXT_OPTIONS
+				options := kn.DEFAULT_TEXT_OPTIONS
 				options.obfuscated = obfuscated
-				content_layout = vgo.make_text_layout(
+				content_layout = kn.make_text_layout(
 					content_string,
 					text_size,
 					selection = object.input.editor.selection,
@@ -327,41 +326,41 @@ raw_input :: proc(
 
 			text_origin -= object.input.offset
 			if object_is_visible(object) {
-				vgo.fill_box(object.box, current_options().radius, paint = style.color.field)
-				vgo.push_scissor(vgo.make_box(object.box, current_options().radius))
+				kn.fill_box(object.box, get_current_options().radius, paint = style.color.field)
+				kn.push_scissor(kn.make_box(object.box, get_current_options().radius))
 				if len(content_string) == 0 {
-					vgo.fill_text(
+					kn.fill_text(
 						placeholder,
 						text_size,
 						text_origin,
-						paint = vgo.fade(style.color.content, 0.5),
+						paint = kn.fade(style.color.content, 0.5),
 					)
 				}
-				if !vgo.text_layout_is_empty(&prefix_layout) {
-					vgo.fill_text_layout(
+				if !kn.text_layout_is_empty(&prefix_layout) {
+					kn.fill_text_layout(
 						prefix_layout,
 						text_origin + {-prefix_layout.size.x, 0},
-						paint = vgo.fade(style.color.content, 0.5),
+						paint = kn.fade(style.color.content, 0.5),
 					)
 				}
 				if .Active in object.state.previous {
 					draw_text_layout_highlight(
 						content_layout,
 						text_origin,
-						vgo.fade(style.color.accent, 1.0 / 3.0),
+						kn.fade(style.color.accent, 1.0 / 3.0),
 					)
 					if len(object.input.closest_match) > 0 {
-						text_layout := vgo.make_text_layout(object.input.closest_match, text_size)
-						vgo.fill_text_layout_range(text_layout, {len(content_layout.glyphs) - 1, len(text_layout.glyphs)}, text_origin, paint = vgo.fade(style.color.content, 0.5))
+						text_layout := kn.make_text_layout(object.input.closest_match, text_size)
+						kn.fill_text_layout_range(text_layout, {len(content_layout.glyphs) - 1, len(text_layout.glyphs)}, text_origin, paint = kn.fade(style.color.content, 0.5))
 					}
 				}
-				vgo.fill_text_layout(content_layout, text_origin, paint = style.color.content)
+				kn.fill_text_layout(content_layout, text_origin, paint = style.color.content)
 				if .Active in object.state.previous {
 					draw_frames(1)
 					draw_text_layout_cursor(
 						content_layout,
 						text_origin,
-						vgo.fade(
+						kn.fade(
 							style.color.accent,
 							clamp(
 								0.5 +
@@ -378,12 +377,12 @@ raw_input :: proc(
 						),
 					)
 				}
-				vgo.pop_scissor()
+				kn.pop_scissor()
 				if .Undecorated not_in flags {
-					vgo.stroke_box(
+					kn.stroke_box(
 						object.box,
 						1,
-						radius = current_options().radius,
+						radius = get_current_options().radius,
 						paint = style.color.accent if .Active in object.state.current else style.color.button,
 					)
 				}
@@ -415,8 +414,6 @@ raw_input :: proc(
 			}
 			result.changed = replace_input_content(data, type_info, strings.to_string(object.input.builder))
 		}
-
-		end_object()
 	}
 	return
 }
@@ -489,13 +486,13 @@ replace_input_content :: proc(
 	return true
 }
 
-draw_text_layout_cursor :: proc(layout: vgo.Text_Layout, origin: [2]f32, color: vgo.Color) {
+draw_text_layout_cursor :: proc(layout: kn.Text_Layout, origin: [2]f32, color: kn.Color) {
 	if len(layout.glyphs) == 0 {
 		return
 	}
 	line_height := layout.font.line_height * layout.font_scale
 	cursor_origin := origin + layout.glyphs[layout.glyph_selection[0]].offset
-	vgo.fill_box(
+	kn.fill_box(
 		snapped_box(
 			{
 				{cursor_origin.x - 1, cursor_origin.y},
@@ -506,7 +503,7 @@ draw_text_layout_cursor :: proc(layout: vgo.Text_Layout, origin: [2]f32, color: 
 	)
 }
 
-draw_text_layout_highlight :: proc(layout: vgo.Text_Layout, origin: [2]f32, color: vgo.Color) {
+draw_text_layout_highlight :: proc(layout: kn.Text_Layout, origin: [2]f32, color: kn.Color) {
 	if layout.glyph_selection[0] == layout.glyph_selection[1] {
 		return
 	}
@@ -533,7 +530,7 @@ draw_text_layout_highlight :: proc(layout: vgo.Text_Layout, origin: [2]f32, colo
 				layout.font.space_advance *
 				layout.font_scale *
 				f32(i32(selection_range.y > line.glyph_range.y))
-			vgo.fill_box(snapped_box(box), paint = color)
+			kn.fill_box(snapped_box(box), paint = color)
 		}
 	}
 }

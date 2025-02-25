@@ -1,7 +1,7 @@
 package demo
 
-import "../"
-import "../../vgo"
+import "../ronin"
+import kn "../../katana/katana"
 import "core:encoding/json"
 import "core:os"
 import "core:fmt"
@@ -29,7 +29,7 @@ destroy_icon_section_state :: proc(state: ^Icon_Section_State) {
 }
 
 icon_section :: proc(state: ^Icon_Section_State) {
-	using onyx
+	using ronin
 
 	first_icon :: rune(0xE000)
 
@@ -55,10 +55,10 @@ icon_section :: proc(state: ^Icon_Section_State) {
 	state.display_size = max(state.display_size, 10)
 
 	shrink(10)
-	set_width(remaining_space().x)
-	set_height(style().visual_size.y)
-	if begin_layout(.Left) {
-		set_size(0)
+	set_width(to_layout_width)
+	set_height(to_scale(1))
+	if do_layout(left_to_right) {
+		set_size(that_of_object)
 		if input(&state.query, placeholder = "Search for icons").changed || len(state.shown_icons) == 0 {
 			lowercase_query := strings.to_lower(state.query, allocator = context.temp_allocator)
 			clear(&state.shown_icons)
@@ -68,121 +68,117 @@ icon_section :: proc(state: ^Icon_Section_State) {
 				}
 			}
 		}
-		space(10)
-		set_align(.Center)
+		space()
+		set_align(0.5)
 		if len(state.query) > 0 {
 			label(fmt.tprintf("Showing %i/%i icons", len(state.shown_icons), int(last_icon - first_icon) + 1))
 		}
-		end_layout()
 	}
-	space(10)
+	space()
 	divider()
-	space(10)
+	space()
 
-	set_side(.Right)
-	set_width(240)
-	set_height(remaining_space().y)
-	if begin_layout(.Top) {
-		set_width(remaining_space().x)
+	set_width(exactly(240))
+	set_height(to_layout_height)
+	if do_layout(top_to_bottom) {
+		set_width(to_layout_width)
 		if state.selected_icon > 0 {
-			set_height(remaining_space().x)
-			if begin_layout(.Top) {
+			set_height(to_layout_width)
+			if do_layout(as_column) {
 				background()
-				set_size(remaining_space())
+				set_size(to_layout_size)
 				icon(state.selected_icon, size = state.display_size)
-				end_layout()
 			}
-			set_height(0)
-			space(10)
+			set_height(whatever)
+			space()
 			slider(&state.display_size, 10, 80)
-			space(10)
+			space()
 			label(state.icon_names[int(state.selected_icon - first_icon)])
-			space(10)
+			space()
 			label(fmt.tprintf("\\u%x", state.selected_icon))
 		}
-		end_layout()
 	}
-	space(20)
+	space()
 
 	icon_size := f32(40)
 	icon_cell_size := f32(80)
 	how_many_icons := len(state.shown_icons)
 	how_many_columns := int(math.floor((remaining_space().x - 12) / icon_cell_size))
 	how_many_rows := int(math.ceil(f32(how_many_icons) / f32(how_many_columns)))
-	set_size(remaining_space())
+	set_size(to_layout_size)
 	if begin_container(
 		space = [2]f32{f32(how_many_columns), f32(how_many_rows)} * icon_cell_size,
 	) {
 		shrink(6)
 
-		container_object := current_object().?
-		vgo.fill_box(container_object.box, style().rounding, paint = style().color.background)
-		vgo.stroke_box(
-			container_object.box,
-			1,
-			style().rounding,
-			paint = style().color.foreground_stroke,
-		)
+		if container_object, ok := get_current_object(); ok {
+			kn.fill_box(container_object.box, get_current_style().rounding, paint = get_current_style().color.background)
+			kn.stroke_box(
+				container_object.box,
+				1,
+				get_current_style().rounding,
+				paint = get_current_style().color.foreground_stroke,
+			)
 
-		set_width(remaining_space().x)
-		set_height(icon_cell_size)
-		for i in 0..<how_many_rows {
-			begin_layout(.Left) or_continue
-			defer end_layout()
+			set_width(to_layout_width)
+			set_height(exactly(icon_cell_size))
+			for i in 0..<how_many_rows {
+				begin_layout(as_row) or_continue
+				defer end_layout()
 
-			set_width(icon_cell_size)
-			if get_clip(view_box(), current_layout().?.box) == .Full {
-				continue
-			}
+				set_width(icon_cell_size)
+				if get_clip(view_box(), get_current_layout().box) == .Full {
+					continue
+				}
 
-			for j in (i * how_many_columns)..<min((i + 1) * how_many_columns, how_many_icons) {
-				icon := state.shown_icons[j]
+				for j in (i * how_many_columns)..<min((i + 1) * how_many_columns, how_many_icons) {
+					icon := state.shown_icons[j]
 
-				object := get_object(hash(int(icon)))
-				object.box = next_box({})
+					object := get_object(hash(int(icon)))
 
-				begin_object(object) or_continue
-				defer end_object()
+					begin_object(object) or_continue
+					defer end_object()
 
-				if object_is_visible(object) {
-					object.hover_time = animate(
-						object.hover_time,
-						0.1,
-						.Hovered in object.state.current,
-					)
-					if point_in_box(mouse_point(), object.box) {
-						hover_object(object)
-					}
-					if .Clicked in object.state.current {
-						set_clipboard_string(fmt.tprintf("\\u%x", icon))
-						state.selected_icon = icon
-					}
-					vgo.fill_box(
-						object.box,
-						style().rounding,
-						vgo.fade(style().color.button, 0.5 * object.hover_time),
-					)
-					vgo.stroke_box(
-						object.box,
-						1,
-						style().rounding,
-						vgo.fade(style().color.foreground_stroke, object.hover_time),
-					)
-					size := icon_size * (1.0 + 0.2 * object.hover_time)
-					font := style().icon_font
-					if glyph, ok := vgo.get_font_glyph(font, icon);
-					   ok {
-						vgo.fill_glyph(
-							glyph,
-							size,
-							linalg.floor(box_center(object.box)) - size / 2 + {0, -size * (font.line_height - font.ascend)},
-							paint = style().color.content,
+					if object_is_visible(object) {
+						object.animation.hover = animate(
+						object.animation.hover,
+							0.1,
+							.Hovered in object.state.current,
 						)
+						if point_in_box(mouse_point(), object.box) {
+							hover_object(object)
+						}
+						if .Clicked in object.state.current {
+							set_clipboard_string(fmt.tprintf("\\u%x", icon))
+							state.selected_icon = icon
+						}
+						kn.fill_box(
+							object.box,
+							get_current_style().rounding,
+							kn.fade(get_current_style().color.button, 0.5 * object.animation.hover),
+						)
+						kn.stroke_box(
+							object.box,
+							1,
+							get_current_style().rounding,
+							kn.fade(get_current_style().color.foreground_stroke, object.animation.hover),
+						)
+						size := icon_size// * (1.0 + 0.2 * object.hover_time)
+						font := get_current_style().icon_font
+						if glyph, ok := kn.get_font_glyph(font, icon);
+						   ok {
+							kn.fill_glyph(
+								glyph,
+								size,
+								linalg.floor(box_center(object.box)) - size / 2 + {0, -size * (font.line_height - font.ascend)},
+								paint = get_current_style().color.content,
+							)
+						}
 					}
 				}
 			}
+			pop_id()
 		}
-		pop_id()
 
 		end_container()
 	}

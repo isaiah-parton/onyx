@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "tedit"
 import "core:strings"
 import "core:fmt"
@@ -21,16 +21,16 @@ paragraph :: proc(
 	font_size := global_state.style.default_text_size,
 	font := global_state.style.default_font,
 	align: [2]f32 = 0,
-	color: vgo.Color = style().color.content,
+	color: kn.Color = get_current_style().color.content,
 	loc := #caller_location,
 ) {
 	object := get_object(hash(loc))
-	text_layout := vgo.make_text_layout(
+	text_layout := kn.make_text_layout(
 		text,
 		font_size,
 		font,
 	)
-	object.box = next_box(text_layout.size)
+
 	if begin_object(object) {
 		if object_is_visible(object) {
 			text_origin := object.box.lo
@@ -53,10 +53,10 @@ paragraph :: proc(
 						text_layout.font.space_advance *
 						text_layout.font_scale *
 						f32(i32(selection_range.y > line.glyph_range.y))
-					vgo.fill_box(snapped_box(box), paint = color)
+					kn.fill_box(snapped_box(box), paint = color)
 				}
 			}
-			vgo.fill_text_layout(text_layout, text_origin, paint = style().color.accent if .Hovered in object.state.current else style().color.content)
+			kn.fill_text_layout(text_layout, text_origin, paint = get_current_style().color.accent if .Hovered in object.state.current else get_current_style().color.content)
 		}
 		end_object()
 	}
@@ -68,24 +68,23 @@ label :: proc(
 	font := global_state.style.default_font,
 	align: [2]f32 = 0,
 	padding: [2]f32 = 0,
-	color: vgo.Color = style().color.content,
+	color: kn.Color = get_current_style().color.content,
 	loc := #caller_location,
 ) {
-	text_layout := vgo.make_text_layout(
+	text_layout := kn.make_text_layout(
 		text,
 		font_size,
 		font,
 	)
-	object := get_object(hash(loc))
-	object.size = text_layout.size
-	object.box = next_box(object.size)
-	if begin_object(object) {
-		if object_is_visible(object) {
-			if point_in_box(mouse_point(), object.box) {
-				hover_object(object)
+	self := get_object(hash(loc))
+	self.size = text_layout.size
+	if begin_object(self) {
+		if object_is_visible(self) {
+			if point_in_box(mouse_point(), self.box) {
+				hover_object(self)
 			}
-			box := shrink_box(object.box, padding)
-			vgo.fill_text_layout(text_layout, linalg.lerp(box.lo, box.hi, align), paint = color, align = align)
+			box := shrink_box(self.box, padding)
+			kn.fill_text_layout(text_layout, linalg.lerp(box.lo, box.hi, align), paint = color, align = align)
 		}
 		end_object()
 	}
@@ -99,17 +98,20 @@ header :: proc(text: string) {
 	)
 }
 
-icon :: proc(which_one: rune, size: f32 = global_state.style.icon_size) -> bool {
-	font := style().icon_font
-	glyph := vgo.get_font_glyph(font, which_one) or_return
-	box := next_box({glyph.advance * size, font.line_height * size})
-	if get_clip(current_clip(), box) != .Full {
-		vgo.fill_glyph(glyph, size, linalg.floor(box_center(box)) - size / 2, style().color.content)
+icon :: proc(which_one: rune, size: f32 = global_state.style.icon_size, loc := #caller_location) {
+	font := get_current_style().icon_font
+	if glyph, ok := kn.get_font_glyph(font, which_one); ok {
+		object := get_object(hash(loc))
+		object.size = {glyph.advance * size, font.line_height * size}
+		if do_object(object) {
+			if get_clip(current_clip(), object.box) != .Full {
+			kn.fill_glyph(glyph, size, linalg.floor(box_center(object.box)) - size / 2, get_current_style().color.content)
+			}
+		}
 	}
-	return true
 }
 
-text_mouse_selection :: proc(object: ^Object, content: string, layout: ^vgo.Text_Layout) {
+text_mouse_selection :: proc(object: ^Object, content: string, layout: ^kn.Text_Layout) {
 	is_separator :: proc(r: rune) -> bool {
 		return !unicode.is_alpha(r) && !unicode.is_number(r)
 	}

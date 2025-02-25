@@ -1,11 +1,11 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "base:intrinsics"
 import "core:math"
 import "core:math/linalg"
 
-Box :: vgo.Box
+Box :: kn.Box
 
 Alignment :: enum {
 	Near,

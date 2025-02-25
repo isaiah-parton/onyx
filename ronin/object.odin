@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "base:intrinsics"
 import "base:runtime"
 import "core:container/small_array"
@@ -51,7 +51,7 @@ OBJECT_STATE_ALL :: Object_Status_Set {
 
 Object_Options :: struct {
 	rounded_corners:  [4]f32,
-	background_color: vgo.Color,
+	background_color: kn.Color,
 	disabled:         bool,
 }
 
@@ -68,25 +68,25 @@ Object_Variant :: union {
 }
 
 Object :: struct {
-	id:              Id,
-	call_index:      int,
-	frames:          int,
-	size:            [2]f32,
-	layer:           ^Layer,
-	box:             Box,
-	cut_side: Side,
-	dead:            bool,
-	disabled:        bool,
-	isolated:        bool,
-	will_be_hovered: bool,
-	flags:           Object_Flags,
-	state:           Object_State,
-	click:           Object_Click,
-	input:           Input_State,
-	variant:         Object_Variant,
-	hovered_time:    time.Time,
-	hover_time:      f32,
-	press_time:      f32,
+	box:           Box,
+	side:          Side,
+	id:            Id,
+	layer:         ^Layer,
+	call_index:    int,
+	frames:        int,
+	cut_size:      [2]f32,
+	size:          [2]f32,
+	size_is_fixed: bool,
+	dead:          bool,
+	disabled:      bool,
+	isolated:      bool,
+	hovered_time: time.Time,
+	flags:         Object_Flags,
+	state:         Object_State,
+	click:         Object_Click,
+	input:         Input_State,
+	animation:     Object_Animation,
+	variant:       Object_Variant,
 }
 
 Object_State :: struct {
@@ -103,7 +103,11 @@ Object_Click :: struct {
 	press_time:   time.Time,
 	point:        [2]f32,
 	button:       Mouse_Button,
-	mods: Mod_Keys,
+	mods:         Mod_Keys,
+}
+
+Object_Animation :: struct {
+	hover, press: f32,
 }
 
 Mod_Key :: enum {
@@ -159,11 +163,11 @@ update_object_references :: proc() {
 	global_state.focused_object = global_state.next_focused_object
 }
 
-current_object :: proc() -> Maybe(^Object) {
+get_current_object :: proc() -> (^Object, bool) {
 	if global_state.object_stack.height > 0 {
-		return global_state.object_stack.items[global_state.object_stack.height - 1]
+		return global_state.object_stack.items[global_state.object_stack.height - 1], true
 	}
-	return nil
+	return nil, false
 }
 
 last_object :: proc() -> Maybe(^Object) {
@@ -207,14 +211,14 @@ object_is_visible :: proc(object: ^Object) -> bool {
 	)
 }
 
-update_object_state :: proc(object: ^Object) {
-	object.state.previous = object.state.current
-	object.state.current -= {.Dragged, .Clicked, .Focused, .Changed, .Hovered}
-	object.state.current += object.state.next
-	object.state.next = {}
+update_object_state :: proc(o: ^Object) {
+	o.state.previous = o.state.current
+	o.state.current -= {.Dragged, .Clicked, .Focused, .Changed, .Hovered}
+	o.state.current += o.state.next
+	o.state.next = {}
 
-	if global_state.focused_object == object.id {
-		object.state.current += {.Focused}
+	if global_state.focused_object == o.id {
+		o.state.current += {.Focused}
 	}
 
 	// if id, ok := global_state.object_to_activate.?; ok {
@@ -226,52 +230,49 @@ update_object_state :: proc(object: ^Object) {
 	// 	}
 	// }
 
-	if global_state.hovered_object == object.id {
-		if current_options().hover_to_focus {
-			if .Pressed not_in object.state.current {
-				object.click.press_time = time.now()
-				global_state.next_focused_object = object.id
+	if global_state.hovered_object == o.id {
+		if get_current_options().hover_to_focus {
+			if .Pressed not_in o.state.current {
+				o.click.press_time = time.now()
+				global_state.next_focused_object = o.id
 			}
-			object.state.current += {.Pressed}
-			object.click.count = max(object.click.count, 1)
+			o.state.current += {.Pressed}
+			o.click.count = max(o.click.count, 1)
 		}
 
-		if .Hovered not_in object.state.previous {
-			object.hovered_time = time.now()
-		}
 
-		object.state.current += {.Hovered}
+		o.state.current += {.Hovered}
 
 		pressed_buttons := global_state.mouse_bits - global_state.last_mouse_bits
 		if pressed_buttons != {} {
-			if object.click.button == global_state.mouse_button &&
-			   time.since(object.click.release_time) <= MAX_CLICK_DELAY {
-				object.click.count = max((object.click.count + 1) % 4, 1)
+			if o.click.button == global_state.mouse_button &&
+			   time.since(o.click.release_time) <= MAX_CLICK_DELAY {
+				o.click.count = max((o.click.count + 1) % 4, 1)
 			} else {
-				object.click.count = 1
+				o.click.count = 1
 			}
 
-			object.click.mods = {}
+			o.click.mods = {}
 			if key_down(.Left_Control) || key_down(.Right_Control) {
-				object.click.mods += {.Control}
+				o.click.mods += {.Control}
 			}
 			if key_down(.Right_Shift) || key_down(.Left_Shift) {
-				object.click.mods += {.Shift}
+				o.click.mods += {.Shift}
 			}
 			if key_down(.Left_Alt) || key_down(.Right_Alt) {
-				object.click.mods += {.Alt}
+				o.click.mods += {.Alt}
 			}
 
-			object.click.button = global_state.mouse_button
-			object.click.point = global_state.mouse_pos
-			object.click.press_time = time.now()
+			o.click.button = global_state.mouse_button
+			o.click.point = global_state.mouse_pos
+			o.click.press_time = time.now()
 
-			object.state.current += {.Pressed}
-			if .Sticky_Hover in object.flags {
-				global_state.dragged_object = object.id
+			o.state.current += {.Pressed}
+			if .Sticky_Hover in o.flags {
+				global_state.dragged_object = o.id
 			}
-			global_state.next_focused_object = object.id
-			global_state.pressed_object = object.id
+			global_state.next_focused_object = o.id
+			global_state.pressed_object = o.id
 
 			draw_frames(1)
 		}
@@ -281,21 +282,21 @@ update_object_state :: proc(object: ^Object) {
 		// 	object.click_count = 0
 		// }
 	} else {
-		if global_state.dragged_object != object.id {
-			object.state.current -= {.Hovered}
-			object.click.count = 0
+		if global_state.dragged_object != o.id {
+			o.state.current -= {.Hovered}
+			o.click.count = 0
 		}
-		if .Sticky_Press not_in object.flags {
-			object.state.current -= {.Pressed}
+		if .Sticky_Press not_in o.flags {
+			o.state.current -= {.Pressed}
 		}
 	}
 
-	if object.state.current >= {.Pressed} {
+	if o.state.current >= {.Pressed} {
 		released_buttons := global_state.last_mouse_bits - global_state.mouse_bits
 		if released_buttons != {} {
-			object.state.current += {.Clicked}
-			object.state.current -= {.Pressed, .Dragged}
-			object.click.release_time = time.now()
+			o.state.current += {.Clicked}
+			o.state.current -= {.Pressed, .Dragged}
+			o.click.release_time = time.now()
 			global_state.dragged_object = 0
 		}
 	}
@@ -316,7 +317,18 @@ begin_object :: proc(object: ^Object) -> bool {
 	}
 	object.frames = global_state.frames
 
-	object.cut_side = current_options().side
+	if next_box, ok := global_state.next_box.?; ok {
+		object.box = next_box
+		global_state.next_box = nil
+	} else {
+		current_layout := get_current_layout()
+		object.side = current_layout.side
+		object.box = place_object_in_layout(object, current_layout)
+		if object.box.lo.x >= object.box.hi.x || object.box.lo.y >= object.box.hi.y {
+			return false
+		}
+	}
+
 	object.layer = current_layer().? or_return
 
 	update_object_state(object)
@@ -335,8 +347,7 @@ begin_object :: proc(object: ^Object) -> bool {
 }
 
 end_object :: proc() {
-	if object, ok := current_object().?; ok {
-
+	if object, ok := get_current_object(); ok {
 		if .Active in (object.state.current - object.state.previous) {
 			global_state.last_activated_object = object.id
 		}
@@ -350,9 +361,21 @@ end_object :: proc() {
 
 		pop_stack(&global_state.object_stack)
 
-		if parent, ok := current_object().?; ok {
+		if parent, ok := get_current_object(); ok {
 			parent.state.current += object_state_output(object.state) & parent.state.input_mask
 		}
+	}
+}
+
+@(deferred_out = __do_object)
+do_object :: proc(object: ^Object) -> bool {
+	return begin_object(object)
+}
+
+@(private)
+__do_object :: proc(ok: bool) {
+	if ok {
+		end_object()
 	}
 }
 
@@ -383,17 +406,21 @@ focus_object :: proc(object: ^Object) {
 
 foreground :: proc(loc := #caller_location) {
 	object := get_object(hash(loc))
-	object.box = current_box()
+	set_next_box(get_current_layout().box)
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
 		draw_shadow(object.box)
-		vgo.fill_box(object.box, current_options().radius, paint = style().color.foreground)
-		vgo.stroke_box(
+		kn.fill_box(
+			object.box,
+			get_current_options().radius,
+			paint = get_current_style().color.foreground,
+		)
+		kn.stroke_box(
 			object.box,
 			1,
-			current_options().radius,
-			paint = style().color.foreground_stroke,
+			get_current_options().radius,
+			paint = get_current_style().color.foreground_stroke,
 		)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
@@ -403,12 +430,21 @@ foreground :: proc(loc := #caller_location) {
 
 background :: proc(loc := #caller_location) {
 	object := get_object(hash(loc))
-	object.box = current_box()
+	set_next_box(get_current_layout().box)
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
-		vgo.fill_box(object.box, current_options().radius, paint = style().color.background)
-		vgo.stroke_box(object.box, 1, current_options().radius, paint = style().color.foreground_stroke)
+		kn.fill_box(
+			object.box,
+			get_current_options().radius,
+			paint = get_current_style().color.background,
+		)
+		kn.stroke_box(
+			object.box,
+			1,
+			get_current_options().radius,
+			paint = get_current_style().color.foreground_stroke,
+		)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
 		}
@@ -417,30 +453,33 @@ background :: proc(loc := #caller_location) {
 
 spinner :: proc(loc := #caller_location) {
 	object := get_object(hash(loc))
-	object.box = next_box({})
+	object.size = get_current_style().scale
 	if begin_object(object) {
 		defer end_object()
 
-		vgo.spinner(box_center(object.box), box_height(object.box) * 0.3, style().color.content)
+		kn.spinner(
+			box_center(object.box),
+			box_height(object.box) * 0.3,
+			get_current_style().color.content,
+		)
 		draw_frames(1)
 	}
 }
 
 draw_skeleton :: proc(box: Box, rounding: f32) {
-	vgo.fill_box(box, rounding, style().color.button)
-	vgo.fill_box(box, rounding, vgo.Paint{kind = .Skeleton})
+	kn.fill_box(box, rounding, get_current_style().color.button)
+	kn.fill_box(box, rounding, kn.Paint{kind = .Skeleton})
 
 	draw_frames(1)
 }
 
 divider :: proc() {
-	layout := current_layout().?
-	side := current_options().side
-	line_box := cut_box(&layout.box, side, 1)
-	j := 1 - int(side) / 2
+	layout := get_current_layout()
+	line_box := cut_box(&layout.box, layout.side, 1)
+	j := 1 - int(layout.side) / 2
 	line_box.lo[j] = layout.bounds.lo[j]
 	line_box.hi[j] = layout.bounds.hi[j]
-	vgo.fill_box(line_box, paint = style().color.foreground_stroke)
+	kn.fill_box(line_box, paint = get_current_style().color.foreground_stroke)
 }
 
 object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {
@@ -454,4 +493,9 @@ content_justify_causes_deference :: proc(justify: Align) -> bool {
 
 add_object_state_for_next_frame :: proc(object: ^Object, state: Object_Status_Set) {
 	object.state.current += state
+}
+
+dummy :: proc(loc := #caller_location) {
+	object := get_object(hash(loc))
+	do_object(object)
 }

@@ -1,30 +1,30 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 
 Color_Scheme :: struct {
-	button, button_background, hover, accent, accent_content, content, shadow: vgo.Color,
-	field, foreground, foreground_stroke, foreground_accent, background: vgo.Color,
-	grid_background, grid_minor_lines, grid_major_lines: vgo.Color,
-	checkers0, checkers1: vgo.Color,
+	button, button_background, hover, accent, accent_content, content, shadow: kn.Color,
+	field, foreground, foreground_stroke, foreground_accent, background:       kn.Color,
+	grid_background, grid_minor_lines, grid_major_lines:                       kn.Color,
+	checkers0, checkers1:                                                      kn.Color,
 }
 
 Style :: struct {
-	icon_font:      vgo.Font,
-	monospace_font: vgo.Font,
-	header_font:    Maybe(vgo.Font),
-	default_font:   vgo.Font,
-	bold_font: vgo.Font,
+	icon_font:      kn.Font,
+	monospace_font: kn.Font,
+	header_font:    Maybe(kn.Font),
+	default_font:   kn.Font,
+	bold_font:      kn.Font,
 	color:          Color_Scheme,
 	using shape:    Style_Shape,
 }
 
 Style_Shape :: struct {
-	visual_size:         [2]f32,
+	scale:               f32,
 	header_text_size:    f32,
 	default_text_size:   f32,
 	tab_text_size:       f32,
-	icon_size: f32,
+	icon_size:           f32,
 	content_text_size:   f32,
 	text_input_height:   f32,
 	button_height:       f32,
@@ -33,7 +33,7 @@ Style_Shape :: struct {
 	panel_padding:       f32,
 	rounding:            f32,
 	popup_margin:        f32,
-	stroke_width:        f32,
+	line_width:        f32,
 	title_margin:        f32,
 	text_padding:        [2]f32,
 	menu_padding:        f32,
@@ -41,7 +41,7 @@ Style_Shape :: struct {
 	table_row_height:    f32,
 }
 
-style :: proc() -> ^Style {
+get_current_style :: proc() -> ^Style {
 	return &global_state.style
 }
 
@@ -57,6 +57,7 @@ rounded_corners :: proc(corners: Corners) -> [4]f32 {
 default_style_shape :: proc() -> Style_Shape {
 	return Style_Shape {
 		tooltip_padding = 3,
+		line_width = 2,
 		panel_padding = 10,
 		text_padding = {6, 4},
 		header_text_size = 22,
@@ -69,7 +70,7 @@ default_style_shape :: proc() -> Style_Shape {
 		popup_margin = 7,
 		scrollbar_thickness = 8,
 		table_row_height = 40,
-		visual_size = {200, 24},
+		scale = 15,
 	}
 }
 
@@ -113,7 +114,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		accent_content = {10, 10, 10, 255},
 		content = {255, 255, 255, 255},
 		shadow = {0, 0, 0, 75},
-		hover = {120, 125, 140, 95}
+		hover = {120, 125, 140, 95},
 	}
 }
 
@@ -162,5 +163,5 @@ set_style_rounding :: proc(amount: f32) {
 }
 
 set_color_scheme :: proc(scheme: Color_Scheme) {
-	style().color = scheme
+	get_current_style().color = scheme
 }

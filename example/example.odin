@@ -1,7 +1,7 @@
 package demo
 
-import onyx ".."
-import vgo "../../vgo"
+import "../ronin"
+import kn "../../katana/katana"
 import "base:runtime"
 import "core:c/libc"
 import "core:fmt"
@@ -56,18 +56,17 @@ destroy_state :: proc(state: ^State) {
 }
 
 Boolean_Section_State :: struct {
-	types: [onyx.Boolean_Type]bool,
+	types: [ronin.Boolean_Type]bool,
 }
 
 boolean_section :: proc(state: ^Boolean_Section_State) {
-	using onyx
+	using ronin
 	shrink(10)
-	set_size_method(.Dont_Care)
 	for type, i in Boolean_Type {
 		push_id(i)
 		boolean(&state.types[type], fmt.tprint(type), type = type)
 		pop_id()
-		space(10)
+		space()
 	}
 }
 
@@ -78,53 +77,52 @@ Analog_Section_State :: struct {
 }
 
 analog_section :: proc(state: ^Analog_Section_State) {
-	using onyx
+	using ronin
 	shrink(10)
-	set_size(0)
+	set_size(that_of_object)
 	slider(&state.float_value, 0, 100)
-	space(10)
+	space()
 	slider(&state.integer_value, 0, 10)
-	space(10)
-	set_height(30)
-	if layout(.Left) {
+	space()
+	set_height(to_scale(1))
+	if do_layout(as_row) {
+		set_width(that_of_object)
 		header("Range sliders")
 	}
-	space(10)
-	set_height(30)
-	set_width(remaining_space().x)
-	if layout(.Left) {
-		set_width(0)
-		set_size_method(.Max)
+	space()
+	set_height(to_scale(1))
+	set_width(to_layout_width)
+	if do_layout(as_row) {
+		set_width(that_of_object)
 		range_slider(&state.float_range[0], &state.float_range[1], 0, 100)
 	}
-	set_height(0)
-	space(20)
+	set_height(that_of_object)
+	space()
 	progress_bar(state.float_value / 100.0)
-	space(20)
+	space()
 	dial(state.float_value / 100.0)
-	space(20)
-	pie({33, 15, 52}, 100, {vgo.Red, vgo.Green, vgo.Blue})
+	space()
+	pie({33, 15, 52}, 100, {kn.Red, kn.Green, kn.Blue})
 }
 
 Button_Section_State :: struct {}
 
 button_section :: proc(state: ^Button_Section_State) {
-	using onyx
+	using ronin
 	shrink(10)
-	set_width(remaining_space().x)
-	set_height(24)
-	if begin_layout(side = .Left) {
-		set_width(0)
+	set_width(to_layout_width)
+	set_height(to_scale(1))
+	if do_layout(as_row) {
+		set_width(that_of_object)
 		for accent, i in Button_Accent {
 			push_id(i)
 			button(fmt.tprint(accent), accent = accent)
 			pop_id()
-			space(10)
+			space()
 		}
-		end_layout()
 	}
-	space(10)
-	set_size(0)
+	space()
+	set_size(that_of_object)
 	button("Button with\nmultiple lines\nof text", text_align = 0.5)
 }
 
@@ -132,21 +130,21 @@ Input_Section_State :: struct {
 	text:           string,
 	multiline_text: string,
 	number:         f32,
-	date:           Maybe(onyx.Date),
-	until:          Maybe(onyx.Date),
+	date:           Maybe(ronin.Date),
+	until:          Maybe(ronin.Date),
 }
 
 input_section :: proc(state: ^Input_Section_State) {
-	using onyx
+	using ronin
 	shrink(10)
-	set_width(200)
-	set_height(30)
+	set_width(to_scale(3))
+	set_height()
 	input(state.text, placeholder = "placeholder")
-	space(10)
-	set_height(100)
+	space()
+	set_height(to_scale(3))
 	input(state.multiline_text, placeholder = "placeholder", flags = {.Multiline})
-	space(10)
-	set_height(30)
+	space()
+	set_height(to_scale(1))
 	input(state.number, prefix = "$")
 }
 
@@ -155,47 +153,44 @@ Graph_Section_State :: struct {
 	time_range:     [2]f32,
 	value_range:    [2]f32,
 	data:           [40]f32,
-	color:          vgo.Color,
+	color:          kn.Color,
 	show_points:    bool,
 	show_crosshair: bool,
 	snap_crosshair: bool,
-	style:          onyx.Line_Chart_Fill_Style,
+	style:          ronin.Line_Chart_Fill_Style,
 }
 
 graph_section :: proc(state: ^Graph_Section_State) {
-	using onyx
+	using ronin
 	shrink(10)
-	set_side(.Bottom)
-	set_height(26)
-	if begin_layout(.Left) {
-		set_align(.Center)
-		set_width(0)
+	set_height()
+	if do_layout(as_row) {
+		set_align(0.5)
+		set_width(to_scale(1))
 		if button("Randomize").clicked {
 			randomize_graphs(state)
 		}
-		space(10)
+		space()
 		color_picker(&state.color)
-		space(10)
+		space()
 		boolean(&state.show_points, "Points")
-		space(10)
+		space()
 		boolean(&state.show_crosshair, "Crosshair")
-		space(10)
+		space()
 		boolean(&state.snap_crosshair, "Snap Crosshair")
-		space(10)
+		space()
 		option_slider(reflect.enum_field_names(Line_Chart_Fill_Style), &state.style)
-		end_layout()
 	}
-	space(10)
-	if begin_layout(.Left) {
-		set_align(.Center)
-		set_width(0)
+	space()
+	if do_layout(as_row) {
+		set_align(0.5)
+		set_width(that_of_object)
 		range_slider(&state.time_range.x, &state.time_range.y, 0, f64(len(state.data)))
-		space(10)
+		space()
 		range_slider(&state.value_range.x, &state.value_range.y, -20, 20)
-		end_layout()
 	}
-	space(10)
-	set_size(remaining_space())
+	space()
+	set_size(to_layout_size)
 
 	if begin_graph(
 		time_range = state.time_range,
@@ -216,7 +211,7 @@ graph_section :: proc(state: ^Graph_Section_State) {
 
 	for i in 0 ..< len(state.data) {
 		difference := (state.data[i] - state.displayed_data[i])
-		state.displayed_data[i] += difference * 10 * vgo.frame_time()
+		state.displayed_data[i] += difference * 10 * kn.frame_time()
 		draw_frames(int(abs(difference) > 0.01) * 2)
 	}
 }
@@ -239,15 +234,15 @@ Nav_Section_State :: struct {
 }
 
 nav_section :: proc(state: ^Nav_Section_State) {
-	using onyx
+	using ronin
 	shrink(10)
-	set_width(remaining_space().x)
-	set_height(50)
-	if begin_layout(.Left) {
-		vgo.fill_box(current_box(), paint = style().color.field)
-		set_width(0)
-		set_height(30)
-		set_align(.Far)
+	set_width(to_layout_width)
+	set_height(to_scale(5))
+	if do_layout(as_row) {
+		kn.fill_box(get_current_layout().box, paint = get_current_style().color.field)
+		set_width(that_of_object)
+		set_height(to_scale(1))
+		set_align(1)
 		for member, i in Tab {
 			push_id(i)
 			if tab(fmt.tprint(member), state.tab == member) {
@@ -255,7 +250,6 @@ nav_section :: proc(state: ^Nav_Section_State) {
 			}
 			pop_id()
 		}
-		end_layout()
 	}
 }
 
@@ -270,55 +264,50 @@ Theme_Section_State :: struct {
 }
 
 theme_section :: proc(state: ^Theme_Section_State) {
-	using onyx
-	struct_info := runtime.type_info_base(type_info_of(onyx.Color_Scheme)).variant.(runtime.Type_Info_Struct)
+	using ronin
+	struct_info := runtime.type_info_base(type_info_of(ronin.Color_Scheme)).variant.(runtime.Type_Info_Struct)
 	shrink(10)
-	set_width(remaining_space().x)
-	set_height(26)
-	set_side(.Bottom)
-	if begin_layout(.Right) {
-		set_width(0)
+	set_width(to_layout_width)
+	set_height(to_scale(1))
+	if do_layout(as_reversed_row) {
+		set_width(that_of_object)
 		if option_slider(reflect.enum_field_names(Theme_Option), &state.option).changed {
 			if state.option == .Light {
-				style().color = light_color_scheme()
+				get_current_style().color = light_color_scheme()
 			} else if state.option == .Dark {
-				style().color = dark_color_scheme()
+				get_current_style().color = dark_color_scheme()
 			}
 		}
-		space(10)
-		slider(&style().rounding, 0, 10)
-		space(10)
-		slider(&style().default_text_size, 10, 30)
-		end_layout()
+		space()
+		slider(&get_current_style().rounding, 0, 10)
+		space()
+		slider(&get_current_style().default_text_size, 10, 30)
 	}
 
 	begin_group()
-	set_side(.Top)
 	for i in 0 ..< struct_info.field_count {
 		push_id(int(i))
-		if begin_layout(.Left) {
-			color := (^vgo.Color)(uintptr(&style().color) + struct_info.offsets[i])
-			set_align(.Center)
-			set_width_method(.Exact)
-			set_width(150)
+		if do_layout(as_row) {
+			color := (^kn.Color)(uintptr(&get_current_style().color) + struct_info.offsets[i])
+			set_align(0.5)
+			set_width(to_scale(5))
 			label(struct_info.names[i])
-			space(10)
-			set_width(remaining_space().y)
+			space()
+			set_width(to_layout_height)
 			set_rounded_corners({.Top_Left, .Bottom_Right})
 			color_picker(color, true)
 			set_rounded_corners(ALL_CORNERS)
-			space(10)
-			set_width((remaining_space().x - 30) / 4)
+			space()
+			set_width(of_layout_width(1/4))
 			slider(&color.r, 0, 255)
-			space(10)
+			space()
 			slider(&color.g, 0, 255)
-			space(10)
+			space()
 			slider(&color.b, 0, 255)
-			space(10)
+			space()
 			slider(&color.a, 0, 255)
-			end_layout()
 		}
-		space(10)
+		space()
 		pop_id()
 	}
 	if group, ok := end_group(); ok {
@@ -329,7 +318,7 @@ theme_section :: proc(state: ^Theme_Section_State) {
 }
 
 recursive_menu :: proc(depth: int = 1, loc := #caller_location) {
-	using onyx
+	using ronin
 	push_id(hash(loc))
 	push_id("salty")
 	push_id(depth)
@@ -345,8 +334,8 @@ recursive_menu :: proc(depth: int = 1, loc := #caller_location) {
 }
 
 menu_section :: proc() {
-	using onyx
-	set_size(0)
+	using ronin
+	set_size(that_of_object)
 	if begin_menu("Open menu", 120, 5, 1) {
 		menu_button("Option")
 		menu_button("Option")
@@ -364,41 +353,39 @@ menu_section :: proc() {
 		menu_button("Close")
 		end_menu()
 	}
-	tooltip_text_layout := vgo.make_text_layout(
+	tooltip_text_layout := kn.make_text_layout(
 		"Click to open!",
-		style().default_text_size,
-		style().default_font,
+		get_current_style().default_text_size,
+		get_current_style().default_font,
 	)
-	if begin_tooltip_for_object(last_object().?, tooltip_text_layout.size + style().text_padding * 2) {
-		vgo.fill_text_layout(
+	if begin_tooltip_for_object(last_object().?, tooltip_text_layout.size + get_current_style().text_padding * 2) {
+		kn.fill_text_layout(
 			tooltip_text_layout,
-			box_center(current_object().?.box),
+			box_center(get_current_layout().box),
 			0.5,
-			style().color.content,
+			get_current_style().color.content,
 		)
 		end_tooltip()
 	}
 }
 
 example_browser :: proc(state: ^State) {
-	using onyx
+	using ronin
 	set_next_box(view_box())
 
 	if begin_layer(.Back) {
 
-		if begin_layout(side = .Left) {
+		if do_layout(as_row) {
 
 			shrink(40)
 
 			set_rounded_corners(ALL_CORNERS)
 
-			set_height(remaining_space().y)
-			set_width(120)
-			if begin_layout(.Top) {
-				set_height(26)
-
+			set_height(to_layout_height)
+			set_width(to_scale(1))
+			if do_layout(as_column) {
+				set_height(to_scale(1))
 				input(state.current_section)
-
 				for section, i in Section {
 					push_id(i)
 					text, _ := strings.replace_all(
@@ -407,20 +394,20 @@ example_browser :: proc(state: ^State) {
 						" ",
 						allocator = context.temp_allocator,
 					)
+					set_height(to_scale(4))
 					if button(text, active = state.current_section == section, accent = .Subtle).pressed {
 						state.current_section = section
 					}
-					space(4)
+					set_height(exactly(4))
+					space()
 					pop_id()
 				}
-
-				end_layout()
 			}
 
-			space(20)
+			space()
 
 			set_width(remaining_space().x)
-			if begin_layout(.Top) {
+			if do_layout(top_to_bottom) {
 				foreground()
 
 				#partial switch state.current_section {
@@ -443,13 +430,8 @@ example_browser :: proc(state: ^State) {
 				case .Icon:
 					icon_section(&state.icon_section)
 				}
-
-				end_layout()
 			}
-
-			end_layout()
 		}
-
 		end_layer()
 	}
 }
@@ -484,16 +466,16 @@ main :: proc() {
 	window := glfw.CreateWindow(1400, 800, "demo", nil, nil)
 	defer glfw.DestroyWindow(window)
 
-	onyx.start(window)
-	defer onyx.shutdown()
+	ronin.start(window)
+	defer ronin.shutdown()
 
 	state: State
 	defer destroy_state(&state)
 
-	panels: [5]onyx.Layer_Sort_Method
+	panels: [5]ronin.Layer_Sort_Method
 
 	rand.reset(rand.uint64())
-	state.graph_section.color = vgo.Green
+	state.graph_section.color = kn.Green
 	state.graph_section.time_range = {0, 20}
 	randomize_graphs(&state.graph_section)
 
@@ -502,7 +484,7 @@ main :: proc() {
 			break
 		}
 		{
-			using onyx
+			using ronin
 
 			free_all(context.temp_allocator)
 
@@ -510,11 +492,24 @@ main :: proc() {
 
 			{
 				box := view_box()
-				vgo.fill_box(box, paint = style().color.background)
+				kn.fill_box(box, paint = get_current_style().color.background)
 			}
 
-			example_browser(&state)
-
+			// example_browser(&state)
+			shrink(50)
+			set_size(to_layout_size)
+			if do_layout(left_to_right, split_golden) {
+				shrink(2)
+				set_padding(2)
+				button("A")
+				if do_layout(top_to_bottom, split_golden) {
+					button("B")
+					if do_layout(right_to_left, split_golden) {
+						button("C")
+						button("D")
+					}
+				}
+			}
 			// for i in 0..<len(panels) {
 			// 	push_id(i)
 			// 	if begin_panel(sort_method = panels[i], size = [2]f32{220, 160}) {
@@ -522,7 +517,7 @@ main :: proc() {
 			// 		shrink(10)
 			// 		set_width(remaining_space().x)
 			// 		set_height(26)
-			// 		option_slider(reflect.enum_field_names(onyx.Layer_Sort_Method), &panels[i])
+			// 		option_slider(reflect.enum_field_names(ronin.Layer_Sort_Method), &panels[i])
 			// 		set_size(remaining_space())
 			// 		label(fmt.tprintf("%v\n%i\n%i", layer.sort_method, layer.index, layer.floating_index))
 			// 		// label(fmt.tprint(i), align = 0.5, font_size = 20)

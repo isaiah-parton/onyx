@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"
@@ -30,15 +30,15 @@ tooltip_for_last_object :: proc(
 	text: string,
 	side: Side = .Bottom,
 	delay: time.Duration = time.Second,
-	font: vgo.Font = global_state.style.default_font,
+	font: kn.Font = global_state.style.default_font,
 ) {
 	object := last_object().?
 	if .Hovered not_in object.state.current {
 		return
 	}
-	text_layout := vgo.make_text_layout(text, style().default_text_size, font)
-	if begin_tooltip_for_object(object, text_layout.size + style().text_padding * 2, side, delay) {
-		vgo.fill_text_layout(text_layout, current_object().?.box.lo + style().text_padding, paint = style().color.content)
+	text_layout := kn.make_text_layout(text, get_current_style().default_text_size, font)
+	if begin_tooltip_for_object(object, text_layout.size + get_current_style().text_padding * 2, side, delay) {
+		kn.fill_text_layout(text_layout, get_current_layout().box.lo + get_current_style().text_padding, paint = get_current_style().color.content)
 		end_tooltip()
 	}
 }
@@ -131,20 +131,20 @@ begin_tooltip_with_options :: proc(size: [2]f32, side: Side = .Bottom, origin: u
 	}
 
 	begin_layer(.Front, loc = loc)
-	vgo.push_matrix()
-	vgo.translate(anchor_point)
-	vgo.scale(scale)
-	vgo.translate(-anchor_point)
-	vgo.disable_scissor()
+	kn.push_matrix()
+	kn.translate(anchor_point)
+	kn.scale(scale)
+	kn.translate(-anchor_point)
+	kn.disable_scissor()
 	draw_shadow(object.box)
-	vgo.fill_box(object.box, global_state.style.rounding, style().color.foreground)
-	vgo.stroke_box(object.box, 1, global_state.style.rounding, style().color.foreground_stroke)
+	kn.fill_box(object.box, global_state.style.rounding, get_current_style().color.foreground)
+	kn.stroke_box(object.box, 1, global_state.style.rounding, get_current_style().color.foreground_stroke)
 	return true
 }
 
 end_tooltip :: proc() {
-	vgo.enable_scissor()
-	vgo.pop_matrix()
+	kn.enable_scissor()
+	kn.pop_matrix()
 	end_layer()
 	end_object()
 }

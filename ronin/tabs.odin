@@ -1,6 +1,6 @@
 package onyx
 
-import "../vgo"
+import kn "../../katana/katana"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -9,9 +9,8 @@ import "core:slice"
 tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bool) {
 	object := get_object(hash(loc))
 	if begin_object(object) {
-		text_layout := vgo.make_text_layout(text, style().default_text_size, style().default_font)
-		object.size = text_layout.size + style().text_padding * 2
-		object.box = next_box(object.size)
+		text_layout := kn.make_text_layout(text, get_current_style().default_text_size, get_current_style().default_font)
+		object.size = text_layout.size + get_current_style().text_padding * 2
 		if point_in_box(mouse_point(), object.box) {
 			hover_object(object)
 		}
@@ -20,11 +19,11 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 		}
 		if object_is_visible(object) {
 			if active {
-				vgo.fill_box(object.box, current_options().radius * {1, 1, 0, 0}, paint = style().color.foreground)
+				kn.fill_box(object.box, get_current_options().radius * {1, 1, 0, 0}, paint = get_current_style().color.foreground)
 			} else {
-				vgo.fill_box(shrink_box(object.box, 2), current_options().radius, paint = vgo.mix(0.5, style().color.foreground_accent, style().color.foreground))
+				kn.fill_box(shrink_box(object.box, 2), get_current_options().radius, paint = kn.mix(0.5, get_current_style().color.foreground_accent, get_current_style().color.foreground))
 			}
-			vgo.fill_text_layout(text_layout, box_center(object.box), 0.5, paint = style().color.content)
+			kn.fill_text_layout(text_layout, box_center(object.box), 0.5, paint = get_current_style().color.content)
 		}
 		clicked = .Clicked in object.state.current
 		end_object()
@@ -36,7 +35,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 	using object:  ^Object,
 // 	index:         int,
 // 	items:         []string,
-// 	label_layouts: []vgo.Text_Layout,
+// 	label_layouts: []kn.Text_Layout,
 // }
 
 // Toggle_Widget :: struct {
@@ -46,7 +45,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 
 // Tab :: struct {
 // 	using __toggle_widget: Toggle_Widget,
-// 	text_layout:           vgo.Text_Layout,
+// 	text_layout:           kn.Text_Layout,
 // 	active_time:           f32,
 // 	hover_time:            f32,
 // }
@@ -62,7 +61,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 	}
 // 	object := &object.variant.(Tab)
 // 	object.state = state
-// 	object.text_layout = vgo.make_text_layout(
+// 	object.text_layout = kn.make_text_layout(
 // 		text,
 // 		global_state.style.default_text_size,
 // 		global_state.style.default_font,
@@ -93,7 +92,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 			object.object.box,
 // 			box_height(object.object.box) * math.lerp(f32(0.85), f32(1.0), object.active_time),
 // 		)
-// 		vgo.fill_box(
+// 		kn.fill_box(
 // 			box,
 // 			{
 // 				global_state.style.rounding * object.active_time,
@@ -101,17 +100,17 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 				0,
 // 				0,
 // 			},
-// 			paint = vgo.mix(
+// 			paint = kn.mix(
 // 				math.lerp(f32(0.25), f32(1.0), max(object.hover_time * 0.5, object.active_time)),
-// 				style().color.background,
-// 				style().color.foreground
+// 				get_current_style().color.background,
+// 				get_current_style().color.foreground
 // 			),
 // 		)
-// 		vgo.fill_text_layout(
+// 		kn.fill_text_layout(
 // 			object.text_layout,
 // 			box_center(box),
 // 			align = 0.5,
-// 			paint = style().color.accent_content,
+// 			paint = get_current_style().color.accent_content,
 // 		)
 // 	}
 // }
@@ -123,9 +122,9 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 			object = object,
 // 		}
 // 	}
-// 	object.metrics.desired_size.y = global_state.style.visual_size.y
+// 	object.metrics.desired_size.y = global_state.style.scale.y
 // 	for item, i in items {
-// 		object.label_layouts[i] = vgo.make_text_layout(
+// 		object.label_layouts[i] = kn.make_text_layout(
 // 			item,
 // 			global_state.style.default_text_size,
 // 			global_state.style.default_font,
@@ -167,19 +166,19 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 			}
 // 		}
 // 		if is_visible {
-// 			vgo.fill_box(
+// 			kn.fill_box(
 // 				{{option_box.lo.x, option_box.hi.y - 3}, {option_box.hi.x, option_box.hi.y}},
 // 				1.5,
-// 				paint = vgo.fade(
-// 					style().color.content,
+// 				paint = kn.fade(
+// 					get_current_style().color.content,
 // 					f32(int(hovered || object.index == i)),
 // 				),
 // 			)
-// 			vgo.fill_text_layout(
+// 			kn.fill_text_layout(
 // 				object.label_layouts[i],
 // 				{box_center_x(option_box), option_box.lo.y},
 // 				align = {0.5, 0},
-// 				paint = vgo.fade(style().color.content, 1 if object.index == i else 0.5),
+// 				paint = kn.fade(get_current_style().color.content, 1 if object.index == i else 0.5),
 // 			)
 // 		}
 // 	}
@@ -194,8 +193,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 		return
 	}
 	object := get_object(hash(loc))
-	object.size = global_state.style.visual_size
-	object.box = next_box(object.size)
+	object.size = global_state.style.scale
 	if begin_object(object) {
 		defer end_object()
 
@@ -206,7 +204,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 		is_visible := object_is_visible(object)
 		inner_box := shrink_box(object.box, 2)
 		if is_visible {
-			vgo.stroke_box(object.box, 1, style().rounding, style().color.button)
+			kn.stroke_box(object.box, 1, get_current_style().rounding, get_current_style().color.button)
 		}
 		option_rounding :=
 			global_state.style.rounding * ((box_height(object.box) - 4) / box_height(object.box))
@@ -227,21 +225,21 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 				}
 			}
 			if is_visible {
-				vgo.fill_box(
+				kn.fill_box(
 					shrink_box(option_box, 1),
 					option_rounding,
-					paint = vgo.fade(
-						style().color.button,
+					paint = kn.fade(
+						get_current_style().color.button,
 						max(f32(int(hovered)) * 0.5, f32(int(index^ == T(i)))),
 					),
 				)
-				vgo.fill_text(
+				kn.fill_text(
 					item,
 					global_state.style.default_text_size,
 					box_center(option_box),
 					font = global_state.style.default_font,
 					align = 0.5,
-					paint = vgo.fade(style().color.content, 1 if int(index^) == i else 0.5),
+					paint = kn.fade(get_current_style().color.content, 1 if int(index^) == i else 0.5),
 				)
 			}
 		}
