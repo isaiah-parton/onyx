@@ -1,7 +1,7 @@
 package demo
 
 import "../ronin"
-import kn "../../katana/katana"
+import kn "local:katana"
 import "base:runtime"
 import "core:c/libc"
 import "core:fmt"

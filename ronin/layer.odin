@@ -1,4 +1,4 @@
-package onyx
+package ronin
 // Layers exist only for object drawing and interaction to be arbitrarily ordered
 // Layers have no interaction of their own, but clicking or hovering a object in a given layer, will update its
 // state.
@@ -8,7 +8,7 @@ package onyx
 //
 // All layers are stored contiguously in the order they are to be rendered
 // a layer's index is an important value and must always be valid
-import kn "../../katana/katana"
+import kn "local:katana"
 import "core:fmt"
 import "core:math"
 import "core:math/ease"

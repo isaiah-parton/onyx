@@ -1,7 +1,7 @@
 package demo
 
 import "../ronin"
-import kn "../../katana/katana"
+import kn "local:katana"
 import "core:encoding/json"
 import "core:os"
 import "core:fmt"

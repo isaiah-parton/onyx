@@ -1,4 +1,4 @@
-package onyx
+package ronin
 
 import "core:math"
 import "core:math/linalg"

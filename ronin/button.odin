@@ -1,6 +1,6 @@
-package onyx
+package ronin
 
-import kn "../../katana/katana"
+import kn "local:katana"
 import "base:intrinsics"
 import "core:container/small_array"
 import "core:fmt"

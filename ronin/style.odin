@@ -1,6 +1,6 @@
-package onyx
+package ronin
 
-import kn "../../katana/katana"
+import kn "local:katana"
 
 Color_Scheme :: struct {
 	button, button_background, hover, accent, accent_content, content, shadow: kn.Color,

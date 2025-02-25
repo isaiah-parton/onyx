@@ -1,6 +1,6 @@
-package onyx
+package ronin
 
-import kn "../../katana/katana"
+import kn "local:katana"
 import "tedit"
 import "core:strings"
 import "core:fmt"

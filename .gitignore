@@ -5,3 +5,4 @@ odinfmt.json
 *.pdb
 *.dll
 example/example
+.zed/
