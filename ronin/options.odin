@@ -99,7 +99,7 @@ set_width :: proc(opts: ..Size_Option) {
 
 set_height :: proc(opts: ..Size_Option) {
 	options := get_current_options()
-	options.size.x, options.methods.x = exact_size_and_method_from_options(1, ..opts)
+	options.size.y, options.methods.y = exact_size_and_method_from_options(1, ..opts)
 }
 
 set_size :: proc(opts: ..Size_Option) {

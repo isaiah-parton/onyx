@@ -157,6 +157,7 @@ Global_State :: struct {
 	frames:                   int,
 	drawn_frames:             int,
 	cursors:                  [Mouse_Cursor]glfw.CursorHandle,
+	text_content_builder: Text_Content_Builder,
 }
 
 seconds :: proc() -> f64 {
@@ -451,6 +452,11 @@ new_frame :: proc() {
 
 	clear(&global_state.debug.hovered_objects)
 
+	if (key_down(.Left_Control) || key_down(.Right_Control)) && key_pressed(.C) {
+		set_clipboard_string(string(global_state.text_content_builder.buf[:]))
+	}
+	text_content_builder_reset(&global_state.text_content_builder)
+
 	update_layers()
 	update_layer_references()
 	clean_up_objects()
@@ -651,7 +657,7 @@ __get_clipboard_string :: proc(_: rawptr) -> (str: string, ok: bool) {
 
 draw_shadow :: proc(box: kn.Box) {
 	if kn.disable_scissor() {
-		kn.box_shadow(
+		kn.add_box_shadow(
 			move_box(box, 3),
 			global_state.style.rounding,
 			6,

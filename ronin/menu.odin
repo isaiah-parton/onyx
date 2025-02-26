@@ -54,7 +54,7 @@ solve_menu_box :: proc(anchor_box: Box, size: [2]f32, margin: f32, side: Side, a
 
 begin_menu :: proc(text: string, width: f32, how_many_items, how_many_dividers: int, loc := #caller_location) -> bool {
 	object := get_object(hash(loc))
-	text_layout := kn.make_text_layout(text, get_current_style().default_text_size, get_current_style().default_font)
+	text_layout := kn.make_text(text, get_current_style().default_text_size, get_current_style().default_font)
 	object.size = text_layout.size + global_state.style.text_padding * {1, 2}
 	object.size.x += object.size.y
 	if begin_object(object) {
@@ -75,35 +75,35 @@ begin_menu :: proc(text: string, width: f32, how_many_items, how_many_dividers: 
 			rounding := get_current_options().radius
 
 			color := get_current_style().color.button
-			kn.stroke_box(object.box, 1, rounding, paint = color)
-			kn.fill_box(
+			kn.add_box_lines(object.box, 1, rounding, paint = color)
+			kn.add_box(
 				object.box,
 				rounding,
 				paint = kn.fade(color, math.lerp(math.lerp(f32(0.5), f32(0.8), object.animation.hover), f32(1.0), object.animation.press)),
 			)
-			kn.fill_text_layout(
+			kn.add_text(
 				text_layout,
 				{
 					object.box.lo.x + get_current_style().text_padding.x,
 					box_center_y(object.box),
-				},
-				align = {0, 0.5},
+				} - text_layout.size * {0, 0.5},
 				paint = text_color,
 			)
 			box := shrink_box(get_box_cut_right(object.box, box_height(object.box)), 8)
-			kn.fill_box({box.lo, {box.hi.x, box.lo.y + 1}}, paint = text_color)
-			kn.fill_box({{box.lo.x, box_center_y(box)}, {box.hi.x, box_center_y(box) + 1}}, paint = text_color)
-			kn.fill_box({{box.lo.x, box.hi.y}, {box.hi.x, box.hi.y + 1}}, paint = text_color)
+			kn.add_box({box.lo, {box.hi.x, box.lo.y + 1}}, paint = text_color)
+			kn.add_box({{box.lo.x, box_center_y(box)}, {box.hi.x, box_center_y(box) + 1}}, paint = text_color)
+			kn.add_box({{box.lo.x, box.hi.y}, {box.hi.x, box.hi.y + 1}}, paint = text_color)
 		}
 		end_object()
 	}
 	return begin_menu_with_activator(object, width, how_many_items, how_many_dividers)
 }
 
-begin_submenu :: proc(text: string, width: f32, how_many_items, how_many_dividers: int, loc := #caller_location) -> bool {
+begin_submenu :: proc(label: string, width: f32, how_many_items, how_many_dividers: int, loc := #caller_location) -> bool {
 	object := get_object(hash(loc))
-	text_layout := kn.make_text_layout(text, get_current_style().default_text_size, get_current_style().default_font)
-	object.size = text_layout.size + global_state.style.text_padding * 2
+	style := get_current_style()
+	label_text := kn.make_text(label, style.default_text_size, style.default_font)
+	object.size = label_text.size + global_state.style.text_padding * 2
 	if begin_object(object) {
 
 		if point_in_box(global_state.mouse_pos, object.box) {
@@ -118,29 +118,28 @@ begin_submenu :: proc(text: string, width: f32, how_many_items, how_many_divider
 		object.animation.press = animate(object.animation.press, 0.08, .Pressed in object.state.current)
 
 		if object_is_visible(object) {
-			text_color: kn.Color = get_current_style().color.content
+			text_color: kn.Color = style.color.content
 			rounding := get_current_options().radius
 
-			color := get_current_style().color.button
-			kn.fill_box(
+			color := style.color.button
+			kn.add_box(
 				object.box,
 				rounding,
 				paint = kn.fade(
-					get_current_style().color.button,
+					style.color.button,
 					max((object.animation.hover + object.animation.press) * 0.5, f32(i32(.Focused in object.state.current))) *
 					0.75,
 				),
 			)
-			kn.fill_text_layout(
-				text_layout,
+			kn.add_text(
+				label_text,
 				{
-					object.box.lo.x + get_current_style().text_padding.x,
+					object.box.lo.x + style.text_padding.x,
 					box_center_y(object.box),
-				},
-				align = {0, 0.5},
+				} - label_text.size * {0, 0.5},
 				paint = text_color,
 			)
-			kn.arrow(box_center(get_box_cut_right(object.box, box_height(object.box))), 5, 1, paint = get_current_style().color.content)
+			kn.add_arrow(box_center(get_box_cut_right(object.box, box_height(object.box))), 5, 1, paint = style.color.content)
 		}
 		end_object()
 	}
@@ -226,6 +225,6 @@ menu_divider :: proc() {
 	j := 1 - i
 	line_box.lo[j] = layout.bounds.lo[j]
 	line_box.hi[j] = layout.bounds.hi[j]
-	kn.fill_box(line_box, paint = get_current_style().color.foreground_stroke)
+	kn.add_box(line_box, paint = get_current_style().color.lines)
 	cut_box(&layout.box, layout.side, get_current_style().menu_padding)
 }

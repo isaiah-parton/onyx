@@ -65,7 +65,6 @@ begin_container :: proc(
 
 	begin_object(self) or_return
 
-
 	if point_in_box(mouse_point(), self.box) {
 		hover_object(object)
 	}
@@ -84,9 +83,8 @@ begin_container :: proc(
 	kn.push_scissor(kn.make_box(self.box, get_current_options().radius))
 	push_clip(self.box)
 
-	layout_origin := self.box.lo + - self.scroll
-	set_next_box({layout_origin, layout_origin + layout_size})
-	begin_layout(as_column, is_dynamic) or_return
+	layout_origin := self.box.lo - self.scroll
+	begin_layout(as_column, is_dynamic, with_box({layout_origin, layout_origin + layout_size})) or_return
 	set_width(to_layout_width)
 
 	return true
@@ -96,7 +94,7 @@ end_container :: proc() {
 	layout := get_current_layout()
 	if object, ok := get_current_object(); ok {
 		extras := &object.variant.(Container)
-		extras.space_needed = linalg.max(layout.content_size + layout.spacing_size * axis_normal(get_current_axis()), extras.space_needed)
+		extras.space_needed = linalg.max(layout.content_size + layout.spacing_size, extras.space_needed)
 
 		end_layout()
 
@@ -239,7 +237,7 @@ scrollbar :: proc(
 		handle_box.hi[j] = object.box.hi[j]
 
 		if object_is_visible(object) {
-			kn.fill_box(
+			kn.add_box(
 				handle_box,
 				rounding,
 				paint = get_current_style().color.accent if .Hovered in object.state.current else get_current_style().color.button,

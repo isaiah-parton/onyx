@@ -23,7 +23,7 @@ import "core:time"
 import "vendor:glfw"
 import "vendor:wgpu"
 
-FILLER_TEXT :: `1. In the beginning was the Word, and the Word was with God, and the Word was God.  2. The same was in the beginning with God.  3. All things were made by him; and without him was not any thing made that was made.  4. In him was life; and the life was the light of men.  5. And the light shineth in darkness; and the darkness comprehended it not.`
+FILLER_TEXT :: `Lorem ipsum odor amet, consectetuer adipiscing elit. Feugiat per venenatis at himenaeos odio ante ante pretium vestibulum. Natoque finibus est consequat orci et curae. Mollis odio massa dictumst mus metus eros aliquam quam. Commodo laoreet ultrices hac conubia ultricies suspendisse magna phasellus magna. Pulvinar tempor maximus venenatis ex pellentesque vitae purus. Ullamcorper aptent inceptos lectus molestie fermentum consectetur tempor. Platea porttitor auctor mattis nisi ut urna lectus magnis risus.`
 
 Section :: enum {
 	Button,
@@ -87,7 +87,7 @@ analog_section :: proc(state: ^Analog_Section_State) {
 	set_height(to_scale(1))
 	if do_layout(as_row) {
 		set_width(that_of_object)
-		header("Range sliders")
+		h1("Range sliders")
 	}
 	space()
 	set_height(to_scale(1))
@@ -239,7 +239,7 @@ nav_section :: proc(state: ^Nav_Section_State) {
 	set_width(to_layout_width)
 	set_height(to_scale(5))
 	if do_layout(as_row) {
-		kn.fill_box(get_current_layout().box, paint = get_current_style().color.field)
+		kn.add_box(get_current_layout().box, paint = get_current_style().color.field)
 		set_width(that_of_object)
 		set_height(to_scale(1))
 		set_align(1)
@@ -353,16 +353,15 @@ menu_section :: proc() {
 		menu_button("Close")
 		end_menu()
 	}
-	tooltip_text_layout := kn.make_text_layout(
+	tooltip_text := kn.make_text(
 		"Click to open!",
 		get_current_style().default_text_size,
 		get_current_style().default_font,
 	)
-	if begin_tooltip_for_object(last_object().?, tooltip_text_layout.size + get_current_style().text_padding * 2) {
-		kn.fill_text_layout(
-			tooltip_text_layout,
-			box_center(get_current_layout().box),
-			0.5,
+	if begin_tooltip_for_object(last_object().?, tooltip_text.size + get_current_style().text_padding * 2) {
+		kn.add_text(
+			tooltip_text,
+			box_center(get_current_layout().box) - tooltip_text.size * 0.5,
 			get_current_style().color.content,
 		)
 		end_tooltip()
@@ -492,28 +491,21 @@ main :: proc() {
 
 			{
 				box := view_box()
-				kn.fill_box(box, paint = get_current_style().color.background)
+				kn.add_box(box, paint = get_current_style().color.background)
 			}
 
 			// example_browser(&state)
 			set_size(to_layout_size)
 			if do_carousel() {
 				if do_page(left_to_right, split_golden) {
-					shrink(50)
-					shrink(2)
-					set_padding(2)
-					foreground()
-					if do_layout(top_to_bottom, split_golden) {
-						foreground()
-						if do_layout(right_to_left, split_golden) {
-							foreground()
-							foreground()
-						}
+					shrink(get_current_style().scale * 2)
+					h1("Ronin")
+					if button("Next \ue425").clicked {
+						pages_proceed()
 					}
 				}
 				if do_page(left_to_right, split_golden) {
-					shrink(50)
-					shrink(2)
+					shrink(get_current_style().scale * 2)
 					set_padding(2)
 					button("A")
 					if do_layout(top_to_bottom, split_golden) {
@@ -523,6 +515,10 @@ main :: proc() {
 							button("D")
 						}
 					}
+				}
+				if do_page(left_to_right) {
+					shrink(get_current_style().scale * 2)
+					foreground()
 				}
 			}
 			// for i in 0..<len(panels) {

@@ -1,6 +1,5 @@
 package ronin
 
-import kn "local:katana"
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
@@ -8,13 +7,14 @@ import "core:io"
 import "core:math"
 import "core:math/linalg"
 import "core:mem"
-import "core:slice"
 import "core:reflect"
+import "core:slice"
 import "core:strconv"
 import "core:strings"
 import "core:time"
 import "core:unicode"
 import "core:unicode/utf8"
+import kn "local:katana"
 import "tedit"
 
 Input_Decal :: enum {
@@ -30,8 +30,8 @@ Input_State :: struct {
 	offset:           [2]f32,
 	last_mouse_index: int,
 	action_time:      time.Time,
-	match_list: [dynamic]string,
-	closest_match: string,
+	match_list:       [dynamic]string,
+	closest_match:    string,
 }
 
 input_select_all :: proc(object: ^Object) {
@@ -105,12 +105,13 @@ raw_input :: proc(
 	}
 	type_info := runtime.type_info_base(type_info)
 
+	style := get_current_style()
 	object := get_object(hash(loc))
 	if .Is_Input not_in object.flags {
 		object.flags += {.Is_Input, .Sticky_Press, .Sticky_Hover}
 		object.input.builder = strings.builder_make()
 	}
-	object.size = get_current_style().scale * [2]f32{3, 1}
+	object.size = {6, 2} * style.scale
 
 	if do_object(object) {
 
@@ -132,7 +133,6 @@ raw_input :: proc(
 		obfuscated := .Obfuscated in flags
 		monospace := .Monospace in flags
 
-		style := get_current_style()
 		text_size := style.content_text_size
 		text_font := (style.monospace_font if (monospace) else style.default_font)
 
@@ -140,17 +140,18 @@ raw_input :: proc(
 
 		text_origin: [2]f32
 		if multiline {
-			text_origin = object.box.lo + global_state.style.text_padding + {0, 2}
+			text_origin = object.box.lo + style.text_padding + {0, 2}
 		} else {
 			text_origin = {
-				object.box.lo.x + global_state.style.text_padding.x,
+				object.box.lo.x + style.text_padding.x,
 				box_center_y(object.box) - text_font.line_height * text_size * 0.5,
 			}
 		}
 
-		content_layout, prefix_layout: kn.Text_Layout
+		content_text: kn.Selectable_Text
+		prefix_layout: kn.Text
 		if len(prefix) > 0 {
-			prefix_layout = kn.make_text_layout(prefix, text_size)
+			prefix_layout = kn.make_text(prefix, text_size)
 			text_origin.x += prefix_layout.size.x
 		}
 
@@ -183,22 +184,21 @@ raw_input :: proc(
 			}
 
 			if is_visible {
-				options := kn.DEFAULT_TEXT_OPTIONS
-				options.obfuscated = obfuscated
-				content_layout = kn.make_text_layout(
-					content_string,
-					text_size,
-					selection = object.input.editor.selection,
-					options = options,
-					local_mouse = mouse_point() - (text_origin - object.input.offset),
+				content_text = kn.make_selectable(
+					kn.make_text(
+						content_string,
+						text_size,
+						selection = object.input.editor.selection,
+					),
+					mouse_point() - text_origin,
 				)
 			}
 
 			if .Pressed not_in object.state.current &&
-			   object.input.last_mouse_index != content_layout.mouse_index {
+			   object.input.last_mouse_index != content_text.selection.index {
 				object.click.count = 0
 			}
-			object.input.last_mouse_index = content_layout.mouse_index
+			object.input.last_mouse_index = content_text.selection.index
 
 			if .Active in object.state.current {
 				if .Active not_in object.state.previous {
@@ -294,16 +294,16 @@ raw_input :: proc(
 
 			last_selection := object.input.editor.selection
 
-			text_mouse_selection(object, content_string, &content_layout)
+			text_mouse_selection(object, content_string, &content_text)
 
-			if .Active in object.state.previous && len(content_layout.glyphs) > 0 {
-				glyph := content_layout.glyphs[content_layout.glyph_selection[0]]
+			if .Active in object.state.previous && len(content_text.glyphs) > 0 {
+				glyph := content_text.glyphs[content_text.selection_glyphs[0]]
 				glyph_pos := (text_origin - object.input.offset) + glyph.offset
 				cursor_box := Box {
 					glyph_pos + {0, -2},
-					glyph_pos + {0, content_layout.font.line_height + 2},
+					glyph_pos + {0, content_text.font.line_height + 2},
 				}
-				inner_box := shrink_box(object.box, global_state.style.text_padding)
+				inner_box := shrink_box(object.box, style.text_padding)
 				object.input.offset.x += max(0, cursor_box.hi.x - inner_box.hi.x)
 				if box_width(inner_box) > box_width(cursor_box) {
 					object.input.offset.x -= max(0, inner_box.lo.x - cursor_box.lo.x)
@@ -326,39 +326,44 @@ raw_input :: proc(
 
 			text_origin -= object.input.offset
 			if object_is_visible(object) {
-				kn.fill_box(object.box, get_current_options().radius, paint = style.color.field)
+				kn.add_box(object.box, get_current_options().radius, paint = style.color.field)
 				kn.push_scissor(kn.make_box(object.box, get_current_options().radius))
 				if len(content_string) == 0 {
-					kn.fill_text(
+					kn.add_string(
 						placeholder,
 						text_size,
 						text_origin,
 						paint = kn.fade(style.color.content, 0.5),
 					)
 				}
-				if !kn.text_layout_is_empty(&prefix_layout) {
-					kn.fill_text_layout(
+				if !kn.text_is_empty(&prefix_layout) {
+					kn.add_text(
 						prefix_layout,
 						text_origin + {-prefix_layout.size.x, 0},
 						paint = kn.fade(style.color.content, 0.5),
 					)
 				}
 				if .Active in object.state.previous {
-					draw_text_layout_highlight(
-						content_layout,
+					draw_text_highlight(
+						&content_text,
 						text_origin,
 						kn.fade(style.color.accent, 1.0 / 3.0),
 					)
 					if len(object.input.closest_match) > 0 {
-						text_layout := kn.make_text_layout(object.input.closest_match, text_size)
-						kn.fill_text_layout_range(text_layout, {len(content_layout.glyphs) - 1, len(text_layout.glyphs)}, text_origin, paint = kn.fade(style.color.content, 0.5))
+						text_layout := kn.make_text(object.input.closest_match, text_size)
+						kn.add_text_range(
+							text_layout,
+							{len(content_text.glyphs) - 1, len(text_layout.glyphs)},
+							text_origin,
+							paint = kn.fade(style.color.content, 0.5),
+						)
 					}
 				}
-				kn.fill_text_layout(content_layout, text_origin, paint = style.color.content)
+				kn.add_text(content_text, text_origin, paint = style.color.content)
 				if .Active in object.state.previous {
 					draw_frames(1)
 					draw_text_layout_cursor(
-						content_layout,
+						content_text,
 						text_origin,
 						kn.fade(
 							style.color.accent,
@@ -379,9 +384,9 @@ raw_input :: proc(
 				}
 				kn.pop_scissor()
 				if .Undecorated not_in flags {
-					kn.stroke_box(
+					kn.add_box_lines(
 						object.box,
-						1,
+						style.line_width,
 						radius = get_current_options().radius,
 						paint = style.color.accent if .Active in object.state.current else style.color.button,
 					)
@@ -412,7 +417,11 @@ raw_input :: proc(
 					}
 				}
 			}
-			result.changed = replace_input_content(data, type_info, strings.to_string(object.input.builder))
+			result.changed = replace_input_content(
+				data,
+				type_info,
+				strings.to_string(object.input.builder),
+			)
 		}
 	}
 	return
@@ -486,13 +495,13 @@ replace_input_content :: proc(
 	return true
 }
 
-draw_text_layout_cursor :: proc(layout: kn.Text_Layout, origin: [2]f32, color: kn.Color) {
+draw_text_layout_cursor :: proc(layout: kn.Text, origin: [2]f32, color: kn.Color) {
 	if len(layout.glyphs) == 0 {
 		return
 	}
 	line_height := layout.font.line_height * layout.font_scale
-	cursor_origin := origin + layout.glyphs[layout.glyph_selection[0]].offset
-	kn.fill_box(
+	cursor_origin := origin + layout.glyphs[layout.selection_glyphs[0]].offset
+	kn.add_box(
 		snapped_box(
 			{
 				{cursor_origin.x - 1, cursor_origin.y},
@@ -503,34 +512,30 @@ draw_text_layout_cursor :: proc(layout: kn.Text_Layout, origin: [2]f32, color: k
 	)
 }
 
-draw_text_layout_highlight :: proc(layout: kn.Text_Layout, origin: [2]f32, color: kn.Color) {
-	if layout.glyph_selection[0] == layout.glyph_selection[1] {
+draw_text_highlight :: proc(text: ^kn.Text, origin: [2]f32, color: kn.Color) {
+	if text.selection_glyphs[0] == text.selection_glyphs[1] {
 		return
 	}
-	line_height := layout.font.line_height * layout.font_scale
-	for &line, i in layout.lines {
-		to_ordered_range :: proc(range: [2]$T) -> [2]T {
-			range := range
-			if range.x > range.y {
-				range = range.yx
-			}
-			return range
-		}
-		selection_range := to_ordered_range(layout.glyph_selection)
+	line_height := text.font.line_height * text.font_scale
+	for &line, i in text.lines {
+		selection_range := to_ordered_range(text.selection_glyphs)
 		highlight_range := [2]int {
 			max(selection_range.x, line.glyph_range.x),
 			min(selection_range.y, line.glyph_range.y),
 		}
-		if highlight_range.x <= highlight_range.y {
+		if highlight_range.x < highlight_range.y {
 			box := Box {
-				origin + layout.glyphs[highlight_range.x].offset,
-				origin + layout.glyphs[highlight_range.y].offset + {0, line_height},
+				origin + text.glyphs[highlight_range.x].offset,
+				origin +
+				text.glyphs[highlight_range.y].offset +
+				{
+					text.font.space_advance *
+					text.font_scale *
+					f32(i32(selection_range.y > line.glyph_range.y)),
+					line_height,
+				},
 			}
-			box.hi.x +=
-				layout.font.space_advance *
-				layout.font_scale *
-				f32(i32(selection_range.y > line.glyph_range.y))
-			kn.fill_box(snapped_box(box), paint = color)
+			kn.add_box(snapped_box(box), paint = color)
 		}
 	}
 }

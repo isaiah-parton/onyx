@@ -9,8 +9,10 @@ import "core:slice"
 tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bool) {
 	object := get_object(hash(loc))
 	if begin_object(object) {
-		text_layout := kn.make_text_layout(text, get_current_style().default_text_size, get_current_style().default_font)
-		object.size = text_layout.size + get_current_style().text_padding * 2
+		style := get_current_style()
+		kn.set_font(style.bold_font)
+		text_layout := kn.make_text(text, style.default_text_size)
+		object.size = text_layout.size + style.text_padding * 2
 		if point_in_box(mouse_point(), object.box) {
 			hover_object(object)
 		}
@@ -19,11 +21,11 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 		}
 		if object_is_visible(object) {
 			if active {
-				kn.fill_box(object.box, get_current_options().radius * {1, 1, 0, 0}, paint = get_current_style().color.foreground)
+				kn.add_box(object.box, get_current_options().radius * {1, 1, 0, 0}, paint = style.color.foreground)
 			} else {
-				kn.fill_box(shrink_box(object.box, 2), get_current_options().radius, paint = kn.mix(0.5, get_current_style().color.foreground_accent, get_current_style().color.foreground))
+				kn.add_box(shrink_box(object.box, 2), get_current_options().radius, paint = kn.mix(0.5, style.color.foreground_accent, style.color.foreground))
 			}
-			kn.fill_text_layout(text_layout, box_center(object.box), 0.5, paint = get_current_style().color.content)
+			kn.add_text(text_layout, box_center(object.box) - text_layout.size * 0.5, paint = style.color.content)
 		}
 		clicked = .Clicked in object.state.current
 		end_object()
@@ -35,7 +37,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 	using object:  ^Object,
 // 	index:         int,
 // 	items:         []string,
-// 	label_layouts: []kn.Text_Layout,
+// 	label_layouts: []kn.Text,
 // }
 
 // Toggle_Widget :: struct {
@@ -45,7 +47,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 
 // Tab :: struct {
 // 	using __toggle_widget: Toggle_Widget,
-// 	text_layout:           kn.Text_Layout,
+// 	text_layout:           kn.Text,
 // 	active_time:           f32,
 // 	hover_time:            f32,
 // }
@@ -61,7 +63,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 	}
 // 	object := &object.variant.(Tab)
 // 	object.state = state
-// 	object.text_layout = kn.make_text_layout(
+// 	object.text_layout = kn.make_text(
 // 		text,
 // 		global_state.style.default_text_size,
 // 		global_state.style.default_font,
@@ -92,7 +94,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 			object.object.box,
 // 			box_height(object.object.box) * math.lerp(f32(0.85), f32(1.0), object.active_time),
 // 		)
-// 		kn.fill_box(
+// 		kn.add_box(
 // 			box,
 // 			{
 // 				global_state.style.rounding * object.active_time,
@@ -106,7 +108,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 				get_current_style().color.foreground
 // 			),
 // 		)
-// 		kn.fill_text_layout(
+// 		kn.add_text(
 // 			object.text_layout,
 // 			box_center(box),
 // 			align = 0.5,
@@ -124,7 +126,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 	}
 // 	object.metrics.desired_size.y = global_state.style.scale.y
 // 	for item, i in items {
-// 		object.label_layouts[i] = kn.make_text_layout(
+// 		object.label_layouts[i] = kn.make_text(
 // 			item,
 // 			global_state.style.default_text_size,
 // 			global_state.style.default_font,
@@ -166,7 +168,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 			}
 // 		}
 // 		if is_visible {
-// 			kn.fill_box(
+// 			kn.add_box(
 // 				{{option_box.lo.x, option_box.hi.y - 3}, {option_box.hi.x, option_box.hi.y}},
 // 				1.5,
 // 				paint = kn.fade(
@@ -174,7 +176,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 					f32(int(hovered || object.index == i)),
 // 				),
 // 			)
-// 			kn.fill_text_layout(
+// 			kn.add_text(
 // 				object.label_layouts[i],
 // 				{box_center_x(option_box), option_box.lo.y},
 // 				align = {0.5, 0},
@@ -204,7 +206,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 		is_visible := object_is_visible(object)
 		inner_box := shrink_box(object.box, 2)
 		if is_visible {
-			kn.stroke_box(object.box, 1, get_current_style().rounding, get_current_style().color.button)
+			kn.add_box_lines(object.box, 1, get_current_style().rounding, get_current_style().color.button)
 		}
 		option_rounding :=
 			global_state.style.rounding * ((box_height(object.box) - 4) / box_height(object.box))
@@ -225,7 +227,7 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 				}
 			}
 			if is_visible {
-				kn.fill_box(
+				kn.add_box(
 					shrink_box(option_box, 1),
 					option_rounding,
 					paint = kn.fade(
@@ -233,11 +235,11 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 						max(f32(int(hovered)) * 0.5, f32(int(index^ == T(i)))),
 					),
 				)
-				kn.fill_text(
+				kn.set_font(get_current_style().default_font)
+				kn.add_string(
 					item,
 					global_state.style.default_text_size,
 					box_center(option_box),
-					font = global_state.style.default_font,
 					align = 0.5,
 					paint = kn.fade(get_current_style().color.content, 1 if int(index^) == i else 0.5),
 				)

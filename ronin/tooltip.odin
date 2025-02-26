@@ -36,9 +36,9 @@ tooltip_for_last_object :: proc(
 	if .Hovered not_in object.state.current {
 		return
 	}
-	text_layout := kn.make_text_layout(text, get_current_style().default_text_size, font)
+	text_layout := kn.make_text(text, get_current_style().default_text_size, font)
 	if begin_tooltip_for_object(object, text_layout.size + get_current_style().text_padding * 2, side, delay) {
-		kn.fill_text_layout(text_layout, get_current_layout().box.lo + get_current_style().text_padding, paint = get_current_style().color.content)
+		kn.add_text(text_layout, get_current_layout().box.lo + get_current_style().text_padding, paint = get_current_style().color.content)
 		end_tooltip()
 	}
 }
@@ -137,8 +137,8 @@ begin_tooltip_with_options :: proc(size: [2]f32, side: Side = .Bottom, origin: u
 	kn.translate(-anchor_point)
 	kn.disable_scissor()
 	draw_shadow(object.box)
-	kn.fill_box(object.box, global_state.style.rounding, get_current_style().color.foreground)
-	kn.stroke_box(object.box, 1, global_state.style.rounding, get_current_style().color.foreground_stroke)
+	kn.add_box(object.box, global_state.style.rounding, get_current_style().color.foreground)
+	kn.add_box_lines(object.box, 1, global_state.style.rounding, get_current_style().color.lines)
 	return true
 }
 

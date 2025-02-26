@@ -65,12 +65,12 @@ triangle_barycentric :: proc(a, b, c, p: [2]f32) -> (u, v, w: f32) {
 }
 
 draw_checkerboard_pattern :: proc(box: Box, size: [2]f32, primary, secondary: kn.Color) {
-	kn.fill_box(box, paint = primary)
+	kn.add_box(box, paint = primary)
 	for x in 0 ..< int(math.ceil(box_width(box) / size.x)) {
 		for y in 0 ..< int(math.ceil(box_height(box) / size.y)) {
 			if (x + y) % 2 == 0 {
 				pos := box.lo + [2]f32{f32(x), f32(y)} * size
-				kn.fill_box({pos, linalg.min(pos + size, box.hi)}, paint = secondary)
+				kn.add_box({pos, linalg.min(pos + size, box.hi)}, paint = secondary)
 			}
 		}
 	}
@@ -86,9 +86,9 @@ color_picker :: proc(value: ^kn.Color, show_hex: bool = false, show_alpha: bool 
 		return
 	}
 	object := get_object(hash(loc))
-	text_layout: kn.Text_Layout
+	text_layout: kn.Text
 	if show_hex {
-		text_layout := kn.make_text_layout(
+		text_layout := kn.make_text(
 			fmt.tprintf("#%6x", kn.hex_from_color(value^)),
 			global_state.style.default_text_size,
 			global_state.style.monospace_font,
@@ -131,10 +131,9 @@ color_picker :: proc(value: ^kn.Color, show_hex: bool = false, show_alpha: bool 
 				kn.blend(get_current_style().color.checkers1, value^, kn.White),
 			)
 			if show_hex {
-				kn.fill_text_layout(
+				kn.add_text(
 					text_layout,
-					box_center(object.box),
-					align = 0.5,
+					box_center(object.box) - text_layout.size * 0.5,
 					paint = accent_color,
 				)
 			}
@@ -163,7 +162,7 @@ color_picker :: proc(value: ^kn.Color, show_hex: bool = false, show_alpha: bool 
 
 					set_rounded_corners(ALL_CORNERS)
 					foreground()
-					kn.stroke_box(get_current_layout().box, 1, get_current_options().radius, paint = get_current_style().color.button)
+					kn.add_box_lines(get_current_layout().box, 1, get_current_options().radius, paint = get_current_style().color.button)
 					shrink(10)
 					alpha_slider(&extras.hsva.w)
 					space()
@@ -230,7 +229,7 @@ alpha_slider :: proc(
 			time := clamp(value^, 0, 1)
 			pos := box.lo[i] + (box.hi[i] - box.lo[i] - 4) * time
 			if axis == .Y {
-				kn.fill_box(
+				kn.add_box(
 					box,
 					paint = kn.make_linear_gradient(
 						box.lo,
@@ -239,7 +238,7 @@ alpha_slider :: proc(
 						color,
 					),
 				)
-				kn.stroke_box(
+				kn.add_box_lines(
 					{{box.lo.x, pos}, {box.hi.x, pos + 4}},
 					1,
 					paint = get_current_style().color.content,
@@ -306,7 +305,7 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 		}
 
 		if object_is_visible(object) {
-			kn.stroke_circle(
+			kn.add_circle_lines(
 				center,
 				outer_radius,
 				width = (outer_radius - inner_radius),
@@ -319,7 +318,7 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 				inner_radius,
 			)
 
-			kn.fill_polygon(
+			kn.add_polygon(
 				{point_a, point_b, point_c},
 				paint = kn.make_tri_gradient(
 					{point_a, point_b, point_c},
@@ -334,8 +333,8 @@ hsv_wheel :: proc(value: ^[3]f32, loc := #caller_location) {
 			)
 			r: f32 =
 				9 if (object.state.current >= {.Pressed} && .Active not_in object.state.current) else 7
-			kn.fill_circle(point, r + 1, paint = kn.Black if value.z > 0.5 else kn.White)
-			kn.fill_circle(point, r, paint = kn.color_from_hsva({value.x, value.y, value.z, 1}))
+			kn.add_circle(point, r + 1, paint = kn.Black if value.z > 0.5 else kn.White)
+			kn.add_circle(point, r, paint = kn.color_from_hsva({value.x, value.y, value.z, 1}))
 		}
 	}
 	return

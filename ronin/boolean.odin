@@ -44,9 +44,9 @@ boolean :: proc(
 		gadget_size = [2]f32{1.75, 1} * base_size
 	}
 
-	text_layout: kn.Text_Layout
+	text_layout: kn.Text
 	if len(text) > 0 {
-		text_layout = kn.make_text_layout(
+		text_layout = kn.make_text(
 			text,
 			global_state.style.default_text_size,
 			global_state.style.default_font,
@@ -110,7 +110,7 @@ boolean :: proc(
 			gadget_center := box_center(gadget_box)
 
 			if .Hovered in widget.state.current {
-				kn.fill_box(
+				kn.add_box(
 					{{gadget_center.x, widget.box.lo.y}, widget.box.hi},
 					{0, global_state.style.rounding, 0, global_state.style.rounding},
 					kn.fade(get_current_style().color.button, 0.2),
@@ -125,8 +125,8 @@ boolean :: proc(
 
 			switch type {
 			case .Checkbox:
-				kn.fill_box(gadget_box, global_state.style.rounding, get_current_style().color.foreground)
-				kn.stroke_box(gadget_box, 1, global_state.style.rounding, get_current_style().color.foreground_stroke)
+				kn.add_box(gadget_box, global_state.style.rounding, get_current_style().color.foreground)
+				kn.add_box_lines(gadget_box, 1, global_state.style.rounding, get_current_style().color.lines)
 				if state_time > 0 && state_time < 1 {
 					kn.push_scissor(kn.make_box(widget.box, global_state.style.rounding))
 				}
@@ -136,7 +136,7 @@ boolean :: proc(
 						box_height(gadget_box) *
 						((1 - state_time) if value^ else -(1 - state_time)),
 					}
-					kn.check(gadget_center, gadget_size.y / 4, 1, get_current_style().color.content)
+					kn.add_check(gadget_center, gadget_size.y / 4, 1, get_current_style().color.content)
 				}
 				if state_time > 0 && state_time < 1 {
 					kn.pop_scissor()
@@ -144,19 +144,19 @@ boolean :: proc(
 			case .Radio:
 				gadget_center := box_center(gadget_box)
 				radius := gadget_size.y / 2
-				kn.fill_circle(
+				kn.add_circle(
 					gadget_center,
 					radius,
 					get_current_style().color.foreground,
 				)
-				kn.stroke_circle(
+				kn.add_circle_lines(
 					gadget_center,
 					radius,
 					1,
-					get_current_style().color.foreground_stroke,
+					get_current_style().color.lines,
 				)
 				if state_time > 0 {
-					kn.fill_circle(
+					kn.add_circle(
 						gadget_center,
 						(radius - 5) * state_time,
 						kn.fade(get_current_style().color.content, state_time),
@@ -172,9 +172,9 @@ boolean :: proc(
 					(box_width(inner_box) - box_height(inner_box)) * state_time,
 					box_center_y(inner_box),
 				}
-				kn.fill_box(gadget_box, paint = get_current_style().color.button_background, radius = outer_radius)
-				kn.stroke_box(gadget_box, 1, paint = get_current_style().color.foreground_stroke, radius = outer_radius)
-				kn.fill_circle(
+				kn.add_box(gadget_box, paint = get_current_style().color.button_background, radius = outer_radius)
+				kn.add_box_lines(gadget_box, 1, paint = get_current_style().color.lines, radius = outer_radius)
+				kn.add_circle(
 					lever_center,
 					inner_radius,
 					kn.mix(state_time, get_current_style().color.button, get_current_style().color.content),
@@ -199,10 +199,9 @@ boolean :: proc(
 				case .Bottom:
 					text_pos = {widget.box.lo.x, widget.box.hi.y}
 				}
-				kn.fill_text_layout(
+				kn.add_text(
 					text_layout,
-					text_pos,
-					align = {0, 0.5},
+					text_pos - text_layout.size * {0, 0.5},
 					paint = kn.fade(get_current_style().color.content, opacity),
 				)
 			}

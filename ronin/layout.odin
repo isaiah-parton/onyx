@@ -26,6 +26,8 @@ Layout_Direction :: enum {
 	Reversed,
 }
 
+Padding :: distinct [4]f32
+Margin :: distinct [4]f32
 Dynamic :: struct {
 }
 Show_Wireframe :: distinct bool
@@ -46,6 +48,8 @@ top_to_bottom :: Cut_Contents_From_Side(.Top)
 bottom_to_top :: Cut_Contents_From_Side(.Bottom)
 
 with_box :: Box
+with_margin :: Margin
+with_padding :: Padding
 as_row :: left_to_right
 as_reversed_row :: right_to_left
 as_column :: top_to_bottom
@@ -62,6 +66,8 @@ with_wireframe :: Show_Wireframe(true)
 
 Layout_Property :: union {
 	Box,
+	Margin,
+	Padding,
 	Cut_From_Side,
 	Cut_Contents_From_Side,
 	Define_Content_Sizes,
@@ -201,15 +207,15 @@ get_current_axis :: proc() -> int {
 
 begin_layout :: proc(props: ..Layout_Property) -> bool {
 	current_layout := get_current_layout()
-	current_axis := int(current_layout.side) / 2
 
 	layout := Layout{}
 
 	cut_from_side := current_layout.side
-	cut_contents_from_side := Side.Left
-	box: Maybe(Box)
+	cut_contents_from_side := Side.Top
 	options := get_current_options()^
 	size_option: Size_Option
+	margin := [4]f32{}
+	padding := [4]f32{}
 
 	for prop in props {
 		#partial switch v in prop {
@@ -226,28 +232,35 @@ begin_layout :: proc(props: ..Layout_Property) -> bool {
 		case Show_Wireframe:
 			layout.show_wireframe = bool(v)
 		case Box:
-			box = Box(v)
+			layout.box = v
+		case Margin:
+			margin = ([4]f32)(v)
+		case Padding:
+			padding = ([4]f32)(v)
 		}
 	}
-	if box == nil {
-		cut_size := solve_size(options.size[current_axis], 0, options.methods[current_axis])
+	if layout.box == {} {
+		cut_axis := int(cut_from_side) / 2
+		cut_size := solve_size(options.size[cut_axis], 0, options.methods[cut_axis])
 		if current_layout.does_grow {
-			current_layout.box = grow_side_of_box(current_layout.box, current_layout.side, cut_size)
+			current_layout.box = grow_side_of_box(current_layout.box, cut_from_side, cut_size)
 		}
-		box = cut_box(
+		layout.box = cut_box(
 			&current_layout.box,
 			cut_from_side,
 			cut_size,
 		)
+		layout.cut_side = cut_from_side
+		layout.box.lo += margin.xy
+		layout.box.hi -= margin.zw
 	}
 	layout.side = cut_contents_from_side
-	layout.box = box.?
-	layout.bounds = box.?
+	layout.bounds = layout.box
 	push_options(options)
 	ok := push_layout(layout)
 	set_cut_size(size_option)
 	if layout.show_wireframe {
-		kn.stroke_box(layout.box, 1, paint = get_current_style().color.foreground_stroke)
+		kn.add_box_lines(layout.box, 1, paint = get_current_style().color.lines)
 	}
 	return ok
 }
@@ -257,12 +270,13 @@ end_layout :: proc() {
 	pop_layout()
 	next_layout := get_current_layout()
 	next_layout.spacing_size += layout.spacing_size
+	effective_size := linalg.max(layout.content_size, box_size(layout.bounds))
 	if int(layout.cut_side) > 1 {
-		next_layout.content_size.x = max(layout.content_size.x, next_layout.content_size.x)
-		next_layout.content_size.y += layout.content_size.y
+		next_layout.content_size.x = max(effective_size.x, next_layout.content_size.x)
+		next_layout.content_size.y += effective_size.y
 	} else {
-		next_layout.content_size.y = max(layout.content_size.y, next_layout.content_size.y)
-		next_layout.content_size.x += layout.content_size.x
+		next_layout.content_size.y = max(effective_size.y, next_layout.content_size.y)
+		next_layout.content_size.x += effective_size.x
 	}
 	pop_options()
 }
@@ -300,7 +314,7 @@ shrink :: proc(amount: [4]f32) {
 space :: proc() {
 	layout := get_current_layout()
 	axis := int(layout.side) / 2
-	cut_size := solve_size(get_current_options().size[axis], 0, .Fixed)
+	cut_size := get_current_style().scale//solve_size(get_current_options().size[axis], 0, .Fixed)
 	cut_box(&layout.box, layout.side, cut_size)
 	layout.spacing_size[axis] += cut_size
 }

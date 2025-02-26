@@ -8,16 +8,56 @@ import "core:math"
 import "core:math/linalg"
 import "core:unicode"
 
+Text_Content_Builder :: struct {
+	buf: [dynamic]u8,
+	needs_new_line: bool,
+}
+
+text_content_builder_reset :: proc(b: ^Text_Content_Builder) {
+	b.needs_new_line = false
+	clear(&b.buf)
+}
+
+text_content_builder_write :: proc(b: ^Text_Content_Builder, s: string, range: [2]int) {
+	if range.x == range.y {
+		return
+	}
+	if b.needs_new_line {
+		append(&b.buf, '\n')
+		b.needs_new_line = false
+	}
+	append(&b.buf, s[range.x:range.y])
+	if range.y == len(s) {
+		b.needs_new_line = true
+	}
+}
+
+add_global_text_content :: proc(s: string, range: [2]int) {
+	text_content_builder_write(&global_state.text_content_builder, s, range)
+}
+
 to_ordered_range :: proc(range: [2]$T) -> [2]T {
 	range := range
 	if range.x > range.y {
-		range = range.yx
+		range.x, range.y = range.y, range.x
 	}
 	return range
 }
 
-paragraph :: proc(
-	text: string,
+point_inside_text :: proc(point: [2]f32, origin: [2]f32, text: kn.Text) -> bool {
+	if !point_in_box(point, Box{origin, origin + text.size}) {
+		return false
+	}
+	for &line in text.lines {
+		if point_in_box(point, Box{origin + line.offset, origin + line.offset + line.size}) {
+			return true
+		}
+	}
+	return false
+}
+
+text :: proc(
+	content: string,
 	font_size := global_state.style.default_text_size,
 	font := global_state.style.default_font,
 	align: [2]f32 = 0,
@@ -25,40 +65,43 @@ paragraph :: proc(
 	loc := #caller_location,
 ) {
 	object := get_object(hash(loc))
-	text_layout := kn.make_text_layout(
-		text,
+	object.flags += {.Sticky_Hover, .Sticky_Press}
+	layout := get_current_layout()
+	text := kn.make_text(
+		content,
 		font_size,
 		font,
+		max_size = box_size(layout.box),
+		wrap = .Word,
+		selection = object.input.editor.selection,
 	)
-
-	if begin_object(object) {
+	object.size = text.size
+	if do_object(object) {
 		if object_is_visible(object) {
+			style := get_current_style()
 			text_origin := object.box.lo
-			line_height := text_layout.font.line_height * text_layout.font_scale
-			for &line, i in text_layout.lines {
-				if point_in_box(mouse_point(), {text_origin + line.offset, text_origin + line.offset + line.size}) {
-					hover_object(object)
-				}
-				selection_range := to_ordered_range(text_layout.glyph_selection)
-				highlight_range := [2]int {
-					max(selection_range.x, line.glyph_range.x),
-					min(selection_range.y, line.glyph_range.y),
-				}
-				if highlight_range.x <= highlight_range.y {
-					box := Box {
-						text_origin + text_layout.glyphs[highlight_range.x].offset,
-						text_origin + text_layout.glyphs[highlight_range.y].offset + {0, line_height},
-					}
-					box.hi.x +=
-						text_layout.font.space_advance *
-						text_layout.font_scale *
-						f32(i32(selection_range.y > line.glyph_range.y))
-					kn.fill_box(snapped_box(box), paint = color)
-				}
+			text := kn.make_selectable(text, mouse_point() - text_origin)
+			if text.selection.valid {
+				hover_object(object)
 			}
-			kn.fill_text_layout(text_layout, text_origin, paint = get_current_style().color.accent if .Hovered in object.state.current else get_current_style().color.content)
+			if .Pressed in object.state.current {
+				object.state.current += {.Active}
+			}
+			if .Active in object.state.current {
+				if global_state.last_focused_object != global_state.focused_object &&
+				   global_state.focused_object != object.id &&
+				   !key_down(.Left_Control) {
+					object.state.current -= {.Active}
+				}
+				draw_text_highlight(&text, text_origin, kn.fade(style.color.accent, 1.0 / 3.0))
+				text_mouse_selection(object, content, &text)
+				add_global_text_content(content, to_ordered_range(object.input.editor.selection))
+			}
+			kn.add_text(text, text_origin, paint = color)
+			if .Hovered in object.state.current {
+				set_cursor(.I_Beam)
+			}
 		}
-		end_object()
 	}
 }
 
@@ -66,90 +109,87 @@ label :: proc(
 	text: string,
 	font_size := global_state.style.default_text_size,
 	font := global_state.style.default_font,
-	align: [2]f32 = 0,
-	padding: [2]f32 = 0,
 	color: kn.Color = get_current_style().color.content,
 	loc := #caller_location,
 ) {
-	text_layout := kn.make_text_layout(
+	text_layout := kn.make_text(
 		text,
 		font_size,
 		font,
 	)
 	self := get_object(hash(loc))
 	self.size = text_layout.size
+	self.size_is_fixed = true
 	if begin_object(self) {
 		if object_is_visible(self) {
 			if point_in_box(mouse_point(), self.box) {
 				hover_object(self)
 			}
-			box := shrink_box(self.box, padding)
-			kn.fill_text_layout(text_layout, linalg.lerp(box.lo, box.hi, align), paint = color, align = align)
+			kn.add_text(text_layout, self.box.lo, paint = color)
 		}
 		end_object()
 	}
 }
 
-header :: proc(text: string) {
-	label(
-		text,
+h1 :: proc(content: string) {
+	text(
+		content,
 		font_size = global_state.style.header_text_size,
 		font = global_state.style.header_font.? or_else global_state.style.default_font,
 	)
 }
 
 icon :: proc(which_one: rune, size: f32 = global_state.style.icon_size, loc := #caller_location) {
-	font := get_current_style().icon_font
+	style := get_current_style()
+	font := style.icon_font
 	if glyph, ok := kn.get_font_glyph(font, which_one); ok {
 		object := get_object(hash(loc))
 		object.size = {glyph.advance * size, font.line_height * size}
 		if do_object(object) {
-			if get_clip(current_clip(), object.box) != .Full {
-			kn.fill_glyph(glyph, size, linalg.floor(box_center(object.box)) - size / 2, get_current_style().color.content)
+			if object_is_visible(object) {
+				kn.add_glyph(glyph, size, linalg.floor(box_center(object.box)) - size / 2, style.color.content)
 			}
 		}
 	}
 }
 
-text_mouse_selection :: proc(object: ^Object, content: string, layout: ^kn.Text_Layout) {
+text_mouse_selection :: proc(object: ^Object, data: string, text: ^kn.Selectable_Text) {
 	is_separator :: proc(r: rune) -> bool {
 		return !unicode.is_alpha(r) && !unicode.is_number(r)
 	}
 
 	last_selection := object.input.editor.selection
-	if .Pressed in object.state.current && layout.mouse_index >= 0 {
+	if .Pressed in object.state.current && text.selection.index >= 0 {
 		if .Pressed not_in object.state.previous {
-			object.input.anchor = layout.mouse_index
+			object.input.anchor = text.selection.index
 			if object.click.count == 3 {
-				tedit.editor_execute(&object.input.editor, .Select_All)
+				object.input.editor.selection = {len(data), 0}
+				// tedit.editor_execute(&object.input.editor, .Select_All)
 			} else {
 				object.input.editor.selection = {
-					layout.mouse_index,
-					layout.mouse_index,
+					text.selection.index,
+					text.selection.index,
 				}
 			}
 		}
 		switch object.click.count {
 		case 2:
-			if layout.mouse_index < object.input.anchor {
-				if content[layout.mouse_index] == ' ' {
-					object.input.editor.selection[0] = layout.mouse_index
-				} else {
-					object.input.editor.selection[0] = max(
-						0,
-						strings.last_index_proc(
-							content[:layout.mouse_index],
-							is_separator,
-						) +
-						1,
-					)
-				}
+			allow_precision := text.selection.index != object.input.anchor
+			if text.selection.index <= object.input.anchor {
+				object.input.editor.selection[0] = text.selection.index if (allow_precision && is_separator(rune(data[text.selection.index]))) else max(
+					0,
+					strings.last_index_proc(
+						data[:text.selection.index],
+						is_separator,
+					) +
+					1,
+				)
 				object.input.editor.selection[1] = strings.index_proc(
-					content[object.input.anchor:],
+					data[object.input.anchor:],
 					is_separator,
 				)
 				if object.input.editor.selection[1] == -1 {
-					object.input.editor.selection[1] = len(content)
+					object.input.editor.selection[1] = len(data)
 				} else {
 					object.input.editor.selection[1] += object.input.anchor
 				}
@@ -157,28 +197,25 @@ text_mouse_selection :: proc(object: ^Object, content: string, layout: ^kn.Text_
 				object.input.editor.selection[1] = max(
 					0,
 					strings.last_index_proc(
-						content[:object.input.anchor],
+						data[:object.input.anchor],
 						is_separator,
 					) +
 					1,
 				)
-				if (layout.mouse_index > 0 &&
-					   content[layout.mouse_index - 1] == ' ') {
-					object.input.editor.selection[0] = 0
-				} else {
-					object.input.editor.selection[0] = strings.index_proc(
-						content[layout.mouse_index:],
-						is_separator,
-					)
-				}
+				// `text.selection.index - 1` is safe as long as `text.selection.index > object.input.anchor`
+				object.input.editor.selection[0] = 0 if (allow_precision && is_separator(rune(data[text.selection.index - 1]))) else strings.index_proc(
+					data[text.selection.index:],
+					is_separator,
+				)
 				if object.input.editor.selection[0] == -1 {
 					object.input.editor.selection[0] =
-						len(content) - layout.mouse_index
+						len(data)
+				} else {
+					object.input.editor.selection[0] += text.selection.index
 				}
-				object.input.editor.selection[0] += layout.mouse_index
 			}
 		case 1:
-			object.input.editor.selection[0] = layout.mouse_index
+			object.input.editor.selection[0] = text.selection.index
 		}
 	}
 }

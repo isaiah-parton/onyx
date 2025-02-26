@@ -418,22 +418,22 @@ focus_object :: proc(object: ^Object) {
 
 foreground :: proc(loc := #caller_location) {
 	object := get_object(hash(loc))
-	// set_next_box(get_current_layout().box)
+	set_next_box(get_current_layout().box)
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
 		style := get_current_style()
 		draw_shadow(object.box)
-		kn.fill_box(
+		kn.add_box(
 			object.box,
 			get_current_options().radius,
 			paint = style.color.foreground,
 		)
-		kn.stroke_box(
+		kn.add_box_lines(
 			object.box,
 			style.line_width,
 			get_current_options().radius,
-			paint = style.color.foreground_stroke,
+			paint = style.color.lines,
 		)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
@@ -447,16 +447,17 @@ background :: proc(loc := #caller_location) {
 	if begin_object(object) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
-		kn.fill_box(
+		style := get_current_style()
+		kn.add_box(
 			object.box,
 			get_current_options().radius,
-			paint = get_current_style().color.background,
+			paint = style.color.background,
 		)
-		kn.stroke_box(
+		kn.add_box_lines(
 			object.box,
-			1,
+			style.line_width,
 			get_current_options().radius,
-			paint = get_current_style().color.foreground_stroke,
+			paint = style.color.lines,
 		)
 		if point_in_box(global_state.mouse_pos, object.box) {
 			hover_object(object)
@@ -469,8 +470,7 @@ spinner :: proc(loc := #caller_location) {
 	object.size = get_current_style().scale
 	if begin_object(object) {
 		defer end_object()
-
-		kn.spinner(
+		kn.add_spinner(
 			box_center(object.box),
 			box_height(object.box) * 0.3,
 			get_current_style().color.content,
@@ -480,19 +480,20 @@ spinner :: proc(loc := #caller_location) {
 }
 
 draw_skeleton :: proc(box: Box, rounding: f32) {
-	kn.fill_box(box, rounding, get_current_style().color.button)
-	kn.fill_box(box, rounding, kn.Paint{kind = .Skeleton})
+	kn.add_box(box, rounding, get_current_style().color.button)
+	kn.add_box(box, rounding, kn.Paint{kind = .Skeleton})
 
 	draw_frames(1)
 }
 
 divider :: proc() {
 	layout := get_current_layout()
-	line_box := cut_box(&layout.box, layout.side, 1)
+	style := get_current_style()
+	line_box := cut_box(&layout.box, layout.side, style.line_width)
 	j := 1 - int(layout.side) / 2
 	line_box.lo[j] = layout.bounds.lo[j]
 	line_box.hi[j] = layout.bounds.hi[j]
-	kn.fill_box(line_box, paint = get_current_style().color.foreground_stroke)
+	kn.add_box(line_box, paint = kn.fade(style.color.lines, 0.5))
 }
 
 object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {

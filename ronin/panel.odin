@@ -128,7 +128,7 @@ begin_panel :: proc(
 
 	if !panel.is_snapped {
 		if kn.disable_scissor() {
-			kn.box_shadow(
+			kn.add_box_shadow(
 				move_box(panel.box, {0, 2}),
 				rounding,
 				6,
@@ -144,8 +144,8 @@ begin_panel :: proc(
 	kn.push_scissor(kn.make_box(panel.box, rounding))
 	push_clip(panel.box)
 
-	kn.fill_box(panel.box, rounding, paint = get_current_style().color.foreground)
-	kn.stroke_box(panel.box, 1, rounding, paint = get_current_style().color.foreground_stroke)
+	kn.add_box(panel.box, rounding, paint = get_current_style().color.foreground)
+	kn.add_box_lines(panel.box, 1, rounding, paint = get_current_style().color.lines)
 
 	set_next_box(panel.box)
 	begin_layout(as_column) or_return
@@ -174,7 +174,7 @@ end_panel :: proc() {
 				icon_color = get_current_style().color.accent
 				global_state.cursor_type = .Resize_NWSE
 			}
-			kn.fill_polygon(
+			kn.add_polygon(
 				{
 					{object.box.hi.x, object.box.lo.y},
 					object.box.hi,
@@ -192,7 +192,7 @@ end_panel :: proc() {
 	}
 
 	// if panel.fade > 0 {
-	// 	kn.fill_box(panel.box, 0, kn.fade(kn.BLACK, panel.fade * 0.25))
+	// 	kn.add_box(panel.box, 0, kn.fade(kn.BLACK, panel.fade * 0.25))
 	// }
 	// panel.fade = animate(
 	// 	panel.fade,
@@ -278,13 +278,13 @@ draw_panel_snap_widgets :: proc(state: Panel_Snap_State) {
 		for orb in orbs {
 			distance_to_mouse := linalg.length(mouse_point() - orb.position)
 			if distance_to_mouse <= RADIUS {
-				kn.stroke_box(orb.box, 2, paint = get_current_style().color.accent)
+				kn.add_box_lines(orb.box, 2, paint = get_current_style().color.accent)
 				if mouse_released(.Left) {
 					panel.box = orb.box
 					panel.is_snapped = true
 				}
 			} else {
-				kn.fill_circle(orb.position, RADIUS, kn.fade(get_current_style().color.accent, 0.5))
+				kn.add_circle(orb.position, RADIUS, kn.fade(get_current_style().color.accent, 0.5))
 			}
 		}
 	}

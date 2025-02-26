@@ -37,7 +37,7 @@ slider :: proc(
 		return
 	}
 	self := get_object(hash(loc))
-	self.size = get_current_style().scale
+	self.size = {10, 2} * get_current_style().scale
 	if self.variant == nil {
 		self.variant = Slider{}
 		self.flags += {.Sticky_Press, .Sticky_Hover}
@@ -78,39 +78,40 @@ slider :: proc(
 			set_cursor(.Resize_EW)
 		}
 		if object_is_visible(self) {
+			style := get_current_style()
 			radius := get_current_options().radius
 			kn.push_scissor(kn.make_box(self.box, radius))
-			kn.fill_box(self.box, paint = get_current_style().color.button_background)
-			kn.fill_box(
+			kn.add_box(self.box, paint = style.color.button_background)
+			kn.add_box(
 				get_box_cut_left(
 					self.box,
 					box_width(self.box) *
 					f32(clamp((f64(value^) - lower) / (upper - lower), 0, 1)),
 				),
-				paint = get_current_style().color.button,
+				paint = style.color.button,
 			)
 			if lower_limit > lower {
 				x :=
 					self.box.lo.x +
 					f32((lower_limit - lower) / (upper - lower)) * box_width(self.box)
-				kn.line({x, self.box.lo.y}, {x, self.box.hi.y}, 1, get_current_style().color.accent)
+				kn.add_line({x, self.box.lo.y}, {x, self.box.hi.y}, 1, style.color.accent)
 			}
 			if upper_limit < upper {
 				x :=
 					self.box.lo.x +
 					f32((upper_limit - lower) / (upper - lower)) * box_width(self.box)
-				kn.line({x, self.box.lo.y}, {x, self.box.hi.y}, 1, get_current_style().color.accent)
+				kn.add_line({x, self.box.lo.y}, {x, self.box.hi.y}, 1, style.color.accent)
 			}
-			kn.fill_text(
+			kn.set_font(style.monospace_font)
+			kn.add_string(
 				fmt.tprintf(format, value^),
-				get_current_style().default_text_size,
+				style.default_text_size,
 				box_center(self.box),
-				font = get_current_style().monospace_font,
 				align = 0.5,
-				paint = get_current_style().color.content,
+				paint = style.color.content,
 			)
 			kn.pop_scissor()
-			kn.stroke_box(self.box, 1, get_current_options().radius, paint = get_current_style().color.button)
+			kn.add_box_lines(self.box, style.line_width, get_current_options().radius, paint = style.color.button)
 		}
 
 		push_id(self.id)
@@ -212,38 +213,37 @@ range_slider :: proc(
 		if is_visible {
 			radius := get_current_options().radius
 			kn.push_scissor(kn.make_box(object.box, radius))
-			kn.fill_box(object.box, paint = get_current_style().color.field)
+			kn.add_box(object.box, paint = get_current_style().color.field)
 			value_box := Box{{lower_x, object.box.lo.y}, {upper_x, object.box.hi.y}}
-			kn.fill_box(
+			kn.add_box(
 				value_box,
 				paint = get_current_style().color.button,
 			)
 			if .Hovered in object.state.current {
 				if hovered_index == 0 || key_down(.Left_Shift) {
-					kn.fill_box({value_box.lo, {value_box.lo.x + 1, value_box.hi.y}}, paint = get_current_style().color.accent)
+					kn.add_box({value_box.lo, {value_box.lo.x + 1, value_box.hi.y}}, paint = get_current_style().color.accent)
 				}
 				if hovered_index == 1 || key_down(.Left_Shift) {
-					kn.fill_box({{value_box.hi.x - 1, value_box.lo.y}, {value_box.hi.x, value_box.hi.y}}, paint = get_current_style().color.accent)
+					kn.add_box({{value_box.hi.x - 1, value_box.lo.y}, {value_box.hi.x, value_box.hi.y}}, paint = get_current_style().color.accent)
 				}
 			}
-			kn.fill_text(
+			kn.set_font(get_current_style().monospace_font)
+			kn.add_string(
 				fmt.tprintf(format, lower_value^),
 				get_current_style().default_text_size,
 				{object.box.lo.x + get_current_style().text_padding.x, box_center_y(object.box)},
-				font = get_current_style().monospace_font,
 				align = {0, 0.5},
 				paint = get_current_style().color.content,
 			)
-			kn.fill_text(
+			kn.add_string(
 				fmt.tprintf(format, upper_value^),
 				get_current_style().default_text_size,
 				{object.box.hi.x - get_current_style().text_padding.x, box_center_y(object.box)},
-				font = get_current_style().monospace_font,
 				align = {1, 0.5},
 				paint = get_current_style().color.content,
 			)
 			kn.pop_scissor()
-			kn.stroke_box(object.box, 1, get_current_options().radius, paint = get_current_style().color.button)
+			kn.add_box_lines(object.box, 1, get_current_options().radius, paint = get_current_style().color.button)
 
 			push_id(object.id)
 			push_options(default_options())
@@ -308,7 +308,7 @@ slider_handle :: proc(box: Box, shape: int, loc := #caller_location) -> (pressed
 					object.box.lo,
 				}
 			}
-			kn.fill_polygon(
+			kn.add_polygon(
 				vertices,
 				paint = get_current_style().color.accent if .Hovered in object.state.current else get_current_style().color.button,
 			)
@@ -329,9 +329,9 @@ progress_bar :: proc(time: f32, color: kn.Color = get_current_style().color.acce
 	if begin_object(object) {
 		if object_is_visible(object) {
 			radius := get_current_options().radius
-			kn.fill_box(object.box, radius, paint = get_current_style().color.background)
+			kn.add_box(object.box, radius, paint = get_current_style().color.background)
 			kn.push_scissor(kn.make_box(object.box, radius))
-			kn.fill_box(
+			kn.add_box(
 				{object.box.lo, {object.box.lo.x + box_width(object.box) * time, object.box.hi.y}},
 				paint = color,
 			)
@@ -363,7 +363,7 @@ dial :: proc(time: f32, color: kn.Color = get_current_style().color.accent, loc 
 			arc_shape.paint = kn.paint_index_from_option(get_current_style().color.background)
 			kn.add_shape(arc_shape)
 			kn.push_scissor(arc_shape)
-			kn.arc(
+			kn.add_arc(
 				center,
 				start_angle,
 				start_angle + (end_angle - start_angle) * time,
@@ -392,7 +392,7 @@ pie :: proc(values: []f32, total: f32, colors: []kn.Color = {}, loc := #caller_l
 				if len(colors) > 0 {
 					slice_color = colors[i % len(colors)]
 				}
-				kn.fill_pie(center, angle, angle + slice_angle, radius, paint = slice_color)
+				kn.add_pie(center, angle, angle + slice_angle, radius, paint = slice_color)
 				angle += slice_angle
 			}
 		}

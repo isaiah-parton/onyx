@@ -122,17 +122,17 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 		if do_layout(as_row) {
 			set_align(0.5)
 			set_width(whatever)
-			label(fmt.tprintf("%s %i", t.Month(page.month), page.year), align = 0.5)
+			label(fmt.tprintf("%s %i", t.Month(page.month), page.year))
 			set_width(to_layout_width)
 			if do_layout(right_to_left) {
 				set_width(to_layout_height)
-				if button(text = "\uE0F6", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
+				if button("\uE0F6", accent = .Subtle, font_size = 20).clicked {
 					extras.page = todays_calendar_page()
 				}
-				if button(text = "\uE126", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
+				if button("\uE126", accent = .Subtle, font_size = 20).clicked {
 					extras.page = move_calendar_page(page, 1)
 				}
-				if button(text = "\uE0fe", accent = .Subtle, font_size = 20, text_align = 0.5).clicked {
+				if button("\uE0fe", accent = .Subtle, font_size = 20).clicked {
 					extras.page = move_calendar_page(page, -1)
 				}
 			}
@@ -142,7 +142,7 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 		if do_layout(as_row, split_sevenths) {
 			WEEKDAY_ABBREVIATIONS :: [?]string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
 			for weekday in WEEKDAY_ABBREVIATIONS {
-				label(text = weekday, align = 0.5, color = kn.fade(get_current_style().color.content, 0.5))
+				label(text = weekday, color = kn.fade(get_current_style().color.content, 0.5))
 			}
 		}
 
@@ -186,10 +186,10 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 				cell_year, cell_month, cell_day := t.date(t.now())
 				ordinal_date := dt.ordinal_to_date(ordinal) or_continue
 
-				stroke_color := get_current_style().color.foreground_stroke
+				stroke_color := get_current_style().color.lines
 				if from_ordinal <= ordinal && ordinal <= to_ordinal {
 					if from_ordinal < to_ordinal {
-						kn.fill_box(
+						kn.add_box(
 							box,
 							hstack_corner_radius(
 								int(ordinal - from_ordinal),
@@ -200,7 +200,7 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 						)
 					}
 					if from_ordinal == ordinal || to_ordinal == ordinal {
-						kn.fill_box(
+						kn.add_box(
 							shrink_box(box, 1),
 							get_current_style().rounding,
 							paint = get_current_style().color.accent,
@@ -208,7 +208,7 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 					}
 					stroke_color = get_current_style().color.content
 				} else {
-					kn.fill_box(
+					kn.add_box(
 						box,
 						get_current_style().rounding,
 						paint = kn.fade(
@@ -218,18 +218,18 @@ calendar :: proc(from: ^Maybe(Date), to: ^Maybe(Date) = nil, loc := #caller_loca
 					)
 				}
 				if ordinal == today_ordinal {
-					kn.stroke_box(
+					kn.add_box_lines(
 						box,
 						1,
 						get_current_style().rounding,
 						paint = stroke_color,
 					)
 				}
-				kn.fill_text(
+				kn.set_font(get_current_style().default_font)
+				kn.add_string(
 					fmt.tprint(ordinal_date.day),
 					get_current_style().default_text_size,
 					box_center(box),
-					get_current_style().default_font,
 					0.5,
 					paint = kn.fade(
 						get_current_style().color.content,

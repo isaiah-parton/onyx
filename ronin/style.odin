@@ -4,7 +4,7 @@ import kn "local:katana"
 
 Color_Scheme :: struct {
 	button, button_background, hover, accent, accent_content, content, shadow: kn.Color,
-	field, foreground, foreground_stroke, foreground_accent, background:       kn.Color,
+	field, foreground, lines, foreground_accent, background:       kn.Color,
 	grid_background, grid_minor_lines, grid_major_lines:                       kn.Color,
 	checkers0, checkers1:                                                      kn.Color,
 }
@@ -33,7 +33,7 @@ Style_Shape :: struct {
 	panel_padding:       f32,
 	rounding:            f32,
 	popup_margin:        f32,
-	line_width:        f32,
+	line_width:          f32,
 	title_margin:        f32,
 	text_padding:        [2]f32,
 	menu_padding:        f32,
@@ -85,7 +85,7 @@ light_color_scheme :: proc() -> Color_Scheme {
 		shadow = {0, 0, 0, 10},
 		field = {233, 234, 232, 255},
 		foreground = {255, 255, 255, 255},
-		foreground_stroke = {180, 180, 180, 255},
+		lines = {180, 180, 180, 255},
 		foreground_accent = {30, 30, 30, 255},
 		background = {240, 240, 240, 255},
 		grid_background = {240, 240, 240, 255},
@@ -102,7 +102,7 @@ dark_color_scheme :: proc() -> Color_Scheme {
 		checkers1 = {160, 160, 160, 255},
 		background = {8, 8, 8, 255},
 		foreground = {18, 19, 20, 255},
-		foreground_stroke = {60, 60, 60, 255},
+		lines = {60, 60, 60, 255},
 		foreground_accent = {30, 30, 30, 255},
 		grid_background = {0, 0, 0, 255},
 		grid_minor_lines = {16, 15, 17, 255},

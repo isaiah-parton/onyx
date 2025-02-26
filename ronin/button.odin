@@ -17,7 +17,7 @@ draw_and_update_wave_effects :: proc(object: ^Object, array: ^Wave_Effects) {
 	}
 
 	for &wave, i in array.data[:array.len] {
-		kn.fill_circle(
+		kn.add_circle(
 			wave.point,
 			linalg.length(object.box.hi - object.box.lo) * min(wave.time, 0.75) * 1.33,
 			paint = kn.fade(kn.White, (1 - max(0, wave.time - 0.75) * 4) * 0.2),
@@ -56,7 +56,7 @@ Button_Result :: struct {
 }
 
 button :: proc(
-	text: string,
+	label: string,
 	accent: Button_Accent = .Normal,
 	font_size: f32 = global_state.style.default_text_size,
 	delay: f32 = 0,
@@ -75,14 +75,16 @@ button :: proc(
 
 	extras := &object.variant.(Button)
 
-	text_layout := kn.make_text_layout(text, font_size, global_state.style.bold_font, justify = text_align)
+	style := get_current_style()
+	kn.set_font(style.bold_font)
+	label_text := kn.make_text(label, font_size, justify = text_align)
 
-	object.size = text_layout.size + global_state.style.text_padding * 2
+	object.size = label_text.size + global_state.style.text_padding * 2
 
 	if begin_object(object) {
 
-		extras.hover_time = animate(extras.hover_time, 0.1, .Hovered in object.state.current)
-		extras.press_time = animate(extras.press_time, 0.08, .Pressed in object.state.current)
+		object.animation.hover = animate(object.animation.hover, 0.1, .Hovered in object.state.current)
+		object.animation.press = animate(object.animation.press, 0.08, .Pressed in object.state.current)
 		extras.hold_time = max(
 			extras.hold_time +
 			delta_time() *
@@ -92,7 +94,7 @@ button :: proc(
 				),
 			0,
 		)
-		if extras.press_time <= 0 {
+		if object.animation.press <= 0 {
 			extras.hold_time = 0
 		}
 		draw_frames(int(extras.hold_time > 0))
@@ -110,21 +112,20 @@ button :: proc(
 		if object_is_visible(object) {
 			text_color: kn.Color = get_current_style().color.content
 			rounding := get_current_options().radius
-			style := get_current_style()
 
 			switch accent {
 			case .Primary:
-				base_color := kn.mix(0.15 * (extras.hover_time + extras.press_time), style.color.accent, kn.White)
+				base_color := kn.mix(0.15 * (object.animation.hover + object.animation.press), style.color.accent, kn.White)
 				stroke_color := base_color
 				fill_color := kn.mix(
-					f32(i32(delay > 0)) * extras.press_time,
+					f32(i32(delay > 0)) * object.animation.press,
 					base_color,
 					style.color.button_background,
 				)
-				kn.fill_box(object.box, rounding, fill_color)
-				if delay > 0 && extras.press_time > 0 {
+				kn.add_box(object.box, rounding, fill_color)
+				if delay > 0 && object.animation.press > 0 {
 					kn.push_scissor(kn.make_box(object.box, rounding))
-					kn.fill_box(
+					kn.add_box(
 						get_box_cut_bottom(
 							object.box,
 							box_height(object.box) *
@@ -133,47 +134,47 @@ button :: proc(
 						paint = base_color,
 					)
 					kn.pop_scissor()
-					kn.stroke_box(
+					kn.add_box_lines(
 						object.box,
 						style.line_width,
 						rounding,
-						kn.fade(stroke_color, extras.press_time),
+						kn.fade(stroke_color, object.animation.press),
 					)
-					kn.fill_box(
+					kn.add_box(
 						object.box,
 						rounding,
-						kn.fade(stroke_color, 1 - extras.press_time),
+						kn.fade(stroke_color, 1 - object.animation.press),
 					)
 				}
 			case .Normal:
 				color := kn.mix(extras.active_time, style.color.button, style.color.accent)
-				kn.stroke_box(object.box, style.line_width, rounding, paint = color)
-				kn.fill_box(
+				kn.add_box_lines(object.box, style.line_width, rounding, paint = color)
+				kn.add_box(
 					object.box,
 					rounding,
-				paint = kn.fade(color, math.lerp(f32(0.5), f32(0.8), (extras.hover_time + extras.press_time) * 0.5)),
+				paint = kn.fade(color, math.lerp(f32(0.5), f32(0.8), (object.animation.hover + object.animation.press) * 0.5)),
 				)
 			case .Subtle:
-				kn.fill_box(
+				kn.add_box(
 					object.box,
 					rounding,
 					paint = kn.fade(
 						style.color.button,
-						max((extras.hover_time + extras.press_time) * 0.5, f32(i32(active))) *
+						max((object.animation.hover + object.animation.press) * 0.5, f32(i32(active))) *
 						0.75,
 					),
 				)
 			}
 
 			if is_loading {
-				kn.spinner(
+				kn.add_spinner(
 					box_center(object.box),
 					box_height(object.box) * 0.3,
 					style.color.accent_content,
 				)
 			} else {
-				kn.fill_text_layout(
-					text_layout,
+				kn.add_text(
+					label_text,
 					{
 						math.lerp(
 							object.box.lo.x + style.text_padding.x,
@@ -181,8 +182,7 @@ button :: proc(
 							text_align,
 						),
 						box_center_y(object.box),
-					},
-					align = {0, 0.5},
+					} - label_text.size * {0, 0.5},
 					paint = text_color,
 				)
 			}
@@ -245,9 +245,9 @@ add_image_button :: proc(using info: ^Image_Button) -> bool {
 				// render_shape_uv(shape, source, 255)
 			}
 		} else {
-			kn.fill_box(self.box, paint = kn.Paint{kind = .Skeleton})
+			kn.add_box(self.box, paint = kn.Paint{kind = .Skeleton})
 		}
-		kn.fill_box(
+		kn.add_box(
 			self.box,
 			core.style.rounding,
 			paint = kn.fade(core.get_current_style().color.substance, self.hover_time * 0.5),
@@ -273,7 +273,7 @@ Floating_Button_Info :: Button_Info
 
 init_floating_button :: proc(using info: ^Floating_Button_Info, loc := #caller_location) -> bool {
 	if info == nil do return false
-	text_layout = kn.make_text_layout(
+	text_layout = kn.make_text(
 		text,
 		core.style.default_font,
 		font_size.? or_else core.style.default_text_size,
@@ -294,7 +294,7 @@ add_floating_button :: proc(using info: ^Floating_Button_Info) -> bool {
 	if self.visible {
 		rounding := math.lerp(box_height(self.box) / 2, core.style.rounding, self.hover_time)
 		// draw_shadow(self.box, rounding)
-		kn.fill_box(
+		kn.add_box(
 			self.box,
 			rounding,
 			kn.fade(
@@ -302,7 +302,7 @@ add_floating_button :: proc(using info: ^Floating_Button_Info) -> bool {
 				math.lerp(f32(0.75), f32(1.0), self.hover_time),
 			),
 		)
-		kn.fill_text_layout(text_layout, box_center(self.box), core.get_current_style().color.content)
+		kn.add_text(text_layout, box_center(self.box), core.get_current_style().color.content)
 	}
 
 	clicked = .Clicked in self.state

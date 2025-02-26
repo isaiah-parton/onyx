@@ -8,7 +8,7 @@ import "core:math/ease"
 import "core:math/linalg"
 
 Graph_Tooltip_Entry :: struct {
-	text_layout: kn.Text_Layout,
+	text: kn.Text,
 	color:       kn.Color,
 }
 
@@ -95,23 +95,23 @@ begin_graph :: proc(
 		)
 	}
 
-	kn.fill_box(object.box, paint = get_current_style().color.grid_background)
+	kn.add_box(object.box, paint = get_current_style().color.grid_background)
 	if grid_step.y > 1 {
 		for y: f32 = grid_pseudo_origin.y;
 		    y >= grid_pseudo_origin.y - grid_size.y;
 		    y -= grid_step.y {
-			kn.line({object.box.lo.x, y}, {object.box.hi.x, y}, 1, grid_minor_color)
+			kn.add_line({object.box.lo.x, y}, {object.box.hi.x, y}, 1, grid_minor_color)
 		}
 	}
 	if grid_step.x > 1 {
 		for x: f32 = grid_pseudo_origin.x;
 		    x <= grid_pseudo_origin.x + grid_size.x;
 		    x += grid_step.x {
-			kn.line({x, object.box.lo.y}, {x, object.box.hi.y}, 1, grid_minor_color)
+			kn.add_line({x, object.box.lo.y}, {x, object.box.hi.y}, 1, grid_minor_color)
 		}
 	}
 	baseline := grid_origin.y + grid_offset.y
-	kn.line(
+	kn.add_line(
 		{object.box.lo.x, math.floor(baseline) + 0.5},
 		{object.box.hi.x, math.floor(baseline) + 0.5},
 		1,
@@ -132,13 +132,13 @@ end_graph :: proc() -> bool {
 		if color == {} {
 			color = get_current_style().color.content
 		}
-		kn.line(
+		kn.add_line(
 			{object.box.lo.x, graph.crosshair_point.y},
 			{object.box.hi.x, graph.crosshair_point.y},
 			1,
 			color,
 		)
-		kn.line(
+		kn.add_line(
 			{graph.crosshair_point.x, object.box.lo.y},
 			{graph.crosshair_point.x, object.box.hi.y},
 			1,
@@ -148,7 +148,7 @@ end_graph :: proc() -> bool {
 
 	{
 		for helper_dot in graph.helper_dots {
-			kn.fill_circle(helper_dot.point, 5, helper_dot.color)
+			kn.add_circle(helper_dot.point, 5, helper_dot.color)
 		}
 	}
 
@@ -164,20 +164,19 @@ end_graph :: proc() -> bool {
 			object.box,
 		)
 
-		kn.fill_box(tooltip_box, get_current_style().rounding, get_current_style().color.field)
-		kn.stroke_box(tooltip_box, 1, get_current_style().rounding, get_current_style().color.button)
+		kn.add_box(tooltip_box, get_current_style().rounding, get_current_style().color.field)
+		kn.add_box_lines(tooltip_box, 1, get_current_style().rounding, get_current_style().color.button)
 		descent: f32
 		#reverse for &entry, i in graph.tooltip_entries {
-			kn.fill_circle(tooltip_box.lo + 10 + {0, tooltip_padding.y + descent}, 3, entry.color)
-			kn.fill_text_layout(
-				entry.text_layout,
+			kn.add_circle(tooltip_box.lo + 10 + {0, tooltip_padding.y + descent}, 3, entry.color)
+			kn.add_text(
+				entry.text,
 				{tooltip_box.hi.x, tooltip_box.lo.y} +
 				{-tooltip_padding.x, tooltip_padding.y} +
-				{0, descent},
-				align = {1, 0},
+				{0, descent} - {entry.text.size.x, 0},
 				paint = get_current_style().color.content,
 			)
-			descent += entry.text_layout.size.y
+			descent += entry.text.size.y
 		}
 	}
 
@@ -202,18 +201,19 @@ curve_line_chart :: proc(
 ) -> bool {
 	object := get_current_object() or_return
 
+	style := get_current_style()
 	graph := &object.variant.(Graph)
 	if graph.active_point_index >= 0 && graph.active_point_index < len(data) {
-		text_layout := kn.make_text_layout(
+		text := kn.make_text(
 			fmt.tprintf(format, data[graph.active_point_index]),
-			get_current_style().default_text_size,
-			get_current_style().default_font,
+			style.default_text_size,
+			style.default_font,
 		)
-		graph.tooltip_size.x = max(graph.tooltip_size.x, text_layout.size.x)
-		graph.tooltip_size.y += text_layout.size.y
+		graph.tooltip_size.x = max(graph.tooltip_size.x, text.size.x)
+		graph.tooltip_size.y += text.size.y
 		append(
 			&graph.tooltip_entries,
-			Graph_Tooltip_Entry{text_layout = text_layout, color = color},
+			Graph_Tooltip_Entry{text = text, color = color},
 		)
 	}
 	inner_box := object.box
@@ -321,7 +321,7 @@ curve_line_chart :: proc(
 
 		if show_points {
 			for point, i in points {
-				kn.fill_circle(point, 3, color)
+				kn.add_circle(point, 3, color)
 			}
 		}
 	}
@@ -362,12 +362,12 @@ bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
 		)
 
 		if .Hovered in object.state.current {
-			kn.fill_box(
+			kn.add_box(
 				{
 					{inner_box.lo.x + f32(tooltip_idx) * block_size, inner_box.lo.y},
 					{inner_box.lo.x + f32(tooltip_idx) * block_size + block_size, inner_box.hi.y},
 				},
-				paint = kn.fade(get_current_style().color.substance, 0.5),
+				paint = kn.fade(style.color.substance, 0.5),
 			)
 		}
 
@@ -377,9 +377,9 @@ bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
 				p := math.floor(
 					inner_box.hi.y + (inner_box.lo.y - inner_box.hi.y) * (f32(v) / f32(hi - lo)),
 				)
-				kn.fill_box(
+				kn.add_box(
 					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
-					paint = kn.fade(get_current_style().color.substance, 0.5),
+					paint = kn.fade(style.color.substance, 0.5),
 				)
 			}
 
@@ -392,12 +392,12 @@ bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
 				}
 
 				if kind.entry_labels && len(entry.label) > 0 {
-					kn.fill_text(
+					kn.add_string(
 						entry.label,
 						16,
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
-						font = global_state.style.default_font,
-						paint = get_current_style().color.content,
+						font = style.default_font,
+						paint = style.color.content,
 					)
 				}
 
@@ -410,12 +410,12 @@ bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
 					field_height :=
 						(f32(entry.values[f]) / f32(hi * f64(len(fields)))) *
 						(inner_box.hi.y - inner_box.lo.y)
-					kn.fill_box(
+					kn.add_box(
 						{
 							{block.lo.x, block.hi.y - (height + field_height)},
 							{block.hi.x, block.hi.y - height},
 						},
-						global_state.style.rounding,
+						style.rounding,
 						paint = color,
 					)
 					height += field_height
@@ -427,9 +427,9 @@ bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
 				p := math.floor(
 					inner_box.hi.y + (inner_box.lo.y - inner_box.hi.y) * (f32(v) / f32(hi - lo)),
 				)
-				kn.fill_box(
+				kn.add_box(
 					{{inner_box.lo.x, p}, {inner_box.hi.x, p + 1}},
-					paint = kn.fade(get_current_style().color.substance, 0.5),
+					paint = kn.fade(style.color.substance, 0.5),
 				)
 			}
 
@@ -445,13 +445,13 @@ bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
 
 				// Draw entry label if enabled
 				if kind.entry_labels && len(entry.label) > 0 {
-					kn.fill_text(
+					kn.add_string(
 						entry.label,
 						18,
 						{(block.lo.x + block.hi.x) / 2, block.hi.y + 2},
-						font = global_state.style.default_font,
+						font = style.default_font,
 						align = {0.5, 0},
-						paint = get_current_style().color.content,
+						paint = style.color.content,
 					)
 				}
 
@@ -464,19 +464,19 @@ bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
 					corners: Corners = {}
 					if f == 0 do corners += {.Top_Left, .Bottom_Left}
 					if f == len(fields) - 1 do corners += {.Top_Right, .Bottom_Right}
-					kn.fill_box(
+					kn.add_box(
 						bar,
-						{global_state.style.rounding, global_state.style.rounding, 0, 0},
+						{style.rounding, style.rounding, 0, 0},
 						color,
 					)
 					if kind.value_labels {
-						kn.fill_text(
+						kn.add_string(
 							fmt.tprint(entry.values[f]),
 							18,
 							origin = {(bar.lo.x + bar.hi.x) / 2, bar.lo.y - 2},
-							font = global_state.style.default_font,
+							font = style.default_font,
 							align = 0.5,
-							paint = kn.fade(get_current_style().color.content, 0.5 if entry.values[f] == 0 else 1.0),
+							paint = kn.fade(style.color.content, 0.5 if entry.values[f] == 0 else 1.0),
 						)
 					}
 				}
@@ -494,21 +494,21 @@ bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
 		// add_padding(3)
 		// if label_tooltip {
 		// 	box := cut_get_current_layout(.Top, [2]f32{0, 26})
-		// 	kn.fill_text_aligned(
+		// 	kn.add_string_aligned(
 		// 		entries[tooltip_idx].label,
-		// 		global_state.style.default_font,
+		// 		style.default_font,
 		// 		18,
 		// 		box.lo + [2]f32{5, 13},
 		// 		.Center,
 		// 		.Top,
-		// 		paint = get_current_style().color.content,
+		// 		paint = style.color.content,
 		// 	)
 		// }
 		// for &field, f in fields {
 		// 	tip_box := shrink_box(cut_box(&get_current_layout().?.box, .Top, 26), 3)
 		// 	blip_box := shrink_box(cut_box_left(&tip_box, box_height(tip_box)), 4)
-		// 	kn.fill_box(blip_box, paint = color)
-		// 	kn.fill_text_aligned(
+		// 	kn.add_box(blip_box, paint = color)
+		// 	kn.add_string_aligned(
 		// 		field.name,
 		// 		global_state.style.default_font,
 		// 		18,
@@ -517,7 +517,7 @@ bar_chart :: proc(data: []f32, labels: []string, loc := #caller_location) {
 		// 		.Center,
 		// 		paint = kn.fade(get_current_style().color.content, 0.5),
 		// 	)
-		// 	kn.fill_text_aligned(
+		// 	kn.add_string_aligned(
 		// 		fmt.tprintf("%v", entries[tooltip_idx].values[f]),
 		// 		global_state.style.default_font,
 		// 		18,

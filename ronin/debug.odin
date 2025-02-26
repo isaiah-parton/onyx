@@ -99,28 +99,28 @@ profiler_end_scope :: proc(scope: Profiler_Scope) {
 @(private)
 draw_object_debug_margin :: proc(box: Box, margin: [4]f32) {
 	kn.set_paint(kn.fade(kn.Yellow, 0.5))
-	if margin.x > 0 do kn.fill_box(attach_box_left(box, margin.x))
-	if margin.y > 0 do kn.fill_box(attach_box_top(box, margin.y))
-	if margin.z > 0 do kn.fill_box(attach_box_right(box, margin.z))
-	if margin.w > 0 do kn.fill_box(attach_box_bottom(box, margin.w))
+	if margin.x > 0 do kn.add_box(attach_box_left(box, margin.x))
+	if margin.y > 0 do kn.add_box(attach_box_top(box, margin.y))
+	if margin.z > 0 do kn.add_box(attach_box_right(box, margin.z))
+	if margin.w > 0 do kn.add_box(attach_box_bottom(box, margin.w))
 }
 
 @(private)
 draw_object_debug_padding :: proc(box: Box, padding: [4]f32) {
 	box := box
 	kn.set_paint(kn.fade(kn.Turquoise, 0.5))
-	if padding.x > 0 do kn.fill_box(cut_box_left(&box, padding.x))
-	if padding.y > 0 do kn.fill_box(cut_box_top(&box, padding.y))
-	if padding.z > 0 do kn.fill_box(cut_box_right(&box, padding.z))
-	if padding.w > 0 do kn.fill_box(cut_box_bottom(&box, padding.w))
+	if padding.x > 0 do kn.add_box(cut_box_left(&box, padding.x))
+	if padding.y > 0 do kn.add_box(cut_box_top(&box, padding.y))
+	if padding.z > 0 do kn.add_box(cut_box_right(&box, padding.z))
+	if padding.w > 0 do kn.add_box(cut_box_bottom(&box, padding.w))
 }
 
 @(private)
 draw_object_debug_box :: proc(state: Debug_State, object: ^Object) {
 	if object_is_being_debugged(state, object) {
-		kn.fill_box(object.box, paint = kn.fade(kn.Blue, 0.25))
+		kn.add_box(object.box, paint = kn.fade(kn.Blue, 0.25))
 	}
-	kn.stroke_box(object.box, 1, paint = kn.Blue)
+	kn.add_box_lines(object.box, 1, paint = kn.Blue)
 }
 
 @(private)
@@ -167,7 +167,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 
 	if global_state.hovered_object != 0 {
 		if object, ok := global_state.object_map[global_state.hovered_object]; ok {
-			kn.stroke_box(object.box, 1, paint = kn.White)
+			kn.add_box_lines(object.box, 1, paint = kn.White)
 		}
 	}
 
@@ -209,12 +209,12 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		fmt.sbprintf(&b, "\nObjects: %i", len(global_state.objects))
 		fmt.sbprintf(&b, "\nLayers: %i", len(global_state.layer_array))
 		fmt.sbprintf(&b, "\nPanels: %i", len(global_state.panel_map))
-		kn.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 1, paint = kn.Black)
-		kn.fill_text(strings.to_string(b), DEBUG_TEXT_SIZE, 0)
+		kn.add_string(strings.to_string(b), DEBUG_TEXT_SIZE, 1, paint = kn.Black)
+		kn.add_string(strings.to_string(b), DEBUG_TEXT_SIZE, 0)
 	}
 
 	{
-		text_layout := kn.make_text_layout(
+		text_layout := kn.make_text(
 			fmt.tprintf(
 				"Scroll = Cycle objects\nF3 = Exit debug\nF6 = Turn %s FPS cap\nF7 = Toggle wireframes",
 				"on" if global_state.disable_frame_skip else "off",
@@ -223,7 +223,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			font = global_state.style.monospace_font,
 		)
 		origin := [2]f32{0, global_state.view.y}
-		kn.fill_text_layout(text_layout, origin, align = {0, 1})
+		kn.add_text(text_layout, origin - text_layout.size * {0, 1})
 	}
 
 	if object, ok := currently_debugged_object(state^); ok {
@@ -241,7 +241,7 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 		)
 
 		variant_typeid := reflect.union_variant_typeid(object.variant)
-		header_text_layout := kn.make_text_layout(
+		header_text_layout := kn.make_text(
 			fmt.tprintf(
 				"%i/%i: %v",
 				state.hovered_object_index + 1,
@@ -250,14 +250,14 @@ draw_debug_stuff :: proc(state: ^Debug_State) {
 			),
 			DEBUG_TEXT_SIZE,
 		)
-		info_text_layout := kn.make_text_layout(strings.to_string(b), DEBUG_TEXT_SIZE)
+		info_text_layout := kn.make_text(strings.to_string(b), DEBUG_TEXT_SIZE)
 		size := info_text_layout.size + {0, header_text_layout.size.y}
 		origin := linalg.clamp(mouse_point() + 10, 0, global_state.view - size)
 
-		kn.fill_box({origin, origin + size}, paint = kn.fade(kn.Black, 0.75))
-		kn.fill_box({origin, origin + header_text_layout.size}, paint = kn.Blue)
-		kn.fill_text_layout(header_text_layout, origin, paint = kn.Black)
-		kn.fill_text_layout(
+		kn.add_box({origin, origin + size}, paint = kn.fade(kn.Black, 0.75))
+		kn.add_box({origin, origin + header_text_layout.size}, paint = kn.Blue)
+		kn.add_text(header_text_layout, origin, paint = kn.Black)
+		kn.add_text(
 			info_text_layout,
 			origin + {0, header_text_layout.size.y},
 			paint = kn.White,
