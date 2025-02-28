@@ -11,6 +11,7 @@ Carousel :: struct {
 	offset:        [2]f32,
 	last_offset:   [2]f32,
 	timer:         f32,
+	last_page: int,
 	page: int,
 	page_count:    int,
 }
@@ -27,23 +28,14 @@ find_object_variant_in_stack :: proc($T: typeid) -> (result: ^T, ok: bool) {
 
 pages_proceed :: proc() -> bool {
 	carousel := find_object_variant_in_stack(Carousel) or_return
-	carousel_set_page(carousel, carousel.page + 1)
+	carousel.page += 1
 	return true
 }
 
 pages_go_back :: proc() -> bool {
 	carousel := find_object_variant_in_stack(Carousel) or_return
-	carousel_set_page(carousel, carousel.page - 1)
+	carousel.page -= 1
 	return true
-}
-
-carousel_set_page :: proc(self: ^Carousel, page: int) {
-	if page == self.page {
-		return
-	}
-	self.page = clamp(page, 0, self.page_count - 1)
-	self.last_offset = self.offset
-	self.timer = 0
 }
 
 begin_carousel :: proc(loc := #caller_location) -> bool {
@@ -54,6 +46,7 @@ begin_carousel :: proc(loc := #caller_location) -> bool {
 	// object.state.input_mask = OBJECT_STATE_ALL
 	carousel := &object.variant.(Carousel)
 	carousel.page_count = 0
+	carousel.last_page = carousel.page
 	begin_object(object) or_return
 	if point_in_box(mouse_point(), object.box) {
 		hover_object(object)
@@ -72,22 +65,16 @@ begin_carousel :: proc(loc := #caller_location) -> bool {
 end_carousel :: proc() {
 	if object, ok := get_current_object(); ok {
 		carousel := &object.variant.(Carousel)
+
 		last_page := carousel.page
 		if .Hovered in object.state.current {
 			if key_pressed(.Left) {
-				carousel_set_page(carousel, carousel.page - 1)
+				carousel.page -= 1
 			} else if key_pressed(.Right) {
-				carousel_set_page(carousel, carousel.page + 1)
+				carousel.page += 1
 			}
-			carousel_set_page(carousel, carousel.page + int(global_state.mouse_scroll.y))
+			carousel.page += int(global_state.mouse_scroll.y)
 		}
-		animation_time := ease.circular_in_out(carousel.timer)
-		carousel.offset.x =
-			carousel.last_offset.x +
-			(box_width(object.box) * f32(carousel.page) - carousel.last_offset.x) *
-				animation_time
-		carousel.timer = min(1, carousel.timer + global_state.delta_time * 5)
-		draw_frames(int(animation_time < 1) * 3)
 
 		// Draw dots
 		{
@@ -99,11 +86,26 @@ end_carousel :: proc() {
 				dot_position := [2]f32{dots_left_origin + f32(page_index) * dot_spacing, object.box.hi.y - dot_margin}
 				push_id(page_index)
 				if pagination_dot(dot_position, carousel.page == page_index) {
-					carousel_set_page(carousel, page_index)
+				carousel.page = page_index
 				}
 				pop_id()
 			}
 		}
+
+		carousel.page = clamp(carousel.page, 0, carousel.page_count - 1)
+		if carousel.last_page != carousel.page {
+			carousel.last_page = carousel.page
+			carousel.last_offset = carousel.offset
+			carousel.timer = 0
+		}
+
+		animation_time := ease.circular_in_out(carousel.timer)
+		carousel.offset.x =
+			carousel.last_offset.x +
+			(box_width(object.box) * f32(carousel.page) - carousel.last_offset.x) *
+				animation_time
+		carousel.timer = min(1, carousel.timer + global_state.delta_time * 5)
+		draw_frames(int(animation_time < 1) * 3)
 
 		end_layout()
 		end_object()

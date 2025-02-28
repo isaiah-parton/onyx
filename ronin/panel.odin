@@ -13,13 +13,23 @@ Panel :: struct {
 	min_size:         [2]f32,
 	resize_offset:    [2]f32,
 	non_snapped_size: [2]f32,
-	fade:             f32,
+	control_animation_time: f32,
 	moving:           bool,
 	resizing:         bool,
+	resize_side: Side,
 	is_snapped:       bool,
 	can_move:         bool,
 	can_resize:       bool,
 	dead:             bool,
+}
+
+Panel_Property :: union {
+	Defined_Position,
+	Defined_Size,
+	Defined_Box,
+	Panel_Can_Resize,
+	Panel_Can_Snap,
+	Layer_Sort_Method,
 }
 
 create_panel :: proc(id: Id) -> Maybe(^Panel) {
@@ -34,12 +44,7 @@ create_panel :: proc(id: Id) -> Maybe(^Panel) {
 }
 
 begin_panel :: proc(
-	sort_method: Layer_Sort_Method = .Floating,
-	position: Maybe([2]f32) = nil,
-	size: Maybe([2]f32) = nil,
-	axis: Axis = .Y,
-	can_drag: bool = true,
-	can_resize: bool = true,
+	props: ..Panel_Property,
 	loc := #caller_location,
 ) -> bool {
 	MIN_SIZE :: [2]f32{100, 100}
@@ -47,108 +52,147 @@ begin_panel :: proc(
 	id := hash(loc)
 	push_id(id)
 
-	panel, ok := global_state.panel_map[id]
+	starting_box: Maybe(Box)
+	starting_size: [2]f32
+	starting_position: Maybe([2]f32)
+	sort_method: Layer_Sort_Method = .Floating
+
+	self, ok := global_state.panel_map[id]
 	if !ok {
-		panel = create_panel(id).? or_return
-
-		position := position.? or_else get_next_panel_position()
-		size := size.? or_else MIN_SIZE
-		panel.box = {position, position + size}
-
-		panel.can_move = true
-		panel.can_resize = can_resize
+		self = create_panel(id).? or_return
 	}
 
-	push_stack(&global_state.panel_stack, panel)
+	for prop in props {
+		#partial switch v in prop {
+		case Defined_Box:
+			starting_box = Box(v)
+		case Defined_Size:
+			starting_size = ([2]f32)(v)
+		case Defined_Position:
+			starting_position = ([2]f32)(v)
+		case Panel_Can_Resize:
+			self.can_resize = bool(v)
+		case Layer_Sort_Method:
+			sort_method = v
+		}
+	}
 
-	if panel.moving == true {
+	if !ok {
+		if starting_box, ok := starting_box.?; ok {
+			self.box = starting_box
+		} else {
+			position := starting_position.? or_else get_next_panel_position()
+			size := linalg.max(starting_size, MIN_SIZE)
+			self.box = {position, position + size}
+		}
+
+		self.can_move = true
+		self.can_resize = true
+	}
+
+	style := get_current_style()
+
+	push_stack(&global_state.panel_stack, self)
+
+	if self.moving == true {
 		mouse_point := mouse_point()
-		size := panel.box.hi - panel.box.lo
-		panel.box.lo = mouse_point - panel.move_offset
-		panel.box.hi = panel.box.lo + size
-		global_state.panel_snapping.active_panel = panel
+		size := self.box.hi - self.box.lo
+		self.box.lo = mouse_point - self.move_offset
+		self.box.hi = self.box.lo + size
+		global_state.panel_snapping.active_panel = self
 		draw_frames(1)
 	}
 
-	min_size := linalg.max(MIN_SIZE, panel.min_size)
-	if panel.resizing {
-		panel.resizing = false
-		panel.box.hi = global_state.mouse_pos + panel.resize_offset
-	}
-	// panel.box.lo = linalg.clamp(
-	// 	panel.box.lo,
-	// 	linalg.min(global_state.view - box_size(panel.box), 0),
-	// 	linalg.max(global_state.view - box_size(panel.box), 0),
-	// )
-	if panel.can_resize {
-		panel.box.hi = linalg.max(panel.box.hi, panel.box.lo + min_size)
+	min_size := linalg.max(MIN_SIZE, self.min_size)
+	if self.resizing {
+		self.resizing = false
+		switch self.resize_side {
+		case .Bottom:
+			self.box.hi.y = max(mouse_point().y, self.box.lo.y + self.min_size.y)
+		case .Top:
+			self.box.lo.y = min(mouse_point().y, self.box.hi.y - self.min_size.y)
+		case .Left:
+			self.box.lo.x = min(mouse_point().x, self.box.hi.x - self.min_size.x)
+		case .Right:
+			self.box.hi.x = max(mouse_point().x, self.box.lo.x + self.min_size.x)
+		}
 	} else {
-		panel.box.hi = panel.box.lo + min_size
+		if self.can_resize {
+			self.box.hi = linalg.max(self.box.hi, self.box.lo + min_size)
+		} else {
+			self.box.hi = self.box.lo + min_size
+		}
 	}
-	panel.box = snapped_box(panel.box)
+	self.box = snapped_box(self.box)
 
-	if panel.last_min_size != panel.min_size {
+	if self.last_min_size != self.min_size {
 		draw_frames(1)
 	}
-	panel.last_min_size = panel.min_size
-	panel.min_size = {}
+
+	self.last_min_size = linalg.max(self.min_size, MIN_SIZE)
+	self.min_size = {}
 
 	begin_layer(sort_method) or_return
-	panel.layer = current_layer().?
+	self.layer = current_layer().?
 
-	rounding := f32(0 if panel.is_snapped else global_state.style.rounding)
+	rounding := f32(1 - int(self.is_snapped)) * style.rounding
 
 	object := get_object(hash("panelbg"))
-	object.box = panel.box
 	object.flags += {.Sticky_Hover, .Sticky_Press}
+	object.state.input_mask = OBJECT_STATE_ALL
+	set_next_box(self.box)
 	begin_object(object) or_return
 
 	if object.variant == nil {
 		object.state.input_mask = OBJECT_STATE_ALL
 	}
 
-	if point_in_box(global_state.mouse_pos, object.box) {
+	if point_in_box(mouse_point(), object.box) {
 		hover_object(object)
 	}
 
-	if .Clicked in object.state.current && object.click.count == 2 {
-		panel.box.hi = panel.box.lo + panel.last_min_size
-	} else if object_is_dragged(object, beyond = 100 if panel.is_snapped else 0) {
-		if !panel.moving {
-			if panel.is_snapped {
-				panel.box.lo = mouse_point() - panel.non_snapped_size / 2
-				panel.box.hi = mouse_point() + panel.non_snapped_size / 2
-				panel.is_snapped = false
+	enable_controls := (key_down(.Left_Alt) || mouse_down(.Middle)) && (.Hovered in object.state.current)
+
+	if enable_controls {
+		if .Clicked in object.state.current && object.click.count == 2 {
+			self.box.hi = self.box.lo + self.last_min_size
+		} else if object_is_dragged(object, beyond = 100 if self.is_snapped else 0, with = .Middle) {
+			if !self.moving {
+				if self.is_snapped {
+					self.box.lo = mouse_point() - self.non_snapped_size / 2
+					self.box.hi = mouse_point() + self.non_snapped_size / 2
+					self.is_snapped = false
+				}
+				self.non_snapped_size = box_size(self.box)
 			}
-			panel.non_snapped_size = box_size(panel.box)
+			self.moving = true
+			self.move_offset = global_state.mouse_pos - self.box.lo
 		}
-		panel.moving = true
-		panel.move_offset = global_state.mouse_pos - panel.box.lo
 	}
 
-	if !panel.is_snapped {
+	if !self.is_snapped {
 		if kn.disable_scissor() {
 			kn.add_box_shadow(
-				move_box(panel.box, {0, 2}),
+				self.box,
 				rounding,
 				6,
-				kn.fade(get_current_style().color.shadow, 1.0 - (0.1 * panel.fade)),
+				style.color.shadow,
 			)
 		}
 	}
 
 	if .Pressed not_in object.state.current {
-		panel.moving = false
+		self.moving = false
 	}
 
-	kn.push_scissor(kn.make_box(panel.box, rounding))
-	push_clip(panel.box)
+	self.control_animation_time = animate(self.control_animation_time, 0.15, self.moving || self.resizing)
 
-	kn.add_box(panel.box, rounding, paint = get_current_style().color.foreground)
-	kn.add_box_lines(panel.box, 1, rounding, paint = get_current_style().color.lines)
+	kn.push_scissor(kn.make_box(self.box, rounding))
+	push_clip(self.box)
 
-	set_next_box(panel.box)
-	begin_layout(as_column) or_return
+	kn.add_box(object.box, paint = style.color.foreground)
+
+	begin_layout(as_column, is_root, with_box(self.box)) or_return
 	return true
 }
 
@@ -158,54 +202,69 @@ end_panel :: proc() {
 	end_layout()
 	pop_clip()
 
-	panel := current_panel()
-	if panel.can_resize {
-		object := get_object(hash("resize"))
-		object.box = Box{panel.box.hi - get_current_style().scale * 0.5, panel.box.hi}
-		object.flags += {.Sticky_Hover, .Sticky_Press}
-		if begin_object(object) {
-			defer end_object()
+	self := current_panel()
 
-			if point_in_box(mouse_point(), object.box) {
-				hover_object(object)
-			}
-			icon_color := get_current_style().color.button
-			if .Hovered in object.state.current {
-				icon_color = get_current_style().color.accent
-				global_state.cursor_type = .Resize_NWSE
-			}
-			kn.add_polygon(
-				{
-					{object.box.hi.x, object.box.lo.y},
-					object.box.hi,
-					{object.box.lo.x, object.box.hi.y},
-				},
-				paint = icon_color,
-			)
-			if .Pressed in object.state.current {
-				panel.resizing = true
-				if .Pressed not_in object.state.previous {
-					panel.resize_offset = panel.box.hi - global_state.mouse_pos
+	self.min_size += layout.content_size + layout.spacing_size
+
+	style := get_current_style()
+
+	kn.add_box_lines(self.box, style.line_width, style.rounding, paint = kn.mix(self.control_animation_time, style.color.lines, style.color.accent))
+	kn.add_box(self.box, paint = kn.fade(style.color.accent, 0.1 * self.control_animation_time))
+
+	if self.can_resize {
+		zone_width := f32(2)
+		zones: [Side]Box = {
+			.Left = {{self.box.lo.x - zone_width, self.box.lo.y}, {self.box.lo.x + zone_width, self.box.hi.y}},
+			.Right = {{self.box.hi.x - zone_width, self.box.lo.y}, {self.box.hi.x + zone_width, self.box.hi.y}},
+			.Top = {{self.box.lo.x, self.box.lo.y - zone_width}, {self.box.hi.x, self.box.lo.y + zone_width}},
+			.Bottom = {{self.box.lo.x, self.box.hi.y - zone_width}, {self.box.hi.x, self.box.hi.y + zone_width}},
+		}
+
+		for side, side_index in Side {
+			push_id(side_index)
+			defer pop_id()
+			zone := zones[side]
+			object := get_object(hash("resize"))
+			object.flags += {.Sticky_Hover, .Sticky_Press}
+			set_next_box(zone)
+			if do_object(object) {
+				if point_in_box(mouse_point(), object.box) {
+					hover_object(object)
+				}
+				if .Hovered in object.state.current {
+					set_cursor(Mouse_Cursor(int(Mouse_Cursor.Resize_EW) + int(side) / 2))
+				}
+				kn.add_box(
+					object.box,
+					paint = kn.fade(style.color.accent, f32(int(.Hovered in object.state.current))),
+				)
+				if .Pressed in object.state.current {
+					self.resizing = true
+					self.resize_side = side
+					if .Pressed not_in object.state.previous {
+						self.resize_offset = self.box.lo - global_state.mouse_pos
+					}
 				}
 			}
 		}
 	}
 
-	// if panel.fade > 0 {
-	// 	kn.add_box(panel.box, 0, kn.fade(kn.BLACK, panel.fade * 0.25))
-	// }
-	// panel.fade = animate(
-	// 	panel.fade,
-	// 	0.25,
-	// 	panel.layer.index < global_state.last_highest_layer_index,
-	// )
-
-	panel.min_size += layout.content_size + layout.spacing_size
-
 	pop_id()
 	kn.pop_scissor()
 	end_layer()
 	pop_stack(&global_state.panel_stack)
+}
+
+@(deferred_out=__do_panel)
+do_panel :: proc(props: ..Panel_Property, loc := #caller_location) -> bool {
+	return begin_panel(..props, loc = loc)
+}
+
+@(private)
+__do_panel :: proc(ok: bool) {
+	if ok {
+		end_panel()
+	}
 }
 
 current_panel :: proc(loc := #caller_location) -> ^Panel {

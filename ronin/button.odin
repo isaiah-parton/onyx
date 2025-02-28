@@ -79,7 +79,7 @@ button :: proc(
 	kn.set_font(style.bold_font)
 	label_text := kn.make_text(label, font_size, justify = text_align)
 
-	object.size = label_text.size + global_state.style.text_padding * 2
+	object.size = linalg.ceil((label_text.size + global_state.style.text_padding * 2) / style.scale) * style.scale
 
 	if begin_object(object) {
 

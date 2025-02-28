@@ -64,8 +64,8 @@ text :: proc(
 	color: kn.Color = get_current_style().color.content,
 	loc := #caller_location,
 ) {
-	object := get_object(hash(loc))
-	object.flags += {.Sticky_Hover, .Sticky_Press}
+	self := get_object(hash(loc))
+	self.flags += {.Sticky_Hover, .Sticky_Press}
 	layout := get_current_layout()
 	text := kn.make_text(
 		content,
@@ -73,32 +73,32 @@ text :: proc(
 		font,
 		max_size = box_size(layout.box),
 		wrap = .Word,
-		selection = object.input.editor.selection,
+		selection = self.input.editor.selection,
 	)
-	object.size = text.size
-	if do_object(object) {
-		if object_is_visible(object) {
+	self.size = text.size
+	if do_object(self) {
+		if object_is_visible(self) {
 			style := get_current_style()
-			text_origin := object.box.lo
+			text_origin := self.box.lo
 			text := kn.make_selectable(text, mouse_point() - text_origin)
 			if text.selection.valid {
-				hover_object(object)
+				hover_object(self)
 			}
-			if .Pressed in object.state.current {
-				object.state.current += {.Active}
+			if .Pressed in self.state.current {
+				self.state.current += {.Active}
 			}
-			if .Active in object.state.current {
+			if .Active in self.state.current {
 				if global_state.last_focused_object != global_state.focused_object &&
-				   global_state.focused_object != object.id &&
+				   global_state.focused_object != self.id &&
 				   !key_down(.Left_Control) {
-					object.state.current -= {.Active}
+					self.state.current -= {.Active}
 				}
 				draw_text_highlight(&text, text_origin, kn.fade(style.color.accent, 1.0 / 3.0))
-				text_mouse_selection(object, content, &text)
-				add_global_text_content(content, to_ordered_range(object.input.editor.selection))
+				text_mouse_selection(self, content, &text)
+				add_global_text_content(content, to_ordered_range(self.input.editor.selection))
 			}
 			kn.add_text(text, text_origin, paint = color)
-			if .Hovered in object.state.current {
+			if .Hovered in self.state.current {
 				set_cursor(.I_Beam)
 			}
 		}
@@ -143,11 +143,11 @@ icon :: proc(which_one: rune, size: f32 = global_state.style.icon_size, loc := #
 	style := get_current_style()
 	font := style.icon_font
 	if glyph, ok := kn.get_font_glyph(font, which_one); ok {
-		object := get_object(hash(loc))
-		object.size = {glyph.advance * size, font.line_height * size}
-		if do_object(object) {
-			if object_is_visible(object) {
-				kn.add_glyph(glyph, size, linalg.floor(box_center(object.box)) - size / 2, style.color.content)
+		self := get_object(hash(loc))
+		self.size = {glyph.advance * size, font.line_height * size}
+		if do_object(self) {
+			if object_is_visible(self) {
+				kn.add_glyph(glyph, size, linalg.floor(box_center(self.box)) - size / 2, style.color.content)
 			}
 		}
 	}

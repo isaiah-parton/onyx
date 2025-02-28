@@ -6,7 +6,7 @@ push_clip :: proc(box: Box) {
 pop_clip :: proc() {
 	pop_stack(&global_state.clip_stack)
 }
-current_clip :: proc() -> Box {
+get_current_clip :: proc() -> Box {
 	if global_state.clip_stack.height > 0 {
 		return global_state.clip_stack.items[global_state.clip_stack.height - 1]
 	}

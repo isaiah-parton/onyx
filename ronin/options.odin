@@ -1,30 +1,5 @@
 package ronin
 
-Exact_Width_Or_Height :: f32
-Exact_Size :: [2]f32
-Preferred_Size_Of_Object :: struct {}
-Factor_Of_Remaining_Width :: distinct f32
-Factor_Of_Remaining_Height :: distinct f32
-Factor_Of_Remaining_Space :: distinct [2]f32
-Factor_Of_Remaining_Cut_Space :: distinct f32
-Subtract_From_Size :: distinct f32
-Account_For_Spacing :: Subtract_From_Size
-Factor_Of_Predefined_Scale :: distinct f32
-
-exactly :: Exact_Size
-whatever :: Preferred_Size_Of_Object{}
-that_of_object :: Preferred_Size_Of_Object{}
-at_most :: Size_Method.Min
-at_least :: Size_Method.Max
-with_spacing :: Account_For_Spacing
-to_scale :: Factor_Of_Predefined_Scale
-to_layout_width :: Factor_Of_Remaining_Width(1)
-to_layout_height :: Factor_Of_Remaining_Height(1)
-to_layout_size :: Factor_Of_Remaining_Space(1)
-of_layout_width :: proc(fraction: f32) -> f32 {return remaining_space().x * fraction}
-of_layout_height :: proc(fraction: f32) -> f32 {return remaining_space().y * fraction}
-of_layout_size :: proc(fraction: [2]f32) -> [2]f32 {return remaining_space() * fraction}
-
 Size_Option :: union {
 	Exact_Size,
 	Exact_Width_Or_Height,
@@ -33,7 +8,7 @@ Size_Option :: union {
 	Factor_Of_Remaining_Width,
 	Factor_Of_Remaining_Height,
 	Factor_Of_Remaining_Space,
-	Factor_Of_Remaining_Cut_Space,
+	Factor_Of_Remaining_Width_Or_Height,
 	Preferred_Size_Of_Object,
 	Subtract_From_Size,
 }
@@ -45,17 +20,37 @@ Size_Method :: enum {
 	Dont_Care,
 }
 
+Exact_Object_Size :: distinct [2]f32
+Relative_Object_Size :: distinct [2]f32
+Object_Size_Variant :: union {
+	Exact_Object_Size,
+	Relative_Object_Size,
+}
+
+Object_Metrics_Descriptor :: struct($T: typeid) {
+	cut_size: T,
+	desired_size: T,
+	compare_methods: T,
+}
+
+Object_Cut_Descriptor :: struct {
+	amount: f32,
+	method: Size_Method,
+}
+
 Options :: struct {
 	align:          [2]f32,
 	padding:        [4]f32,
 	radius:         [4]f32,
 	size:           [2]f32,
 	methods:        [2]Size_Method,
+	unlocked: [2]bool,
 	hover_to_focus: bool,
 	object_height:  int,
 }
 
 exact_size_and_method_from_options :: proc(axis: int, opts: ..Size_Option) -> (value: f32, method: Size_Method) {
+	defined_method: Maybe(Size_Method)
 	for opt in opts {
 		switch v in opt {
 		case Exact_Width_Or_Height:
@@ -69,27 +64,34 @@ exact_size_and_method_from_options :: proc(axis: int, opts: ..Size_Option) -> (v
 			method = .Fixed
 		case Factor_Of_Remaining_Width:
 			value = remaining_space().x * f32(v)
-			method = .Fixed
+			method = .Max
 		case Factor_Of_Remaining_Height:
 			value = remaining_space().y * f32(v)
-			method = .Fixed
+			method = .Max
 		case Factor_Of_Remaining_Space:
 			value = remaining_space()[axis] * f32(v[axis])
-			method = .Fixed
-		case Factor_Of_Remaining_Cut_Space:
+			method = .Max
+		case Factor_Of_Remaining_Width_Or_Height:
 			current_axis := get_current_axis()
 			value = remaining_space()[current_axis] * f32(v)
-			method = .Fixed
+			method = .Max
 		case Subtract_From_Size:
 			value -= f32(v)
 		case Size_Method:
-			method = v
+			defined_method = v
 		case Preferred_Size_Of_Object:
 			value = 0
 			method = .Max
 		}
 	}
+	if defined_method, ok := defined_method.?; ok {
+		method = defined_method
+	}
 	return
+}
+
+set_axis_locks :: proc(x, y: bool) {
+	get_current_options().unlocked = {!x, !y}
 }
 
 set_width :: proc(opts: ..Size_Option) {

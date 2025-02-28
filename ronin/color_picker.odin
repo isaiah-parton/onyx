@@ -186,7 +186,7 @@ color_picker :: proc(value: ^kn.Color, show_hex: bool = false, show_alpha: bool 
 alpha_slider :: proc(
 	value: ^f32,
 	color: kn.Color = kn.Black,
-	axis: Axis = .Y,
+	axis: int = 1,
 	loc := #caller_location,
 ) {
 	if value == nil {
@@ -195,15 +195,13 @@ alpha_slider :: proc(
 	color := color
 	object := get_object(hash(loc))
 	object.size = global_state.style.scale
-	if axis == .Y {
+	if axis == 1 {
 		object.size.xy = object.size.yx
 	}
 	if begin_object(object) {
 		defer end_object()
 
-
-
-		i := int(axis)
+		i := axis
 		j := 1 - i
 
 		if .Pressed in object.state.current {
@@ -228,7 +226,7 @@ alpha_slider :: proc(
 			color.a = 255
 			time := clamp(value^, 0, 1)
 			pos := box.lo[i] + (box.hi[i] - box.lo[i] - 4) * time
-			if axis == .Y {
+			if axis == 1 {
 				kn.add_box(
 					box,
 					paint = kn.make_linear_gradient(

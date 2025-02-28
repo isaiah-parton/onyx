@@ -1,12 +1,12 @@
 package ronin
 
-import kn "local:katana"
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
 import "core:reflect"
+import kn "local:katana"
 
 Container :: struct {
 	using object:    ^Object,
@@ -27,7 +27,11 @@ Container :: struct {
 	initialized:     bool,
 }
 
-solve_anchored_zoom_scroll :: proc(content_box, view_box: Box, old_zoom, new_zoom: f32, anchor: [2]f32) -> [2]f32 {
+solve_anchored_zoom_scroll :: proc(
+	content_box, view_box: Box,
+	old_zoom, new_zoom: f32,
+	anchor: [2]f32,
+) -> [2]f32 {
 	content_origin := content_box.lo
 	content_size := box_size(content_box)
 	view_top_left := view_box.lo
@@ -48,10 +52,10 @@ begin_container :: proc(
 	object := get_object(hash(loc))
 	if object.variant == nil {
 		object.variant = Container {
-			object   = object,
-			min_zoom = 0.1,
-			max_zoom = 1.0,
-			zoom = 1,
+			object      = object,
+			min_zoom    = 0.1,
+			max_zoom    = 1.0,
+			zoom        = 1,
 			target_zoom = 1,
 		}
 		object.state.input_mask = OBJECT_STATE_ALL
@@ -84,7 +88,12 @@ begin_container :: proc(
 	push_clip(self.box)
 
 	layout_origin := self.box.lo - self.scroll
-	begin_layout(as_column, is_dynamic, with_box({layout_origin, layout_origin + layout_size})) or_return
+	begin_layout(
+		as_column,
+		is_root,
+		is_dynamic,
+		with_box({layout_origin, layout_origin + layout_size}),
+	) or_return
 	set_width(to_layout_width)
 
 	return true
@@ -94,7 +103,10 @@ end_container :: proc() {
 	layout := get_current_layout()
 	if object, ok := get_current_object(); ok {
 		extras := &object.variant.(Container)
-		extras.space_needed = linalg.max(layout.content_size + layout.spacing_size, extras.space_needed)
+		extras.space_needed = linalg.max(
+			layout.content_size + layout.spacing_size,
+			extras.space_needed,
+		)
 
 		end_layout()
 
@@ -112,7 +124,13 @@ end_container :: proc() {
 					extras.max_zoom,
 				)
 				if new_zoom != old_zoom {
-					extras.target_scroll += solve_anchored_zoom_scroll(layout.bounds, object.box, old_zoom, new_zoom, mouse_point())
+					extras.target_scroll += solve_anchored_zoom_scroll(
+						layout.bounds,
+						object.box,
+						old_zoom,
+						new_zoom,
+						mouse_point(),
+					)
 				}
 			} else {
 				delta_scroll := global_state.mouse_scroll
@@ -138,7 +156,10 @@ end_container :: proc() {
 		target_content_size := extras.space * extras.target_zoom
 		view_size := box_size(object.box)
 
-		extras.target_scroll = linalg.max(linalg.min(extras.target_scroll, target_content_size - view_size), 0)
+		extras.target_scroll = linalg.max(
+			linalg.min(extras.target_scroll, target_content_size - view_size),
+			0,
+		)
 		delta_scroll := (extras.target_scroll - extras.scroll) * global_state.delta_time * 15
 		extras.scroll += delta_scroll
 
@@ -146,8 +167,10 @@ end_container :: proc() {
 			draw_frames(1)
 		}
 
-		enable_scroll_x := math.floor(content_size.x) > box_width(object.box) && !extras.hide_scrollbars
-		enable_scroll_y := math.floor(content_size.y) > box_height(object.box) && !extras.hide_scrollbars
+		enable_scroll_x :=
+			math.floor(content_size.x) > box_width(object.box) && !extras.hide_scrollbars
+		enable_scroll_y :=
+			math.floor(content_size.y) > box_height(object.box) && !extras.hide_scrollbars
 
 		extras.scroll_time.x = animate(extras.scroll_time.x, 0.2, enable_scroll_x)
 		extras.scroll_time.y = animate(extras.scroll_time.y, 0.2, enable_scroll_y)
@@ -170,7 +193,10 @@ end_container :: proc() {
 				box = box,
 				pos = &extras.scroll.y,
 				travel = content_size.y - box_height(object.box),
-				handle_size = max(box_height(box) * box_height(object.box) / content_size.y, global_state.style.scrollbar_thickness * 2),
+				handle_size = max(
+					box_height(box) * box_height(object.box) / content_size.y,
+					global_state.style.scrollbar_thickness * 2,
+				),
 			) {
 				extras.target_scroll.y = extras.scroll.y
 			}
@@ -188,7 +214,10 @@ end_container :: proc() {
 				box = box,
 				pos = &extras.scroll.x,
 				travel = content_size.x - box_width(object.box),
-				handle_size = max(box_width(box) * box_width(object.box) / content_size.x, global_state.style.scrollbar_thickness * 2),
+				handle_size = max(
+					box_width(box) * box_width(object.box) / content_size.x,
+					global_state.style.scrollbar_thickness * 2,
+				),
 			) {
 				extras.target_scroll.x = extras.scroll.x
 			}
@@ -199,6 +228,23 @@ end_container :: proc() {
 	}
 }
 
+@(deferred_out = __do_container)
+do_container :: proc(
+	space: Maybe([2]f32) = nil,
+	can_zoom: bool = false,
+	hide_scrollbars: bool = false,
+	loc := #caller_location,
+) -> bool {
+	return begin_container(space, can_zoom, hide_scrollbars, loc)
+}
+
+@(private)
+__do_container :: proc(ok: bool) {
+	if ok {
+		end_container()
+	}
+}
+
 scrollbar :: proc(
 	pos: ^f32,
 	travel, handle_size: f32,
@@ -206,7 +252,9 @@ scrollbar :: proc(
 	make_visible: bool = false,
 	vertical: bool = false,
 	loc := #caller_location,
-) -> (changed: bool) {
+) -> (
+	changed: bool,
+) {
 	if pos == nil {
 		return
 	}
@@ -248,7 +296,9 @@ scrollbar :: proc(
 			if .Pressed not_in object.state.previous {
 				global_state.drag_offset = handle_box.lo - mouse_point()
 			}
-			time := ((mouse_point()[i] + global_state.drag_offset[i]) - object.box.lo[i]) / handle_travel_distance
+			time :=
+				((mouse_point()[i] + global_state.drag_offset[i]) - object.box.lo[i]) /
+				handle_travel_distance
 			pos^ = travel * clamp(time, f32(0), f32(1))
 			changed = true
 		}

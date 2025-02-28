@@ -20,8 +20,8 @@ import "vendor:glfw"
 import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
 
-EMBED_DEFAULT_FONTS :: #config(ONYX_EMBED_FONTS, false)
-FONT_PATH :: #config(ONYX_FONT_PATH, "fonts")
+EMBED_DEFAULT_FONTS :: #config(RONIN_EMBED_FONTS, false)
+FONT_PATH :: #config(RONIN_FONT_PATH, "fonts")
 MAX_IDS :: 32
 MAX_LAYERS :: 100
 MAX_LAYOUTS :: 100
@@ -215,14 +215,15 @@ load_default_fonts :: proc() -> bool {
 		MONOSPACE_FONT_IMAGE,
 		MONOSPACE_FONT_JSON,
 	) or_return
-	global_state.style.header_font = kn.load_font_from_slices(
-		HEADER_FONT_IMAGE,
-		HEADER_FONT_JSON,
-	) or_return
+	// global_state.style.header_font = kn.load_font_from_slices(
+	// 	HEADER_FONT_IMAGE,
+	// 	HEADER_FONT_JSON,
+	// ) or_return
+	global_state.style.header_font = global_state.style.bold_font
 	global_state.style.icon_font = kn.load_font_from_slices(
 		ICON_FONT_IMAGE,
 		ICON_FONT_JSON,
-		true,
+		// true,
 	) or_return
 
 	kn.set_fallback_font(global_state.style.icon_font)

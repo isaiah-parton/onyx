@@ -15,10 +15,6 @@ import "core:math/ease"
 import "core:math/linalg"
 import "core:slice"
 
-// NEW IDEA
-// layers are sorted every frame
-// based on their floating order and sort method
-
 Layer_Sort_Method :: enum {
 	Back,
 	Floating,
@@ -220,6 +216,20 @@ end_layer :: proc() {
 	pop_stack(&global_state.layer_stack)
 	if layer, ok := current_layer().?; ok {
 		kn.set_draw_order(layer.index)
+	}
+}
+
+@(deferred_out=__do_layer)
+do_layer :: proc(sort_method: Layer_Sort_Method,
+	options: Layer_Options = {},
+	loc := #caller_location) -> bool {
+	return begin_layer(sort_method, options, loc)
+}
+
+@(private)
+__do_layer :: proc(ok: bool) {
+	if ok {
+		end_layer()
 	}
 }
 

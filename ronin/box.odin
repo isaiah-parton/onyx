@@ -7,12 +7,6 @@ import "core:math/linalg"
 
 Box :: kn.Box
 
-Alignment :: enum {
-	Near,
-	Middle,
-	Far,
-}
-
 Corner :: enum {
 	Top_Left,
 	Top_Right,
@@ -196,27 +190,6 @@ align_box_inside :: proc(bounds: Box, size, align: [2]f32) -> Box {
 	}
 }
 
-point_aligned_in_box :: proc(box: Box, align_h: Alignment, align_v: Alignment) -> [2]f32 {
-	point: [2]f32
-	switch align_h {
-	case .Near:
-		point.x = box.lo.x
-	case .Far:
-		point.x = box.hi.x
-	case .Middle:
-		point.x = (box.lo.x + box.hi.x) / 2
-	}
-	switch align_v {
-	case .Near:
-		point.y = box.lo.y
-	case .Far:
-		point.y = box.hi.y
-	case .Middle:
-		point.y = (box.lo.y + box.hi.y) / 2
-	}
-	return point
-}
-
 shrink_box :: proc(a: Box, amount: [2]f32) -> Box {
 	return {a.lo + amount, a.hi - amount}
 }
@@ -367,4 +340,19 @@ get_attached_box :: proc(box: Box, side: Side, size: [2]f32, offset: f32) -> Box
 		}
 	}
 	return {}
+}
+
+grow_side_of_box :: proc(box: Box, side: Side, size: [2]f32) -> Box {
+	box := box
+	switch side {
+	case .Top:
+		box.hi.y = max(box.hi.y, box.lo.y + size.y)
+	case .Bottom:
+		box.lo.y = min(box.lo.y, box.hi.y - size.y)
+	case .Left:
+		box.hi.x = max(box.hi.x, box.lo.x + size.x)
+	case .Right:
+		box.lo.x = min(box.lo.x, box.hi.x - size.x)
+	}
+	return box
 }

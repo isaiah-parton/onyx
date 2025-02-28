@@ -66,12 +66,33 @@ Input_Flag :: enum {
 
 Input_Flags :: bit_set[Input_Flag;u8]
 
+// Abstractions
+Input_Prefix :: distinct string
+Input_Placeholder :: distinct string
+Input_Format :: distinct string
+Input_Increment_Buttons :: struct {increment_by: f64}
+only_if_active :: Input_Flag.Hidden_Unless_Active
+with_multiline :: Input_Flag.Multiline
+with_hidden_content :: Input_Flag.Obfuscated
+undecorated :: Input_Flag.Undecorated
+with_hidden_content_if :: proc(condition: bool) -> Input_Property {return (with_hidden_content if condition else nil)}
+that_selects_all_when_clicked :: Input_Flag.Select_All
+with_prefix :: Input_Prefix
+with_placeholder :: Input_Placeholder
+with_format :: Input_Format
+with_increment_buttons :: Input_Increment_Buttons
+
+Input_Property :: union {
+	Input_Prefix,
+	Input_Placeholder,
+	Input_Format,
+	Input_Increment_Buttons,
+	Input_Flag,
+}
+
 input :: proc(
 	value: any,
-	format: string = "%v",
-	prefix: string = "",
-	placeholder: string = "",
-	flags: Input_Flags = {},
+	props: ..Input_Property,
 	loc := #caller_location,
 ) -> Input_Result {
 	type_info := runtime.type_info_base(type_info_of(value.id))
@@ -79,23 +100,17 @@ input :: proc(
 		return raw_input(
 			(^rawptr)(value.data)^,
 			pointer_info.elem,
-			format,
-			prefix,
-			placeholder,
-			flags,
-			loc,
+			..props,
+			loc = loc,
 		)
 	}
-	return raw_input(value.data, type_info, format, prefix, placeholder, flags, loc)
+	return raw_input(value.data, type_info, ..props, loc = loc)
 }
 
 raw_input :: proc(
 	data: rawptr,
 	type_info: ^runtime.Type_Info,
-	format: string = "%v",
-	prefix: string = "",
-	placeholder: string = "",
-	flags: Input_Flags = {},
+	props: ..Input_Property,
 	loc := #caller_location,
 ) -> (
 	result: Input_Result,
@@ -104,6 +119,25 @@ raw_input :: proc(
 		return {}
 	}
 	type_info := runtime.type_info_base(type_info)
+
+	flags: Input_Flags
+	prefix: string
+	placeholder: string
+	format: string = "%v"
+	for prop in props {
+		switch v in prop {
+		case Input_Flag:
+			flags += {v}
+		case Input_Prefix:
+			prefix = string(v)
+		case Input_Format:
+			format = string(v)
+		case Input_Placeholder:
+			placeholder = string(v)
+		case Input_Increment_Buttons:
+
+		}
+	}
 
 	style := get_current_style()
 	object := get_object(hash(loc))
@@ -326,7 +360,9 @@ raw_input :: proc(
 
 			text_origin -= object.input.offset
 			if object_is_visible(object) {
-				kn.add_box(object.box, get_current_options().radius, paint = style.color.field)
+				if .Undecorated not_in flags {
+					kn.add_box(object.box, get_current_options().radius, paint = style.color.field)
+				}
 				kn.push_scissor(kn.make_box(object.box, get_current_options().radius))
 				if len(content_string) == 0 {
 					kn.add_string(
@@ -529,11 +565,11 @@ draw_text_highlight :: proc(text: ^kn.Text, origin: [2]f32, color: kn.Color) {
 				origin +
 				text.glyphs[highlight_range.y].offset +
 				{
-					text.font.space_advance *
-					text.font_scale *
-					f32(i32(selection_range.y > line.glyph_range.y)),
-					line_height,
-				},
+						text.font.space_advance *
+						text.font_scale *
+						f32(i32(selection_range.y > line.glyph_range.y)),
+						line_height,
+					},
 			}
 			kn.add_box(snapped_box(box), paint = color)
 		}

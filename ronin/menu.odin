@@ -13,26 +13,12 @@ solve_menu_content_height :: proc(how_many_items, how_many_dividers: int) -> f32
 	return style.menu_padding * 2 * f32(how_many_dividers) + f32(how_many_items) * style.scale + f32(how_many_dividers)
 }
 
-solve_menu_box :: proc(anchor_box: Box, size: [2]f32, margin: f32, side: Side, align: Align) -> (box: Box) {
+solve_menu_box :: proc(anchor_box: Box, size: [2]f32, margin: f32, side: Side, align: f32) -> (box: Box) {
 	if int(side) > 1 {
-		switch align {
-		case .Near:
-			box.lo.x = anchor_box.lo.x
-		case .Center:
-			box.lo.x = box_center_x(anchor_box) - size.x / 2
-		case .Far:
-			box.lo.x = anchor_box.hi.x - size.x
-		}
+		box.lo.x = math.lerp(anchor_box.lo.x, anchor_box.hi.x - size.x, align)
 		box.hi.x = box.lo.x + size.x
 	} else {
-		switch align {
-		case .Near:
-			box.lo.y = anchor_box.lo.y
-		case .Center:
-			box.lo.y = box_center_y(anchor_box) - size.y / 2
-		case .Far:
-			box.lo.y = anchor_box.hi.y - size.y
-		}
+		box.lo.y = math.lerp(anchor_box.lo.y, anchor_box.hi.y - size.y, align)
 		box.hi.y = box.lo.y + size.y
 	}
 	switch side {
@@ -165,7 +151,7 @@ begin_menu_with_activator :: proc(
 		[2]f32{max(width, box_width(activator.box)), solve_menu_content_height(how_many_items, how_many_dividers)} +
 		get_current_style().menu_padding * 2
 	box :=
-		solve_menu_box(activator.box, size, get_current_style().popup_margin, side, .Near)
+		solve_menu_box(activator.box, size, get_current_style().popup_margin, side, 0)
 	if int(side) < 2 {
 		box = move_box(box, {0, -get_current_style().menu_padding})
 	}

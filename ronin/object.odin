@@ -218,7 +218,7 @@ get_object :: proc(id: Id) -> ^Object {
 object_is_visible :: proc(object: ^Object) -> bool {
 	return(
 		global_state.visible &&
-		get_clip(current_clip(), object.box) != .Full &&
+		get_clip(get_current_clip(), object.box) != .Full &&
 		(object.box.lo.x < object.box.hi.x || object.box.lo.y < object.box.hi.y) \
 	)
 }
@@ -406,7 +406,7 @@ lost_state :: proc(state: Object_State) -> Object_Status_Set {
 hover_object :: proc(object: ^Object) {
 	if object.disabled do return
 	if object.layer.index < global_state.hovered_layer_index do return
-	if !point_in_box(global_state.mouse_pos, current_clip()) do return
+	if !point_in_box(global_state.mouse_pos, get_current_clip()) do return
 	global_state.next_hovered_object = object.id
 	global_state.next_hovered_layer = object.layer.id
 	global_state.hovered_layer_index = object.layer.index
@@ -501,15 +501,11 @@ object_is_in_front_of :: proc(object: ^Object, other: ^Object) -> bool {
 	return (object.call_index > other.call_index) && (object.layer.index >= other.layer.index)
 }
 
-content_justify_causes_deference :: proc(justify: Align) -> bool {
-	return int(justify) > 0
-}
-
 add_object_state_for_next_frame :: proc(object: ^Object, state: Object_Status_Set) {
 	object.state.current += state
 }
 
-dummy :: proc(loc := #caller_location) {
+do_dummy :: proc(loc := #caller_location) {
 	object := get_object(hash(loc))
 	do_object(object)
 }

@@ -494,14 +494,27 @@ main :: proc() {
 				kn.add_box(box, paint = get_current_style().color.background)
 			}
 
+			if do_panel(with_size(300)) {
+				shrink(get_current_style().scale)
+				set_width(to_scale(10))
+				button("i'm a panel")
+				button("\ue4e7", accent = .Subtle)
+			}
+
 			// example_browser(&state)
 			set_size(to_layout_size)
 			if do_carousel() {
-				if do_page(left_to_right, split_golden) {
-					shrink(get_current_style().scale * 2)
-					h1("Ronin")
-					if button("Next \ue425").clicked {
-						pages_proceed()
+				if do_page(as_column) {
+					if do_layout(as_column, center_contents, with_box(align_box_inside(get_current_layout().box, 200, 0.5))) {
+						set_size(that_of_object)
+						set_axis_locks(false, true)
+						h1("Ronin")
+						text("while (1) {fork()};", font = get_current_style().monospace_font)
+						space()
+						set_width(to_scale(8))
+						if button("Continue\ue391").clicked {
+							pages_proceed()
+						}
 					}
 				}
 				if do_page(left_to_right, split_golden) {
@@ -519,6 +532,7 @@ main :: proc() {
 				if do_page(left_to_right) {
 					shrink(get_current_style().scale * 2)
 					foreground()
+					icon_section(&state.icon_section)
 				}
 			}
 			// for i in 0..<len(panels) {

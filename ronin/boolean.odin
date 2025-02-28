@@ -27,108 +27,94 @@ boolean :: proc(
 	type: Boolean_Type = .Checkbox,
 	loc := #caller_location,
 ) -> (result: Boolean_Result) {
-	widget := get_object(hash(loc))
-	if widget.variant == nil {
-		widget.variant = Boolean{}
+	self := get_object(hash(loc))
+	if self.variant == nil {
+		self.variant = Boolean{}
 	}
-	extras := &widget.variant.(Boolean)
+	extras := &self.variant.(Boolean)
+	style := get_current_style()
 
 	gadget_size: [2]f32
-
-	base_size := get_current_style().scale
+	base_size := style.scale * golden_ratio
 
 	switch type {
 	case .Checkbox, .Radio:
 		gadget_size = base_size
 	case .Switch:
-		gadget_size = [2]f32{1.75, 1} * base_size
+		gadget_size = [2]f32{golden_ratio, 1} * base_size
 	}
 
 	text_layout: kn.Text
 	if len(text) > 0 {
 		text_layout = kn.make_text(
 			text,
-			global_state.style.default_text_size,
-			global_state.style.default_font,
+			style.default_text_size,
+			style.default_font,
 		)
 		if int(text_side) > 1 {
-			widget.size.x = max(gadget_size.x, text_layout.size.x)
-			widget.size.y = gadget_size.x + text_layout.size.y
+			self.size.x = max(gadget_size.x, text_layout.size.x)
+			self.size.y = gadget_size.x + text_layout.size.y
 		} else {
-			widget.size.x =
+			self.size.x =
 				gadget_size.x +
 				text_layout.size.x +
-				global_state.style.text_padding.x * 2
-			widget.size.y = gadget_size.y
+				style.text_padding.x * 2
+			self.size.y = gadget_size.y
 		}
 	} else {
-		widget.size = base_size
+		self.size = base_size
 	}
 
-	widget.size_is_fixed = true
+	self.size_is_fixed = true
 
-	if do_object(widget) {
-		if .Hovered in widget.state.current {
+	if do_object(self) {
+		if .Hovered in self.state.current {
 			set_cursor(.Pointing_Hand)
 		}
-		if point_in_box(global_state.mouse_pos, widget.box) {
-			hover_object(widget)
+		if point_in_box(global_state.mouse_pos, self.box) {
+			hover_object(self)
 		}
 		extras.animation_timer = animate(extras.animation_timer, 0.2, value^)
 
-		if object_is_visible(widget) {
-			gadget_box: Box
+		if object_is_visible(self) {
+			gadget_center: [2]f32
 
 			if len(text) > 0 {
 				switch text_side {
 				case .Left:
-					gadget_box = {widget.box.lo, gadget_size}
+					gadget_center = self.box.lo + box_height(self.box) / 2
 				case .Right:
-					gadget_box = {
-						{widget.box.hi.x - gadget_size.x, widget.box.lo.y},
-						gadget_size,
-					}
+					gadget_center = self.box.hi - box_height(self.box) / 2
 				case .Top:
-					gadget_box = {
-						{
-							box_center_x(widget.box) - gadget_size.x / 2,
-							widget.box.hi.y - gadget_size.y,
-						},
-						gadget_size,
-					}
+					gadget_center = {box_center_x(self.box), self.box.lo.y + gadget_size.y / 2}
 				case .Bottom:
-					gadget_box = {
-						{box_center_x(widget.box) - gadget_size.x / 2, widget.box.lo.y},
-						gadget_size,
-					}
+					gadget_center = {box_center_x(self.box), self.box.hi.y - gadget_size.y / 2}
 				}
-				gadget_box.hi += gadget_box.lo
 			} else {
-				gadget_box = widget.box
+				gadget_center = box_center(self.box)
 			}
 
-			gadget_center := box_center(gadget_box)
+			gadget_box := Box{gadget_center - gadget_size / 2, gadget_center + gadget_size / 2}
 
-			if .Hovered in widget.state.current {
+			if .Hovered in self.state.current {
 				kn.add_box(
-					{{gadget_center.x, widget.box.lo.y}, widget.box.hi},
-					{0, global_state.style.rounding, 0, global_state.style.rounding},
-					kn.fade(get_current_style().color.button, 0.2),
+					self.box,
+					style.rounding,
+					kn.fade(style.color.button, 0.2),
 				)
 			}
 
-			opacity: f32 = 0.5 if widget.disabled else 1
+			opacity: f32 = 0.5 if self.disabled else 1
 
 			state_time := ease.quadratic_in_out(extras.animation_timer)
-			gadget_fill_color := get_current_style().color.accent
+			gadget_fill_color := style.color.accent
 			gadget_accent_color := kn.mix(0.4, gadget_fill_color, kn.Black)
 
 			switch type {
 			case .Checkbox:
-				kn.add_box(gadget_box, global_state.style.rounding, get_current_style().color.foreground)
-				kn.add_box_lines(gadget_box, 1, global_state.style.rounding, get_current_style().color.lines)
+				kn.add_box(gadget_box, style.rounding, style.color.background)
 				if state_time > 0 && state_time < 1 {
-					kn.push_scissor(kn.make_box(widget.box, global_state.style.rounding))
+					kn.push_scissor(kn.make_box(gadget_box, style.rounding))
 				}
 				if state_time > 0 {
 					gadget_center += {
@@ -136,30 +122,31 @@ boolean :: proc(
 						box_height(gadget_box) *
 						((1 - state_time) if value^ else -(1 - state_time)),
 					}
-					kn.add_check(gadget_center, gadget_size.y / 4, 1, get_current_style().color.content)
+					kn.add_check(gadget_center, gadget_size.y / 4, style.line_width, style.color.content)
 				}
 				if state_time > 0 && state_time < 1 {
 					kn.pop_scissor()
 				}
+				kn.add_box_lines(gadget_box, style.line_width, style.rounding, style.color.lines)
 			case .Radio:
 				gadget_center := box_center(gadget_box)
 				radius := gadget_size.y / 2
 				kn.add_circle(
 					gadget_center,
 					radius,
-					get_current_style().color.foreground,
+					style.color.foreground,
 				)
 				kn.add_circle_lines(
 					gadget_center,
 					radius,
-					1,
-					get_current_style().color.lines,
+					style.line_width,
+					style.color.lines,
 				)
 				if state_time > 0 {
 					kn.add_circle(
 						gadget_center,
 						(radius - 5) * state_time,
-						kn.fade(get_current_style().color.content, state_time),
+						kn.fade(style.color.content, state_time),
 					)
 				}
 			case .Switch:
@@ -172,12 +159,12 @@ boolean :: proc(
 					(box_width(inner_box) - box_height(inner_box)) * state_time,
 					box_center_y(inner_box),
 				}
-				kn.add_box(gadget_box, paint = get_current_style().color.button_background, radius = outer_radius)
-				kn.add_box_lines(gadget_box, 1, paint = get_current_style().color.lines, radius = outer_radius)
+				kn.add_box(gadget_box, paint = style.color.button_background, radius = outer_radius)
+				kn.add_box_lines(gadget_box, style.line_width, paint = style.color.lines, radius = outer_radius)
 				kn.add_circle(
 					lever_center,
 					inner_radius,
-					kn.mix(state_time, get_current_style().color.button, get_current_style().color.content),
+					kn.mix(state_time, style.color.button, style.color.content),
 				)
 			}
 
@@ -186,28 +173,28 @@ boolean :: proc(
 				switch text_side {
 				case .Left:
 					text_pos = {
-						gadget_box.hi.x + global_state.style.text_padding.x,
-						box_center_y(widget.box),
+						gadget_box.hi.x + style.text_padding.x,
+						box_center_y(self.box),
 					}
 				case .Right:
 					text_pos = {
-						gadget_box.lo.x - global_state.style.text_padding.x,
-						box_center_y(widget.box),
+						gadget_box.lo.x - style.text_padding.x,
+						box_center_y(self.box),
 					}
 				case .Top:
-					text_pos = widget.box.lo
+					text_pos = self.box.lo
 				case .Bottom:
-					text_pos = {widget.box.lo.x, widget.box.hi.y}
+					text_pos = {self.box.lo.x, self.box.hi.y}
 				}
 				kn.add_text(
 					text_layout,
 					text_pos - text_layout.size * {0, 0.5},
-					paint = kn.fade(get_current_style().color.content, opacity),
+					paint = kn.fade(style.color.content, opacity),
 				)
 			}
 		}
 
-		if .Clicked in widget.state.current {
+		if .Clicked in self.state.current {
 			value^ = !value^
 			result.changed = true
 		}

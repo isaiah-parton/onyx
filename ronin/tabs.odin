@@ -65,7 +65,7 @@ tab :: proc(text: string, active: bool, loc := #caller_location) -> (clicked: bo
 // 	object.state = state
 // 	object.text_layout = kn.make_text(
 // 		text,
-// 		global_state.style.default_text_size,
+// 		style.default_text_size,
 // 		global_state.style.default_font,
 // 	)
 // 	object.size = object.text_layout.size + {20, 10}
@@ -194,8 +194,9 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 	if index == nil {
 		return
 	}
+	style := get_current_style()
 	object := get_object(hash(loc))
-	object.size = global_state.style.scale
+	object.size = {6, 2} * style.scale
 	if begin_object(object) {
 		defer end_object()
 
@@ -204,12 +205,10 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 		}
 
 		is_visible := object_is_visible(object)
-		inner_box := shrink_box(object.box, 2)
+		inner_box := shrink_box(object.box, 0)
 		if is_visible {
-			kn.add_box_lines(object.box, 1, get_current_style().rounding, get_current_style().color.button)
+			kn.add_box_lines(object.box, style.line_width, style.rounding, style.color.button)
 		}
-		option_rounding :=
-			global_state.style.rounding * ((box_height(object.box) - 4) / box_height(object.box))
 		option_size := (inner_box.hi.x - inner_box.lo.x) / f32(len(items))
 
 		for item, i in items {
@@ -227,21 +226,26 @@ option_slider :: proc(items: []string, index: ^$T, loc := #caller_location) -> (
 				}
 			}
 			if is_visible {
-				kn.add_box(
-					shrink_box(option_box, 1),
-					option_rounding,
-					paint = kn.fade(
-						get_current_style().color.button,
-						max(f32(int(hovered)) * 0.5, f32(int(index^ == T(i)))),
-					),
-				)
-				kn.set_font(get_current_style().default_font)
+				if i == int(index^) {
+					kn.add_box(
+						option_box,
+						style.rounding,
+						paint = kn.fade(style.color.accent, 0.2),
+					)
+					kn.add_box_lines(
+						option_box,
+						style.line_width,
+						style.rounding,
+						paint = style.color.accent,
+					)
+				}
+				kn.set_font(style.default_font)
 				kn.add_string(
 					item,
-					global_state.style.default_text_size,
+					style.default_text_size,
 					box_center(option_box),
 					align = 0.5,
-					paint = kn.fade(get_current_style().color.content, 1 if int(index^) == i else 0.5),
+					paint = kn.fade(style.color.content, 1 if int(index^) == i else 0.5),
 				)
 			}
 		}
