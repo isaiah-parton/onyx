@@ -1,7 +1,10 @@
 # Ronin
 My immediate-mode UI library for writing desktop apps in Odin.
-**Still a major WIP**
+
+## Major WIP
+
+![](sample.png)
 
 It uses *katana* my WGPU graphics library.
 
-**Basic docs comming soon...**
+**Basic usage sample appearing here soon...**

@@ -17,6 +17,9 @@ import "core:unicode/utf8"
 import kn "local:katana"
 import "tedit"
 
+// This is stupid
+OBFUSCATED_TEXT := "***********************************************************************************************************************************"
+
 Input_Decal :: enum {
 	None,
 	Check,
@@ -154,7 +157,12 @@ raw_input :: proc(
 			strings.builder_reset(&object.input.builder)
 			fmt.sbprintf(&object.input.builder, format, any{id = type_info.id, data = data})
 		}
-		content_string = strings.to_string(object.input.builder)
+
+		if .Obfuscated in flags {
+			content_string = OBFUSCATED_TEXT[:strings.builder_len(object.input.builder)]
+		} else {
+			content_string = strings.to_string(object.input.builder)
+		}
 
 		if object.input.editor.builder == nil {
 			tedit.make_editor(&object.input.editor, context.allocator, context.allocator)
