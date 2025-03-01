@@ -19,7 +19,7 @@ package ronin
 // Cons:
 // 	- A dozen or so bytes of overhead and a few loop cycles with a union switch statement for every object, every frame
 //
-// I could let the user handle the `*_Descriptor` data themselves, but this would seem to defeat the purpose of the abstractions
+// I could let the user handle the `*_Descriptor` data themselves, but this would seem to defeat the purpose of the abstractions.  Using a descriptor struct would also require always checking every field, while with `..Property` only properties present are processed
 
 golden_ratio :: 1.618033988749
 phi :: golden_ratio

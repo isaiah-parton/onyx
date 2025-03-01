@@ -2,6 +2,7 @@ package ronin
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:bufio"
 import "core:fmt"
 import "core:io"
 import "core:math"
@@ -16,9 +17,6 @@ import "core:unicode"
 import "core:unicode/utf8"
 import kn "local:katana"
 import "tedit"
-
-// This is stupid
-OBFUSCATED_TEXT := "***********************************************************************************************************************************"
 
 Input_Decal :: enum {
 	None,
@@ -124,7 +122,10 @@ raw_input :: proc(
 	type_info := runtime.type_info_base(type_info)
 
 	flags: Input_Flags
+
 	prefix: string
+	prefix_layout: kn.Text
+
 	placeholder: string
 	format: string = "%v"
 	for prop in props {
@@ -151,19 +152,6 @@ raw_input :: proc(
 	object.size = {6, 2} * style.scale
 
 	if do_object(object) {
-
-		content_string: string
-		if .Active not_in object.state.current {
-			strings.builder_reset(&object.input.builder)
-			fmt.sbprintf(&object.input.builder, format, any{id = type_info.id, data = data})
-		}
-
-		if .Obfuscated in flags {
-			content_string = OBFUSCATED_TEXT[:strings.builder_len(object.input.builder)]
-		} else {
-			content_string = strings.to_string(object.input.builder)
-		}
-
 		if object.input.editor.builder == nil {
 			tedit.make_editor(&object.input.editor, context.allocator, context.allocator)
 			tedit.begin(&object.input.editor, 0, &object.input.builder)
@@ -178,6 +166,44 @@ raw_input :: proc(
 		text_size := style.content_text_size
 		text_font := (style.monospace_font if (monospace) else style.default_font)
 
+		content_reader: io.Reader
+		content_string_reader: strings.Reader
+
+		strings.builder_reset(&object.input.builder)
+		fmt.sbprintf(
+			&object.input.builder,
+			format,
+			any{id = type_info.id, data = data},
+		)
+
+		if .Active in (object.state.current - object.state.previous) {
+			if .Select_All in flags {
+				tedit.editor_execute(&object.input.editor, .Select_All)
+			}
+		}
+
+		if .Obfuscated in flags {
+			strings.reader_init(&content_string_reader, strings.to_string(object.input.builder))
+			content_reader = io.Reader(io.Stream{
+				procedure = proc(data: rawptr, mode: io.Stream_Mode, p: []byte, _: i64, _: io.Seek_From) -> (n: i64, err: io.Error) {
+					if mode == .Read {
+						r := (^strings.Reader)(data)
+						nn: int
+						nn, err = strings.reader_read(r, p)
+						if len(p) > 0 {
+							p[0] = '*'
+						}
+						n = i64(min(nn, 1))
+					}
+					return
+				},
+				data = &content_string_reader
+			})
+		} else {
+			content_reader = strings.to_reader(&content_string_reader, strings.to_string(object.input.builder))
+		}
+
+
 		kn.set_font(text_font)
 
 		text_origin: [2]f32
@@ -191,7 +217,6 @@ raw_input :: proc(
 		}
 
 		content_text: kn.Selectable_Text
-		prefix_layout: kn.Text
 		if len(prefix) > 0 {
 			prefix_layout = kn.make_text(prefix, text_size)
 			text_origin.x += prefix_layout.size.x
@@ -227,8 +252,8 @@ raw_input :: proc(
 
 			if is_visible {
 				content_text = kn.make_selectable(
-					kn.make_text(
-						content_string,
+					kn.make_text_with_reader(
+						content_reader,
 						text_size,
 						selection = object.input.editor.selection,
 					),
@@ -243,18 +268,6 @@ raw_input :: proc(
 			object.input.last_mouse_index = content_text.selection.index
 
 			if .Active in object.state.current {
-				if .Active not_in object.state.previous {
-					strings.builder_reset(&object.input.builder)
-					fmt.sbprintf(
-						&object.input.builder,
-						format,
-						any{id = type_info.id, data = data},
-					)
-					if .Select_All in flags {
-						tedit.editor_execute(&object.input.editor, .Select_All)
-					}
-				}
-
 				cmd: tedit.Command
 				control_down := key_down(.Left_Control) || key_down(.Right_Control)
 				shift_down := key_down(.Left_Shift) || key_down(.Right_Shift)
@@ -336,7 +349,7 @@ raw_input :: proc(
 
 			last_selection := object.input.editor.selection
 
-			text_mouse_selection(object, content_string, &content_text)
+			text_mouse_selection(object, strings.to_string(object.input.builder), &content_text)
 
 			if .Active in object.state.previous && len(content_text.glyphs) > 0 {
 				glyph := content_text.glyphs[content_text.selection_glyphs[0]]
@@ -372,7 +385,7 @@ raw_input :: proc(
 					kn.add_box(object.box, get_current_options().radius, paint = style.color.field)
 				}
 				kn.push_scissor(kn.make_box(object.box, get_current_options().radius))
-				if len(content_string) == 0 {
+				if strings.builder_len(object.input.builder) == 0 {
 					kn.add_string(
 						placeholder,
 						text_size,
