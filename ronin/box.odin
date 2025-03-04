@@ -7,14 +7,14 @@ import "core:math/linalg"
 
 Box :: kn.Box
 
-Corner :: enum {
+Corner :: enum u8 {
 	Top_Left,
 	Top_Right,
 	Bottom_Left,
 	Bottom_Right,
 }
 
-Side :: enum {
+Side :: enum u8 {
 	Left,
 	Right,
 	Top,
@@ -25,7 +25,7 @@ Corners :: bit_set[Corner;u8]
 
 ALL_CORNERS :: Corners{.Top_Left, .Top_Right, .Bottom_Left, .Bottom_Right}
 
-Clip :: enum {
+Clip :: enum u8 {
 	None,
 	Partial,
 	Full,

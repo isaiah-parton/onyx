@@ -18,7 +18,7 @@ import "core:unicode/utf8"
 import kn "local:katana"
 import "tedit"
 
-Input_Decal :: enum {
+Input_Decal :: enum u8 {
 	None,
 	Check,
 	Spinner,
@@ -27,12 +27,12 @@ Input_Decal :: enum {
 Input_State :: struct {
 	editor:           tedit.Editor,
 	builder:          strings.Builder,
-	anchor:           int,
-	offset:           [2]f32,
-	last_mouse_index: int,
-	action_time:      time.Time,
 	match_list:       [dynamic]string,
+	offset:           [2]f32,
+	action_time:      time.Time,
 	closest_match:    string,
+	anchor:           int,
+	last_mouse_index: int,
 }
 
 input_select_all :: proc(object: ^Object) {

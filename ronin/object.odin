@@ -1,6 +1,5 @@
 package ronin
 
-import kn "local:katana"
 import "base:intrinsics"
 import "base:runtime"
 import "core:container/small_array"
@@ -12,11 +11,12 @@ import "core:mem"
 import "core:reflect"
 import "core:strings"
 import "core:time"
+import kn "local:katana"
 import "tedit"
 
 MAX_CLICK_DELAY :: time.Millisecond * 450
 
-Object_Flag :: enum {
+Object_Flag :: enum u8 {
 	Is_Input,
 	Hover_Through,
 	Sticky_Press,
@@ -26,7 +26,7 @@ Object_Flag :: enum {
 
 Object_Flags :: bit_set[Object_Flag;u8]
 
-Object_Status :: enum {
+Object_Status :: enum u8 {
 	Hovered,
 	Focused,
 	Pressed,
@@ -69,25 +69,24 @@ Object_Variant :: union {
 }
 
 Object :: struct {
+	variant:       Object_Variant,
+	input:         Input_State,
+	click:         Object_Click,
+	animation:     Object_Animation,
+	state:         Object_State,
 	box:           Box,
-	side:          Side,
-	id:            Id,
-	layer:         ^Layer,
-	call_index:    int,
-	frames:        int,
 	cut_size:      [2]f32,
 	size:          [2]f32,
+	hovered_time:  time.Time,
+	call_index:    int,
+	frames:        int,
+	id:            Id,
 	size_is_fixed: bool,
 	dead:          bool,
 	disabled:      bool,
 	isolated:      bool,
-	hovered_time: time.Time,
 	flags:         Object_Flags,
-	state:         Object_State,
-	click:         Object_Click,
-	input:         Input_State,
-	animation:     Object_Animation,
-	variant:       Object_Variant,
+	side:          Side,
 }
 
 Object_State :: struct {
@@ -123,7 +122,7 @@ clean_up_objects :: proc() {
 		if object.dead {
 			destroy_object(object)
 			delete_key(&global_state.object_map, object.id)
-			ordered_remove(&global_state.objects, index)
+			unordered_remove(&global_state.objects, index)
 			free(object)
 			draw_frames(1)
 		} else {
@@ -424,11 +423,7 @@ foreground :: proc(loc := #caller_location) {
 		object.state.input_mask = OBJECT_STATE_ALL
 		style := get_current_style()
 		draw_shadow(object.box)
-		kn.add_box(
-			object.box,
-			get_current_options().radius,
-			paint = style.color.foreground,
-		)
+		kn.add_box(object.box, get_current_options().radius, paint = style.color.foreground)
 		kn.add_box_lines(
 			object.box,
 			style.line_width,
@@ -448,11 +443,7 @@ background :: proc(loc := #caller_location) {
 		defer end_object()
 		object.state.input_mask = OBJECT_STATE_ALL
 		style := get_current_style()
-		kn.add_box(
-			object.box,
-			get_current_options().radius,
-			paint = style.color.background,
-		)
+		kn.add_box(object.box, get_current_options().radius, paint = style.color.background)
 		kn.add_box_lines(
 			object.box,
 			style.line_width,

@@ -92,7 +92,7 @@ Global_State :: struct {
 	frames_so_far:            int,
 	frames_this_second:       int,
 	id_stack:                 Stack(Id, MAX_IDS),
-	objects:                  [dynamic]^Object,
+	objects:                  [dynamic]Object,
 	object_map:               map[Id]^Object,
 	object_stack:             Stack(^Object, 128),
 	object_index:             int,
@@ -122,8 +122,8 @@ Global_State :: struct {
 	next_id:                  Maybe(Id),
 	group_stack:              Stack(Group, 32),
 	focus_next:               bool,
-	layer_array:              [dynamic]^Layer,
-	layer_map:                map[Id]^Layer,
+	layer_array:              [dynamic]Layer,
+	layer_map:                map[Id]Layer,
 	layer_stack:              Stack(^Layer, MAX_LAYERS),
 	last_layer_counts:        [Layer_Sort_Method]int,
 	layer_counts:             [Layer_Sort_Method]int,
@@ -592,9 +592,8 @@ shutdown :: proc() {
 		return
 	}
 
-	for object in global_state.objects {
-		destroy_object(object)
-		free(object)
+	for &object in global_state.objects {
+		destroy_object(&object)
 	}
 	delete(global_state.objects)
 	delete(global_state.object_map)
