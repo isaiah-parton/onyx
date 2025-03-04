@@ -139,13 +139,13 @@ input_section :: proc(state: ^Input_Section_State) {
 	shrink(10)
 	set_width(to_scale(3))
 	set_height()
-	input(state.text, placeholder = "placeholder")
+	input(state.text, with_placeholder("placeholder"))
 	space()
 	set_height(to_scale(3))
-	input(state.multiline_text, placeholder = "placeholder", flags = {.Multiline})
+	input(state.multiline_text, with_placeholder("placeholder"), with_multiline)
 	space()
 	set_height(to_scale(1))
-	input(state.number, prefix = "$")
+	input(state.number, with_prefix("$"))
 }
 
 Graph_Section_State :: struct {

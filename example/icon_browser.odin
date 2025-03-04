@@ -64,7 +64,7 @@ icon_section :: proc(state: ^Icon_Section_State) {
 			shrink(style.scale * 1)
 			set_padding(0)
 			set_width(to_scale(10))
-			if input(&state.query, placeholder = "Search for icons").changed || len(state.shown_icons) == 0 {
+			if input(&state.query, with_placeholder("Search for icons")).changed || len(state.shown_icons) == 0 {
 				lowercase_query := strings.to_lower(state.query, allocator = context.temp_allocator)
 				clear(&state.shown_icons)
 				for name, i in state.icon_names {

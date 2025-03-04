@@ -116,7 +116,7 @@ slider :: proc(
 
 		push_id(self.id)
 		set_next_box(self.box)
-		input(value, format, flags = {.Hidden_Unless_Active, .Select_All})
+		input(value, with_format(format), only_if_active, that_selects_all_when_clicked)
 		pop_id()
 	}
 	return
@@ -257,14 +257,14 @@ range_slider :: proc(
 			if was_clicked_in_place && click_index == 0 {
 				focus_next_object()
 			}
-			input(lower_value, format, flags = {.Hidden_Unless_Active, .Monospace})
+			input(lower_value, with_format(format), only_if_active)
 
 			set_next_box({{center_x, object.box.lo.y}, object.box.hi})
 			set_rounded_corners({.Top_Right, .Bottom_Right})
 			if was_clicked_in_place && click_index == 1 {
 				focus_next_object()
 			}
-			input(upper_value, format, flags = {.Hidden_Unless_Active, .Monospace})
+			input(upper_value, with_format(format), only_if_active)
 
 			pop_options()
 			pop_id()
